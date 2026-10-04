@@ -1,6 +1,5 @@
 // File Path: app/admin/roles/page.tsx
 "use client";
-
 import React, { useState, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
@@ -25,7 +24,7 @@ const ALL_PERMISSIONS = [
   { id: "coupons", label: "🏷️ کدهای تخفیف و کمپین‌ها" },
   { id: "appearance", label: "🎨 استودیوی ظاهر، هدر و فوتر" },
   { id: "pages", label: "⚡ صفحه‌ساز ماژولار" },
-  { id: "menu", label: "🧭 منوهای درختی و دسته‌بندی‌ها" },
+  { id: "menu", label: "🧭 منوهای درختی و دسته‌‌بندی‌ها" },
   { id: "banners", label: "🖼️ مدیریت بنرها و اسلایدر" },
   { id: "blog", label: "📚 مجله و مقالات سئو" },
   { id: "news", label: "📡 رادار اخبار تکنولوژی" },
@@ -43,7 +42,6 @@ export default function AdminRolesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
   const [editingId, setEditingId] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [fullName, setFullName] = useState("");
@@ -58,7 +56,7 @@ export default function AdminRolesPage() {
 
   const fetchAdmins = async () => {
     try {
-      const res = await fetch("/api/admin/users", { cache: "no-store" });
+      const res = await fetch("/api/admin/users?t=" + Date.now(), { cache: "no-store" });
       const json = await res.json();
       if (json.success && Array.isArray(json.users)) {
         setUsers(json.users);
@@ -72,20 +70,19 @@ export default function AdminRolesPage() {
 
   useEffect(() => {
     fetchAdmins();
-
     const channel = supabase
       .channel("realtime-admin-roles-users")
       .on("postgres_changes", { event: "*", schema: "public", table: "admin_users" }, () => {
         fetchAdmins();
       })
       .subscribe();
-
     return () => {
       supabase.removeChannel(channel);
     };
   }, []);
 
   const applyPresetByRole = (newRole: string) => {
+    soundEngine.playClick();
     setRole(newRole);
     if (newRole === "superadmin") {
       setSelectedPerms(ALL_PERMISSIONS.map((p) => p.id));
@@ -132,10 +129,13 @@ export default function AdminRolesPage() {
 
   const handleSaveAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedPerms.length === 0) {
+      setFeedback({ type: "error", text: "لطفاً حداقل یک دسترسی برای این نقش انتخاب نمایید." });
+      return;
+    }
     soundEngine.playClick();
     setSaving(true);
     setFeedback(null);
-
     try {
       const res = await fetch("/api/admin/users", {
         method: editingId ? "PUT" : "POST",
@@ -156,7 +156,7 @@ export default function AdminRolesPage() {
           type: "success",
           text:
             json.message ||
-            "✓ حساب مدیر ثبت شد و منوی پنل مدیریت برای این نقش به صورت خودکار محدود گردید.",
+            "✓ حساب مدیر ثبت شد و دسترسی‌های انتخاب‌شده با موفقیت در دیتابیس ذخیره گردید.",
         });
         resetForm();
         fetchAdmins();
@@ -196,10 +196,9 @@ export default function AdminRolesPage() {
             <span>🛡️</span> مدیریت نقش‌ها، زیرمجموعه‌ها و محدودسازی واقعی پنل ادمین (RBAC)
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            با انتخاب هر نقش (مدیر ارشد، کارشناس سئو، پشتیبان سفارشات، بیننده و گزارش‌‌دهنده)، پنل ادمین منحصراً به همان دسترسی‌ها محدود می‌شود
+            با انتخاب هر نقش یا تیک زدن دلخواه هر گزینه، دسترسی‌های پنل ادمین دقیقاً به همان موارد محدود می‌شود
           </p>
         </div>
-
         {editingId && (
           <button
             type="button"
@@ -235,7 +234,9 @@ export default function AdminRolesPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام کاربری (لاتین) *</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                نام کاربری (لاتین) *
+              </label>
               <input
                 type="text"
                 required
@@ -248,7 +249,9 @@ export default function AdminRolesPage() {
             </div>
 
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان / نام کامل *</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                عنوان / نام کامل *
+              </label>
               <input
                 type="text"
                 required
@@ -275,7 +278,9 @@ export default function AdminRolesPage() {
             </div>
 
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">انتخاب نقش سازمانی:</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                انتخاب نقش سازمانی (پیش‌فرض):
+              </label>
               <select
                 value={role}
                 onChange={(e) => applyPresetByRole(e.target.value)}
@@ -293,48 +298,61 @@ export default function AdminRolesPage() {
           <div className="space-y-2.5 pt-2 border-t border-[var(--card-border)]">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-black text-[var(--accent-blue)]">
-                ☑️ منوهای مجاز قابل مشاهده برای این نقش ({selectedPerms.length} از {ALL_PERMISSIONS.length}):
+                ☑️ منوهای مجاز قابل مشاهده برای این نقش ({selectedPerms.length} از{" "}
+                {ALL_PERMISSIONS.length}):
               </span>
               <div className="flex gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setSelectedPerms(ALL_PERMISSIONS.map((p) => p.id))}
-                  className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 font-bold text-[10px] cursor-pointer"
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setSelectedPerms(ALL_PERMISSIONS.map((p) => p.id));
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-500 font-bold text-[10px] cursor-pointer hover:bg-emerald-500 hover:text-white transition"
                 >
                   انتخاب همه ✓
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedPerms(["dashboard"])}
-                  className="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-400 font-bold text-[10px] cursor-pointer"
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setSelectedPerms(["dashboard"]);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-500 font-bold text-[10px] cursor-pointer hover:bg-rose-500 hover:text-white transition"
                 >
                   فقط داشبورد
                 </button>
               </div>
             </div>
 
+            {/* استفاده از دکمه مستقیم بدون تگ label جهت جلوگیری ۱۰۰٪ از باگ Double-Click */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto p-1">
               {ALL_PERMISSIONS.map((perm) => {
                 const isChecked = selectedPerms.includes(perm.id);
                 return (
-                  <label
+                  <button
                     key={perm.id}
+                    type="button"
                     onClick={() => togglePermission(perm.id)}
                     className={
-                      "p-2.5 rounded-xl border transition cursor-pointer flex items-center gap-2.5 select-text " +
+                      "w-full p-2.5 rounded-xl border transition cursor-pointer flex items-center gap-2.5 text-right select-none " +
                       (isChecked
-                        ? "bg-[var(--accent-blue)]/15 border-[var(--accent-blue)] font-black text-[var(--text-primary)]"
-                        : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)]")
+                        ? "bg-[var(--accent-blue)]/15 border-[var(--accent-blue)] font-black text-[var(--text-primary)] shadow-sm"
+                        : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:border-[var(--accent-blue)]/50")
                     }
                   >
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => {}}
-                      className="rounded accent-[var(--accent-blue)] w-4 h-4 pointer-events-none"
-                    />
+                    <span
+                      className={
+                        "w-4 h-4 rounded flex items-center justify-center border shrink-0 transition " +
+                        (isChecked
+                          ? "bg-[var(--accent-blue)] border-[var(--accent-blue)] text-white text-[10px]"
+                          : "bg-[var(--modal-bg)] border-slate-400/60")
+                      }
+                    >
+                      {isChecked ? "✓" : ""}
+                    </span>
                     <span className="truncate text-[11px]">{perm.label}</span>
-                  </label>
+                  </button>
                 );
               })}
             </div>
@@ -357,7 +375,6 @@ export default function AdminRolesPage() {
           <h2 className="font-black text-sm border-b border-[var(--card-border)] pb-3">
             لیست مدیران و زیرمجموعه‌های فعال ({users.length})
           </h2>
-
           {loading ? (
             <div className="py-12 text-center text-slate-400">در حال بارگذاری لیست مدیران...</div>
           ) : (
@@ -371,13 +388,14 @@ export default function AdminRolesPage() {
                     <div>
                       <h4 className="font-black text-sm">{u.full_name || u.username}</h4>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="font-mono text-[11px] text-[var(--accent-blue)]">@{u.username}</span>
+                        <span className="font-mono text-[11px] text-[var(--accent-blue)]">
+                          @{u.username}
+                        </span>
                         <span className="px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-400 text-[10px] font-bold">
                           {u.role}
                         </span>
                       </div>
                     </div>
-
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -395,14 +413,13 @@ export default function AdminRolesPage() {
                       </button>
                     </div>
                   </div>
-
                   <div className="flex flex-wrap gap-1 pt-1">
                     {(u.permissions || []).map((pId) => {
                       const found = ALL_PERMISSIONS.find((x) => x.id === pId);
                       return (
                         <span
                           key={pId}
-                          className="px-2 py-0.5 rounded-md bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] text-slate-300"
+                          className="px-2 py-0.5 rounded-md bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] text-slate-500 dark:text-slate-300 font-bold"
                         >
                           {pId === "all" ? "👑 دسترسی کامل به کل سایت" : found ? found.label : pId}
                         </span>

@@ -40,11 +40,16 @@ async function saveStoredPermissionsMap(map: Record<string, string[]>) {
       },
     };
 
-    if (row && row.id) {
-      await supabaseAdmin
-        .from("site_info")
-        .update({ homepage_layout_config: updatedLayout })
-        .eq("id", row.id);
+    const { data: allRows } = await supabaseAdmin.from("site_info").select("id");
+    if (allRows && allRows.length > 0) {
+      for (const r of allRows) {
+        if (r?.id) {
+          await supabaseAdmin
+            .from("site_info")
+            .update({ homepage_layout_config: updatedLayout })
+            .eq("id", r.id);
+        }
+      }
     }
   } catch {}
 }

@@ -14,7 +14,10 @@ export const dynamic = "force-dynamic";
 
 function sanitizeUserForClient(u: StoredAdminUser) {
   const { password_hash, ...safe } = u;
-  return safe;
+  return {
+    ...safe,
+    ui_theme: u.ui_theme === "light" ? "light" : "dark",
+  };
 }
 
 export async function GET(req: NextRequest) {
@@ -41,10 +44,39 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+
+    // تغییر سریع تم یک زیرمجموعه یا مدیر ارشد
+    if (body.action === "set_user_theme" && (body.id || body.username)) {
+      const targetTheme: "dark" | "light" = body.ui_theme === "light" ? "light" : "dark";
+      const users = await getAllAdminUsers();
+      const idx = users.findIndex(
+        (u) =>
+          (body.id && String(u.id) === String(body.id)) ||
+          (body.username && u.username.toLowerCase() === String(body.username).toLowerCase())
+      );
+      if (idx !== -1) {
+        users[idx] = {
+          ...users[idx],
+          ui_theme: targetTheme,
+          updated_at: new Date().toISOString(),
+        };
+        await saveAdminUsersRegistry(users);
+        return NextResponse.json({
+          success: true,
+          user: sanitizeUserForClient(users[idx]),
+          users: users.map(sanitizeUserForClient),
+          message: `✓ تم پنل برای «${users[idx].full_name || users[idx].username}» به حالت ${
+            targetTheme === "light" ? "روشن (Light)" : "تیره (Dark)"
+          } تغییر یافت.`,
+        });
+      }
+    }
+
     const rawUsername = String(body.username || "").trim();
     const fullName = String(body.full_name || rawUsername).trim();
     const password = String(body.password || "").trim();
     const role = String(body.role || "viewer_reporter").trim();
+    const uiTheme: "dark" | "light" = body.ui_theme === "light" ? "light" : "dark";
     const permissions: string[] = Array.isArray(body.permissions)
       ? body.permissions
       : ["dashboard"];
@@ -80,6 +112,7 @@ export async function POST(req: NextRequest) {
         username: rawUsername,
         full_name: fullName,
         role,
+        ui_theme: uiTheme,
         permissions: role === "superadmin" ? ["all"] : permissions,
         password_hash: password ? hashAdminPassword(password) : prev.password_hash,
         updated_at: nowIso,
@@ -91,7 +124,7 @@ export async function POST(req: NextRequest) {
         success: true,
         user: sanitizeUserForClient(updatedUser),
         users: users.map(sanitizeUserForClient),
-        message: `✓ دسترسی‌ها و اطلاعات «${fullName} (@${rawUsername})» با موفقیت بروزرسانی شد.`,
+        message: `✓ اطلاعات، دسترسی‌ها و تم پنل «${fullName} (@${rawUsername})» با موفقیت بروزرسانی شد.`,
       });
     } else {
       const newId = randomUUID();
@@ -100,6 +133,7 @@ export async function POST(req: NextRequest) {
         username: rawUsername,
         full_name: fullName,
         role,
+        ui_theme: uiTheme,
         permissions: role === "superadmin" ? ["all"] : permissions,
         password_hash: hashAdminPassword(password),
         created_at: nowIso,
@@ -109,7 +143,6 @@ export async function POST(req: NextRequest) {
       users.push(newUser);
       await saveAdminUsersRegistry(users);
 
-      // تلاش اختیاری و ایمن برای ثبت در جدول admin_users در صورتی که ستون‌های پایه وجود داشته باشند
       try {
         await supabaseAdmin
           .from("admin_users")
@@ -120,7 +153,9 @@ export async function POST(req: NextRequest) {
         success: true,
         user: sanitizeUserForClient(newUser),
         users: users.map(sanitizeUserForClient),
-        message: `✓ حساب «${fullName} (@${rawUsername})» با موفقیت ساخته شد و محدودیت‌های نقش اعمال گردید.`,
+        message: `✓ حساب «${fullName} (@${rawUsername})» با تم ${
+          uiTheme === "light" ? "روشن" : "تیره"
+        } ساخته شد.`,
       });
     }
   } catch (err: any) {

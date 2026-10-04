@@ -10,6 +10,7 @@ interface AdminUserItem {
   username: string;
   full_name: string;
   role: string;
+  ui_theme?: "dark" | "light";
   permissions: string[];
   created_at?: string;
 }
@@ -48,6 +49,7 @@ export default function AdminRolesPage() {
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("product_manager");
+  const [uiTheme, setUiTheme] = useState<"dark" | "light">("dark");
   const [selectedPerms, setSelectedPerms] = useState<string[]>([
     "dashboard",
     "products",
@@ -111,6 +113,7 @@ export default function AdminRolesPage() {
     setFullName("");
     setPassword("");
     setRole("product_manager");
+    setUiTheme("dark");
     setSelectedPerms(["dashboard", "products", "inventory", "orders"]);
   };
 
@@ -121,11 +124,36 @@ export default function AdminRolesPage() {
     setFullName(u.full_name || u.username);
     setPassword("");
     setRole(u.role || "product_manager");
+    setUiTheme(u.ui_theme === "light" ? "light" : "dark");
     if (u.role === "superadmin" || (u.permissions && u.permissions.includes("all"))) {
       setSelectedPerms(ALL_PERMISSIONS.map((p) => p.id));
     } else {
       setSelectedPerms(Array.isArray(u.permissions) ? u.permissions : ["dashboard"]);
     }
+  };
+
+  const handleQuickToggleUserTheme = async (u: AdminUserItem) => {
+    soundEngine.playClick();
+    const nextTheme: "dark" | "light" = u.ui_theme === "light" ? "dark" : "light";
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "set_user_theme",
+          id: u.id,
+          username: u.username,
+          ui_theme: nextTheme,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        setUsers(json.users || []);
+        setFeedback({ type: "success", text: json.message });
+        setTimeout(() => setFeedback(null), 3500);
+      }
+    } catch {}
   };
 
   const handleSaveAdmin = async (e: React.FormEvent) => {
@@ -147,6 +175,7 @@ export default function AdminRolesPage() {
           full_name: fullName.trim() || username.trim(),
           password: password.trim() || undefined,
           role,
+          ui_theme: uiTheme,
           permissions: selectedPerms,
         }),
       });
@@ -157,7 +186,7 @@ export default function AdminRolesPage() {
           type: "success",
           text:
             json.message ||
-            "✓ حساب مدیر ثبت شد و تفکیک امنیتی «انجام کار / فقط مشاهده» برای این نقش اعمال گردید.",
+            "✓ حساب مدیر ثبت شد و تنظیمات نقش و تم پنل با موفقیت اعمال گردید.",
         });
         resetForm();
         fetchAdmins();
@@ -194,10 +223,10 @@ export default function AdminRolesPage() {
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🛡️</span> مدیریت نقش‌ها، زیرمجموعه‌ها و فایروال سطح دسترسی (RBAC)
+            <span>🛡️</span> مدیریت نقش‌ها، زیرمجموعه‌ها، سطح دسترسی و تم پنل (RBAC)
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium leading-relaxed">
-            فقط «مدیر ارشد» اختیار تام در کل سایت دارد. سایر نقش‌ها فقط در حوزه تخصصی خودشان مجاز به ویرایش هستند و اگر بخش دیگری برایشان تیک بخورد، صرفاً به صورت «👁️ فقط مشاهده (بدون امکان دستکاری)» برایشان باز می‌شود.
+            مدیر ارشد در بالای پنل خود قابلیت تغییر آزادانه تم دارک/لایت را دارد و برای سایر نقش‌ها می‌تواند تم پنلشان را از همین بخش تعیین کند.
           </p>
         </div>
         {editingId && (
@@ -230,7 +259,7 @@ export default function AdminRolesPage() {
           className="lg:col-span-6 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4"
         >
           <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
-            {editingId ? "✏️ ویرایش زیرمجموعه و دسترسی‌ها" : "➕ افزودن زیرمجموعه مدیریتی جدید"}
+            {editingId ? "✏️ ویرایش زیرمجموعه، دسترسی‌ها و تم پنل" : "➕ افزودن زیرمجموعه مدیریتی جدید"}
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -244,7 +273,7 @@ export default function AdminRolesPage() {
                 dir="ltr"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="seo_specialist"
+                placeholder="Mis_Mardali"
                 className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none focus:border-[var(--accent-blue)]"
               />
             </div>
@@ -293,6 +322,50 @@ export default function AdminRolesPage() {
                 <option value="product_manager">📦 مدیر کاتالوگ و انبار (Product Manager)</option>
                 <option value="viewer_reporter">👁️ بیننده و گزارش‌دهنده (Viewer & Reporter)</option>
               </select>
+            </div>
+
+            {/* انتخاب تم پنل برای این نقش توسط مدیر ارشد */}
+            <div className="sm:col-span-2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+              <label className="block font-black text-[var(--accent-blue)]">
+                🎨 انتخاب تم ظاهری پنل مدیریت برای این کاربر / نقش:
+              </label>
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setUiTheme("dark");
+                  }}
+                  className={
+                    "p-3 rounded-xl border font-black flex items-center justify-center gap-2 transition cursor-pointer " +
+                    (uiTheme === "dark"
+                      ? "bg-slate-900 text-sky-400 border-sky-500 shadow-md"
+                      : "bg-[var(--modal-bg)] text-[var(--text-secondary)] border-[var(--card-border)]")
+                  }
+                >
+                  <span>🌙</span>
+                  <span>تم تیره (Dark Mode)</span>
+                  {uiTheme === "dark" && <span>✓</span>}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setUiTheme("light");
+                  }}
+                  className={
+                    "p-3 rounded-xl border font-black flex items-center justify-center gap-2 transition cursor-pointer " +
+                    (uiTheme === "light"
+                      ? "bg-white text-amber-600 border-amber-500 shadow-md"
+                      : "bg-[var(--modal-bg)] text-[var(--text-secondary)] border-[var(--card-border)]")
+                  }
+                >
+                  <span>☀️</span>
+                  <span>تم روشن (Light Mode)</span>
+                  {uiTheme === "light" && <span>✓</span>}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -383,8 +456,8 @@ export default function AdminRolesPage() {
             {saving
               ? "در حال ذخیره در دیتابیس..."
               : editingId
-              ? "💾 بروزرسانی نقش و محدودیت منوهای این مدیر"
-              : "💾 ثبت مدیر جدید و اعمال محدودیت دسترسی"}
+              ? "💾 بروزرسانی نقش، تم پنل و محدودیت منوهای این مدیر"
+              : "💾 ثبت مدیر جدید و اعمال تم و محدودیت دسترسی"}
           </button>
         </form>
 
@@ -396,71 +469,87 @@ export default function AdminRolesPage() {
             <div className="py-12 text-center text-slate-400">در حال بارگذاری لیست مدیران...</div>
           ) : (
             <div className="space-y-3">
-              {users.map((u) => (
-                <div
-                  key={u.id}
-                  className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <h4 className="font-black text-sm">{u.full_name || u.username}</h4>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="font-mono text-[11px] text-[var(--accent-blue)]">
-                          @{u.username}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-400 text-[10px] font-bold">
-                          {u.role}
-                        </span>
+              {users.map((u) => {
+                const userTheme = u.ui_theme === "light" ? "light" : "dark";
+                return (
+                  <div
+                    key={u.id}
+                    className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h4 className="font-black text-sm">{u.full_name || u.username}</h4>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <span className="font-mono text-[11px] text-[var(--accent-blue)]">
+                            @{u.username}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-400 text-[10px] font-bold">
+                            {u.role}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickToggleUserTheme(u)}
+                            className={
+                              "px-2.5 py-0.5 rounded-md text-[10px] font-black border cursor-pointer transition " +
+                              (userTheme === "light"
+                                ? "bg-amber-500/15 border-amber-500/40 text-amber-500"
+                                : "bg-slate-800 border-slate-600 text-sky-400")
+                            }
+                            title="کلیک برای تغییر فوری تم پنل این کاربر بین تیره و روشن"
+                          >
+                            {userTheme === "light" ? "☀️ تم روشن (Light)" : "🌙 تم تیره (Dark)"}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectEdit(u)}
+                          className="px-3 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold cursor-pointer"
+                        >
+                          ✏️ ویرایش دسترسی و تم
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAdmin(u.id, u.username)}
+                          className="px-2.5 py-1.5 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30 font-bold cursor-pointer"
+                        >
+                          🗑️
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSelectEdit(u)}
-                        className="px-3 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold cursor-pointer"
-                      >
-                        ✏️ ویرایش دسترسی
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteAdmin(u.id, u.username)}
-                        className="px-2.5 py-1.5 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30 font-bold cursor-pointer"
-                      >
-                        🗑️
-                      </button>
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {(u.permissions || []).map((pId) => {
+                        const found = ALL_PERMISSIONS.find((x) => x.id === pId);
+                        const isWritable = canRoleWriteModule(u.role, pId);
+                        return (
+                          <span
+                            key={pId}
+                            className="px-2 py-0.5 rounded-md bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] font-bold flex items-center gap-1"
+                          >
+                            <span>
+                              {pId === "all"
+                                ? "👑 دسترسی کامل مالک سایت"
+                                : found
+                                ? found.label
+                                : pId}
+                            </span>
+                            {pId !== "all" && u.role !== "superadmin" && (
+                              <span
+                                className={
+                                  isWritable ? "text-emerald-500" : "text-amber-500"
+                                }
+                              >
+                                ({isWritable ? "ویرایش" : "فقط مشاهده"})
+                              </span>
+                            )}
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {(u.permissions || []).map((pId) => {
-                      const found = ALL_PERMISSIONS.find((x) => x.id === pId);
-                      const isWritable = canRoleWriteModule(u.role, pId);
-                      return (
-                        <span
-                          key={pId}
-                          className="px-2 py-0.5 rounded-md bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] font-bold flex items-center gap-1"
-                        >
-                          <span>
-                            {pId === "all"
-                              ? "👑 دسترسی کامل مالک سایت"
-                              : found
-                              ? found.label
-                              : pId}
-                          </span>
-                          {pId !== "all" && u.role !== "superadmin" && (
-                            <span
-                              className={
-                                isWritable ? "text-emerald-500" : "text-amber-500"
-                              }
-                            >
-                              ({isWritable ? "ویرایش" : "فقط مشاهده"})
-                            </span>
-                          )}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

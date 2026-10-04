@@ -9,6 +9,7 @@ export interface StoredAdminUser {
   full_name: string;
   role: string;
   permissions: string[];
+  ui_theme?: "dark" | "light";
   password_hash?: string;
   created_at: string;
   updated_at?: string;
@@ -68,18 +69,17 @@ export async function getAllAdminUsers(): Promise<StoredAdminUser[]> {
 
   const mergedMap = new Map<string, StoredAdminUser>();
 
-  // ۱. افزودن مدیر ارشد پیش‌فرض در صورت خالی بودن
   const defaultSuper: StoredAdminUser = {
     id: "master-superadmin",
     username: "admin",
     full_name: "مدیر ارشد",
     role: "superadmin",
     permissions: ["all"],
+    ui_theme: "dark",
     created_at: new Date().toISOString(),
   };
   mergedMap.set("admin", defaultSuper);
 
-  // ۲. خواندن کاربران از جدول admin_users در صورت وجود
   for (const u of dbUsers) {
     const uname = String(u.username || u.email || "admin").trim().toLowerCase();
     const mappedInfo = legacyPermissionsMap[u.id] || legacyPermissionsMap[uname] || {};
@@ -95,12 +95,12 @@ export async function getAllAdminUsers(): Promise<StoredAdminUser[]> {
         : u.role === "superadmin"
         ? ["all"]
         : ["dashboard"],
+      ui_theme: mappedInfo.ui_theme === "light" ? "light" : "dark",
       password_hash: u.password_hash || u.password || mappedInfo.password_hash,
       created_at: u.created_at || new Date().toISOString(),
     });
   }
 
-  // ۳. خواندن و اولویت دادن به رجیستری کامل داخل site_info
   for (const regUser of registry) {
     if (!regUser?.username) continue;
     const uname = String(regUser.username).trim().toLowerCase();
@@ -109,6 +109,7 @@ export async function getAllAdminUsers(): Promise<StoredAdminUser[]> {
       ...(existing || {}),
       ...regUser,
       username: String(regUser.username).trim(),
+      ui_theme: regUser.ui_theme === "light" ? "light" : existing?.ui_theme || "dark",
       password_hash: regUser.password_hash || existing?.password_hash,
     });
   }
@@ -131,6 +132,7 @@ export async function saveAdminUsersRegistry(users: StoredAdminUser[]): Promise<
       full_name: u.full_name,
       role: u.role,
       permissions: u.permissions,
+      ui_theme: u.ui_theme === "light" ? "light" : "dark",
       password_hash: u.password_hash,
     };
     permissionsMap[u.id] = entry;

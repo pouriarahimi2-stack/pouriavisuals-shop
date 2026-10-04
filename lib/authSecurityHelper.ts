@@ -1,6 +1,7 @@
+// File Path: lib/authSecurityHelper.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyPayload, COOKIE_NAME, AdminSessionPayload } from "@/lib/session";
-import { adminHasPermission } from "@/lib/rbacGuard";
+import { canRoleMutateApi } from "@/lib/roleWriteFirewall";
 
 export const OTP_HMAC_SECRET =
   process.env.OTP_HMAC_SECRET ||
@@ -8,29 +9,76 @@ export const OTP_HMAC_SECRET =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   "axon_core_otp_secret_key_minimum_32_bytes";
 
+function isRoleMutationBlocked(req: NextRequest, session: AdminSessionPayload | null): boolean {
+  if (!session) return true;
+  const method = String(req.method || "GET").toUpperCase();
+  // درخواست‌های خواندن (GET) برای مشاهده بخش‌های تیک‌خورده مجاز هستند
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
+    return false;
+  }
+  const pathname = req.nextUrl?.pathname || "";
+  return !canRoleMutateApi(session.role, pathname);
+}
+
 export async function verifyAdminSession(req: NextRequest): Promise<AdminSessionPayload | null> {
   try {
-    const token = req.cookies.get(COOKIE_NAME)?.value;
+    const token =
+      req.cookies.get(COOKIE_NAME)?.value ||
+      req.cookies.get("axon_admin_session")?.value;
     if (!token) return null;
-    return await verifyPayload(token);
+    const session = await verifyPayload(token);
+    if (!session) return null;
+
+    if (isRoleMutationBlocked(req, session)) {
+      return null;
+    }
+
+    return session;
   } catch {
     return null;
   }
 }
 
-export async function requireAdmin(req: NextRequest, permission?: string) {
-  const session = await verifyAdminSession(req);
-  if (!session) {
-    return { 
-      ok: false as const, 
-      res: NextResponse.json({ success: false, message: "دسترسی غیرمجاز. ورود به سیستم الزامی است." }, { status: 401 }) 
+export async function requireAdmin(req: NextRequest, _permission?: string) {
+  try {
+    const token =
+      req.cookies.get(COOKIE_NAME)?.value ||
+      req.cookies.get("axon_admin_session")?.value;
+    const rawSession = token ? await verifyPayload(token) : null;
+
+    if (!rawSession) {
+      return {
+        ok: false as const,
+        res: NextResponse.json(
+          { success: false, message: "دسترسی غیرمجاز. ورود به سیستم الزامی است." },
+          { status: 401 }
+        ),
+      };
+    }
+
+    if (isRoleMutationBlocked(req, rawSession)) {
+      return {
+        ok: false as const,
+        res: NextResponse.json(
+          {
+            success: false,
+            readOnly: true,
+            message:
+              "⛔ بر اساس نقش سازمانی شما، دسترسی شما در این بخش «فقط مشاهده (Read-Only)» است و مجاز به ایجاد، ویرایش یا حذف اطلاعات در این قسمت نیستید.",
+          },
+          { status: 403 }
+        ),
+      };
+    }
+
+    return { ok: true as const, session: rawSession };
+  } catch {
+    return {
+      ok: false as const,
+      res: NextResponse.json(
+        { success: false, message: "خطا در بررسی نشست امنیتی." },
+        { status: 401 }
+      ),
     };
   }
-  if (permission && !adminHasPermission(session.role, permission)) {
-    return { 
-      ok: false as const, 
-      res: NextResponse.json({ success: false, message: "سطح دسترسی شما برای این عملیات کافی نیست." }, { status: 403 }) 
-    };
-  }
-  return { ok: true as const, session };
 }

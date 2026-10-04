@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
+import { canRoleWriteModule } from "@/lib/roleWriteFirewall";
 
 interface AdminUserItem {
   id: string;
@@ -24,7 +25,7 @@ const ALL_PERMISSIONS = [
   { id: "coupons", label: "🏷️ کدهای تخفیف و کمپین‌ها" },
   { id: "appearance", label: "🎨 استودیوی ظاهر، هدر و فوتر" },
   { id: "pages", label: "⚡ صفحه‌ساز ماژولار" },
-  { id: "menu", label: "🧭 منوهای درختی و دسته‌‌بندی‌ها" },
+  { id: "menu", label: "🧭 منوهای درختی و دسته‌بندی‌ها" },
   { id: "banners", label: "🖼️ مدیریت بنرها و اسلایدر" },
   { id: "blog", label: "📚 مجله و مقالات سئو" },
   { id: "news", label: "📡 رادار اخبار تکنولوژی" },
@@ -156,7 +157,7 @@ export default function AdminRolesPage() {
           type: "success",
           text:
             json.message ||
-            "✓ حساب مدیر ثبت شد و دسترسی‌های انتخاب‌شده با موفقیت در دیتابیس ذخیره گردید.",
+            "✓ حساب مدیر ثبت شد و تفکیک امنیتی «انجام کار / فقط مشاهده» برای این نقش اعمال گردید.",
         });
         resetForm();
         fetchAdmins();
@@ -193,10 +194,10 @@ export default function AdminRolesPage() {
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🛡️</span> مدیریت نقش‌ها، زیرمجموعه‌ها و محدودسازی واقعی پنل ادمین (RBAC)
+            <span>🛡️</span> مدیریت نقش‌ها، زیرمجموعه‌ها و فایروال سطح دسترسی (RBAC)
           </h1>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            با انتخاب هر نقش یا تیک زدن دلخواه هر گزینه، دسترسی‌های پنل ادمین دقیقاً به همان موارد محدود می‌شود
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium leading-relaxed">
+            فقط «مدیر ارشد» اختیار تام در کل سایت دارد. سایر نقش‌ها فقط در حوزه تخصصی خودشان مجاز به ویرایش هستند و اگر بخش دیگری برایشان تیک بخورد، صرفاً به صورت «👁️ فقط مشاهده (بدون امکان دستکاری)» برایشان باز می‌شود.
           </p>
         </div>
         {editingId && (
@@ -279,7 +280,7 @@ export default function AdminRolesPage() {
 
             <div>
               <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                انتخاب نقش سازمانی (پیش‌فرض):
+                انتخاب نقش سازمانی:
               </label>
               <select
                 value={role}
@@ -325,33 +326,49 @@ export default function AdminRolesPage() {
               </div>
             </div>
 
-            {/* استفاده از دکمه مستقیم بدون تگ label جهت جلوگیری ۱۰۰٪ از باگ Double-Click */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto p-1">
               {ALL_PERMISSIONS.map((perm) => {
                 const isChecked = selectedPerms.includes(perm.id);
+                const canWriteThisModule = canRoleWriteModule(role, perm.id);
+
                 return (
                   <button
                     key={perm.id}
                     type="button"
                     onClick={() => togglePermission(perm.id)}
                     className={
-                      "w-full p-2.5 rounded-xl border transition cursor-pointer flex items-center gap-2.5 text-right select-none " +
+                      "w-full p-2.5 rounded-xl border transition cursor-pointer flex items-center justify-between gap-2 text-right select-none " +
                       (isChecked
                         ? "bg-[var(--accent-blue)]/15 border-[var(--accent-blue)] font-black text-[var(--text-primary)] shadow-sm"
                         : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:border-[var(--accent-blue)]/50")
                     }
                   >
-                    <span
-                      className={
-                        "w-4 h-4 rounded flex items-center justify-center border shrink-0 transition " +
-                        (isChecked
-                          ? "bg-[var(--accent-blue)] border-[var(--accent-blue)] text-white text-[10px]"
-                          : "bg-[var(--modal-bg)] border-slate-400/60")
-                      }
-                    >
-                      {isChecked ? "✓" : ""}
-                    </span>
-                    <span className="truncate text-[11px]">{perm.label}</span>
+                    <div className="flex items-center gap-2 truncate">
+                      <span
+                        className={
+                          "w-4 h-4 rounded flex items-center justify-center border shrink-0 transition " +
+                          (isChecked
+                            ? "bg-[var(--accent-blue)] border-[var(--accent-blue)] text-white text-[10px]"
+                            : "bg-[var(--modal-bg)] border-slate-400/60")
+                        }
+                      >
+                        {isChecked ? "✓" : ""}
+                      </span>
+                      <span className="truncate text-[11px]">{perm.label}</span>
+                    </div>
+
+                    {isChecked && (
+                      <span
+                        className={
+                          "px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 " +
+                          (canWriteThisModule
+                            ? "bg-emerald-500/20 text-emerald-500"
+                            : "bg-amber-500/20 text-amber-500")
+                        }
+                      >
+                        {canWriteThisModule ? "✏️ انجام کار" : "👁️ فقط مشاهده"}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -416,12 +433,28 @@ export default function AdminRolesPage() {
                   <div className="flex flex-wrap gap-1 pt-1">
                     {(u.permissions || []).map((pId) => {
                       const found = ALL_PERMISSIONS.find((x) => x.id === pId);
+                      const isWritable = canRoleWriteModule(u.role, pId);
                       return (
                         <span
                           key={pId}
-                          className="px-2 py-0.5 rounded-md bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] text-slate-500 dark:text-slate-300 font-bold"
+                          className="px-2 py-0.5 rounded-md bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] font-bold flex items-center gap-1"
                         >
-                          {pId === "all" ? "👑 دسترسی کامل به کل سایت" : found ? found.label : pId}
+                          <span>
+                            {pId === "all"
+                              ? "👑 دسترسی کامل مالک سایت"
+                              : found
+                              ? found.label
+                              : pId}
+                          </span>
+                          {pId !== "all" && u.role !== "superadmin" && (
+                            <span
+                              className={
+                                isWritable ? "text-emerald-500" : "text-amber-500"
+                              }
+                            >
+                              ({isWritable ? "ویرایش" : "فقط مشاهده"})
+                            </span>
+                          )}
                         </span>
                       );
                     })}

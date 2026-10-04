@@ -146,12 +146,26 @@ export default function AdminModularPages() {
     return { header: DEFAULT_GLOBAL_HEADER, footer: DEFAULT_GLOBAL_FOOTER };
   };
 
+  const CORE_DEFAULT_PAGES = [
+    { id: "core_home", slug: "home", title: "صفحه اصلی فروشگاه" },
+    { id: "core_products", slug: "products", title: "کاتالوگ محصولات" },
+    { id: "core_campaign", slug: "special-offer", title: "🎯 لندینگ‌پیج کمپین تبلیغاتی ویژه" },
+    { id: "core_about", slug: "about", title: "درباره آکسون کور" },
+    { id: "core_contact", slug: "contact", title: "تماس و پشتیبانی" },
+  ];
   const fetchPages = async () => {
     try {
       const res = await fetch("/api/pages", { cache: "no-store" });
       const json = await res.json();
       if (json.success && Array.isArray(json.pages)) {
-        setPages(json.pages);
+        const map = new Map<string, { id: string; slug: string; title: string }>();
+        CORE_DEFAULT_PAGES.forEach((cp) => map.set(cp.slug, cp));
+        json.pages.forEach((dbP: any) => {
+          if (dbP?.slug) map.set(dbP.slug, { id: String(dbP.id), slug: dbP.slug, title: dbP.title || dbP.slug });
+        });
+        setPages(Array.from(map.values()));
+      } else {
+        setPages(CORE_DEFAULT_PAGES);
       }
     } catch {}
   };

@@ -7,7 +7,7 @@ import { useSiteInfo } from "@/context/SiteInfoContext";
 import AnimatedLogo from "@/components/AnimatedLogo";
 import EnamadBadge from "@/components/EnamadBadge";
 
-function firstNonEmptyStr(...vals: any[]): string {
+function resolveSafeImgUrl(...vals: any[]): string {
   for (const v of vals) {
     if (typeof v === "string" && v.trim().length > 0) {
       const clean = v.trim();
@@ -16,12 +16,6 @@ function firstNonEmptyStr(...vals: any[]): string {
       }
       return clean;
     }
-  }
-  return "";
-}
-function _unusedFirstNonEmpty(...vals: any[]): string {
-  for (const v of vals) {
-    if (typeof v === "string" && v.trim().length > 0) return v.trim();
   }
   return "";
 }
@@ -43,8 +37,7 @@ export default function Footer() {
     {};
   const footerCfg = layoutCfg?.footer || {};
 
-  // استخراج قطعی لوگوی فوتر (و در صورت خالی بودن، استفاده از لوگوی اصلی برند)
-  const footerLogoUrl = firstNonEmptyStr(
+  const footerLogoUrl = resolveSafeImgUrl(
     tbFooter.footerLogoUrl,
     persisted.footer_logo_url,
     footerCfg.footerLogoUrl,
@@ -62,69 +55,70 @@ export default function Footer() {
 
   if (footerCfg.show === false) return null;
 
-  const brandTitle = firstNonEmptyStr(
-    tbFooter.brandTitle,
-    persisted.site_name,
-    footerCfg.brandTitle,
-    info.site_name,
-    info.storeName,
-    "آکسون کور | Axon Core"
-  );
+  // اگر ادمین فیلد عنوان برند یا زیرعنوان را در استودیوی ظاهر خالی گذاشت، دقیقاً خالی بماند و متن پیش‌فرض جایگزین نشود!
+  const brandTitle =
+    tbFooter.brandTitle !== undefined
+      ? String(tbFooter.brandTitle).trim()
+      : footerCfg.brandTitle !== undefined
+      ? String(footerCfg.brandTitle).trim()
+      : "آکسون کور | Axon Core";
 
-  const brandSubtitle = firstNonEmptyStr(
-    tbFooter.brandSubtitle,
-    persisted.tagline,
-    footerCfg.brandSubtitle,
-    info.tagline,
-    "مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال"
-  );
+  const brandSubtitle =
+    tbFooter.brandSubtitle !== undefined
+      ? String(tbFooter.brandSubtitle).trim()
+      : footerCfg.brandSubtitle !== undefined
+      ? String(footerCfg.brandSubtitle).trim()
+      : "مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال";
 
-  const brandDescription = firstNonEmptyStr(
-    tbFooter.brandDescription,
-    persisted.description,
-    footerCfg.description,
-    info.description
-  );
+  const brandDescription =
+    tbFooter.brandDescription !== undefined
+      ? String(tbFooter.brandDescription).trim()
+      : String(footerCfg.description ?? info.description ?? "").trim();
 
-  const supportPhone = firstNonEmptyStr(
-    tbFooter.supportPhone,
-    persisted.phone,
-    footerCfg.supportPhone,
-    info.phone,
-    "09376110200"
-  );
+  const footerLogoWidth = Number(tbFooter.footerLogoWidth || footerCfg.footerLogoWidth || 140);
+  const footerLogoHeight = Number(tbFooter.footerLogoHeight || footerCfg.footerLogoHeight || 56);
+  const footerLogoRadius = tbFooter.footerLogoRadius || "12px";
+  const showFooterLogoBox = Boolean(tbFooter.showFooterLogoBox);
 
-  const supportEmail = firstNonEmptyStr(
-    tbFooter.supportEmail,
-    persisted.email,
-    footerCfg.supportEmail,
-    info.email,
-    "Pouriarahimi@yahoo.com"
-  );
+  const showTrustBadges =
+    tbFooter.showTrustBadges !== undefined ? Boolean(tbFooter.showTrustBadges) : true;
+  const badge1Text =
+    tbFooter.badge1Text !== undefined ? String(tbFooter.badge1Text).trim() : "ضمانت اصالت کالا";
+  const badge2Text =
+    tbFooter.badge2Text !== undefined ? String(tbFooter.badge2Text).trim() : "ارسال سریع سراسری";
 
-  const warehouseAddress = firstNonEmptyStr(
-    tbFooter.warehouseAddress,
-    persisted.address,
-    footerCfg.warehouseAddress,
-    info.address,
-    "شیراز - ستارخان"
-  );
+  const quickLinksTitle =
+    tbFooter.quickLinksTitle !== undefined ? String(tbFooter.quickLinksTitle).trim() : "دسترسی سریع";
+  const supportTitle =
+    tbFooter.supportTitle !== undefined
+      ? String(tbFooter.supportTitle).trim()
+      : "مرکز ارتباط و پشتیبانی";
 
-  const workingHours = firstNonEmptyStr(
-    tbFooter.workingHours,
-    persisted.working_hours,
-    footerCfg.workingHours,
-    info.working_hours,
-    "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰"
-  );
+  const supportPhone =
+    tbFooter.supportPhone !== undefined
+      ? String(tbFooter.supportPhone).trim()
+      : String(footerCfg.supportPhone || info.phone || "09376110200");
+  const supportEmail =
+    tbFooter.supportEmail !== undefined
+      ? String(tbFooter.supportEmail).trim()
+      : String(footerCfg.supportEmail || info.email || "Pouriarahimi@yahoo.com");
+  const warehouseAddress =
+    tbFooter.warehouseAddress !== undefined
+      ? String(tbFooter.warehouseAddress).trim()
+      : String(footerCfg.warehouseAddress || info.address || "شیراز - ستارخان");
+  const workingHours =
+    tbFooter.workingHours !== undefined
+      ? String(tbFooter.workingHours).trim()
+      : String(footerCfg.workingHours || info.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰");
 
-  const copyrightText = firstNonEmptyStr(
-    tbFooter.copyright,
-    persisted.footer_text,
-    footerCfg?.bottomBar?.copyrightText,
-    info.footer_text,
-    "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026"
-  );
+  const copyrightText =
+    tbFooter.copyright !== undefined
+      ? String(tbFooter.copyright).trim()
+      : String(
+          footerCfg?.bottomBar?.copyrightText ||
+            info.footer_text ||
+            "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026"
+        );
 
   const enamadEnabled =
     tbFooter.enamadEnabled !== undefined
@@ -140,8 +134,8 @@ export default function Footer() {
   const paddingMode = tbFooter.paddingMode || footerCfg.paddingMode || "normal";
 
   const quickLinks: Array<{ id?: string; title: string; url: string; show?: boolean }> =
-    Array.isArray(tbFooter.quickLinks) && tbFooter.quickLinks.length > 0
-      ? tbFooter.quickLinks.filter((l: any) => l.show !== false)
+    Array.isArray(tbFooter.quickLinks)
+      ? tbFooter.quickLinks.filter((l: any) => l.show !== false && String(l.title || "").trim() !== "")
       : [
           { id: "q1", title: "🛍️ کاتالوگ محصولات", url: "/products" },
           { id: "q2", title: "📦 پیگیری آنلاین سفارش", url: "/track-order" },
@@ -151,13 +145,17 @@ export default function Footer() {
           { id: "q6", title: "📞 تماس و پشتیبانی", url: "/contact" },
         ];
 
+  // حذف کامل لینک‌های فنی ترب (/api/torob) و نقشه سایت (/sitemap.xml) از دید مشتریان در فوتر
   const externalLinks: Array<{ id?: string; title: string; url: string; show?: boolean }> =
-    Array.isArray(tbFooter.externalLinks) && tbFooter.externalLinks.length > 0
-      ? tbFooter.externalLinks.filter((l: any) => l.show !== false)
-      : [
-          { id: "ext_torob", title: "فید رسمی محصولات در ترب (Torob)", url: "/api/torob" },
-          { id: "ext_sitemap", title: "نقشه سایت گوگل (Sitemap)", url: "/sitemap.xml" },
-        ];
+    Array.isArray(tbFooter.externalLinks)
+      ? tbFooter.externalLinks.filter(
+          (l: any) =>
+            l.show !== false &&
+            l.url !== "/api/torob" &&
+            l.url !== "/sitemap.xml" &&
+            String(l.title || "").trim() !== ""
+        )
+      : [];
 
   const columnOrder: string[] =
     Array.isArray(tbFooter.columnOrder) && tbFooter.columnOrder.length === 4
@@ -178,28 +176,47 @@ export default function Footer() {
     if (colKey === "brand") {
       return (
         <div key="col_brand" className="lg:col-span-4 space-y-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-md">
+          <div className="flex flex-wrap items-center gap-4">
+            <div
+              className={
+                showFooterLogoBox
+                  ? "p-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-md"
+                  : "flex items-center justify-center shrink-0"
+              }
+            >
               {footerLogoUrl && !logoImgFailed ? (
                 <img
                   key={footerLogoUrl}
                   src={footerLogoUrl}
-                  alt={brandTitle}
+                  alt={brandTitle || "Logo"}
                   onError={() => setLogoImgFailed(true)}
-                  className="w-11 h-11 object-contain rounded-xl"
+                  style={{
+                    width: footerLogoWidth + "px",
+                    height: footerLogoHeight + "px",
+                    borderRadius: String(footerLogoRadius),
+                    objectFit: "contain",
+                  }}
+                  className="transition-all duration-300"
                 />
               ) : (
-                <AnimatedLogo size={38} />
+                <AnimatedLogo size={Math.max(38, Math.min(80, footerLogoHeight))} />
               )}
             </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-black text-[var(--text-primary)]">
-                {brandTitle}
-              </h3>
-              <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5 leading-relaxed">
-                {brandSubtitle}
-              </p>
-            </div>
+
+            {(brandTitle || brandSubtitle) && (
+              <div className="min-w-[180px] flex-1">
+                {brandTitle && (
+                  <h3 className="text-base sm:text-lg font-black text-[var(--text-primary)]">
+                    {brandTitle}
+                  </h3>
+                )}
+                {brandSubtitle && (
+                  <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5 leading-relaxed">
+                    {brandSubtitle}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {brandDescription && (
@@ -208,16 +225,22 @@ export default function Footer() {
             </p>
           )}
 
-          <div className="grid grid-cols-2 gap-2.5 pt-1 text-[11px] font-bold">
-            <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex items-center gap-2 text-[var(--text-primary)]">
-              <span>🛡️</span>
-              <span>ضمانت اصالت کالا</span>
+          {showTrustBadges && (badge1Text || badge2Text) && (
+            <div className="grid grid-cols-2 gap-2.5 pt-1 text-[11px] font-bold">
+              {badge1Text && (
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex items-center gap-2 text-[var(--text-primary)]">
+                  <span>🛡️</span>
+                  <span>{badge1Text}</span>
+                </div>
+              )}
+              {badge2Text && (
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex items-center gap-2 text-[var(--text-primary)]">
+                  <span>🚀</span>
+                  <span>{badge2Text}</span>
+                </div>
+              )}
             </div>
-            <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex items-center gap-2 text-[var(--text-primary)]">
-              <span>🚀</span>
-              <span>ارسال سریع سراسری</span>
-            </div>
-          </div>
+          )}
         </div>
       );
     }
@@ -225,7 +248,9 @@ export default function Footer() {
     if (colKey === "quick_links") {
       return (
         <div key="col_quick" className={"lg:col-span-3 space-y-3 " + textScaleClass}>
-          <h4 className="font-black text-sm text-[var(--accent-blue)]">دسترسی سریع</h4>
+          {quickLinksTitle && (
+            <h4 className="font-black text-sm text-[var(--accent-blue)]">{quickLinksTitle}</h4>
+          )}
           <ul className="space-y-2 font-bold text-[var(--text-secondary)]">
             {quickLinks.map((q, idx) => (
               <li key={q.id || idx}>
@@ -254,34 +279,46 @@ export default function Footer() {
     if (colKey === "support") {
       return (
         <div key="col_support" className={"lg:col-span-3 space-y-3 " + textScaleClass}>
-          <h4 className="font-black text-sm text-[var(--accent-blue)]">مرکز ارتباط و پشتیبانی</h4>
+          {supportTitle && (
+            <h4 className="font-black text-sm text-[var(--accent-blue)]">{supportTitle}</h4>
+          )}
           <div className="space-y-2.5 text-[var(--text-secondary)] font-bold">
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)]">
-              <span>تلفن پشتیبانی:</span>
-              <a
-                href={"tel:" + supportPhone}
-                dir="ltr"
-                className="font-mono font-black text-[var(--accent-blue)] hover:underline"
-              >
-                {supportPhone}
-              </a>
-            </div>
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)]">
-              <span>ایمیل رسمی:</span>
-              <a
-                href={"mailto:" + supportEmail}
-                dir="ltr"
-                className="font-mono text-[11px] text-[var(--text-primary)] hover:underline truncate max-w-[160px]"
-              >
-                {supportEmail}
-              </a>
-            </div>
-            <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)] space-y-1">
-              <div className="text-[var(--text-primary)]">📍 نشانی: {warehouseAddress}</div>
-              <div className="text-[11px] text-[var(--text-secondary)]">
-                🕒 ساعات کاری: {workingHours}
+            {supportPhone && (
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)]">
+                <span>تلفن پشتیبانی:</span>
+                <a
+                  href={"tel:" + supportPhone}
+                  dir="ltr"
+                  className="font-mono font-black text-[var(--accent-blue)] hover:underline"
+                >
+                  {supportPhone}
+                </a>
               </div>
-            </div>
+            )}
+            {supportEmail && (
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)]">
+                <span>ایمیل رسمی:</span>
+                <a
+                  href={"mailto:" + supportEmail}
+                  dir="ltr"
+                  className="font-mono text-[11px] text-[var(--text-primary)] hover:underline truncate max-w-[160px]"
+                >
+                  {supportEmail}
+                </a>
+              </div>
+            )}
+            {(warehouseAddress || workingHours) && (
+              <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)] space-y-1">
+                {warehouseAddress && (
+                  <div className="text-[var(--text-primary)]">📍 نشانی: {warehouseAddress}</div>
+                )}
+                {workingHours && (
+                  <div className="text-[11px] text-[var(--text-secondary)]">
+                    🕒 ساعات کاری: {workingHours}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       );
@@ -310,6 +347,7 @@ export default function Footer() {
 
   return (
     <footer
+      style={tbFooter.bgColor ? { backgroundColor: tbFooter.bgColor } : undefined}
       className="mt-16 border-t border-[var(--card-border)] bg-slate-100/90 dark:bg-[#0b0f17] text-[var(--text-primary)] font-sans select-text pb-24 lg:pb-10 transition-colors duration-300"
       dir="rtl"
     >
@@ -318,12 +356,14 @@ export default function Footer() {
           {columnOrder.map((colKey) => renderColumn(colKey))}
         </div>
 
-        <div className="pt-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)] font-bold">
-          <p>{copyrightText}</p>
-          <span className="font-mono text-[11px] text-[var(--accent-blue)]">
-            AXON CORE SECURE E-COMMERCE
-          </span>
-        </div>
+        {copyrightText && (
+          <div className="pt-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)] font-bold">
+            <p>{copyrightText}</p>
+            <span className="font-mono text-[11px] text-[var(--accent-blue)]">
+              AXON CORE SECURE E-COMMERCE
+            </span>
+          </div>
+        )}
       </div>
     </footer>
   );

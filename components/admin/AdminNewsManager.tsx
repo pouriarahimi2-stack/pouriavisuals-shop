@@ -92,6 +92,26 @@ export default function AdminNewsManager() {
     setTags("تکنولوژی, سخت افزار, گجت هوشمند");
   };
 
+  const handleUpgradeAllShortNews = async () => {
+    soundEngine.playClick();
+    setSyncing(true);
+    setStatusMsg(null);
+    try {
+      const res = await fetch("/api/news/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "upgrade_all_short_news" }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        soundEngine.playSuccess();
+        setStatusMsg({ type: "success", text: json.message });
+        await fetchNews();
+      }
+    } finally {
+      setSyncing(false);
+    }
+  };
   const handleTriggerAutonomousSync = async () => {
     soundEngine.playClick();
     setSyncing(true);
@@ -198,7 +218,15 @@ export default function AdminNewsManager() {
             className="flex-1 sm:flex-initial justify-center px-4 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition cursor-pointer shadow-lg disabled:opacity-50 flex items-center gap-1.5"
           >
             <span>🤖</span>
-            <span>{syncing ? "در حال دریافت و ترجمه..." : "پایش و ترجمه فوری اخبار جهان"}</span>
+            <span>{syncing ? "در حال پردازش..." : "🤖 تولید خبر تحلیلی عمیق جدید"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleUpgradeAllShortNews}
+            disabled={syncing}
+            className="flex-1 sm:flex-initial justify-center px-4 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs transition cursor-pointer shadow-lg disabled:opacity-50"
+          >
+            ⚡ ارتقای اخبار کوتاه فعلی به مقالات جامع سئو
           </button>
           <button
             type="button"

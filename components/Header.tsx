@@ -23,12 +23,6 @@ function firstNonEmptyStr(...vals: any[]): string {
   }
   return "";
 }
-function _unusedFirstNonEmpty(...vals: any[]): string {
-  for (const v of vals) {
-    if (typeof v === "string" && v.trim().length > 0) return v.trim();
-  }
-  return "";
-}
 
 export default function Header() {
   const pathname = usePathname() || "/";
@@ -53,7 +47,6 @@ export default function Header() {
   const [copiedCoupon, setCopiedCoupon] = useState(false);
   const [currentDevice, setCurrentDevice] = useState<"mobile" | "tablet" | "desktop">("desktop");
 
-  // استخراج قطعی آدرس لوگوی هدر بدون تله رشته خالی عملگر ??
   const logoSrc = firstNonEmptyStr(
     themeHeader.logoUrl,
     persisted.logo_url,
@@ -94,7 +87,6 @@ export default function Header() {
     detectViewportDevice();
     window.addEventListener("resize", detectViewportDevice, { passive: true });
 
-    // ثبت بازدید دستگاه یک بار در هر نشست
     if (!sessionStorage.getItem("axon_device_tracked")) {
       sessionStorage.setItem("axon_device_tracked", "1");
       const w = window.innerWidth;
@@ -178,19 +170,24 @@ export default function Header() {
 
   const variantMode = themeHeader.variant || headerCfg.variant || "capsule";
   const isCapsule = variantMode !== "full-width";
-  const brandName = firstNonEmptyStr(
-    themeHeader.brandName,
-    persisted.site_name,
-    headerCfg?.brand?.name,
-    siteInfo?.site_name,
-    "آکسون کور | Axon Core"
-  );
 
-  const logoWidth = Number(themeHeader.logoWidth || headerCfg?.brand?.logoWidth || 38);
-  const logoHeight = Number(themeHeader.logoHeight || headerCfg?.brand?.logoHeight || 38);
+  // اگر ادمین نام برند در هدر را خالی گذاشت، خالی بماند تا فقط لوگو نمایش داده شود
+  const brandName =
+    themeHeader.brandName !== undefined
+      ? String(themeHeader.brandName).trim()
+      : firstNonEmptyStr(
+          persisted.site_name,
+          headerCfg?.brand?.name,
+          siteInfo?.site_name,
+          "آکسون کور | Axon Core"
+        );
+
+  const menuFontSize = Number(themeHeader.menuFontSize || headerCfg?.menu?.fontSize || 12);
+  const logoWidth = Number(themeHeader.logoWidth || headerCfg?.brand?.logoWidth || 44);
+  const logoHeight = Number(themeHeader.logoHeight || headerCfg?.brand?.logoHeight || 44);
   const logoRadius = themeHeader.logoRadius || "12px";
   const logoFit = themeHeader.logoObjectFit || "contain";
-  const baseHeight = Number(themeHeader.height || headerCfg.height || 60);
+  const baseHeight = Number(themeHeader.height || headerCfg.height || 64);
 
   const navMenuFromDb = siteInfo?.navigation_menu || layoutCfg?.navigation_menu;
   const menuItems =
@@ -219,7 +216,6 @@ export default function Header() {
   return (
     <>
       <div className="fixed top-0 inset-x-0 z-40 flex flex-col items-center pointer-events-none" dir="rtl">
-        {/* ۱. نوار اعلان سراسری بالای سایت */}
         {showAnnouncement && (
           <div
             style={{
@@ -240,7 +236,6 @@ export default function Header() {
           </div>
         )}
 
-        {/* ۲. نوار آفر هوشمند اختصاصی هر دستگاه (موبایل / تبلت / دسکتاپ) */}
         {showDeviceOffer && (
           <div
             style={{
@@ -287,7 +282,6 @@ export default function Header() {
           </div>
         )}
 
-        {/* ۳. هدر اصلی سایت */}
         <header
           data-axon-header="main"
           className="w-full px-3 sm:px-6 pt-2.5 pointer-events-auto transition-all duration-300"
@@ -316,7 +310,7 @@ export default function Header() {
                   <img
                     key={logoSrc}
                     src={logoSrc}
-                    alt={brandName}
+                    alt={brandName || "Logo"}
                     onError={() => setLogoError(true)}
                     style={{
                       width: logoWidth + "px",
@@ -328,11 +322,16 @@ export default function Header() {
                 ) : (
                   <AnimatedLogo size={36} />
                 )}
-                <span className="font-black whitespace-nowrap hidden sm:inline">{brandName}</span>
+                {brandName ? (
+                  <span className="font-black whitespace-nowrap hidden sm:inline">{brandName}</span>
+                ) : null}
               </Link>
 
               {headerCfg.menu?.show !== false && (
-                <nav className="hidden md:flex items-center gap-5 lg:gap-6 text-xs font-bold text-[var(--text-secondary)]">
+                <nav
+                  style={{ fontSize: menuFontSize + "px" }}
+                  className="hidden md:flex items-center gap-5 lg:gap-6 font-bold text-[var(--text-secondary)]"
+                >
                   {menuItems.map((item: any) => {
                     const isActive = pathname === item.url;
                     const hasSub = Array.isArray(item.children) && item.children.length > 0;

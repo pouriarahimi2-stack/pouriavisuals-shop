@@ -323,7 +323,7 @@ export default function AdminAiMasterSuite() {
         {[
           { id: "copilot", label: "💬 کوپایلوت بازار، تأمین‌کننده و استراتژی رشد" },
           { id: "seo", label: "📈 اتوپایلوت رشد سئو (GSC)" },
-          { id: "teardown", label: "🔬 کالبدشکافی ۳D و متالورژی" },
+          // { id: "teardown", label: "🔬 کالبدشکافی ۳D و متالورژی" }, // Hidden per admin request
           { id: "api_key", label: "🔑 تست و ذخیره امن کلیدهای AI" },
         ].map((tab) => {
           const isSelected = activeTab === tab.id;

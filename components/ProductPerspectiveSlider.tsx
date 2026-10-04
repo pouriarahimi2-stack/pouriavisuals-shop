@@ -245,7 +245,7 @@ export default function ProductPerspectiveSlider({
                       soundEngine.playExplodeShift();
                       setTeardownProduct(p);
                     }}
-                    className="absolute bottom-2 right-2 px-2.5 py-1.5 rounded-xl bg-black/75 hover:bg-blue-600 text-white font-bold text-[10px] border border-white/20 backdrop-blur-md transition flex items-center gap-1 shadow-md cursor-pointer z-10"
+                    className="hidden"
                     title="کالبدشکافی سه‌بعدی لایه‌ها"
                   >
                     <span>🧬</span>

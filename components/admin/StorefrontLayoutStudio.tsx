@@ -44,7 +44,7 @@ const DEFAULT_HOME_SECTIONS: HomeSectionConfig[] = [
     id: "sec_perspective",
     type: "NativePerspectiveSlider",
     title: "نمایشگاه تعاملی سه‌بعدی محصولات پرچمدار (ویژه موبایل)",
-    subtitle: "بررسی لایه‌به‌‌لایه و ساختار مهندسی قطعات با کنترل لمسی در موبایل",
+    subtitle: "پیمایش لمسی محصولات در موبایل",
     enabled: true,
     showOnMobile: true,
     showOnTablet: false,
@@ -63,9 +63,9 @@ const DEFAULT_HOME_SECTIONS: HomeSectionConfig[] = [
 ];
 
 const COLUMN_LABELS: Record<string, string> = {
-  brand: "۱. ستون لوگو، معرفی برند و نشانی",
+  brand: "۱. ستون لوگو و معرفی برند",
   quick_links: "۲. ستون لینک‌های دسترسی سریع",
-  support: "۳. ستون پشتیبانی و لینک‌های رسمی",
+  support: "۳. ستون پشتیبانی و اطلاعات تماس",
   enamad: "۴. ستون نشان رسمی اینماد",
 };
 
@@ -83,7 +83,6 @@ export default function StorefrontLayoutStudio({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [uploadTarget, setUploadTarget] = useState<"logo" | "favicon" | "footerLogo" | null>(null);
 
-  // رادار آمار بازدید دستگاه‌ها
   const [deviceStats, setDeviceStats] = useState({
     mobile: { sharePercent: 72, orders: 0 },
     tablet: { sharePercent: 6, orders: 0 },
@@ -93,30 +92,39 @@ export default function StorefrontLayoutStudio({
   // ۱. استیت‌های هدر، فاوآیکون و نوار اعلان
   const [brandName, setBrandName] = useState("آکسون کور | Axon Core");
   const [logoUrl, setLogoUrl] = useState("");
-  const [logoWidth, setLogoWidth] = useState<number>(38);
-  const [logoHeight, setLogoHeight] = useState<number>(38);
+  const [logoWidth, setLogoWidth] = useState<number>(44);
+  const [logoHeight, setLogoHeight] = useState<number>(44);
   const [logoRadius, setLogoRadius] = useState<string>("12px");
   const [logoObjectFit, setLogoObjectFit] = useState<"contain" | "cover">("contain");
   const [faviconUrl, setFaviconUrl] = useState("/favicon.ico");
   const [headerVariant, setHeaderVariant] = useState<"capsule" | "full-width">("capsule");
-  const [headerHeight, setHeaderHeight] = useState<number>(60);
+  const [headerHeight, setHeaderHeight] = useState<number>(64);
+  const [menuFontSize, setMenuFontSize] = useState<number>(12);
   const [announcementText, setAnnouncementText] = useState("ارسال سریع سفارش‌ها به سراسر کشور 🚀");
   const [announcementEnabled, setAnnouncementEnabled] = useState(false);
   const [ctaText, setCtaText] = useState("کاتالوگ محصولات");
   const [ctaUrl, setCtaUrl] = useState("/products");
   const [headerBg, setHeaderBg] = useState("");
 
-  // آفرهای هوشمند به تفکیک دستگاه (موبایل / تبلت / دسکتاپ)
   const [deviceOffers, setDeviceOffers] =
     useState<Record<"mobile" | "tablet" | "desktop", DeviceSmartOffer>>(DEFAULT_DEVICE_OFFERS);
 
-  // ۲. استیت‌های فوتر و اینماد
+  // ۲. استیت‌های کامل فوتر و ابعاد لوگوی فوتر
   const [footerLogoUrl, setFooterLogoUrl] = useState("");
-  const [footerTitle, setFooterTitle] = useState("آکسون کور | Axon Core");
+  const [footerLogoWidth, setFooterLogoWidth] = useState<number>(140);
+  const [footerLogoHeight, setFooterLogoHeight] = useState<number>(56);
+  const [footerLogoRadius, setFooterLogoRadius] = useState<string>("12px");
+  const [showFooterLogoBox, setShowFooterLogoBox] = useState<boolean>(false);
+  const [footerTitle, setFooterTitle] = useState("");
   const [footerSubtitle, setFooterSubtitle] = useState(
     "مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال"
   );
   const [footerDesc, setFooterDesc] = useState("");
+  const [showTrustBadges, setShowTrustBadges] = useState<boolean>(true);
+  const [badge1Text, setBadge1Text] = useState("ضمانت اصالت کالا");
+  const [badge2Text, setBadge2Text] = useState("ارسال سریع سراسری");
+  const [quickLinksTitle, setQuickLinksTitle] = useState("دسترسی سریع");
+  const [supportTitle, setSupportTitle] = useState("مرکز ارتباط و پشتیبانی");
   const [footerScale, setFooterScale] = useState<"compact" | "normal" | "large">("normal");
   const [footerPadding, setFooterPadding] = useState<"compact" | "normal" | "relaxed">("normal");
   const [footerBgColor, setFooterBgColor] = useState("");
@@ -145,13 +153,10 @@ export default function StorefrontLayoutStudio({
     { id: "q3", title: "📚 مجله تخصصی و راهنمای خرید", url: "/blog", show: true },
     { id: "q4", title: "📦 پیگیری لحظه‌ای سفارشات", url: "/track-order", show: true },
   ]);
+  const [newQuickTitle, setNewQuickTitle] = useState("");
+  const [newQuickUrl, setNewQuickUrl] = useState("");
 
-  const [externalLinks, setExternalLinks] = useState<FooterLinkItem[]>([
-    { id: "ext_torob", title: "فید رسمی محصولات در ترب (Torob)", url: "/api/torob", show: true },
-    { id: "ext_sitemap", title: "نقشه سایت گوگل (Sitemap)", url: "/sitemap.xml", show: true },
-  ]);
-
-  // ۳. استیت‌های ابعاد بنر و چینش ریسپانسیو سکشن‌ها
+  // ۳. استیت‌های ابعاد بنر و سکشن‌ها
   const [sections, setSections] = useState<HomeSectionConfig[]>(DEFAULT_HOME_SECTIONS);
   const [bannerMobileHeight, setBannerMobileHeight] = useState<number>(160);
   const [bannerTabletHeight, setBannerTabletHeight] = useState<number>(250);
@@ -185,53 +190,59 @@ export default function StorefrontLayoutStudio({
 
       if (cfg.globalHeader) {
         const gh = cfg.globalHeader;
-        if (gh.brandName !== undefined) setBrandName(gh.brandName);
-        if (gh.logoUrl !== undefined) setLogoUrl(gh.logoUrl);
+        if (gh.brandName !== undefined) setBrandName(String(gh.brandName));
+        if (gh.logoUrl !== undefined) setLogoUrl(String(gh.logoUrl));
         if (gh.logoWidth) setLogoWidth(Number(gh.logoWidth));
         if (gh.logoHeight) setLogoHeight(Number(gh.logoHeight));
         if (gh.logoRadius) setLogoRadius(gh.logoRadius);
         if (gh.logoObjectFit) setLogoObjectFit(gh.logoObjectFit);
-        if (gh.faviconUrl !== undefined) setFaviconUrl(gh.faviconUrl);
+        if (gh.faviconUrl !== undefined) setFaviconUrl(String(gh.faviconUrl));
         if (gh.variant) setHeaderVariant(gh.variant);
         if (gh.height) setHeaderHeight(Number(gh.height));
-        if (gh.ctaText !== undefined) setCtaText(gh.ctaText);
-        if (gh.ctaUrl !== undefined) setCtaUrl(gh.ctaUrl);
-        if (gh.bgColor !== undefined) setHeaderBg(gh.bgColor);
-        if (gh.announcementText !== undefined) setAnnouncementText(gh.announcementText);
+        if (gh.menuFontSize) setMenuFontSize(Number(gh.menuFontSize));
+        if (gh.ctaText !== undefined) setCtaText(String(gh.ctaText));
+        if (gh.ctaUrl !== undefined) setCtaUrl(String(gh.ctaUrl));
+        if (gh.bgColor !== undefined) setHeaderBg(String(gh.bgColor));
+        if (gh.announcementText !== undefined) setAnnouncementText(String(gh.announcementText));
         if (gh.announcementEnabled !== undefined) {
           setAnnouncementEnabled(Boolean(gh.announcementEnabled));
         }
       }
 
       if (cfg.deviceOffers) {
-        setDeviceOffers({
-          ...DEFAULT_DEVICE_OFFERS,
-          ...cfg.deviceOffers,
-        });
+        setDeviceOffers({ ...DEFAULT_DEVICE_OFFERS, ...cfg.deviceOffers });
       }
 
       if (cfg.globalFooter) {
         const gf = cfg.globalFooter;
-        if (gf.footerLogoUrl !== undefined) setFooterLogoUrl(gf.footerLogoUrl);
-        if (gf.brandTitle !== undefined) setFooterTitle(gf.brandTitle);
-        if (gf.brandSubtitle !== undefined) setFooterSubtitle(gf.brandSubtitle);
-        if (gf.brandDescription !== undefined) setFooterDesc(gf.brandDescription);
+        if (gf.footerLogoUrl !== undefined) setFooterLogoUrl(String(gf.footerLogoUrl));
+        if (gf.footerLogoWidth) setFooterLogoWidth(Number(gf.footerLogoWidth));
+        if (gf.footerLogoHeight) setFooterLogoHeight(Number(gf.footerLogoHeight));
+        if (gf.footerLogoRadius) setFooterLogoRadius(String(gf.footerLogoRadius));
+        if (gf.showFooterLogoBox !== undefined) setShowFooterLogoBox(Boolean(gf.showFooterLogoBox));
+        if (gf.brandTitle !== undefined) setFooterTitle(String(gf.brandTitle));
+        if (gf.brandSubtitle !== undefined) setFooterSubtitle(String(gf.brandSubtitle));
+        if (gf.brandDescription !== undefined) setFooterDesc(String(gf.brandDescription));
+        if (gf.showTrustBadges !== undefined) setShowTrustBadges(Boolean(gf.showTrustBadges));
+        if (gf.badge1Text !== undefined) setBadge1Text(String(gf.badge1Text));
+        if (gf.badge2Text !== undefined) setBadge2Text(String(gf.badge2Text));
+        if (gf.quickLinksTitle !== undefined) setQuickLinksTitle(String(gf.quickLinksTitle));
+        if (gf.supportTitle !== undefined) setSupportTitle(String(gf.supportTitle));
         if (gf.scaleMode) setFooterScale(gf.scaleMode);
         if (gf.paddingMode) setFooterPadding(gf.paddingMode);
-        if (gf.bgColor !== undefined) setFooterBgColor(gf.bgColor);
+        if (gf.bgColor !== undefined) setFooterBgColor(String(gf.bgColor));
         if (Array.isArray(gf.columnOrder) && gf.columnOrder.length === 4) {
           setColumnOrder(gf.columnOrder);
         }
-        if (gf.supportPhone !== undefined) setSupportPhone(gf.supportPhone);
-        if (gf.supportEmail !== undefined) setSupportEmail(gf.supportEmail);
-        if (gf.warehouseAddress !== undefined) setWarehouseAddress(gf.warehouseAddress);
-        if (gf.workingHours !== undefined) setWorkingHours(gf.workingHours);
-        if (gf.enamadCode !== undefined) setEnamadCode(gf.enamadCode);
-        if (gf.enamadLink !== undefined) setEnamadLink(gf.enamadLink);
+        if (gf.supportPhone !== undefined) setSupportPhone(String(gf.supportPhone));
+        if (gf.supportEmail !== undefined) setSupportEmail(String(gf.supportEmail));
+        if (gf.warehouseAddress !== undefined) setWarehouseAddress(String(gf.warehouseAddress));
+        if (gf.workingHours !== undefined) setWorkingHours(String(gf.workingHours));
+        if (gf.enamadCode !== undefined) setEnamadCode(String(gf.enamadCode));
+        if (gf.enamadLink !== undefined) setEnamadLink(String(gf.enamadLink));
         if (gf.enamadEnabled !== undefined) setEnamadEnabled(Boolean(gf.enamadEnabled));
-        if (gf.copyright !== undefined) setCopyrightText(gf.copyright);
+        if (gf.copyright !== undefined) setCopyrightText(String(gf.copyright));
         if (Array.isArray(gf.quickLinks)) setQuickLinks(gf.quickLinks);
-        if (Array.isArray(gf.externalLinks)) setExternalLinks(gf.externalLinks);
       }
 
       if (cfg.bannerSizing) {
@@ -338,6 +349,17 @@ export default function StorefrontLayoutStudio({
     }));
   };
 
+  const handleAddQuickLink = () => {
+    if (!newQuickTitle.trim() || !newQuickUrl.trim()) return;
+    soundEngine.playClick();
+    setQuickLinks((prev) => [
+      ...prev,
+      { id: "q_" + Date.now(), title: newQuickTitle.trim(), url: newQuickUrl.trim(), show: true },
+    ]);
+    setNewQuickTitle("");
+    setNewQuickUrl("");
+  };
+
   const persistStudioConfig = async (overrides?: {
     newLogoUrl?: string;
     newFooterLogoUrl?: string;
@@ -365,6 +387,7 @@ export default function StorefrontLayoutStudio({
         faviconUrl: effectiveFavicon.trim() || "/favicon.ico",
         variant: headerVariant,
         height: headerHeight,
+        menuFontSize,
         announcementText: announcementText.trim(),
         announcementEnabled,
         ctaText: ctaText.trim(),
@@ -373,12 +396,18 @@ export default function StorefrontLayoutStudio({
       },
       globalFooter: {
         footerLogoUrl: effectiveFooterLogo.trim(),
-        logoWidth,
-        logoHeight,
-        logoRadius,
+        footerLogoWidth,
+        footerLogoHeight,
+        footerLogoRadius,
+        showFooterLogoBox,
         brandTitle: footerTitle.trim(),
         brandSubtitle: footerSubtitle.trim(),
         brandDescription: footerDesc.trim(),
+        showTrustBadges,
+        badge1Text: badge1Text.trim(),
+        badge2Text: badge2Text.trim(),
+        quickLinksTitle: quickLinksTitle.trim(),
+        supportTitle: supportTitle.trim(),
         scaleMode: footerScale,
         paddingMode: footerPadding,
         bgColor: footerBgColor.trim(),
@@ -391,7 +420,7 @@ export default function StorefrontLayoutStudio({
         enamadLink: enamadLink.trim(),
         enamadEnabled,
         quickLinks,
-        externalLinks,
+        externalLinks: [],
         copyright: copyrightText.trim(),
       },
       bannerSizing: {
@@ -430,7 +459,7 @@ export default function StorefrontLayoutStudio({
         await refreshGlobalSiteInfo();
         setFeedback(
           json.message ||
-            "✓ تمامی تنظیمات لوگوها، هدر، فوتر و آفرهای دستگاه‌ها با موفقیت ذخیره و در لحظه روی سایت اعمال شد."
+            "✓ تمامی تنظیمات لوگوها، ابعاد، متون و لینک‌ها با موفقیت ذخیره و در لحظه روی سایت اعمال شد."
         );
       } else {
         setFeedback(json.message || "خطا در ذخیره تنظیمات.");
@@ -452,14 +481,13 @@ export default function StorefrontLayoutStudio({
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      {/* هدر اصلی استودیوی ظاهر */}
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🎨</span> مرکز فرماندهی یکپارچه ظاهر، لوگوها، هدر، فوتر و شخصی‌سازی هوشمند دستگاه‌ها
+            <span>🎨</span> مرکز فرماندهی یکپارچه ظاهر، ابعاد لوگوها، هدر، فوتر و صفحه‌ساز
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            هر تغییر به طور پیش‌فرض در همه دستگاه‌ها یکسان است، با قابلیت فعال‌سازی آفر و چیدمان اختصاصی برای موبایل، تبلت یا دسکتاپ
+            کنترل ۱۰۰٪ ابعاد لوگوی هدر و فوتر، حذف یا تغییر هر متن دلخواه، مدیریت لینک‌های فوتر و لندینگ‌پیج‌ساز
           </p>
         </div>
 
@@ -473,7 +501,6 @@ export default function StorefrontLayoutStudio({
         </button>
       </div>
 
-      {/* رادار زنده آمار بازدید و خرید به تفکیک دستگاه */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
         <div className="p-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-between">
           <div>
@@ -504,14 +531,13 @@ export default function StorefrontLayoutStudio({
         </div>
       </div>
 
-      {/* ۵ تب اصلی استودیو */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-2 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-black">
         {[
           { id: "header", label: "🧭 ۱. هدر، لوگو و آفر دستگاه‌ها" },
-          { id: "footer", label: "🏛️️ ۲. فوتر، لوگوی فوتر و اینماد" },
+          { id: "footer", label: "🏛 ۲. فوتر، سایز لوگو و لینک‌ها" },
           { id: "sections", label: "📑 ۳. چینش سکشن‌ها و ابعاد بنر" },
           { id: "menus", label: "🌳 ۴. منوها و دسته‌بندی‌ها" },
-          { id: "page_builder", label: "⚡ ۵. صفحه‌ساز ماژولار" },
+          { id: "page_builder", label: "⚡ ۵. صفحه‌ساز و لندینگ‌پیج" },
         ].map((t) => (
           <button
             key={t.id}
@@ -543,7 +569,6 @@ export default function StorefrontLayoutStudio({
 
       {(activeTab === "header" || activeTab === "footer" || activeTab === "sections") && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
-          {/* ستون تنظیمات (۷ ستون) */}
           <form
             onSubmit={handleSaveAll}
             className="lg:col-span-7 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5"
@@ -551,16 +576,19 @@ export default function StorefrontLayoutStudio({
             {activeTab === "header" && (
               <div className="space-y-5">
                 <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
-                  تنظیمات کامل هدر، لوگوی هدر، فاوآیکون، نوار اعلان و آفر اختصاصی هر دستگاه
+                  تنظیمات کامل هدر، ابعاد لوگوی هدر، سایز فونت منو، فاوآیکون و نوار اعلان
                 </h2>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام برند در هدر:</label>
+                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                      نام برند در هدر (در صورت خالی گذاشتن، فقط لوگو نمایش داده می‌شود):
+                    </label>
                     <input
                       type="text"
                       value={brandName}
                       onChange={(e) => setBrandName(e.target.value)}
+                      placeholder="خالی = عدم نمایش متن کنار لوگو"
                       className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
                     />
                   </div>
@@ -577,7 +605,6 @@ export default function StorefrontLayoutStudio({
                     </select>
                   </div>
 
-                  {/* لوگوی هدر با پیش‌نمایش زنده و ذخیره خودکار */}
                   <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
                     <div className="flex items-center justify-between">
                       <label className="font-black text-[var(--text-primary)]">تصویر لوگوی هدر:</label>
@@ -595,7 +622,7 @@ export default function StorefrontLayoutStudio({
                       )}
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="w-14 h-14 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 p-1">
+                      <div className="w-16 h-14 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 p-1">
                         {logoUrl ? (
                           <img src={logoUrl} alt="Header Logo" className="w-full h-full object-contain" />
                         ) : (
@@ -609,26 +636,25 @@ export default function StorefrontLayoutStudio({
                           value={logoUrl}
                           onChange={(e) => setLogoUrl(e.target.value)}
                           placeholder="https://..."
-                          className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[11px] outline-none"
+                          className="w-full p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[10px] outline-none"
                         />
                         <button
                           type="button"
                           onClick={() => setUploadTarget("logo")}
                           className="w-full py-2 rounded-xl bg-[var(--accent-blue)] text-white font-black cursor-pointer"
                         >
-                          ☁️ آپلود و اعمال فوری لوگوی هدر
+                          ☁️ آپلود لوگوی هدر
                         </button>
                       </div>
                     </div>
                   </div>
 
-                  {/* آیکون تب مرورگر Favicon */}
                   <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
                     <label className="block font-black text-[var(--text-primary)]">
                       آیکون تب مرورگر (Favicon):
                     </label>
                     <div className="flex items-center gap-3">
-                      <div className="w-14 h-14 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 p-2">
+                      <div className="w-16 h-14 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 p-2">
                         {faviconUrl ? (
                           <img src={faviconUrl} alt="Favicon" className="w-full h-full object-contain" />
                         ) : (
@@ -642,79 +668,92 @@ export default function StorefrontLayoutStudio({
                           value={faviconUrl}
                           onChange={(e) => setFaviconUrl(e.target.value)}
                           placeholder="/favicon.ico"
-                          className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[11px] outline-none"
+                          className="w-full p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[10px] outline-none"
                         />
                         <button
                           type="button"
                           onClick={() => setUploadTarget("favicon")}
                           className="w-full py-2 rounded-xl bg-indigo-600 text-white font-black cursor-pointer"
                         >
-                          ☁️ آپلود و اعمال فوری فاوآیکون
+                          ☁️ آپلود فاوآیکون
                         </button>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* ابعاد لوگو */}
+                {/* اسلایدرهای دقیق ابعاد لوگوی هدر و ارتفاع هدر */}
                 <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
                   <span className="font-black text-[var(--accent-blue)] block">
-                    📐 ویرایشگر دقیق ابعاد و استایل لوگو:
+                    📐 تنظیم دقیق سایز لوگوی هدر، ارتفاع هدر و سایز فونت منو:
                   </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div>
-                      <label className="block mb-1 text-[11px] font-bold text-[var(--text-secondary)]">عرض لوگو (px):</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
+                      <div className="flex justify-between font-bold text-[11px]">
+                        <span>عرض لوگوی هدر:</span>
+                        <span className="font-mono text-[var(--accent-blue)]">{logoWidth}px</span>
+                      </div>
                       <input
-                        type="number"
-                        min={20}
-                        max={180}
+                        type="range"
+                        min={24}
+                        max={220}
                         value={logoWidth}
                         onChange={(e) => setLogoWidth(Number(e.target.value))}
-                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-center"
+                        className="w-full accent-[var(--accent-blue)] cursor-pointer"
                       />
                     </div>
-                    <div>
-                      <label className="block mb-1 text-[11px] font-bold text-[var(--text-secondary)]">ارتفاع لوگو (px):</label>
+
+                    <div className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
+                      <div className="flex justify-between font-bold text-[11px]">
+                        <span>ارتفاع لوگوی هدر:</span>
+                        <span className="font-mono text-[var(--accent-blue)]">{logoHeight}px</span>
+                      </div>
                       <input
-                        type="number"
-                        min={20}
-                        max={120}
+                        type="range"
+                        min={24}
+                        max={100}
                         value={logoHeight}
                         onChange={(e) => setLogoHeight(Number(e.target.value))}
-                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-center"
+                        className="w-full accent-[var(--accent-blue)] cursor-pointer"
                       />
                     </div>
-                    <div>
-                      <label className="block mb-1 text-[11px] font-bold text-[var(--text-secondary)]">گردی کادر لوگو:</label>
-                      <select
-                        value={logoRadius}
-                        onChange={(e) => setLogoRadius(e.target.value)}
-                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
-                      >
-                        <option value="0px">مربعی (0px)</option>
-                        <option value="8px">نرم (8px)</option>
-                        <option value="12px">استاندارد (12px)</option>
-                        <option value="9999px">دایره‌ای کامل</option>
-                      </select>
+
+                    <div className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
+                      <div className="flex justify-between font-bold text-[11px]">
+                        <span>ارتفاع کل نوار هدر:</span>
+                        <span className="font-mono text-emerald-500">{headerHeight}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={50}
+                        max={110}
+                        value={headerHeight}
+                        onChange={(e) => setHeaderHeight(Number(e.target.value))}
+                        className="w-full accent-emerald-500 cursor-pointer"
+                      />
                     </div>
-                    <div>
-                      <label className="block mb-1 text-[11px] font-bold text-[var(--text-secondary)]">حالت برش تصویر:</label>
-                      <select
-                        value={logoObjectFit}
-                        onChange={(e) => setLogoObjectFit(e.target.value as any)}
-                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
-                      >
-                        <option value="contain">نمایش کامل (Contain)</option>
-                        <option value="cover">پر کردن کادر (Cover)</option>
-                      </select>
+
+                    <div className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
+                      <div className="flex justify-between font-bold text-[11px]">
+                        <span>سایز فونت منو:</span>
+                        <span className="font-mono text-indigo-400">{menuFontSize}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={11}
+                        max={18}
+                        value={menuFontSize}
+                        onChange={(e) => setMenuFontSize(Number(e.target.value))}
+                        className="w-full accent-indigo-500 cursor-pointer"
+                      />
                     </div>
                   </div>
                 </div>
 
-                {/* نوار اعلان سراسری بالای سایت */}
+                {/* نوار اعلان بالای سایت */}
                 <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
                   <label className="block font-black text-[var(--text-primary)]">
-                    📢 نوار اعلان سراسری بالای سایت (یکسان در همه دستگاه‌ها):
+                    📢 نوار اعلان سراسری بالای سایت:
                   </label>
                   <input
                     type="text"
@@ -734,7 +773,7 @@ export default function StorefrontLayoutStudio({
                   </label>
                 </div>
 
-                {/* آفر و نوار پیشنهاد اختصاصی برای کاربران هر دستگاه */}
+                {/* آفر اختصاصی هر دستگاه */}
                 <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-sky-500/40 space-y-3.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-black text-sky-400">
@@ -771,7 +810,7 @@ export default function StorefrontLayoutStudio({
                       className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
                     />
                     <span>
-                      فعال‌سازی نوار آفر اختصاصی فقط برای بازدیدکنندگان{" "}
+                      فعال‌سازی نوار آفر اختصاصی برای بازدیدکنندگان{" "}
                       {offerDeviceTab === "mobile"
                         ? "📱 موبایل"
                         : offerDeviceTab === "tablet"
@@ -785,7 +824,7 @@ export default function StorefrontLayoutStudio({
                       type="text"
                       value={activeOfferObj.badge}
                       onChange={(e) => updateOfferField(offerDeviceTab, "badge", e.target.value)}
-                      placeholder="بج (مثلاً: 📱 آفر موبایل)"
+                      placeholder="بج (📱 آفر موبایل)"
                       className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
                     />
                     <input
@@ -795,31 +834,6 @@ export default function StorefrontLayoutStudio({
                       placeholder="متن پیشنهاد ویژه..."
                       className="sm:col-span-2 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
                     />
-                    <input
-                      type="text"
-                      dir="ltr"
-                      value={activeOfferObj.couponCode}
-                      onChange={(e) =>
-                        updateOfferField(offerDeviceTab, "couponCode", e.target.value.toUpperCase())
-                      }
-                      placeholder="کد تخفیف (مثلاً MOB10)"
-                      className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold outline-none"
-                    />
-                    <input
-                      type="text"
-                      value={activeOfferObj.ctaText}
-                      onChange={(e) => updateOfferField(offerDeviceTab, "ctaText", e.target.value)}
-                      placeholder="متن لینک"
-                      className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
-                    />
-                    <input
-                      type="text"
-                      dir="ltr"
-                      value={activeOfferObj.ctaUrl}
-                      onChange={(e) => updateOfferField(offerDeviceTab, "ctaUrl", e.target.value)}
-                      placeholder="/products"
-                      className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none"
-                    />
                   </div>
                 </div>
               </div>
@@ -828,85 +842,145 @@ export default function StorefrontLayoutStudio({
             {activeTab === "footer" && (
               <div className="space-y-5">
                 <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
-                  مدیریت کامل فوتر، لوگوی اختصاصی فوتر، متن معرفی، ترتیب ستون‌ها و اینماد
+                  مدیریت کامل فوتر، سایز لوگوی فوتر، متون اختیاری، لینک‌های دسترسی سریع و اینماد
                 </h2>
 
+                {/* ۱. لوگوی فوتر و تنظیم سایز دقیق آن */}
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--accent-blue)]/40 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-[var(--accent-blue)]">
+                      🖼️ تصویر و ابعاد دقیق لوگوی فوتر (Footer Logo):
+                    </span>
+                    {footerLogoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFooterLogoUrl("");
+                          persistStudioConfig({ newFooterLogoUrl: "" });
+                        }}
+                        className="text-[10px] text-rose-500 font-bold cursor-pointer hover:underline"
+                      >
+                        حذف لوگوی فوتر ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center min-w-[140px] min-h-[70px]">
+                      {footerLogoUrl || logoUrl ? (
+                        <img
+                          src={footerLogoUrl || logoUrl}
+                          alt="Footer Logo Preview"
+                          style={{
+                            width: Math.min(200, footerLogoWidth) + "px",
+                            height: Math.min(90, footerLogoHeight) + "px",
+                            objectFit: "contain",
+                          }}
+                        />
+                      ) : (
+                        <span className="text-[10px] text-slate-400">پیش‌فرض</span>
+                      )}
+                    </div>
+                    <div className="flex-1 w-full space-y-2">
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={footerLogoUrl}
+                        onChange={(e) => setFooterLogoUrl(e.target.value)}
+                        placeholder="https://..."
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setUploadTarget("footerLogo")}
+                        className="w-full py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black cursor-pointer"
+                      >
+                        ☁️ آپلود لوگوی اختصاصی فوتر
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[var(--card-border)]">
+                    <div className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
+                      <div className="flex justify-between font-bold text-[11px]">
+                        <span>عرض لوگوی فوتر:</span>
+                        <span className="font-mono font-black text-[var(--accent-blue)]">{footerLogoWidth}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={40}
+                        max={280}
+                        step={4}
+                        value={footerLogoWidth}
+                        onChange={(e) => setFooterLogoWidth(Number(e.target.value))}
+                        className="w-full accent-[var(--accent-blue)] cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
+                      <div className="flex justify-between font-bold text-[11px]">
+                        <span>ارتفاع لوگوی فوتر:</span>
+                        <span className="font-mono font-black text-[var(--accent-blue)]">{footerLogoHeight}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={32}
+                        max={140}
+                        step={4}
+                        value={footerLogoHeight}
+                        onChange={(e) => setFooterLogoHeight(Number(e.target.value))}
+                        className="w-full accent-[var(--accent-blue)] cursor-pointer"
+                      />
+                    </div>
+
+                    <label className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center gap-2 font-bold cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showFooterLogoBox}
+                        onChange={(e) => setShowFooterLogoBox(e.target.checked)}
+                        className="w-4 h-4 accent-[var(--accent-blue)] rounded"
+                      />
+                      <span className="text-[11px]">کادر سفید دور لوگوی فوتر</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* ۲. متون فوتر (در صورت خالی گذاشتن هر فیلد، در فوتر نمایش داده نمی‌شود) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">عنوان برند در فوتر:</label>
+                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                      عنوان برند در فوتر (خالی = عدم نمایش عنوان متنی):
+                    </label>
                     <input
                       type="text"
                       value={footerTitle}
                       onChange={(e) => setFooterTitle(e.target.value)}
-                      className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+                      placeholder="خالی بگذارید تا فقط لوگو نمایش داده شود"
+                      className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
                     />
                   </div>
                   <div>
-                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">زیرعنوان فوتر:</label>
+                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                      زیرعنوان فوتر (خالی = مخفی):
+                    </label>
                     <input
                       type="text"
                       value={footerSubtitle}
                       onChange={(e) => setFooterSubtitle(e.target.value)}
-                      className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+                      placeholder="شعار یا توضیح کوتاه زیر لوگو..."
+                      className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
                     />
                   </div>
 
-                  {/* لوگوی فوتر با پیش‌نمایش زنده و آپلود/ذخیره فوری */}
-                  <div className="sm:col-span-2 p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <label className="font-black text-[var(--text-primary)]">
-                        تصویر لوگوی فوتر (Footer Logo):
-                      </label>
-                      {footerLogoUrl && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFooterLogoUrl("");
-                            persistStudioConfig({ newFooterLogoUrl: "" });
-                          }}
-                          className="text-[10px] text-rose-500 font-bold cursor-pointer hover:underline"
-                        >
-                          حذف لوگوی فوتر ✕
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-16 h-16 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 p-1.5">
-                        {footerLogoUrl ? (
-                          <img src={footerLogoUrl} alt="Footer Logo" className="w-full h-full object-contain" />
-                        ) : logoUrl ? (
-                          <img src={logoUrl} alt="Header Fallback" className="w-full h-full object-contain opacity-60" />
-                        ) : (
-                          <span className="text-[10px] text-slate-400">پیش‌فرض</span>
-                        )}
-                      </div>
-                      <div className="flex-1 space-y-2">
-                        <input
-                          type="text"
-                          dir="ltr"
-                          value={footerLogoUrl}
-                          onChange={(e) => setFooterLogoUrl(e.target.value)}
-                          placeholder="https://..."
-                          className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setUploadTarget("footerLogo")}
-                          className="w-full py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black cursor-pointer"
-                        >
-                          ☁️ آپلود و اعمال فوری لوگوی فوتر
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
                   <div className="sm:col-span-2">
-                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">متن معرفی و توضیحات فوتر:</label>
+                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                      متن معرفی و توضیحات فوتر (خالی = مخفی):
+                    </label>
                     <textarea
-                      rows={3}
+                      rows={2}
                       value={footerDesc}
                       onChange={(e) => setFooterDesc(e.target.value)}
-                      placeholder="توضیحات درباره فروشگاه و تضمین اصالت کالاها..."
+                      placeholder="توضیحات درباره فروشگاه..."
                       className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none leading-relaxed"
                     />
                   </div>
@@ -964,7 +1038,85 @@ export default function StorefrontLayoutStudio({
                   </div>
                 </div>
 
-                {/* ترتیب ستون‌های فوتر */}
+                {/* ۳. مدیریت کامل لینک‌های دسترسی سریع در فوتر */}
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-black text-[var(--accent-blue)]">
+                      🔗 مدیریت کامل لینک‌های ستون فوتر (افزودن، ویرایش یا حذف هر لینک):
+                    </span>
+                    <input
+                      type="text"
+                      value={quickLinksTitle}
+                      onChange={(e) => setQuickLinksTitle(e.target.value)}
+                      placeholder="عنوان ستون (دسترسی سریع)"
+                      className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    {quickLinks.map((ql, idx) => (
+                      <div key={ql.id || idx} className="flex flex-col sm:flex-row items-center gap-2">
+                        <input
+                          type="text"
+                          value={ql.title}
+                          onChange={(e) => {
+                            const copy = [...quickLinks];
+                            copy[idx] = { ...copy[idx], title: e.target.value };
+                            setQuickLinks(copy);
+                          }}
+                          className="flex-1 w-full p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
+                        />
+                        <input
+                          type="text"
+                          dir="ltr"
+                          value={ql.url}
+                          onChange={(e) => {
+                            const copy = [...quickLinks];
+                            copy[idx] = { ...copy[idx], url: e.target.value };
+                            setQuickLinks(copy);
+                          }}
+                          className="flex-1 w-full p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setQuickLinks((prev) => prev.filter((_, i) => i !== idx))
+                          }
+                          className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 font-bold cursor-pointer shrink-0"
+                        >
+                          🗑️ حذف
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-[var(--card-border)]">
+                    <input
+                      type="text"
+                      value={newQuickTitle}
+                      onChange={(e) => setNewQuickTitle(e.target.value)}
+                      placeholder="عنوان لینک جدید..."
+                      className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
+                    />
+                    <input
+                      type="text"
+                      dir="ltr"
+                      value={newQuickUrl}
+                      onChange={(e) => setNewQuickUrl(e.target.value)}
+                      placeholder="/products"
+                      className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddQuickLink}
+                      className="px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black cursor-pointer shrink-0"
+                    >
+                      + افزودن لینک
+                    </button>
+                  </div>
+                </div>
+
+                {/* ۴. ترتیب ستون‌های فوتر */}
                 <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
                   <span className="font-black text-[var(--accent-blue)] block">
                     🔄 ترتیب قرارگیری ۴ ستون فوتر (راست به چپ):
@@ -1073,54 +1225,9 @@ export default function StorefrontLayoutStudio({
                         className="w-full accent-[var(--accent-blue)] cursor-pointer"
                       />
                     </div>
-
-                    <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5">
-                      <div className="flex justify-between font-bold">
-                        <span>📱 اندازه عکس در موبایل:</span>
-                        <span className="font-mono font-black text-emerald-500">{bannerMobileImgSize}px</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={60}
-                        max={150}
-                        step={5}
-                        value={bannerMobileImgSize}
-                        onChange={(e) => setBannerMobileImgSize(Number(e.target.value))}
-                        className="w-full accent-emerald-500 cursor-pointer"
-                      />
-                    </div>
-
-                    <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5">
-                      <div className="flex justify-between font-bold">
-                        <span>🖥️ اندازه عکس در دسکتاپ:</span>
-                        <span className="font-mono font-black text-emerald-500">{bannerDesktopImgSize}px</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={140}
-                        max={320}
-                        step={5}
-                        value={bannerDesktopImgSize}
-                        onChange={(e) => setBannerDesktopImgSize(Number(e.target.value))}
-                        className="w-full accent-emerald-500 cursor-pointer"
-                      />
-                    </div>
-
-                    <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5">
-                      <span className="block font-bold">📱 چیدمان بنر در موبایل:</span>
-                      <select
-                        value={bannerMobileLayout}
-                        onChange={(e) => setBannerMobileLayout(e.target.value as any)}
-                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
-                      >
-                        <option value="horizontal">افقی جمع‌‌وجور (پیشنهادی)</option>
-                        <option value="vertical">عمودی (عکس بالای متن)</option>
-                      </select>
-                    </div>
                   </div>
                 </div>
 
-                {/* لیست سکشن‌ها با کنترل مستقل موبایل، تبلت و دسکتاپ */}
                 <div className="space-y-3">
                   <h3 className="font-black text-sm text-[var(--accent-blue)]">
                     مدیریت نمایش سکشن‌ها به تفکیک 📱 موبایل، 📟 تبلت و 🖥️ دسکتاپ
@@ -1242,7 +1349,7 @@ export default function StorefrontLayoutStudio({
             </button>
           </form>
 
-          {/* ستون پیش‌نمایش زنده ریسپانسیو هدر، آفر دستگاه و فوتر (۵ ستون) */}
+          {/* ستون پیش‌نمایش زنده ریسپانسیو هدر و فوتر (۵ ستون) */}
           <div className="lg:col-span-5 p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 h-fit">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
               <span className="font-black text-sm">پیش‌نمایش زنده ریسپانسیو</span>
@@ -1297,77 +1404,57 @@ export default function StorefrontLayoutStudio({
                   </div>
                 )}
 
-                {deviceOffers[previewDevice]?.enabled && (
-                  <div className="w-full py-1.5 px-3 rounded-xl bg-slate-900 text-sky-400 border border-sky-500/30 text-[10px] font-black text-center">
-                    {deviceOffers[previewDevice].badge} — {deviceOffers[previewDevice].text}
-                  </div>
-                )}
-
-                {/* پیش‌نمایش هدر */}
                 <div className="p-3 rounded-full bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-lg flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    {logoUrl ? (
+                    {logoUrl && (
                       <img
                         src={logoUrl}
                         alt=""
                         style={{
-                          width: Math.min(36, logoWidth) + "px",
-                          height: Math.min(36, logoHeight) + "px",
+                          width: Math.min(80, logoWidth) + "px",
+                          height: Math.min(44, logoHeight) + "px",
                           borderRadius: logoRadius,
                           objectFit: logoObjectFit,
                         }}
                       />
-                    ) : (
-                      <span className="w-7 h-7 rounded-lg bg-[var(--accent-blue)]/20 flex items-center justify-center text-xs">
-                        ⚡
-                      </span>
                     )}
-                    <span className="font-black text-xs truncate max-w-[140px]">{brandName}</span>
+                    {brandName && (
+                      <span className="font-black text-xs truncate max-w-[140px]">{brandName}</span>
+                    )}
                   </div>
                   <span className="px-3 py-1 rounded-full bg-[var(--accent-blue)] text-white text-[10px] font-black">
                     🛒 0
                   </span>
                 </div>
 
-                {/* پیش‌‌نمایش بنر */}
-                <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] space-y-1">
-                  <div className="font-black text-[var(--accent-blue)]">وضعیت بنر در این دستگاه:</div>
-                  <div className="text-[var(--text-secondary)]">
-                    ارتفاع:{" "}
-                    <strong className="font-mono text-[var(--text-primary)]">
-                      {previewDevice === "mobile"
-                        ? bannerMobileHeight + "px"
-                        : previewDevice === "tablet"
-                        ? bannerTabletHeight + "px"
-                        : bannerDesktopHeight + "px"}
-                    </strong>
-                  </div>
-                </div>
-
-                {/* پیش‌نمایش فوتر و لوگوی فوتر */}
-                <div className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden p-1 shrink-0">
-                      {footerLogoUrl || logoUrl ? (
-                        <img
-                          src={footerLogoUrl || logoUrl}
-                          alt="Footer"
-                          className="w-full h-full object-contain"
-                        />
-                      ) : (
-                        <span className="text-xs">🏛️</span>
+                {/* پیش‌نمایش فوتر و لوگوی بزرگ فوتر */}
+                <div className="p-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2.5">
+                  <div className="flex flex-wrap items-center gap-3">
+                    {(footerLogoUrl || logoUrl) && (
+                      <img
+                        src={footerLogoUrl || logoUrl}
+                        alt="Footer"
+                        style={{
+                          width: Math.min(180, footerLogoWidth) + "px",
+                          height: Math.min(75, footerLogoHeight) + "px",
+                          objectFit: "contain",
+                        }}
+                      />
+                    )}
+                    <div>
+                      {footerTitle && <div className="font-black text-xs">{footerTitle}</div>}
+                      {footerSubtitle && (
+                        <div className="text-[10px] text-[var(--text-secondary)]">
+                          {footerSubtitle}
+                        </div>
                       )}
                     </div>
-                    <div className="overflow-hidden">
-                      <div className="font-black text-xs truncate">{footerTitle}</div>
-                      <div className="text-[10px] text-[var(--text-secondary)] truncate">
-                        {footerSubtitle}
-                      </div>
+                  </div>
+                  {copyrightText && (
+                    <div className="text-[10px] text-[var(--text-secondary)] border-t border-[var(--card-border)] pt-2 truncate">
+                      {copyrightText}
                     </div>
-                  </div>
-                  <div className="text-[10px] text-[var(--text-secondary)] border-t border-[var(--card-border)] pt-1.5 truncate">
-                    {copyrightText}
-                  </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -7,35 +7,39 @@ import { supabase } from "@/lib/supabase";
 
 const STORAGE_CHAT_KEY = "axon_verified_live_chat_v2026";
 
-function generateRandomCode(): string {
-  return String(Math.floor(1000 + Math.random() * 9000));
-}
-
 export default function ContactDock() {
   const pathname = usePathname() || "";
   const [isOpen, setIsOpen] = useState(false);
 
-  // مراحل احراز هویت مخاطب: "init" -> "otp" -> "chat"
+  // مراحل: "init" (نام + موبایل + کپچای گرافیکی سرور) -> "otp" (تایید کد ۴ رقمی) -> "chat" (گفتگوی زنده بلادرنگ)
   const [step, setStep] = useState<"init" | "otp" | "chat">("init");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
-  const [captchaCode, setCaptchaCode] = useState(() => generateRandomCode());
-  const [captchaInput, setCaptchaInput] = useState("");
-  const [otpInput, setOtpInput] = useState("");
-  const [otpHint, setOtpHint] = useState<string | null>(null);
+  const [honeypot, setHoneypot] = useState("");
 
+  // کپچای گرافیکی رمزنگاری‌شده سرور
+  const [captchaImage, setCaptchaImage] = useState<string>("");
+  const [captchaToken, setCaptchaToken] = useState<string>("");
+  const [captchaInput, setCaptchaInput] = useState("");
+  const [loadingCaptcha, setLoadingCaptcha] = useState(false);
+
+  // تایید OTP
+  const [otpChallengeToken, setOtpChallengeToken] = useState("");
+  const [otpInput, setOtpInput] = useState("");
+  const [fallbackOtpCode, setFallbackOtpCode] = useState<string | null>(null);
+
+  // نشست گفتگوی زنده
   const [sessionId, setSessionId] = useState("");
   const [chatToken, setChatToken] = useState("");
   const [sessionData, setSessionData] = useState<any>(null);
 
-  // ارسال پیام، لینک و فایل در اتاق گفتگو
+  // ارسال پیام، لینک و فایل در چت
   const [msgText, setMsgText] = useState("");
   const [showAttachPanel, setShowAttachPanel] = useState(false);
   const [linkInput, setLinkInput] = useState("");
   const [fileDataUrl, setFileDataUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>("");
   const [fileMime, setFileMime] = useState<string>("");
-  const [attachCaptchaCode, setAttachCaptchaCode] = useState(() => generateRandomCode());
   const [attachCaptchaInput, setAttachCaptchaInput] = useState("");
 
   const [loading, setLoading] = useState(false);
@@ -51,7 +55,27 @@ export default function ContactDock() {
     return "💻 دسکتاپ";
   };
 
-  // بازیابی نشست تاییدشده قبلی کاربر از حافظه مرورگر
+  const fetchServerCaptcha = useCallback(async () => {
+    setLoadingCaptcha(true);
+    try {
+      const res = await fetch("/api/live-chat?mode=captcha&t=" + Date.now(), {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.captchaImage) {
+          setCaptchaImage(json.captchaImage);
+          setCaptchaToken(json.captchaToken);
+          setCaptchaInput("");
+          setAttachCaptchaInput("");
+        }
+      }
+    } catch {
+    } finally {
+      setLoadingCaptcha(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -76,6 +100,12 @@ export default function ContactDock() {
     } catch {}
   }, []);
 
+  useEffect(() => {
+    if (isOpen && (step === "init" || showAttachPanel) && !captchaImage) {
+      fetchServerCaptcha();
+    }
+  }, [isOpen, step, showAttachPanel, captchaImage, fetchServerCaptcha]);
+
   const fetchLiveMessages = useCallback(async () => {
     if (!sessionId || !chatToken) return;
     try {
@@ -90,17 +120,21 @@ export default function ContactDock() {
         if (json.success && json.session) {
           setSessionData(json.session);
         }
+      } else if (res.status === 404) {
+        localStorage.removeItem(STORAGE_CHAT_KEY);
+        setStep("init");
+        fetchServerCaptcha();
       }
     } catch {}
-  }, [sessionId, chatToken]);
+  }, [sessionId, chatToken, fetchServerCaptcha]);
 
-  // اتصال بلادرنگ وب‌سوکت برای دریافت آنی پاسخ مدیران و زیرمجموعه‌ها
+  // اتصال وب‌سوکت بلادرنگ برای دریافت فوری پیام‌های پشتیبان بدون نیاز به رفرش
   useEffect(() => {
     if (!isOpen || step !== "chat" || !sessionId) return;
     fetchLiveMessages();
 
     const ch = supabase
-      .channel("axon-live-chat-client-" + sessionId)
+      .channel("axon-live-chat-room-" + sessionId)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "site_info" },
@@ -110,9 +144,16 @@ export default function ContactDock() {
       )
       .subscribe();
 
-    const timer = setInterval(fetchLiveMessages, 3000);
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("axon_live_chat_realtime_bus");
+      bc.onmessage = () => fetchLiveMessages();
+    } catch {}
+
+    const timer = setInterval(fetchLiveMessages, 2500);
     return () => {
       supabase.removeChannel(ch);
+      if (bc) bc.close();
       clearInterval(timer);
     };
   }, [isOpen, step, sessionId, fetchLiveMessages]);
@@ -125,9 +166,35 @@ export default function ContactDock() {
 
   if (pathname.startsWith("/admin")) return null;
 
+  const notifyRealtimeBus = () => {
+    try {
+      const bc = new BroadcastChannel("axon_live_chat_realtime_bus");
+      bc.postMessage({ updatedAt: Date.now() });
+      bc.close();
+    } catch {}
+  };
+
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      setErrorMsg("لطفاً نام و نام خانوادگی خود را وارد نمایید.");
+      return;
+    }
+    const cleanPhone = phone
+      .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+      .replace(/[^0-9]/g, "")
+      .replace(/^98/, "0");
+    if (!/^09\d{9}$/.test(cleanPhone)) {
+      setErrorMsg("شماره موبایل ۱۱ رقمی معتبر وارد نمایید (مثال: 09123456789).");
+      return;
+    }
+    if (!captchaInput.trim() || captchaInput.trim().length < 4) {
+      setErrorMsg("لطفاً ۵ کاراکتر تصویر امنیتی (کپچا) را وارد نمایید.");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/live-chat", {
@@ -135,21 +202,28 @@ export default function ContactDock() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "request_otp",
-          fullName,
-          phone,
-          captchaInput,
-          captchaExpected: captchaCode,
+          fullName: fullName.trim(),
+          phone: cleanPhone,
+          captchaInput: captchaInput.trim(),
+          captchaToken,
+          website_hp: honeypot,
         }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        if (json.verificationHint) setOtpHint(String(json.verificationHint));
+        setOtpChallengeToken(json.otpChallengeToken);
+        setFallbackOtpCode(json.fallbackOtpCode || null);
         setStep("otp");
       } else {
-        setCaptchaCode(generateRandomCode());
+        if (json.captchaImage && json.captchaToken) {
+          setCaptchaImage(json.captchaImage);
+          setCaptchaToken(json.captchaToken);
+        } else {
+          fetchServerCaptcha();
+        }
         setCaptchaInput("");
-        setErrorMsg(json.message || "خطا در ارسال کد تایید.");
+        setErrorMsg(json.message || "خطا در تایید کپچا.");
       }
     } catch {
       setErrorMsg("خطا در برقراری ارتباط با سرور.");
@@ -161,6 +235,11 @@ export default function ContactDock() {
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+    if (!otpInput.trim() || otpInput.trim().length < 4) {
+      setErrorMsg("لطفاً کد تایید ۴ رقمی را وارد نمایید.");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/live-chat", {
@@ -169,7 +248,8 @@ export default function ContactDock() {
         body: JSON.stringify({
           action: "verify_otp",
           phone,
-          code: otpInput,
+          code: otpInput.trim(),
+          otpChallengeToken,
           platform: detectPlatformName(),
         }),
       });
@@ -188,12 +268,13 @@ export default function ContactDock() {
             phone: json.session.phone,
           })
         );
+        notifyRealtimeBus();
         setStep("chat");
       } else {
-        setErrorMsg(json.message || "کد واردشده معتبر نیست.");
+        setErrorMsg(json.message || "کد تایید واردشده صحیح نیست.");
       }
     } catch {
-      setErrorMsg("خطا در تایید کد.");
+      setErrorMsg("خطا در بررسی کد تایید.");
     } finally {
       setLoading(false);
     }
@@ -207,7 +288,7 @@ export default function ContactDock() {
     }
     const allowed = ["image/png", "image/jpeg", "image/jpg", "image/webp", "application/pdf"];
     if (!allowed.includes(file.type)) {
-      setErrorMsg("فقط ارسال تصویر (PNG/JPG/WebP) یا فایل PDF مجاز است.");
+      setErrorMsg("فقط ارسال تصویر (PNG/JPG/WebP) یا سند PDF مجاز است.");
       return;
     }
     const reader = new FileReader();
@@ -222,7 +303,15 @@ export default function ContactDock() {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
-    if (!msgText.trim() && !linkInput.trim() && !fileDataUrl) return;
+    if (!msgText.trim() && !linkInput.trim() && !fileDataUrl) {
+      setErrorMsg("لطفاً متن پیام، لینک یا فایل خود را وارد کنید.");
+      return;
+    }
+
+    if ((fileDataUrl || linkInput.trim()) && !attachCaptchaInput.trim()) {
+      setErrorMsg("برای ارسال فایل یا لینک، وارد کردن حروف تصویر کپچا الزامی است.");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -238,8 +327,8 @@ export default function ContactDock() {
           attachmentUrl: fileDataUrl || undefined,
           attachmentName: fileName || undefined,
           attachmentMime: fileMime || undefined,
-          captchaInput: attachCaptchaInput,
-          captchaExpected: attachCaptchaCode,
+          captchaInput: attachCaptchaInput.trim(),
+          captchaToken,
         }),
       });
       const json = await res.json();
@@ -251,10 +340,15 @@ export default function ContactDock() {
         setFileDataUrl(null);
         setFileName("");
         setAttachCaptchaInput("");
-        setAttachCaptchaCode(generateRandomCode());
         setShowAttachPanel(false);
+        notifyRealtimeBus();
       } else {
-        setAttachCaptchaCode(generateRandomCode());
+        if (json.captchaImage && json.captchaToken) {
+          setCaptchaImage(json.captchaImage);
+          setCaptchaToken(json.captchaToken);
+        } else if (fileDataUrl || linkInput.trim()) {
+          fetchServerCaptcha();
+        }
         setErrorMsg(json.message || "خطا در ارسال پیام.");
       }
     } catch {
@@ -268,13 +362,13 @@ export default function ContactDock() {
 
   return (
     <div className="fixed bottom-20 md:bottom-6 left-4 sm:left-6 z-50 font-sans select-text" dir="rtl">
-      {/* دکمه شناور گفتگوی زنده در هر ۳ پلتفرم (موبایل، تبلت، دسکتاپ) */}
       {!isOpen && (
         <button
           type="button"
           onClick={() => {
             soundEngine.playClick();
             setIsOpen(true);
+            if (!captchaImage) fetchServerCaptcha();
           }}
           className="px-4 sm:px-5 py-3 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-2xl border border-white/20 flex items-center gap-2.5 cursor-pointer transition-all hover:scale-105 active:scale-95"
         >
@@ -291,9 +385,8 @@ export default function ContactDock() {
         </button>
       )}
 
-      {/* پنجره گفتگوی زنده حرفه‌ای */}
       {isOpen && (
-        <div className="w-[92vw] sm:w-[390px] rounded-3xl bg-[var(--modal-bg)] border-2 border-[var(--card-border)] shadow-2xl overflow-hidden flex flex-col max-h-[82vh]">
+        <div className="w-[92vw] sm:w-[400px] rounded-3xl bg-[var(--modal-bg)] border-2 border-[var(--card-border)] shadow-2xl overflow-hidden flex flex-col max-h-[84vh]">
           {/* هدر چت */}
           <div className="p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -318,17 +411,28 @@ export default function ContactDock() {
           </div>
 
           {errorMsg && (
-            <div className="m-3 mb-0 p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-500 text-[11px] font-bold text-center">
+            <div className="m-3 mb-0 p-3 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-500 text-xs font-black text-center">
               {errorMsg}
             </div>
           )}
 
-          {/* مرحله ۱: دریافت نام، شماره موبایل و کپچا (حتی برای کاربران مهمان) */}
+          {/* مرحله ۱: احراز هویت با کپچای گرافیکی واقعی سرور (بدون هیچ‌گونه تولتیپ انگلیسی مرورگر) */}
           {step === "init" && (
-            <form onSubmit={handleRequestOtp} className="p-4 space-y-3.5 text-xs">
-              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed font-medium">
-                جهت شروع گفتگوی زنده با کارشناسان، لطفاً نام و شماره موبایل خود را تایید فرمایید:
+            <form noValidate onSubmit={handleRequestOtp} className="p-4 space-y-3.5 text-xs">
+              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed font-bold">
+                جهت شروع گفتگوی زنده با کارشناسان، نام و شماره موبایل خود را وارد نمایید:
               </p>
+
+              {/* فیلد مخفی ضد ربات (Honeypot) */}
+              <input
+                type="text"
+                name="website_hp"
+                value={honeypot}
+                onChange={(e) => setHoneypot(e.target.value)}
+                className="hidden"
+                tabIndex={-1}
+                autoComplete="off"
+              />
 
               <div>
                 <label className="block mb-1 font-bold text-[var(--text-secondary)]">
@@ -336,75 +440,107 @@ export default function ContactDock() {
                 </label>
                 <input
                   type="text"
-                  required
                   value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  onChange={(e) => {
+                    setFullName(e.target.value);
+                    if (errorMsg) setErrorMsg(null);
+                  }}
                   placeholder="مثال: علی محمدی"
-                  className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
 
               <div>
                 <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                  شماره موبایل (جهت تایید هویت) *
+                  شماره موبایل (جهت تایید هویت پیامکی) *
                 </label>
                 <input
                   type="tel"
-                  required
                   dir="ltr"
+                  maxLength={11}
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    if (errorMsg) setErrorMsg(null);
+                  }}
                   placeholder="09123456789"
-                  className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none focus:border-[var(--accent-blue)]"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-left outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
 
-              <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-[11px]">کد امنیتی ضد ربات:</span>
+              {/* کادر کپچای گرافیکی رمزنگاری‌شده سرور (SVG Image) */}
+              <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-black text-[11px] text-[var(--text-secondary)]">
+                    🛡️ تصویر امنیتی کپچا:
+                  </span>
                   <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 rounded-lg bg-slate-900 text-emerald-400 font-mono font-black tracking-widest text-sm select-none">
-                      {captchaCode}
-                    </span>
+                    {captchaImage ? (
+                      <img
+                        src={captchaImage}
+                        alt="Security Captcha"
+                        className="h-12 w-40 rounded-xl border border-slate-700 object-cover select-none shadow-md"
+                        draggable={false}
+                      />
+                    ) : (
+                      <div className="h-12 w-40 rounded-xl bg-slate-900 flex items-center justify-center text-[10px] text-slate-400">
+                        در حال ساخت کپچا...
+                      </div>
+                    )}
                     <button
                       type="button"
-                      onClick={() => setCaptchaCode(generateRandomCode())}
-                      className="text-xs cursor-pointer"
-                      title="کد جدید"
+                      disabled={loadingCaptcha}
+                      onClick={() => {
+                        soundEngine.playClick();
+                        fetchServerCaptcha();
+                      }}
+                      className="w-10 h-12 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-sm cursor-pointer transition"
+                      title="دریافت تصویر کپچای جدید"
                     >
                       🔄
                     </button>
                   </div>
                 </div>
+
                 <input
                   type="text"
-                  required
                   dir="ltr"
+                  maxLength={5}
                   value={captchaInput}
-                  onChange={(e) => setCaptchaInput(e.target.value)}
-                  placeholder="عدد ۴ رقمی بالا را وارد کنید"
-                  className="w-full p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-center font-bold outline-none"
+                  onChange={(e) => {
+                    setCaptchaInput(e.target.value.toUpperCase());
+                    if (errorMsg) setErrorMsg(null);
+                  }}
+                  placeholder="حروف داخل تصویر بالا را وارد کنید"
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-center font-black tracking-widest uppercase outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black shadow-lg cursor-pointer hover:opacity-90 disabled:opacity-50"
+                className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black shadow-lg cursor-pointer hover:opacity-90 disabled:opacity-50"
               >
-                {loading ? "در حال ارسال کد تایید..." : "دریافت کد تایید و شروع گفتگو ←"}
+                {loading ? "در حال بررسی امنیت و ارسال کد..." : "دریافت کد تایید و شروع گفتگو ←"}
               </button>
             </form>
           )}
 
           {/* مرحله ۲: وارد کردن کد تایید ۴ رقمی */}
           {step === "otp" && (
-            <form onSubmit={handleVerifyOtp} className="p-4 space-y-4 text-xs">
-              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 font-bold text-[11px] leading-relaxed">
-                کد تایید ۴ رقمی برای شماره <span className="font-mono">{phone}</span> صادر شد.
-                {otpHint && (
-                  <div className="mt-1 font-mono text-xs">
-                    کد تایید سریع شما: <strong className="underline">{otpHint}</strong>
+            <form noValidate onSubmit={handleVerifyOtp} className="p-4 space-y-4 text-xs">
+              <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 font-bold text-[11px] leading-relaxed">
+                ✓ کد تایید ۴ رقمی برای شماره <span className="font-mono font-black">{phone}</span> ارسال گردید.
+                {fallbackOtpCode && (
+                  <div className="mt-1.5 pt-1.5 border-t border-emerald-500/20 font-mono text-xs flex items-center justify-between">
+                    <span>کد تایید مستقیم:</span>
+                    <button
+                      type="button"
+                      onClick={() => setOtpInput(fallbackOtpCode)}
+                      className="px-2.5 py-0.5 rounded-lg bg-emerald-600 text-white font-black cursor-pointer"
+                    >
+                      {fallbackOtpCode} (کلیک برای درج)
+                    </button>
                   </div>
                 )}
               </div>
@@ -415,13 +551,15 @@ export default function ContactDock() {
                 </label>
                 <input
                   type="text"
-                  required
                   dir="ltr"
                   maxLength={4}
                   value={otpInput}
-                  onChange={(e) => setOtpInput(e.target.value)}
+                  onChange={(e) => {
+                    setOtpInput(e.target.value);
+                    if (errorMsg) setErrorMsg(null);
+                  }}
                   placeholder="••••"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-center text-base font-black tracking-widest outline-none focus:border-[var(--accent-blue)]"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-center text-lg font-black tracking-widest outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
 
@@ -429,29 +567,32 @@ export default function ContactDock() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 py-3 rounded-2xl bg-emerald-600 text-white font-black shadow-lg cursor-pointer"
+                  className="flex-1 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-lg cursor-pointer"
                 >
-                  {loading ? "در حال بررسی..." : "✓ تایید و ورود به چت زنده"}
+                  {loading ? "در حال تایید..." : "✓ تایید شماره و ورود به گفتگوی زنده"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setStep("init")}
-                  className="px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold cursor-pointer"
+                  onClick={() => {
+                    setStep("init");
+                    fetchServerCaptcha();
+                  }}
+                  className="px-4 py-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold cursor-pointer"
                 >
-                  ویرایش شماره
+                  تغییر شماره
                 </button>
               </div>
             </form>
           )}
 
-          {/* مرحله ۳: اتاق گفتگوی زنده بلادرنگ */}
+          {/* مرحله ۳: اتاق گفتگوی زنده و بلادرنگ */}
           {step === "chat" && (
             <>
               <div className="px-4 py-2 bg-[var(--input-bg)] border-b border-[var(--card-border)] flex items-center justify-between text-[10px]">
-                <span className="font-bold text-emerald-500">
+                <span className="font-black text-emerald-500">
                   ✓ مخاطب تاییدشده: {sessionData?.fullName || fullName} ({phone})
                 </span>
-                <span className="text-[var(--text-secondary)] font-mono">
+                <span className="text-[var(--text-secondary)] font-mono font-bold">
                   سهمیه فایل: {remainingFiles}/3
                 </span>
               </div>
@@ -532,12 +673,12 @@ export default function ContactDock() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* پنل امن ارسال لینک یا فایل محدودشده با کپچا */}
+              {/* پنل پیوست فایل یا لینک همراه با کپچای گرافیکی واقعی سرور */}
               {showAttachPanel && (
                 <div className="p-3 bg-[var(--input-bg)] border-t border-[var(--card-border)] space-y-2.5 text-[11px]">
                   <div className="flex items-center justify-between font-bold">
                     <span className="text-[var(--accent-blue)]">
-                      📎 پیوست لینک یا فایل (حداکثر ۲MB - تصویر/PDF):
+                      📎 ارسال فایل (تصویر/PDF تا ۲MB) یا لینک امن:
                     </span>
                     <button
                       type="button"
@@ -553,7 +694,7 @@ export default function ContactDock() {
                     dir="ltr"
                     value={linkInput}
                     onChange={(e) => setLinkInput(e.target.value)}
-                    placeholder="https://example.com (لینک اختیاری)"
+                    placeholder="https://example.com (ارسال لینک اختیاری)"
                     className="w-full p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none"
                   />
 
@@ -589,17 +730,31 @@ export default function ContactDock() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-900 text-emerald-400 font-mono font-black">
-                      {attachCaptchaCode}
-                    </span>
+                  {/* کپچای گرافیکی سرور برای تایید ارسال فایل یا لینک */}
+                  <div className="flex items-center gap-2 pt-1">
+                    {captchaImage && (
+                      <img
+                        src={captchaImage}
+                        alt="Captcha"
+                        className="h-10 w-32 rounded-lg border border-slate-700 object-cover shrink-0"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={fetchServerCaptcha}
+                      className="px-2 py-2 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] cursor-pointer"
+                      title="تصویر جدید"
+                    >
+                      🔄
+                    </button>
                     <input
                       type="text"
                       dir="ltr"
+                      maxLength={5}
                       value={attachCaptchaInput}
-                      onChange={(e) => setAttachCaptchaInput(e.target.value)}
-                      placeholder="کد کپچا برای ارسال فایل/لینک"
-                      className="flex-1 p-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-center outline-none"
+                      onChange={(e) => setAttachCaptchaInput(e.target.value.toUpperCase())}
+                      placeholder="کد تصویر"
+                      className="flex-1 p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-center font-black uppercase outline-none"
                     />
                   </div>
                 </div>
@@ -607,6 +762,7 @@ export default function ContactDock() {
 
               {/* کادر ارسال پیام */}
               <form
+                noValidate
                 onSubmit={handleSendMessage}
                 className="p-3 bg-[var(--modal-bg)] border-t border-[var(--card-border)] flex items-center gap-2"
               >
@@ -614,7 +770,9 @@ export default function ContactDock() {
                   type="button"
                   onClick={() => {
                     soundEngine.playClick();
-                    setShowAttachPanel(!showAttachPanel);
+                    const nextState = !showAttachPanel;
+                    setShowAttachPanel(nextState);
+                    if (nextState) fetchServerCaptcha();
                   }}
                   className={
                     "w-9 h-9 rounded-xl border flex items-center justify-center text-sm cursor-pointer shrink-0 transition " +
@@ -629,7 +787,10 @@ export default function ContactDock() {
                 <input
                   type="text"
                   value={msgText}
-                  onChange={(e) => setMsgText(e.target.value)}
+                  onChange={(e) => {
+                    setMsgText(e.target.value);
+                    if (errorMsg) setErrorMsg(null);
+                  }}
                   placeholder="پیام خود را بنویسید..."
                   className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
                 />

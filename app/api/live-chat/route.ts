@@ -41,10 +41,152 @@ export interface LiveChatLeadSession {
   messages: LiveChatMessage[];
 }
 
-const pendingOtps = new Map<
-  string,
-  { code: string; fullName: string; expiresAt: number; attempts: number }
->();
+// محدودیت نرخ درخواست (Rate Limit) بر اساس IP
+const ipRateMap = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(ip: string, maxReq = 25, windowMs = 60_000): boolean {
+  const now = Date.now();
+  const entry = ipRateMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    ipRateMap.set(ip, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (entry.count >= maxReq) return false;
+  entry.count += 1;
+  return true;
+}
+
+// تولید کپچای گرافیکی واقعی SVG در سمت سرور به همراه توکن رمزنگاری‌شده HMAC-SHA256
+function generateServerGraphicalCaptcha() {
+  const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+  let code = "";
+  for (let i = 0; i < 5; i++) {
+    code += chars[crypto.randomInt(0, chars.length)];
+  }
+
+  const expiresAt = Date.now() + 3 * 60 * 1000;
+  const nonce = crypto.randomBytes(8).toString("hex");
+  const payload = `${code.toUpperCase()}:${expiresAt}:${nonce}`;
+  const sig = crypto.createHmac("sha256", CHAT_SECRET).update(payload).digest("hex");
+  const captchaToken = Buffer.from(`${expiresAt}:${nonce}:${sig}`).toString("base64");
+
+  // ساخت خطوط منحنی نویز و نقاط امنیتی تصادفی در SVG
+  let noisePaths = "";
+  const colors = ["#38bdf8", "#818cf8", "#34d399", "#f472b6", "#fbbf24"];
+  for (let i = 0; i < 6; i++) {
+    const c = colors[i % colors.length];
+    const y1 = crypto.randomInt(8, 48);
+    const y2 = crypto.randomInt(8, 48);
+    const cx = crypto.randomInt(40, 140);
+    const cy = crypto.randomInt(5, 50);
+    noisePaths += `<path d="M 5 ${y1} Q ${cx} ${cy} 175 ${y2}" stroke="${c}" stroke-width="1.6" fill="none" opacity="0.45" />`;
+  }
+
+  let dots = "";
+  for (let i = 0; i < 28; i++) {
+    const dx = crypto.randomInt(6, 174);
+    const dy = crypto.randomInt(6, 48);
+    const r = crypto.randomInt(1, 3);
+    const c = colors[i % colors.length];
+    dots += `<circle cx="${dx}" cy="${dy}" r="${r}" fill="${c}" opacity="0.35" />`;
+  }
+
+  let charElements = "";
+  for (let i = 0; i < code.length; i++) {
+    const ch = code[i];
+    const x = 22 + i * 30 + crypto.randomInt(-3, 4);
+    const y = 34 + crypto.randomInt(-4, 5);
+    const rot = crypto.randomInt(-22, 23);
+    const c = colors[(i + crypto.randomInt(0, 3)) % colors.length];
+    charElements += `<text x="${x}" y="${y}" fill="${c}" font-family="monospace, sans-serif" font-size="24" font-weight="900" transform="rotate(${rot} ${x} ${y})">${ch}</text>`;
+  }
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="54" viewBox="0 0 180 54">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#0f172a"/>
+        <stop offset="100%" stop-color="#1e1b4b"/>
+      </linearGradient>
+      <pattern id="grid" width="12" height="12" patternUnits="userSpaceOnUse">
+        <path d="M 12 0 L 0 0 0 12" fill="none" stroke="#334155" stroke-width="0.6" opacity="0.4"/>
+      </pattern>
+    </defs>
+    <rect width="180" height="54" rx="12" fill="url(#bg)"/>
+    <rect width="180" height="54" rx="12" fill="url(#grid)"/>
+    ${dots}
+    ${noisePaths}
+    ${charElements}
+  </svg>`;
+
+  const captchaImage = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+  return { captchaImage, captchaToken };
+}
+
+function verifyServerGraphicalCaptcha(userInput: string, captchaToken: string): boolean {
+  try {
+    const cleanInput = String(userInput || "")
+      .trim()
+      .toUpperCase();
+    if (!cleanInput || !captchaToken) return false;
+
+    const decoded = Buffer.from(captchaToken, "base64").toString("utf8");
+    const parts = decoded.split(":");
+    if (parts.length !== 3) return false;
+
+    const [expiresAtStr, nonce, providedSig] = parts;
+    const expiresAt = Number(expiresAtStr);
+    if (!expiresAt || Date.now() > expiresAt) return false;
+
+    const expectedPayload = `${cleanInput}:${expiresAt}:${nonce}`;
+    const expectedSig = crypto
+      .createHmac("sha256", CHAT_SECRET)
+      .update(expectedPayload)
+      .digest("hex");
+
+    return crypto.timingSafeEqual(
+      Buffer.from(providedSig, "hex"),
+      Buffer.from(expectedSig, "hex")
+    );
+  } catch {
+    return false;
+  }
+}
+
+// امضای دیجیتال بدون حالت (Stateless HMAC) برای کد تایید پیامکی (OTP) جهت کارکرد ۱۰۰٪ روی Vercel
+function createSignedOtpChallenge(phone: string, fullName: string, code: string): string {
+  const expiresAt = Date.now() + 5 * 60 * 1000;
+  const data = `${phone}|${fullName}|${code}|${expiresAt}`;
+  const sig = crypto.createHmac("sha256", CHAT_SECRET).update(data).digest("hex");
+  return Buffer.from(`${phone}|${fullName}|${expiresAt}|${sig}`).toString("base64");
+}
+
+function verifySignedOtpChallenge(
+  otpToken: string,
+  phoneInput: string,
+  codeInput: string
+): { valid: boolean; fullName: string } {
+  try {
+    const decoded = Buffer.from(otpToken, "base64").toString("utf8");
+    const [phone, fullName, expiresAtStr, providedSig] = decoded.split("|");
+    const expiresAt = Number(expiresAtStr);
+    if (!expiresAt || Date.now() > expiresAt) return { valid: false, fullName: "" };
+    if (phone !== phoneInput) return { valid: false, fullName: "" };
+
+    const expectedData = `${phone}|${fullName}|${String(codeInput).trim()}|${expiresAt}`;
+    const expectedSig = crypto
+      .createHmac("sha256", CHAT_SECRET)
+      .update(expectedData)
+      .digest("hex");
+
+    const isMatch = crypto.timingSafeEqual(
+      Buffer.from(providedSig, "hex"),
+      Buffer.from(expectedSig, "hex")
+    );
+    return { valid: isMatch, fullName };
+  } catch {
+    return { valid: false, fullName: "" };
+  }
+}
 
 function signChatToken(sessionId: string, phone: string): string {
   return crypto
@@ -100,6 +242,16 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const mode = searchParams.get("mode");
+
+    // تولید تصویر کپچای گرافیکی جدید از سمت سرور
+    if (mode === "captcha") {
+      const { captchaImage, captchaToken } = generateServerGraphicalCaptcha();
+      return NextResponse.json(
+        { success: true, captchaImage, captchaToken },
+        { headers: { "Cache-Control": "no-store, max-age=0" } }
+      );
+    }
+
     const siteRow = await getMasterSiteInfoRow();
     const layoutCfg = siteRow?.homepage_layout_config || {};
     const sessions: LiveChatLeadSession[] = Array.isArray(layoutCfg.live_chat_sessions)
@@ -143,93 +295,115 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { action } = body;
     const ip =
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       req.headers.get("x-real-ip") ||
       "127.0.0.1";
 
-    // ۱. درخواست کد تایید (OTP) برای شروع گفتگوی زنده همراه با بررسی کپچا
+    if (!checkRateLimit(ip, 30, 60_000)) {
+      return NextResponse.json(
+        { success: false, message: "تعداد درخواست‌های شما بیش از حد مجاز است. کمی صبر کنید." },
+        { status: 429 }
+      );
+    }
+
+    const body = await req.json();
+    const { action } = body;
+
+    // فیلد تله ضد ربات (Honeypot)
+    if (body.website_hp && String(body.website_hp).trim().length > 0) {
+      return NextResponse.json({ success: false, message: "دسترسی ربات مسدود شد." }, { status: 403 });
+    }
+
+    // ۱. بررسی کپچای گرافیکی سرور و ارسال کد تایید پیامکی (OTP)
     if (action === "request_otp") {
       const fullName = sanitizeText(body.fullName, 60);
       const phone = String(body.phone || "")
+        .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
         .replace(/[^0-9]/g, "")
         .replace(/^98/, "0");
       const captchaInput = String(body.captchaInput || "").trim();
-      const captchaExpected = String(body.captchaExpected || "").trim();
+      const captchaToken = String(body.captchaToken || "").trim();
 
       if (!fullName || fullName.length < 2) {
         return NextResponse.json(
-          { success: false, message: "لطفاً نام و نام خانوادگی خود را وارد نمایید." },
+          {
+            success: false,
+            field: "fullName",
+            message: "لطفاً نام و نام خانوادگی خود را کامل وارد نمایید.",
+          },
           { status: 400 }
         );
       }
       if (!/^09\d{9}$/.test(phone)) {
         return NextResponse.json(
-          { success: false, message: "شماره موبایل معتبر نیست (مثال: 09123456789)." },
+          {
+            success: false,
+            field: "phone",
+            message: "شماره موبایل ۱۱ رقمی معتبر وارد کنید (مثال: 09123456789).",
+          },
           { status: 400 }
         );
       }
-      if (!captchaInput || captchaInput !== captchaExpected) {
+      if (!verifyServerGraphicalCaptcha(captchaInput, captchaToken)) {
+        const freshCaptcha = generateServerGraphicalCaptcha();
         return NextResponse.json(
-          { success: false, message: "کد امنیتی (کپچا) به درستی وارد نشده است." },
+          {
+            success: false,
+            field: "captcha",
+            ...freshCaptcha,
+            message: "حروف تصویر امنیتی (کپچا) اشتباه یا منقضی شده است. تصویر جدید را وارد کنید.",
+          },
           { status: 400 }
         );
       }
 
-      const otpCode = String(Math.floor(1000 + Math.random() * 9000));
-      pendingOtps.set(phone, {
-        code: otpCode,
-        fullName,
-        expiresAt: Date.now() + 5 * 60 * 1000,
-        attempts: 0,
-      });
+      const otpCode = String(crypto.randomInt(1000, 9999));
+      const otpChallengeToken = createSignedOtpChallenge(phone, fullName, otpCode);
 
-      // تلاش برای ارسال پیامک واقعی از طریق درگاه پیامک سایت
-      let smsSent = false;
+      // ارسال پیامک به شماره موبایل کاربر از طریق سرویس پیامک سایت
+      let smsDelivered = false;
       try {
         const origin = req.nextUrl.origin;
-        const smsRes = await fetch(origin + "/api/auth/otp/send", {
+        const smsRes = await fetch(origin + "/api/send-otp", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone, purpose: "live_chat" }),
+          body: JSON.stringify({ phone, code: otpCode }),
         });
-        if (smsRes.ok) smsSent = true;
+        if (smsRes.ok) smsDelivered = true;
       } catch {}
 
       return NextResponse.json({
         success: true,
-        smsSent,
-        verificationHint: otpCode,
-        message: "✓ کد تایید ۴ رقمی برای شماره " + phone + " صادر شد.",
+        smsDelivered,
+        otpChallengeToken,
+        fallbackOtpCode: otpCode,
+        message: "✓ کد تایید ۴ رقمی برای شماره " + phone + " ارسال شد.",
       });
     }
 
-    // ۲. تایید شماره موبایل و ثبت کاربر به عنوان «مخاطب تاییدشده گفتگوی زنده (سرنخ فروش / Verified Lead)»
+    // ۲. تایید کد OTP و ذخیره مخاطب به عنوان «مخاطب تاییدشده گفتگوی زنده (سرنخ فروش / Verified Lead)»
     if (action === "verify_otp") {
       const phone = String(body.phone || "")
+        .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
         .replace(/[^0-9]/g, "")
         .replace(/^98/, "0");
-      const code = String(body.code || "").trim();
+      const code = String(body.code || "")
+        .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+        .trim();
+      const otpChallengeToken = String(body.otpChallengeToken || "");
       const platform = sanitizeText(body.platform || "دسکتاپ", 30);
-      const pending = pendingOtps.get(phone);
 
-      if (!pending || Date.now() > pending.expiresAt) {
+      const check = verifySignedOtpChallenge(otpChallengeToken, phone, code);
+      if (!check.valid) {
         return NextResponse.json(
-          { success: false, message: "کد تایید منقضی شده است. مجدداً درخواست دهید." },
+          {
+            success: false,
+            message: "کد تایید ۴ رقمی واردشده اشتباه یا منقضی شده است.",
+          },
           { status: 400 }
         );
       }
-      if (pending.code !== code) {
-        pending.attempts += 1;
-        return NextResponse.json(
-          { success: false, message: "کد تایید واردشده صحیح نیست." },
-          { status: 400 }
-        );
-      }
-
-      pendingOtps.delete(phone);
 
       const siteRow = await getMasterSiteInfoRow();
       const layoutCfg = siteRow?.homepage_layout_config || {};
@@ -244,7 +418,7 @@ export async function POST(req: NextRequest) {
         const sessionId = "chat_" + phone + "_" + Date.now().toString(36);
         existing = {
           sessionId,
-          fullName: pending.fullName,
+          fullName: check.fullName,
           phone,
           verified: true,
           leadCategory: "مخاطب تاییدشده گفتگوی زنده (سرنخ فروش / Lead)",
@@ -260,23 +434,22 @@ export async function POST(req: NextRequest) {
               id: "msg_welcome_" + Date.now(),
               senderType: "admin",
               senderName: "پشتیبانی آنلاین آکسون کور",
-              senderRole: "سیستم هوشمند پشتیبانی",
+              senderRole: "پشتیبانی بلادرنگ",
               text:
                 "سلام " +
-                pending.fullName +
-                " عزیز 👋 شماره شما تایید شد. کارشناسان ما آنلاین هستند؛ سوال، لینک یا تصویر مورد نظر خود را بفرستید.",
+                check.fullName +
+                " عزیز 👋 شماره شما با موفقیت تایید شد. کارشناسان ما آماده پاسخگویی زنده هستند؛ سوال، لینک یا فایل خود را ارسال کنید.",
               createdAt: nowIso,
             },
           ],
         };
         sessions.unshift(existing);
       } else {
-        existing.fullName = pending.fullName || existing.fullName;
+        existing.fullName = check.fullName || existing.fullName;
         existing.updatedAt = nowIso;
         existing.platform = platform;
       }
 
-      // ذخیره هم‌زمان در لیست سرنخ‌های مشتریان (CRM Leads)
       const crmLeads = Array.isArray(layoutCfg.verified_chat_leads)
         ? layoutCfg.verified_chat_leads
         : [];
@@ -310,7 +483,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ۳. ارسال پیام، لینک یا فایل محدودشده توسط مخاطب تاییدشده
+    // ۳. ارسال پیام، لینک یا فایل محدودشده توسط کاربر (با اعتبارسنجی کپچای گرافیکی سرور برای فایل/لینک)
     if (action === "send_customer_message") {
       const {
         sessionId,
@@ -321,7 +494,7 @@ export async function POST(req: NextRequest) {
         attachmentName,
         attachmentMime,
         captchaInput,
-        captchaExpected,
+        captchaToken,
       } = body;
 
       const siteRow = await getMasterSiteInfoRow();
@@ -352,18 +525,20 @@ export async function POST(req: NextRequest) {
 
       if (!cleanText && !safeLink && !hasAttachment) {
         return NextResponse.json(
-          { success: false, message: "متن پیام نمی‌تواند خالی باشد." },
+          { success: false, message: "لطفاً متن پیام خود را وارد نمایید." },
           { status: 400 }
         );
       }
 
-      // در صورت ارسال فایل یا لینک توسط کاربر، بررسی کپچای امنیتی و سقف مجاز (حداکثر ۳ فایل و ۲ مگابایت)
+      // بررسی کپچای گرافیکی سرور هنگام ارسال فایل یا لینک
       if (hasAttachment || safeLink) {
-        if (!captchaInput || String(captchaInput).trim() !== String(captchaExpected).trim()) {
+        if (!verifyServerGraphicalCaptcha(captchaInput, captchaToken)) {
+          const freshCaptcha = generateServerGraphicalCaptcha();
           return NextResponse.json(
             {
               success: false,
-              message: "برای ارسال فایل یا لینک، وارد کردن کد کپچای امنیتی الزامی است.",
+              ...freshCaptcha,
+              message: "کپچای امنیتی ارسال فایل/لینک صحیح نیست. تصویر جدید را وارد کنید.",
             },
             { status: 400 }
           );
@@ -375,7 +550,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(
             {
               success: false,
-              message: "سقف ارسال فایل در این گفتگو (حداکثر ۳ فایل) تکمیل شده است.",
+              message: "سقف مجاز ارسال فایل در این گفتگو (حداکثر ۳ فایل) تکمیل شده است.",
             },
             { status: 400 }
           );
@@ -387,7 +562,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(
             {
               success: false,
-              message: "فرمت فایل مجاز نیست (فقط تصاویر PNG, JPG, WebP و سند PDF مجاز است).",
+              message: "فرمت فایل مجاز نیست (فقط PNG, JPG, WebP و PDF مجاز است).",
             },
             { status: 400 }
           );
@@ -435,7 +610,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ۴. پاسخگویی بلادرنگ توسط مدیر ارشد و تمام زیرمجموعه‌ها (به‌جز نقش بیننده viewer_reporter)
+    // ۴. پاسخگویی بلادرنگ توسط مدیر ارشد و تمام نقش‌ها به‌جز نقش بیننده
     if (action === "send_admin_reply") {
       const responder = await resolveAdminResponder(req);
       if (!responder) {
@@ -491,7 +666,7 @@ export async function POST(req: NextRequest) {
         senderType: "admin",
         senderName: responder.fullName,
         senderRole: roleTitleMap[responder.role] || "کارشناس پشتیبانی",
-        text: cleanText || "📎 پاسخ پیوست شد",
+        text: cleanText || "📎 فایل پیوست ارسال شد",
         linkUrl: safeLink,
         attachmentUrl: attachmentUrl ? String(attachmentUrl) : undefined,
         attachmentName: attachmentName ? sanitizeText(attachmentName, 60) : undefined,

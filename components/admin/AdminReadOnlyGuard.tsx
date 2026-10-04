@@ -1,6 +1,6 @@
 "use client";
 // File Path: components/admin/AdminReadOnlyGuard.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { soundEngine } from "@/lib/soundEngine";
 import { canRoleWriteOnAdminPage, canRoleMutateApi } from "@/lib/roleWriteFirewall";
@@ -32,6 +32,89 @@ const ROUTE_PERM_MAP: Array<{ prefix: string; perms: string[] }> = [
   { prefix: "/admin/roles", perms: ["roles", "all"] },
 ];
 
+// کلمات کلیدی دکمه‌هایی که عملیات تغییر، افزودن، ویرایش یا حذف انجام می‌دهند و باید در حالت Read-Only قفل شوند
+const MUTATION_BUTTON_KEYWORDS = [
+  "ذخیره",
+  "ثبت",
+  "حذف",
+  "ویرایش",
+  "افزودن",
+  "ایجاد",
+  "جدید",
+  "آپلود",
+  "بارگذاری",
+  "انتشار",
+  "ارتقا",
+  "بهینه‌سازی",
+  "تولید",
+  "ارسال",
+  "پاکسازی",
+  "بازگردانی",
+  "بکاپ",
+  "تغییر",
+  "اعمال",
+  "تعمیرات",
+  "مسدود",
+  "تایید",
+  "لغو",
+  "صدور",
+  "درج",
+  "حساب جدید",
+  "کوپن",
+  "بنر جدید",
+  "مقاله جدید",
+  "کالای جدید",
+  "محصول جدید",
+  "پاسخ",
+  "فاکتور جدید",
+  "سند جدید",
+  "انبارگردانی",
+  "تست و ذخیره",
+  "حذف لوگو",
+  "پیش‌فرض",
+  "بازنشانی",
+  "همگام‌سازی",
+  "پایش و ترجمه",
+  "نمایش در هدر",
+  "پیامک",
+  "🗑️",
+  "✏️",
+  "➕",
+  "💾",
+  "☁️",
+];
+
+function isMutatingButton(btn: HTMLElement): boolean {
+  if (btn.getAttribute("type")?.toLowerCase() === "submit") return true;
+  const text = (
+    (btn.innerText || btn.textContent || "") +
+    " " +
+    (btn.getAttribute("title") || "") +
+    " " +
+    (btn.getAttribute("aria-label") || "")
+  )
+    .trim()
+    .toLowerCase();
+
+  // دکمه‌های مجاز برای بیننده (تب‌ها، مشاهده، بستن مودال، چاپ، اکسل، استعلام)
+  if (
+    text === "✕" ||
+    text.includes("بستن") ||
+    text.includes("انصراف") ||
+    text.includes("مشاهده") ||
+    text.includes("چاپ") ||
+    text.includes("اکسل") ||
+    text.includes("csv") ||
+    text.includes("استعلام")
+  ) {
+    if (!text.includes("ذخیره") && !text.includes("حذف") && !text.includes("ویرایش")) {
+      return false;
+    }
+  }
+
+  return MUTATION_BUTTON_KEYWORDS.some((kw) => text.includes(kw.toLowerCase()));
+}
+
 export default function AdminReadOnlyGuard() {
   const pathname = usePathname() || "/admin/dashboard";
   const router = useRouter();
@@ -41,6 +124,16 @@ export default function AdminReadOnlyGuard() {
     permissions?: string[];
   } | null>(null);
   const [blockedAlert, setBlockedAlert] = useState<string | null>(null);
+
+  const triggerAlert = useCallback(() => {
+    try {
+      soundEngine.playClick();
+    } catch {}
+    setBlockedAlert(
+      "⛔ قفل امنیتی نقش سازمانی: حساب شما در این بخش دارای دسترسی «👁️ فقط مشاهده (Read-Only)» است و امکان افزودن، ویرایش یا حذف اطلاعات را ندارید."
+    );
+    setTimeout(() => setBlockedAlert(null), 4000);
+  }, []);
 
   useEffect(() => {
     fetch("/api/admin/auth?t=" + Date.now(), { cache: "no-store" })
@@ -53,12 +146,16 @@ export default function AdminReadOnlyGuard() {
       .catch(() => {});
   }, [pathname]);
 
-  // ۱. بررسی اینکه آیا مدیر ارشد تیک مشاهده این منو را برای این کاربر زده است یا خیر
+  // ۱. کنترل دسترسی به مسیر بر اساس تیک‌های منو
   useEffect(() => {
     if (!adminUser) return;
-    const isSuper =
-      adminUser.role === "superadmin" || (adminUser.permissions || []).includes("all");
+    const isSuper = adminUser.role === "superadmin";
     if (isSuper) return;
+
+    if (pathname.startsWith("/admin/roles") || pathname.startsWith("/admin/change-pin")) {
+      router.replace("/admin/dashboard");
+      return;
+    }
 
     const userPerms = adminUser.permissions || ["dashboard"];
     const matchedRule = ROUTE_PERM_MAP.find((r) => pathname.startsWith(r.prefix));
@@ -75,27 +172,91 @@ export default function AdminReadOnlyGuard() {
   const isCurrentPageReadOnly =
     Boolean(adminUser) && !isSuperAdmin && !canRoleWriteOnAdminPage(role, pathname);
 
-  // ۲. مسدودسازی ارسال فرم‌ها و درخواست‌های تغییر (POST/PUT/PATCH/DELETE) در بخش‌های غیرمرتبط با نقش
+  // ۲. قفل کامل DOM (غیرفعال‌سازی فیزیکی اینپوت‌ها، سلکت‌ها، اسلایدرها و دکمه‌های ویرایش/حذف/ذخیره در صفحه)
   useEffect(() => {
-    if (!adminUser || isSuperAdmin || typeof window === "undefined") return;
+    if (!isCurrentPageReadOnly || typeof document === "undefined") return;
 
-    const triggerAlert = () => {
-      try {
-        soundEngine.playClick();
-      } catch {}
-      setBlockedAlert(
-        "⛔ دسترسی فقط مشاهده (Read-Only): بر اساس نقش سازمانی شما، مشاهده این بخش مجاز است اما امکان ذخیره، ویرایش یا حذف اطلاعات در این قسمت وجود ندارد."
-      );
-      setTimeout(() => setBlockedAlert(null), 4200);
+    const lockWorkspaceElements = () => {
+      const workspace = document.getElementById("axon-admin-main-workspace");
+      if (!workspace) return;
+
+      // الف) قفل کردن تمام input, textarea, select به جز کادرهای جستجو
+      const inputs = workspace.querySelectorAll<
+        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      >("input, textarea, select");
+
+      inputs.forEach((el) => {
+        const placeholder = (el.getAttribute("placeholder") || "").toLowerCase();
+        const isSearchBox =
+          placeholder.includes("جستجو") ||
+          placeholder.includes("search") ||
+          placeholder.includes("فیلتر");
+        if (isSearchBox) return;
+
+        el.setAttribute("data-axon-readonly-locked", "1");
+        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+          el.readOnly = true;
+        }
+        el.disabled = true;
+        el.style.opacity = "0.55";
+        el.style.cursor = "not-allowed";
+        el.style.pointerEvents = "none";
+      });
+
+      // ب) قفل کردن تمام دکمه‌های عملیاتی (ذخیره، ثبت، حذف، ویرایش، افزودن، آپلود و...)
+      const buttons = workspace.querySelectorAll<HTMLButtonElement>("button");
+      buttons.forEach((btn) => {
+        if (btn.getAttribute("data-axon-readonly-btn") === "1") return;
+        if (isMutatingButton(btn)) {
+          btn.setAttribute("data-axon-readonly-btn", "1");
+          btn.disabled = true;
+          btn.style.opacity = "0.38";
+          btn.style.cursor = "not-allowed";
+          btn.style.filter = "grayscale(100%)";
+          btn.title = "🔒 قفل شده (حالت فقط مشاهده)";
+        }
+      });
     };
 
-    const handleFormSubmit = (e: Event) => {
-      if (isCurrentPageReadOnly) {
+    lockWorkspaceElements();
+    const observer = new MutationObserver(() => {
+      lockWorkspaceElements();
+    });
+
+    const workspace = document.getElementById("axon-admin-main-workspace") || document.body;
+    observer.observe(workspace, { childList: true, subtree: true });
+
+    // مسدودسازی رویدادهای کلیک و ارسال فرم در فاز Capture
+    const handleCaptureClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const btn = target.closest("button");
+      if (btn && isMutatingButton(btn)) {
         e.preventDefault();
         e.stopPropagation();
         triggerAlert();
       }
     };
+
+    const handleCaptureSubmit = (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+      triggerAlert();
+    };
+
+    document.addEventListener("click", handleCaptureClick, true);
+    document.addEventListener("submit", handleCaptureSubmit, true);
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("click", handleCaptureClick, true);
+      document.removeEventListener("submit", handleCaptureSubmit, true);
+    };
+  }, [isCurrentPageReadOnly, pathname, triggerAlert]);
+
+  // ۳. مسدودسازی تمام درخواست‌های شبکه (چه به /api/ و چه مستقیم به Supabase REST/Storage)
+  useEffect(() => {
+    if (!adminUser || isSuperAdmin || typeof window === "undefined") return;
 
     const originalFetch = window.fetch;
     window.fetch = async function (input: RequestInfo | URL, init?: RequestInit) {
@@ -103,6 +264,17 @@ export default function AdminReadOnlyGuard() {
       const urlStr = typeof input === "string" ? input : input.toString();
 
       if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+        // مسدود کردن درخواست‌های مستقیم مرورگر به Supabase در حالت Read-Only
+        if (urlStr.includes(".supabase.co/rest/") || urlStr.includes(".supabase.co/storage/")) {
+          if (isCurrentPageReadOnly || role === "viewer_reporter") {
+            triggerAlert();
+            return new Response(
+              JSON.stringify({ message: "Read-only role cannot mutate database" }),
+              { status: 403, headers: { "Content-Type": "application/json" } }
+            );
+          }
+        }
+
         let apiPath = urlStr;
         try {
           if (urlStr.startsWith("http")) {
@@ -117,7 +289,7 @@ export default function AdminReadOnlyGuard() {
               success: false,
               readOnly: true,
               message:
-                "⛔ بر اساس نقش سازمانی شما، این بخش در حالت «فقط مشاهده» قرار دارد و امکان تغییر اطلاعات وجود ندارد.",
+                "⛔ حساب شما در این بخش دارای سطح دسترسی «فقط مشاهده (Read-Only)» است و امکان تغییر اطلاعات وجود ندارد.",
             }),
             {
               status: 403,
@@ -129,26 +301,24 @@ export default function AdminReadOnlyGuard() {
       return originalFetch.apply(this, [input, init as any]);
     };
 
-    document.addEventListener("submit", handleFormSubmit, true);
     return () => {
       window.fetch = originalFetch;
-      document.removeEventListener("submit", handleFormSubmit, true);
     };
-  }, [adminUser, isSuperAdmin, isCurrentPageReadOnly, role]);
+  }, [adminUser, isSuperAdmin, isCurrentPageReadOnly, role, triggerAlert]);
 
   if (!isCurrentPageReadOnly) return null;
 
   return (
-    <div className="mb-4 space-y-2 font-sans select-text" dir="rtl">
-      <div className="p-3.5 px-5 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-500 text-xs font-black flex flex-wrap items-center justify-between gap-2 shadow-sm">
-        <div className="flex items-center gap-2">
-          <span className="text-base">👁️</span>
+    <div className="mb-5 space-y-2 font-sans select-text" dir="rtl">
+      <div className="p-4 px-5 rounded-3xl bg-amber-500/15 border-2 border-amber-500/50 text-amber-400 text-xs font-black flex flex-wrap items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center gap-2.5">
+          <span className="text-lg">🔒</span>
           <span>
-            حالت فقط مشاهده (Read-Only): این بخش توسط مدیر ارشد صرفاً جهت مشاهده و گزارش‌گیری برای نقش شما باز شده است و امکان ویرایش یا حذف اطلاعات در این قسمت وجود ندارد.
+            حالت «فقط مشاهده و گزارش‌گیری (Read-Only)» فعال است — حساب @{adminUser?.username} مجاز به مشاهده آمار و صفحات است، اما تمامی دکمه‌های ذخیره، افزودن، ویرایش و حذف برای این نقش قفل شده‌اند.
           </span>
         </div>
-        <span className="px-2.5 py-1 rounded-lg bg-amber-500 text-slate-950 font-mono text-[10px] font-black">
-          VIEW ONLY SCOPE
+        <span className="px-3 py-1 rounded-xl bg-amber-500 text-slate-950 font-mono text-[10px] font-black shrink-0">
+          READ-ONLY LOCKED
         </span>
       </div>
 

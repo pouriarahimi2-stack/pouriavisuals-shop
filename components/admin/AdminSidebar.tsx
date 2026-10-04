@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
+import { canRoleWriteModule } from "@/lib/roleWriteFirewall";
 
 export interface SidebarNavItem {
   id: string;
@@ -11,29 +12,31 @@ export interface SidebarNavItem {
   href: string;
   icon: string;
   badge?: string;
+  permKey: string;
   requiredPerm: string[];
 }
 
 export const UNIFIED_ADMIN_NAV: SidebarNavItem[] = [
-  { id: "dashboard", label: "داشبورد تحلیلی و فرماندهی", href: "/admin/dashboard", icon: "📊", requiredPerm: ["dashboard", "all"] },
-  { id: "inventory_hub", label: "حسابداری، انبار، سفارشات و مالی", href: "/admin/inventory", icon: "🏛️", badge: "یکپارچه", requiredPerm: ["inventory", "orders", "financial", "reports", "all"] },
-  { id: "products", label: "کاتالوگ محصولات و قیمت‌ها", href: "/admin/products", icon: "🛍️", requiredPerm: ["products", "all"] },
-  { id: "banners", label: "بنرها و اسلایدر محصولات", href: "/admin/banners", icon: "🖼️", requiredPerm: ["banners", "all"] },
-  { id: "customers", label: "مشتریان (CRM) و پیامک", href: "/admin/customers", icon: "👥", requiredPerm: ["customers", "all"] },
-  { id: "coupons", label: "کدهای تخفیف زمان‌دار و هدفمند", href: "/admin/coupons", icon: "🏷️", requiredPerm: ["coupons", "all"] },
-  { id: "appearance_hub", label: "استودیوی ظاهر، منوها و صفحه‌ساز", href: "/admin/appearance", icon: "🎨", badge: "یکپارچه", requiredPerm: ["appearance", "menu", "pages", "all"] },
-  { id: "styles", label: "هویت بصری، فونت‌ها و CSS", href: "/admin/styles", icon: "✨", requiredPerm: ["appearance", "styles", "all"] },
-  { id: "seo", label: "دستیار تخصصی سئو (رنک ۱)", href: "/admin/seo", icon: "🚀", badge: "SEO", requiredPerm: ["seo", "all"] },
-  { id: "blog", label: "وبلاگ و مقالات سئو (متصل به کالا)", href: "/admin/blog", icon: "📚", requiredPerm: ["blog", "seo", "all"] },
-  { id: "news", label: "رادار خودکار اخبار فناوری", href: "/admin/news", icon: "📡", requiredPerm: ["news", "seo", "all"] },
-  { id: "ai", label: "مرکز هوش مصنوعی و کوپایلوت", href: "/admin/ai", icon: "🤖", requiredPerm: ["ai", "all"] },
-  { id: "messages", label: "تیکت‌ها و پیام‌های کاربران", href: "/admin/messages", icon: "📩", requiredPerm: ["messages", "all"] },
-  { id: "reviews", label: "دیدگاه‌ها و رضایت خریداران", href: "/admin/reviews", icon: "⭐", requiredPerm: ["reviews", "all"] },
-  { id: "roles", label: "مدیران و ماتریس دسترسی‌ها", href: "/admin/roles", icon: "🛡️", requiredPerm: ["roles", "all"] },
-  { id: "change_pin", label: "تغییر رمز عبور و پین امنیتی", href: "/admin/change-pin", icon: "🔐", requiredPerm: ["dashboard", "all"] },
-  { id: "audit_logs", label: "لاگ‌های امنیتی و اسکنر هوشمند", href: "/admin/audit-logs", icon: "🚨", requiredPerm: ["audit_logs", "all"] },
-  { id: "backup", label: "بکاپ خودکار روزانه و بازیابی", href: "/admin/backup", icon: "💾", requiredPerm: ["backup", "all"] },
-  { id: "settings", label: "تنظیمات کلان و حالت تعمیرات", href: "/admin/settings", icon: "⚙️", requiredPerm: ["settings", "all"] },
+  { id: "dashboard", permKey: "dashboard", label: "داشبورد تحلیلی و فرماندهی", href: "/admin/dashboard", icon: "📊", requiredPerm: ["dashboard", "all"] },
+  { id: "inventory_hub", permKey: "inventory", label: "حسابداری، انبار، سفارشات و مالی", href: "/admin/inventory", icon: "🏛️", badge: "یکپارچه", requiredPerm: ["inventory", "orders", "financial", "reports", "all"] },
+  { id: "products", permKey: "products", label: "کاتالوگ محصولات و قیمت‌ها", href: "/admin/products", icon: "🛍️", requiredPerm: ["products", "all"] },
+  { id: "torob", permKey: "products", label: "مرکز آمار و رادار زنده تُرب", href: "/admin/torob", icon: "🔍", badge: "ترب", requiredPerm: ["products", "seo", "reports", "all"] },
+  { id: "banners", permKey: "banners", label: "بنرها و اسلایدر محصولات", href: "/admin/banners", icon: "🖼️", requiredPerm: ["banners", "all"] },
+  { id: "customers", permKey: "customers", label: "مشتریان (CRM) و پیامک", href: "/admin/customers", icon: "👥", requiredPerm: ["customers", "all"] },
+  { id: "coupons", permKey: "coupons", label: "کدهای تخفیف زمان‌دار و هدفمند", href: "/admin/coupons", icon: "🏷️", requiredPerm: ["coupons", "all"] },
+  { id: "appearance_hub", permKey: "appearance", label: "استودیوی ظاهر، منوها و صفحه‌ساز", href: "/admin/appearance", icon: "🎨", badge: "یکپارچه", requiredPerm: ["appearance", "menu", "pages", "all"] },
+  { id: "styles", permKey: "styles", label: "هویت بصری، فونت‌ها و CSS", href: "/admin/styles", icon: "✨", requiredPerm: ["appearance", "styles", "all"] },
+  { id: "seo", permKey: "seo", label: "دستیار تخصصی سئو (رنک ۱)", href: "/admin/seo", icon: "🚀", badge: "SEO", requiredPerm: ["seo", "all"] },
+  { id: "blog", permKey: "blog", label: "وبلاگ و مقالات سئو (متصل به کالا)", href: "/admin/blog", icon: "📚", requiredPerm: ["blog", "seo", "all"] },
+  { id: "news", permKey: "news", label: "رادار خودکار اخبار فناوری", href: "/admin/news", icon: "📡", requiredPerm: ["news", "seo", "all"] },
+  { id: "ai", permKey: "ai", label: "مرکز هوش مصنوعی و کوپایلوت", href: "/admin/ai", icon: "🤖", requiredPerm: ["ai", "all"] },
+  { id: "messages", permKey: "messages", label: "تیکت‌ها و پیام‌های کاربران", href: "/admin/messages", icon: "📩", requiredPerm: ["messages", "all"] },
+  { id: "reviews", permKey: "reviews", label: "دیدگاه‌ها و رضایت خریداران", href: "/admin/reviews", icon: "⭐", requiredPerm: ["reviews", "all"] },
+  { id: "roles", permKey: "roles", label: "مدیران و ماتریس دسترسی‌ها", href: "/admin/roles", icon: "🛡️", requiredPerm: ["roles", "all"] },
+  { id: "change_pin", permKey: "change_pin", label: "تغییر رمز عبور و پین امنیتی", href: "/admin/change-pin", icon: "🔐", requiredPerm: ["settings", "all"] },
+  { id: "audit_logs", permKey: "audit_logs", label: "لاگ‌های امنیتی و اسکنر هوشمند", href: "/admin/audit-logs", icon: "🚨", requiredPerm: ["audit_logs", "all"] },
+  { id: "backup", permKey: "backup", label: "بکاپ خودکار روزانه و بازیابی", href: "/admin/backup", icon: "💾", requiredPerm: ["backup", "all"] },
+  { id: "settings", permKey: "settings", label: "تنظیمات کلان و حالت تعمیرات", href: "/admin/settings", icon: "⚙️", requiredPerm: ["settings", "all"] },
 ];
 
 export function AdminSidebar(props: any = {}) {
@@ -43,6 +46,7 @@ export function AdminSidebar(props: any = {}) {
     role?: string;
     permissions?: string[];
   } | null>(null);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [customLabels, setCustomLabels] = useState<Record<string, string>>({});
   const [customIcons, setCustomIcons] = useState<Record<string, string>>({});
@@ -53,8 +57,8 @@ export function AdminSidebar(props: any = {}) {
   const fetchSessionAndLabels = async () => {
     try {
       const [authRes, tbRes] = await Promise.all([
-        fetch("/api/admin/auth", { cache: "no-store" }).catch(() => null),
-        fetch("/api/theme-builder", { cache: "no-store" }).catch(() => null),
+        fetch("/api/admin/auth?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
+        fetch("/api/theme-builder?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
       ]);
       if (authRes && authRes.ok) {
         const json = await authRes.json();
@@ -68,7 +72,10 @@ export function AdminSidebar(props: any = {}) {
         if (saved.icons) setCustomIcons(saved.icons);
         if (saved.fontSize) setSidebarFontSize(Number(saved.fontSize));
       }
-    } catch {}
+    } catch {
+    } finally {
+      setSessionLoaded(true);
+    }
   };
 
   useEffect(() => {
@@ -86,7 +93,12 @@ export function AdminSidebar(props: any = {}) {
     };
   }, []);
 
+  const userRole = adminUser?.role || "viewer_reporter";
+  const isSuper = userRole === "superadmin";
+  const userPerms = adminUser?.permissions || (sessionLoaded ? ["dashboard"] : []);
+
   const handleSaveCustomLabels = async () => {
+    if (!isSuper) return;
     soundEngine.playClick();
     setSavingLabels(true);
     try {
@@ -112,10 +124,11 @@ export function AdminSidebar(props: any = {}) {
     }
   };
 
-  const userPerms = adminUser?.permissions || ["all"];
-  const isSuper = adminUser?.role === "superadmin" || userPerms.includes("all");
   const allowedMenuItems = UNIFIED_ADMIN_NAV.filter((item) => {
+    if (!sessionLoaded) return item.id === "dashboard";
     if (isSuper) return true;
+    // صفحه مدیریت مدیران (/admin/roles) و تغییر پین فقط مخصوص مالک سایت (superadmin) است
+    if (item.id === "roles" || item.id === "change_pin") return false;
     return item.requiredPerm.some((p) => userPerms.includes(p));
   });
 
@@ -124,7 +137,7 @@ export function AdminSidebar(props: any = {}) {
     if (role === "product_manager") return "📦 مدیر کاتالوگ و انبار";
     if (role === "order_manager") return "💳 پشتیبان سفارشات و مالی";
     if (role === "content_seo_manager") return "🚀 کارشناس محتوا و سئو";
-    if (role === "viewer_reporter") return "👁️ بیننده و گزارش‌دهنده";
+    if (role === "viewer_reporter") return "👁️ بیننده و گزارش‌دهنده (فقط مشاهده)";
     return "🛡 مدیر سیستم";
   };
 
@@ -157,26 +170,34 @@ export function AdminSidebar(props: any = {}) {
         <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="font-black text-xs text-[var(--accent-blue)]">AXON ADMIN OS</span>
-            <button
-              type="button"
-              onClick={() => {
-                soundEngine.playClick();
-                setIsEditingLabels(!isEditingLabels);
-              }}
-              className="px-2 py-0.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[10px] font-bold cursor-pointer"
-            >
-              {isEditingLabels ? "✕ بستن" : "✏️ ویرایش منوها"}
-            </button>
+            {/* دکمه ویرایش منوها منحصراً برای مدیر ارشد (superadmin) نمایش داده می‌شود */}
+            {isSuper && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playClick();
+                  setIsEditingLabels(!isEditingLabels);
+                }}
+                className="px-2 py-0.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[10px] font-bold cursor-pointer"
+              >
+                {isEditingLabels ? "✕ بستن" : "✏️ ویرایش منوها"}
+              </button>
+            )}
           </div>
           <div className="text-[11px] font-bold text-[var(--text-primary)] truncate">
-            {adminUser?.username ? "حساب: @" + adminUser.username : "مدیریت یکپارچه سایت"}
+            {adminUser?.username ? "حساب: @" + adminUser.username : "در حال بررسی نشست..."}
           </div>
-          <div className="text-[10px] font-bold text-emerald-400">
-            {getRoleBadgeLabel(adminUser?.role)}
+          <div
+            className={
+              "text-[10px] font-black " +
+              (userRole === "viewer_reporter" ? "text-amber-400" : "text-emerald-400")
+            }
+          >
+            {getRoleBadgeLabel(userRole)}
           </div>
         </div>
 
-        {isEditingLabels && (
+        {isSuper && isEditingLabels && (
           <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--accent-blue)] space-y-2.5 text-[11px]">
             <div className="flex items-center justify-between">
               <span className="font-black text-[var(--accent-blue)]">سایز فونت منو:</span>
@@ -263,6 +284,8 @@ export function AdminSidebar(props: any = {}) {
                 ? customIcons[item.id]
                 : item.icon;
 
+            const isReadOnlyItem = !isSuper && !canRoleWriteModule(userRole, item.permKey);
+
             return (
               <Link
                 key={item.id}
@@ -285,7 +308,19 @@ export function AdminSidebar(props: any = {}) {
                   <span className="text-sm shrink-0">{displayIcon}</span>
                   <span className="truncate">{displayLabel}</span>
                 </div>
-                {item.badge && (
+                {isReadOnlyItem ? (
+                  <span
+                    className={
+                      "px-1.5 py-0.5 rounded-md text-[9px] font-black shrink-0 " +
+                      (isActive
+                        ? "bg-black/25 text-amber-200"
+                        : "bg-amber-500/15 text-amber-400")
+                    }
+                    title="فقط مشاهده (بدون امکان ویرایش)"
+                  >
+                    👁️ مشاهده
+                  </span>
+                ) : item.badge ? (
                   <span
                     className={
                       "px-2 py-0.5 rounded-md text-[9px] font-black shrink-0 " +
@@ -296,7 +331,7 @@ export function AdminSidebar(props: any = {}) {
                   >
                     {item.badge}
                   </span>
-                )}
+                ) : null}
               </Link>
             );
           })}

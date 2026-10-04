@@ -1,12 +1,13 @@
 "use client";
 // File Path: app/admin/layout.tsx
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminReadOnlyGuard from "@/components/admin/AdminReadOnlyGuard";
 import { soundEngine } from "@/lib/soundEngine";
 import { themeEngine } from "@/lib/themeEngine";
+import { supabase } from "@/lib/supabase";
 
 const SUPERADMIN_THEME_STORAGE_KEY = "axon_superadmin_panel_theme_v2026";
 
@@ -65,6 +66,147 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     ui_theme?: "dark" | "light";
   } | null>(null);
   const [activeTheme, setActiveTheme] = useState<"dark" | "light">("dark");
+  const wsChannelRef = useRef<any>(null);
+
+  const pushLiveTelemetry = useCallback(
+    (payload: {
+      eventType: string;
+      path: string;
+      subTab?: string;
+      method?: string;
+      details: string;
+    }) => {
+      if (typeof window === "undefined") return;
+      const screenRes = window.screen
+        ? `${window.screen.width}x${window.screen.height}`
+        : "";
+      const bodyData = {
+        ...payload,
+        screenResolution: screenRes,
+        timestamp: new Date().toISOString(),
+      };
+
+      // ۱. ارسال فوری از طریق وب‌سوکت Supabase Realtime و BroadcastChannel برای نمایش آنی زیر ۱۰۰ میلی‌ثانیه
+      try {
+        if (wsChannelRef.current) {
+          wsChannelRef.current.send({
+            type: "broadcast",
+            event: "subadmin_live_action",
+            payload: bodyData,
+          });
+        }
+        const bc = new BroadcastChannel("axon_subadmin_live_monitor");
+        bc.postMessage(bodyData);
+        bc.close();
+      } catch {}
+
+      // ۲. ثبت پایدار در سرور و دیتابیس
+      fetch("/api/admin/monitoring", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bodyData),
+      }).catch(() => {});
+    },
+    []
+  );
+
+  // راه‌اندازی کانال وب‌سوکت سراسری پنل ادمین
+  useEffect(() => {
+    if (pathname.startsWith("/admin/login") || pathname.startsWith("/admin/setup")) return;
+    const ch = supabase
+      .channel("axon-live-monitoring-bus")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "site_info" },
+        () => {
+          syncAdminSessionAndTheme();
+        }
+      )
+      .subscribe();
+    wsChannelRef.current = ch;
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [pathname]);
+
+  // رصد بلادرنگ تغییر صفحه، کلیک روی تب‌ها و دکمه‌ها، و جستجوها
+  useEffect(() => {
+    if (pathname.startsWith("/admin/login") || pathname.startsWith("/admin/setup")) return;
+
+    pushLiveTelemetry({
+      eventType: "page_view",
+      path: pathname,
+      method: "VIEW",
+      details: "👁️ ورود و مشاهده بخش " + pathname,
+    });
+
+    const hbTimer = setInterval(() => {
+      pushLiveTelemetry({
+        eventType: "heartbeat",
+        path: pathname,
+        details: "🟢 حضور آنلاین در " + pathname,
+      });
+    }, 8000);
+
+    // شنود تمام کلیک‌های کاربر روی تب‌ها و دکمه‌های محیط کاری
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const btn = target.closest("button, a");
+      if (!btn) return;
+      const text = (btn.textContent || btn.getAttribute("title") || "").trim().slice(0, 70);
+      if (!text) return;
+
+      const isTabSwitch = /^[🧭🏛📑🌳⚡🏭📦📈🎯✏️📡💻📊📋🔍🚀📚🤖]*s*[۱۱۲۳۴۵12345]./.test(text);
+      if (isTabSwitch) {
+        pushLiveTelemetry({
+          eventType: "tab_switch",
+          path: pathname,
+          subTab: text,
+          method: "TAB",
+          details: "📑 تغییر تب به: «" + text + "»",
+        });
+      } else if (!text.includes("خروج امن")) {
+        pushLiveTelemetry({
+          eventType: "click_action",
+          path: pathname,
+          method: "CLICK",
+          details: "🖱️ کلیک روی دکمه/گزینه: «" + text + "»",
+        });
+      }
+    };
+
+    // شنود جستجوها و فیلترهایی که کاربر تایپ یا انتخاب می‌کند
+    let searchDebounce: any = null;
+    const handleGlobalInput = (e: Event) => {
+      const el = e.target as HTMLInputElement | HTMLSelectElement | null;
+      if (!el) return;
+      if (el.type === "password") return;
+      const val = String(el.value || "").trim();
+      if (!val) return;
+      const placeholder = el.getAttribute("placeholder") || el.name || "فیلد";
+
+      if (searchDebounce) clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(() => {
+        pushLiveTelemetry({
+          eventType: "search_filter",
+          path: pathname,
+          method: "INPUT",
+          details: `🔍 ورود/انتخاب مقدار «${val.slice(0, 40)}» در (${placeholder.slice(0, 35)})`,
+        });
+      }, 900);
+    };
+
+    document.addEventListener("click", handleGlobalClick, true);
+    document.addEventListener("change", handleGlobalInput, true);
+
+    return () => {
+      clearInterval(hbTimer);
+      if (searchDebounce) clearTimeout(searchDebounce);
+      document.removeEventListener("click", handleGlobalClick, true);
+      document.removeEventListener("change", handleGlobalInput, true);
+    };
+  }, [pathname, pushLiveTelemetry]);
 
   const syncAdminSessionAndTheme = useCallback(async () => {
     try {
@@ -86,39 +228,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     } catch {}
   }, []);
 
-  // ارسال لحظه‌ای صفحه در حال بازدید و وضعیت آنلاین (Heartbeat) به رادار نظارت مدیر ارشد
-  useEffect(() => {
-    if (pathname.startsWith("/admin/login") || pathname.startsWith("/admin/setup")) return;
-    fetch("/api/admin/monitoring", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        eventType: "page_view",
-        path: pathname,
-        method: "VIEW",
-        details: "👁️ ورود و مشاهده صفحه " + pathname,
-      }),
-    }).catch(() => {});
-
-    const hbTimer = setInterval(() => {
-      fetch("/api/admin/monitoring", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          eventType: "heartbeat",
-          path: pathname,
-        }),
-      }).catch(() => {});
-    }, 20000);
-
-    return () => clearInterval(hbTimer);
-  }, [pathname]);
-
   useEffect(() => {
     if (pathname.startsWith("/admin/login") || pathname.startsWith("/admin/setup")) return;
     syncAdminSessionAndTheme();
 
-    // همگام‌سازی خودکار در صورت تغییر تم توسط مدیر ارشد
     const onCustomThemeEvent = (e: any) => {
       const nextMode: "dark" | "light" = e?.detail === "light" ? "light" : "dark";
       setActiveTheme(nextMode);
@@ -175,16 +288,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const handleLogout = async () => {
     soundEngine.playClick();
     try {
-      await fetch("/api/admin/monitoring", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          eventType: "logout",
-          path: pathname,
-          method: "LOGOUT",
-          details: "🚪 خروج از پنل مدیریت",
-        }),
-      }).catch(() => {});
+      pushLiveTelemetry({
+        eventType: "logout",
+        path: pathname,
+        method: "LOGOUT",
+        details: "🚪 خروج از پنل مدیریت",
+      });
       await fetch("/api/admin/logout", { method: "POST" });
     } catch {}
     router.replace("/admin/login");
@@ -197,7 +306,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       className="min-h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-text transition-colors duration-300"
       dir="rtl"
     >
-      {/* استایل سراسری برای تبدیل ۱۰۰٪ کارت‌های دارای کلاس تیره در داشبورد و سایر صفحات به تم روشن هنگام فعال بودن Light Mode */}
       <style>{
         activeTheme === "light"
           ? `
@@ -268,7 +376,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         <div className="flex items-center gap-2 text-xs">
-          {/* دکمه تغییر تم دارک و لایت منحصراً برای مدیر ارشد (Super Admin) */}
           {isSuperAdmin && (
             <button
               type="button"
@@ -298,7 +405,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </header>
 
-      {/* بدنه اصلی پنل ادمین شامل سایدبار و محیط کاری محافظت‌شده */}
       <div className="flex-1 flex flex-col lg:flex-row">
         <AdminSidebar />
         <main

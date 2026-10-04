@@ -44,14 +44,13 @@ async function resolveCurrentSessionUser(req: NextRequest) {
   }
 }
 
-// GET: منحصراً مخصوص مدیر ارشد کل سیستم (superadmin) برای مشاهده زنده عملکرد زیرمجموعه‌ها
 export async function GET(req: NextRequest) {
   const currentUser = await resolveCurrentSessionUser(req);
   if (!currentUser || currentUser.role !== "superadmin") {
     return NextResponse.json(
       {
         success: false,
-        message: "⛔ دسترسی غیرمجاز! بخش نظارت زنده بر مدیران منحصراً در اختیار مدیر ارشد (مالک سایت) است.",
+        message: "⛔ دسترسی غیرمجاز! بخش نظارت زنده بر مدیران منحصراً در اختیار مدیر ارشد است.",
       },
       { status: 403 }
     );
@@ -69,8 +68,8 @@ export async function GET(req: NextRequest) {
       const key = u.username.toLowerCase();
       const p = snapshot.presenceMap[key];
       const lastActiveMs = p?.lastActiveAt ? new Date(p.lastActiveAt).getTime() : 0;
-      // اگر در ۷۵ ثانیه اخیر فعالیت یا Heartbeat داشته، آنلاین محسوب می‌شود
-      const isOnline = lastActiveMs > 0 && nowMs - lastActiveMs < 75 * 1000;
+      const secondsAgo = lastActiveMs > 0 ? Math.max(0, Math.floor((nowMs - lastActiveMs) / 1000)) : null;
+      const isOnline = secondsAgo !== null && secondsAgo < 45;
 
       const sectionVisitsObj = p?.sectionVisits || {};
       const topSections = Object.entries(sectionVisitsObj)
@@ -85,13 +84,21 @@ export async function GET(req: NextRequest) {
         permissions: u.permissions || [],
         ui_theme: u.ui_theme || "dark",
         isOnline,
+        secondsAgo,
         currentPath: p?.currentPath || "—",
         currentSectionTitle: p?.currentSectionTitle || "هنوز وارد نشده",
+        currentSubTab: p?.currentSubTab || "—",
+        lastActionDetails: p?.lastActionDetails || "بدون فعالیت ثبت‌شده",
         ip: p?.ip || "—",
+        os: p?.os || "—",
+        browser: p?.browser || "—",
+        deviceType: p?.deviceType || "—",
+        screenResolution: p?.screenResolution || "—",
         lastActiveAt: p?.lastActiveAt || null,
         lastLoginAt: p?.lastLoginAt || null,
         totalLogins: Number(p?.totalLogins || 0),
         totalPageViews: Number(p?.totalPageViews || 0),
+        totalClicks: Number(p?.totalClicks || 0),
         totalActions: Number(p?.totalActions || 0),
         totalBlocked: Number(p?.totalBlocked || 0),
         topSections,
@@ -108,6 +115,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
+        serverTime: new Date().toISOString(),
         summary: {
           totalUsers: monitoredUsers.length,
           subAdminsCount,
@@ -125,7 +133,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST: ثبت تله‌متری لحظه‌ای بازدید صفحات از سمت پنل زیرمجموعه‌ها + پاکسازی لاگ‌ها توسط مدیر ارشد
 export async function POST(req: NextRequest) {
   const currentUser = await resolveCurrentSessionUser(req);
   if (!currentUser) {
@@ -175,9 +182,11 @@ export async function POST(req: NextRequest) {
       role: currentUser.role,
       eventType,
       path: targetPath,
+      subTab: body.subTab ? String(body.subTab) : undefined,
       method: body.method || "VIEW",
       details,
       ip,
+      screenResolution: body.screenResolution ? String(body.screenResolution) : undefined,
       userAgent: ua,
     });
 

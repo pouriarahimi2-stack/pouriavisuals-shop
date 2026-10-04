@@ -5,6 +5,9 @@ export type MonitorEventType =
   | "login"
   | "logout"
   | "page_view"
+  | "tab_switch"
+  | "click_action"
+  | "search_filter"
   | "heartbeat"
   | "action_success"
   | "action_blocked";
@@ -21,6 +24,10 @@ export interface SubAdminActivityEvent {
   method?: string;
   details: string;
   ip: string;
+  os: string;
+  browser: string;
+  deviceType: string;
+  screenResolution: string;
   userAgent: string;
   timestamp: string;
 }
@@ -31,11 +38,18 @@ export interface SubAdminPresenceState {
   role: string;
   currentPath: string;
   currentSectionTitle: string;
+  currentSubTab: string;
+  lastActionDetails: string;
   ip: string;
+  os: string;
+  browser: string;
+  deviceType: string;
+  screenResolution: string;
   lastActiveAt: string;
   lastLoginAt?: string;
   totalLogins: number;
   totalPageViews: number;
+  totalClicks: number;
   totalActions: number;
   totalBlocked: number;
   sectionVisits: Record<string, number>;
@@ -62,26 +76,53 @@ const SECTION_LABELS_MAP: Array<{ match: string; key: string; title: string }> =
   { match: "/admin/messages", key: "messages", title: "📩 تیکت‌ها و پیام‌های کاربران" },
   { match: "/admin/reviews", key: "reviews", title: "⭐ دیدگاه‌ها و نظرات" },
   { match: "/admin/roles", key: "roles", title: "🛡️ مدیران و ماتریس دسترسی‌ها" },
-  { match: "/admin/monitoring", key: "monitoring", title: "👁️‍🗨️ رادار نظارت بر مدیران" },
+  { match: "/admin/monitoring", key: "monitoring", title: "👁️‍🗨️ رادار نظارت زنده بر مدیران" },
   { match: "/admin/change-pin", key: "change_pin", title: "🔐 تغییر رمز و پین امنیتی" },
   { match: "/admin/audit-logs", key: "audit_logs", title: "🚨 لاگ‌های امنیتی" },
   { match: "/admin/backup", key: "backup", title: "💾 بکاپ و بازیابی دیتابیس" },
   { match: "/admin/settings", key: "settings", title: "⚙️ تنظیمات کلان و تعمیرات" },
-  { match: "/api/products", key: "products", title: "🛍️ API کاتالوگ محصولات" },
-  { match: "/api/admin/products", key: "products", title: "🛍️ API مدیریت محصولات" },
-  { match: "/api/accounting", key: "inventory", title: "🏛️ API حسابداری و انبار" },
-  { match: "/api/admin/orders", key: "orders", title: "📦 API مدیریت سفارشات" },
-  { match: "/api/admin/coupons", key: "coupons", title: "🏷️ API کدهای تخفیف" },
-  { match: "/api/admin/banners", key: "banners", title: "🖼️ API بنرها و اسلایدر" },
-  { match: "/api/blogs", key: "blog", title: "📚 API مقالات وبلاگ" },
-  { match: "/api/news", key: "news", title: "📡 API رادار اخبار" },
-  { match: "/api/admin/seo-audit", key: "seo", title: "🚀 API ممیزی و بهینه‌سازی سئو" },
-  { match: "/api/theme-builder", key: "appearance", title: "🎨 API استودیوی ظاهر" },
-  { match: "/api/site-info", key: "settings", title: "⚙️ API اطلاعات و تنظیمات سایت" },
-  { match: "/api/admin/settings", key: "settings", title: "⚙️ API تنظیمات کلان" },
-  { match: "/api/admin/backup", key: "backup", title: "💾 API بکاپ دیتابیس" },
-  { match: "/api/admin/users", key: "roles", title: "🛡️ API مدیریت نقش‌ها" },
+  { match: "/api/products", key: "products", title: "🛍️ وب‌سرویس کاتالوگ محصولات" },
+  { match: "/api/admin/products", key: "products", title: "🛍️ وب‌سرویس مدیریت محصولات" },
+  { match: "/api/accounting", key: "inventory", title: "🏛️ وب‌سرویس حسابداری و انبار" },
+  { match: "/api/admin/orders", key: "orders", title: "📦 وب‌سرویس مدیریت سفارشات" },
+  { match: "/api/admin/coupons", key: "coupons", title: "🏷️ وب‌سرویس کدهای تخفیف" },
+  { match: "/api/admin/banners", key: "banners", title: "🖼️ وب‌سرویس بنرها و اسلایدر" },
+  { match: "/api/blogs", key: "blog", title: "📚 وب‌سرویس مقالات وبلاگ" },
+  { match: "/api/news", key: "news", title: "📡 وب‌سرویس رادار اخبار" },
+  { match: "/api/admin/seo-audit", key: "seo", title: "🚀 وب‌سرویس ممیزی سئو" },
+  { match: "/api/theme-builder", key: "appearance", title: "🎨 وب‌سرویس استودیوی ظاهر" },
+  { match: "/api/site-info", key: "settings", title: "⚙️ وب‌سرویس اطلاعات سایت" },
+  { match: "/api/admin/settings", key: "settings", title: "⚙️ وب‌سرویس تنظیمات کلان" },
+  { match: "/api/admin/backup", key: "backup", title: "💾 وب‌سرویس بکاپ دیتابیس" },
+  { match: "/api/admin/users", key: "roles", title: "🛡️ وب‌سرویس مدیریت نقش‌ها" },
 ];
+
+export function parseUserAgentDetails(uaRaw: string): {
+  os: string;
+  browser: string;
+  deviceType: string;
+} {
+  const ua = String(uaRaw || "");
+  let os = "نامشخص";
+  if (/Windows NT 10|Windows NT 11/i.test(ua)) os = "Windows 10/11";
+  else if (/Windows/i.test(ua)) os = "Windows";
+  else if (/Mac OS X/i.test(ua) && !/iPhone|iPad/i.test(ua)) os = "macOS";
+  else if (/Android/i.test(ua)) os = "Android";
+  else if (/iPhone|iPad|iPod/i.test(ua)) os = "iOS";
+  else if (/Linux/i.test(ua)) os = "Linux";
+
+  let browser = "مرورگر وب";
+  if (/Edg\//i.test(ua)) browser = "Microsoft Edge";
+  else if (/Chrome\//i.test(ua) && !/Edg\//i.test(ua)) browser = "Google Chrome";
+  else if (/Firefox\//i.test(ua)) browser = "Mozilla Firefox";
+  else if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua)) browser = "Apple Safari";
+
+  let deviceType = "💻 دسکتاپ";
+  if (/Mobile|Android|iPhone/i.test(ua)) deviceType = "📱 موبایل";
+  else if (/iPad|Tablet/i.test(ua)) deviceType = "📟 تبلت";
+
+  return { os, browser, deviceType };
+}
 
 export function resolveSectionFromPath(rawPath: string): { key: string; title: string } {
   const clean = String(rawPath || "").trim();
@@ -92,7 +133,6 @@ export function resolveSectionFromPath(rawPath: string): { key: string; title: s
   return { key: "general", title: "🌐 پنل مدیریت" };
 }
 
-// کش حافظه سرور برای پاسخ‌دهی فوری در کنار ذخیره‌سازی پایدار در دیتابیس
 const memoryEventsBuffer: SubAdminActivityEvent[] = [];
 const memoryPresenceMap: Record<string, SubAdminPresenceState> = {};
 
@@ -102,9 +142,11 @@ export async function recordSubAdminActivity(params: {
   role: string;
   eventType: MonitorEventType;
   path: string;
+  subTab?: string;
   method?: string;
   details?: string;
   ip?: string;
+  screenResolution?: string;
   userAgent?: string;
 }): Promise<void> {
   try {
@@ -112,6 +154,7 @@ export async function recordSubAdminActivity(params: {
     const lowerKey = uname.toLowerCase();
     const nowIso = new Date().toISOString();
     const sec = resolveSectionFromPath(params.path);
+    const uaInfo = parseUserAgentDetails(params.userAgent || "");
 
     const prevPresence: SubAdminPresenceState = memoryPresenceMap[lowerKey] || {
       username: uname,
@@ -119,10 +162,17 @@ export async function recordSubAdminActivity(params: {
       role: params.role || "viewer_reporter",
       currentPath: params.path || "/admin/dashboard",
       currentSectionTitle: sec.title,
+      currentSubTab: params.subTab || "نمای اصلی",
+      lastActionDetails: params.details || sec.title,
       ip: params.ip || "127.0.0.1",
+      os: uaInfo.os,
+      browser: uaInfo.browser,
+      deviceType: uaInfo.deviceType,
+      screenResolution: params.screenResolution || "—",
       lastActiveAt: nowIso,
       totalLogins: 0,
       totalPageViews: 0,
+      totalClicks: 0,
       totalActions: 0,
       totalBlocked: 0,
       sectionVisits: {},
@@ -132,11 +182,23 @@ export async function recordSubAdminActivity(params: {
     if (params.full_name) prevPresence.full_name = params.full_name;
     if (params.role) prevPresence.role = params.role;
     if (params.ip) prevPresence.ip = params.ip;
+    if (uaInfo.os !== "نامشخص") prevPresence.os = uaInfo.os;
+    if (uaInfo.browser !== "مرورگر وب") prevPresence.browser = uaInfo.browser;
+    if (uaInfo.deviceType) prevPresence.deviceType = uaInfo.deviceType;
+    if (params.screenResolution) prevPresence.screenResolution = params.screenResolution;
+    if (params.subTab) prevPresence.currentSubTab = params.subTab;
     prevPresence.lastActiveAt = nowIso;
 
     if (params.path && params.path.startsWith("/admin")) {
       prevPresence.currentPath = params.path;
       prevPresence.currentSectionTitle = sec.title;
+      if (params.eventType === "page_view" && !params.subTab) {
+        prevPresence.currentSubTab = "نمای اصلی بخش";
+      }
+    }
+
+    if (params.details && params.eventType !== "heartbeat") {
+      prevPresence.lastActionDetails = params.details;
     }
 
     if (params.eventType === "login") {
@@ -148,6 +210,12 @@ export async function recordSubAdminActivity(params: {
         ...(prevPresence.sectionVisits || {}),
         [sec.title]: Number(prevPresence.sectionVisits?.[sec.title] || 0) + 1,
       };
+    } else if (
+      params.eventType === "click_action" ||
+      params.eventType === "tab_switch" ||
+      params.eventType === "search_filter"
+    ) {
+      prevPresence.totalClicks = Number(prevPresence.totalClicks || 0) + 1;
     } else if (params.eventType === "action_success") {
       prevPresence.totalActions = Number(prevPresence.totalActions || 0) + 1;
     } else if (params.eventType === "action_blocked") {
@@ -156,7 +224,6 @@ export async function recordSubAdminActivity(params: {
 
     memoryPresenceMap[lowerKey] = prevPresence;
 
-    // رویداد heartbeat فقط وضعیت آنلاین را تازه می‌کند و لاگ تکراری در جدول نمی‌اندازد
     let newEvent: SubAdminActivityEvent | null = null;
     if (params.eventType !== "heartbeat") {
       newEvent = {
@@ -168,14 +235,18 @@ export async function recordSubAdminActivity(params: {
         sectionKey: sec.key,
         sectionTitle: sec.title,
         path: params.path,
-        method: params.method || "GET",
+        method: params.method || "VIEW",
         details: params.details || sec.title,
-        ip: params.ip || "127.0.0.1",
+        ip: prevPresence.ip,
+        os: prevPresence.os,
+        browser: prevPresence.browser,
+        deviceType: prevPresence.deviceType,
+        screenResolution: prevPresence.screenResolution,
         userAgent: String(params.userAgent || "").slice(0, 120),
         timestamp: nowIso,
       };
       memoryEventsBuffer.unshift(newEvent);
-      if (memoryEventsBuffer.length > 350) memoryEventsBuffer.pop();
+      if (memoryEventsBuffer.length > 400) memoryEventsBuffer.pop();
     }
 
     const siteRow = await getMasterSiteInfoRow();
@@ -198,6 +269,13 @@ export async function recordSubAdminActivity(params: {
             Number(existingUserPresence.totalPageViews || 0),
             prevPresence.totalPageViews - 1
           ) + (params.eventType === "page_view" ? 1 : 0),
+        totalClicks:
+          Math.max(Number(existingUserPresence.totalClicks || 0), prevPresence.totalClicks - 1) +
+          (params.eventType === "click_action" ||
+          params.eventType === "tab_switch" ||
+          params.eventType === "search_filter"
+            ? 1
+            : 0),
         totalActions:
           Math.max(Number(existingUserPresence.totalActions || 0), prevPresence.totalActions - 1) +
           (params.eventType === "action_success" ? 1 : 0),
@@ -223,7 +301,7 @@ export async function recordSubAdminActivity(params: {
       ? existingMonitor.events
       : [];
     if (newEvent) {
-      dbEvents = [newEvent, ...dbEvents].slice(0, 300);
+      dbEvents = [newEvent, ...dbEvents].slice(0, 350);
     }
 
     await saveMasterSiteInfoRow(
@@ -263,7 +341,7 @@ export async function getSubAdminMonitoringSnapshot() {
 
   const events = Array.from(eventsMap.values())
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    .slice(0, 300);
+    .slice(0, 350);
 
   return {
     presenceMap: combinedPresenceMap,

@@ -52,7 +52,8 @@ export async function POST(req: NextRequest) {
       const idx = users.findIndex(
         (u) =>
           (body.id && String(u.id) === String(body.id)) ||
-          (body.username && u.username.toLowerCase() === String(body.username).toLowerCase())
+          (body.username && u.username.toLowerCase() === String(body.username).toLowerCase()) ||
+          (body.role === "superadmin" && u.role === "superadmin")
       );
       if (idx !== -1) {
         users[idx] = {

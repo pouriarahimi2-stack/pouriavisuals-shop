@@ -73,6 +73,8 @@ export default function AdminRolesPage() {
 
   useEffect(() => {
     fetchAdmins();
+    const onHeaderThemeToggle = () => fetchAdmins();
+    window.addEventListener("axon_admin_theme_reload_list", onHeaderThemeToggle);
     const channel = supabase
       .channel("realtime-admin-roles-users")
       .on("postgres_changes", { event: "*", schema: "public", table: "admin_users" }, () => {
@@ -80,6 +82,7 @@ export default function AdminRolesPage() {
       })
       .subscribe();
     return () => {
+      window.removeEventListener("axon_admin_theme_reload_list", onHeaderThemeToggle);
       supabase.removeChannel(channel);
     };
   }, []);
@@ -150,6 +153,10 @@ export default function AdminRolesPage() {
       if (res.ok && json.success) {
         soundEngine.playSuccess();
         setUsers(json.users || []);
+        if (u.role === "superadmin" && typeof window !== "undefined") {
+          localStorage.setItem("axon_superadmin_panel_theme_v2026", nextTheme);
+          window.dispatchEvent(new CustomEvent("axon_admin_theme_changed", { detail: nextTheme }));
+        }
         setFeedback({ type: "success", text: json.message });
         setTimeout(() => setFeedback(null), 3500);
       }
@@ -182,6 +189,10 @@ export default function AdminRolesPage() {
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
+        if (role === "superadmin" && typeof window !== "undefined") {
+          localStorage.setItem("axon_superadmin_panel_theme_v2026", uiTheme);
+          window.dispatchEvent(new CustomEvent("axon_admin_theme_changed", { detail: uiTheme }));
+        }
         setFeedback({
           type: "success",
           text:

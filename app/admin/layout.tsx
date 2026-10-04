@@ -13,19 +13,44 @@ const SUPERADMIN_THEME_STORAGE_KEY = "axon_superadmin_panel_theme_v2026";
 function applyAdminDomTheme(mode: "dark" | "light") {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
+  const body = document.body;
+
   if (mode === "light") {
     root.classList.remove("dark");
     root.classList.add("light");
     root.setAttribute("data-theme", "light");
     root.style.colorScheme = "light";
+    root.style.setProperty("--bg-primary", "#f1f5f9");
+    root.style.setProperty("--bg-secondary", "#e2e8f0");
+    root.style.setProperty("--modal-bg", "#ffffff");
+    root.style.setProperty("--input-bg", "#f8fafc");
+    root.style.setProperty("--card-border", "#cbd5e1");
+    root.style.setProperty("--text-primary", "#0f172a");
+    root.style.setProperty("--text-secondary", "#475569");
+    if (body) {
+      body.classList.remove("dark");
+      body.classList.add("light");
+    }
   } else {
     root.classList.remove("light");
     root.classList.add("dark");
     root.setAttribute("data-theme", "dark");
     root.style.colorScheme = "dark";
+    root.style.setProperty("--bg-primary", "#07090e");
+    root.style.setProperty("--bg-secondary", "#0b0f17");
+    root.style.setProperty("--modal-bg", "#0f141f");
+    root.style.setProperty("--input-bg", "#161d2b");
+    root.style.setProperty("--card-border", "#1e293b");
+    root.style.setProperty("--text-primary", "#f8fafc");
+    root.style.setProperty("--text-secondary", "#94a3b8");
+    if (body) {
+      body.classList.remove("light");
+      body.classList.add("dark");
+    }
   }
+
   try {
-    themeEngine.applyTheme(mode, false);
+    themeEngine.applyTheme(mode, true);
   } catch {}
 }
 
@@ -48,29 +73,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       const json = await res.json();
       if (json.authenticated && json.user) {
         setAdminUser(json.user);
-        const role = String(json.user.role || "superadmin");
+        const dbTheme: "dark" | "light" =
+          json.user.ui_theme === "light" ? "light" : "dark";
 
-        if (role === "superadmin") {
-          // مدیر ارشد: خواندن آخرین تم انتخابی خودش از مرورگر یا دیتابیس
-          const savedLocal =
-            typeof window !== "undefined"
-              ? (localStorage.getItem(SUPERADMIN_THEME_STORAGE_KEY) as "dark" | "light" | null)
-              : null;
-          const resolved: "dark" | "light" =
-            savedLocal === "light" || savedLocal === "dark"
-              ? savedLocal
-              : json.user.ui_theme === "light"
-              ? "light"
-              : "dark";
-          setActiveTheme(resolved);
-          applyAdminDomTheme(resolved);
-        } else {
-          // سایر نقش‌ها: اعمال اجباری و دقیق تمی که مدیر ارشد برای این کاربر تعیین کرده است
-          const assignedBySuperAdmin: "dark" | "light" =
-            json.user.ui_theme === "light" ? "light" : "dark";
-          setActiveTheme(assignedBySuperAdmin);
-          applyAdminDomTheme(assignedBySuperAdmin);
+        if (json.user.role === "superadmin" && typeof window !== "undefined") {
+          localStorage.setItem(SUPERADMIN_THEME_STORAGE_KEY, dbTheme);
         }
+
+        setActiveTheme(dbTheme);
+        applyAdminDomTheme(dbTheme);
       }
     } catch {}
   }, []);
@@ -78,6 +89,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (pathname.startsWith("/admin/login") || pathname.startsWith("/admin/setup")) return;
     syncAdminSessionAndTheme();
+
+    // همگام‌سازی خودکار در صورت تغییر تم توسط مدیر ارشد
+    const onCustomThemeEvent = (e: any) => {
+      const nextMode: "dark" | "light" = e?.detail === "light" ? "light" : "dark";
+      setActiveTheme(nextMode);
+      applyAdminDomTheme(nextMode);
+    };
+
+    const onFocus = () => syncAdminSessionAndTheme();
+    const interval = setInterval(syncAdminSessionAndTheme, 4000);
+
+    window.addEventListener("axon_admin_theme_changed", onCustomThemeEvent);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("axon_admin_theme_changed", onCustomThemeEvent);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [pathname, syncAdminSessionAndTheme]);
 
   if (pathname.startsWith("/admin/login") || pathname.startsWith("/admin/setup")) {
@@ -92,6 +122,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const nextTheme: "dark" | "light" = activeTheme === "dark" ? "light" : "dark";
     setActiveTheme(nextTheme);
     applyAdminDomTheme(nextTheme);
+
     try {
       if (typeof window !== "undefined") {
         localStorage.setItem(SUPERADMIN_THEME_STORAGE_KEY, nextTheme);
@@ -103,9 +134,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           action: "set_user_theme",
           id: adminUser?.id,
           username: adminUser?.username || "admin",
+          role: "superadmin",
           ui_theme: nextTheme,
         }),
       });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("axon_admin_theme_reload_list"));
+      }
     } catch {}
   };
 
@@ -119,9 +154,69 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div
+      id="axon-admin-shell"
+      data-admin-theme={activeTheme}
       className="min-h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-text transition-colors duration-300"
       dir="rtl"
     >
+      {/* استایل سراسری برای تبدیل ۱۰۰٪ کارت‌های دارای کلاس تیره در داشبورد و سایر صفحات به تم روشن هنگام فعال بودن Light Mode */}
+      <style>{
+        activeTheme === "light"
+          ? `
+        #axon-admin-shell[data-admin-theme="light"] {
+          --bg-primary: #f1f5f9 !important;
+          --bg-secondary: #e2e8f0 !important;
+          --modal-bg: #ffffff !important;
+          --input-bg: #f8fafc !important;
+          --card-border: #cbd5e1 !important;
+          --text-primary: #0f172a !important;
+          --text-secondary: #475569 !important;
+          background-color: #f1f5f9 !important;
+          color: #0f172a !important;
+        }
+        #axon-admin-shell[data-admin-theme="light"] [class*="bg-[#0"],
+        #axon-admin-shell[data-admin-theme="light"] [class*="bg-[#1"],
+        #axon-admin-shell[data-admin-theme="light"] .bg-slate-950,
+        #axon-admin-shell[data-admin-theme="light"] .bg-slate-900,
+        #axon-admin-shell[data-admin-theme="light"] .bg-zinc-900,
+        #axon-admin-shell[data-admin-theme="light"] .bg-gray-900 {
+          background-color: #ffffff !important;
+          color: #0f172a !important;
+          border-color: #cbd5e1 !important;
+        }
+        #axon-admin-shell[data-admin-theme="light"] .bg-slate-800,
+        #axon-admin-shell[data-admin-theme="light"] .bg-zinc-800 {
+          background-color: #f1f5f9 !important;
+          color: #0f172a !important;
+          border-color: #cbd5e1 !important;
+        }
+        #axon-admin-shell[data-admin-theme="light"] .text-slate-200,
+        #axon-admin-shell[data-admin-theme="light"] .text-slate-300,
+        #axon-admin-shell[data-admin-theme="light"] .text-zinc-200,
+        #axon-admin-shell[data-admin-theme="light"] .text-zinc-300 {
+          color: #334155 !important;
+        }
+        #axon-admin-shell[data-admin-theme="light"] .border-slate-800,
+        #axon-admin-shell[data-admin-theme="light"] .border-slate-700,
+        #axon-admin-shell[data-admin-theme="light"] .border-zinc-800 {
+          border-color: #cbd5e1 !important;
+        }
+      `
+          : `
+        #axon-admin-shell[data-admin-theme="dark"] {
+          --bg-primary: #07090e !important;
+          --bg-secondary: #0b0f17 !important;
+          --modal-bg: #0f141f !important;
+          --input-bg: #161d2b !important;
+          --card-border: #1e293b !important;
+          --text-primary: #f8fafc !important;
+          --text-secondary: #94a3b8 !important;
+          background-color: #07090e !important;
+          color: #f8fafc !important;
+        }
+      `
+      }</style>
+
       {/* نوار ارشد بالای پنل فرماندهی */}
       <header className="w-full px-4 sm:px-6 py-3 bg-[var(--modal-bg)] border-b border-[var(--card-border)] flex flex-wrap items-center justify-between gap-3 shadow-md z-30">
         <div className="flex items-center gap-3">
@@ -144,7 +239,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               title="تغییر تم پنل مدیریت (ویژه مدیر ارشد)"
             >
               <span>{activeTheme === "dark" ? "☀️" : "🌙"}</span>
-              <span>{activeTheme === "dark" ? "تم روشن" : "تم تیره"}</span>
+              <span>{activeTheme === "dark" ? "رفتن به تم روشن" : "رفتن به تم تیره"}</span>
             </button>
           )}
 
@@ -158,7 +253,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <button
             type="button"
             onClick={handleLogout}
-            className="px-3.5 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer"
+            className="px-3.5 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer"
           >
             خروج امن
           </button>

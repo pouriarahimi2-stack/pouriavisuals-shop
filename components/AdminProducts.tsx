@@ -396,6 +396,19 @@ export function AdminProducts(_props: any = {}) {
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
+                      onClick={() => {
+                        const url = "https://axoncore.ir/products/" + p.id;
+                        navigator.clipboard?.writeText(url);
+                        soundEngine.playSuccess();
+                        notify("✓ لینک محصول برای ترب کپی شد: " + url);
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl bg-sky-500/15 text-sky-400 border border-sky-500/30 font-bold cursor-pointer"
+                      title="کپی لینک مستقیم صفحه محصول برای ترب"
+                    >
+                      🔗 کپی لینک
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleOpenEditProduct(p)}
                       className="px-3 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-black cursor-pointer"
                     >

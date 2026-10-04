@@ -1,4 +1,5 @@
 "use client";
+import SecurityCaptchaBox from "@/components/SecurityCaptchaBox";
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -144,6 +145,7 @@ export default function CheckoutPage() {
   const [otpCode, setOtpCode] = useState("");
   const [verifiedToken, setVerifiedToken] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const [captchaVerified, setCaptchaVerified] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fetchLiveStoreRules = useCallback(async () => {
@@ -339,6 +341,10 @@ export default function CheckoutPage() {
       return;
     }
 
+    if (!captchaVerified) {
+      setErrorMsg("لطفاً ابتدا کد امنیتی ضد ربات (کادر تصویر امنیتی) را به درستی وارد نمایید.");
+      return;
+    }
     if (cartItems.length === 0) {
       setErrorMsg("سبد خرید شما خالی است.");
       return;
@@ -648,9 +654,10 @@ export default function CheckoutPage() {
             </div>
           </div>
 
+          <SecurityCaptchaBox onVerifyChange={setCaptchaVerified} />
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !captchaVerified}
             className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs sm:text-sm shadow-xl cursor-pointer transition disabled:opacity-50"
           >
             {submitting

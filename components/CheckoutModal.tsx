@@ -1,5 +1,6 @@
-// File Path: components/CheckoutModal.tsx
 "use client";
+import SecurityCaptchaBox from "@/components/SecurityCaptchaBox";
+// File Path: components/CheckoutModal.tsx
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -75,6 +76,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const [verifiedPhone, setVerifiedPhone] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
+  const [captchaVerified, setCaptchaVerified] = useState(false);
   const [formError, setFormError] = useState("");
 
   // بازیابی از حافظه ضد رفرش
@@ -243,6 +245,10 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       return;
     }
 
+    if (!captchaVerified) {
+      setFormError("لطفاً ابتدا کد امنیتی ضد ربات را وارد نمایید.");
+      return;
+    }
     if (!address.trim() || address.trim().length < 8) {
       setFormError("لطفاً نشانی پستی دقیق خود را وارد نمایید.");
       return;
@@ -535,10 +541,11 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             </div>
           )}
 
+          <SecurityCaptchaBox onVerifyChange={setCaptchaVerified} />
           <div className="pt-2">
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !captchaVerified}
               className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs transition cursor-pointer shadow-xl shadow-blue-500/25 hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {submitting

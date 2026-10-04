@@ -1,6 +1,5 @@
-// File Path: components/LayoutShell.tsx
 "use client";
-
+// File Path: components/LayoutShell.tsx
 import React from "react";
 import { usePathname } from "next/navigation";
 import Header from "@/components/Header";
@@ -10,6 +9,7 @@ import CartDrawer from "@/components/CartDrawer";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import ThemeProvider from "@/components/ThemeProvider";
 import ClientLayoutEnhancer from "@/components/ClientLayoutEnhancer";
+import VpnGuardModal from "@/components/VpnGuardModal";
 import { useSiteInfo } from "@/context/SiteInfoContext";
 import MaintenancePage from "@/app/maintenance/page";
 
@@ -20,7 +20,6 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
 
   const sysMaint =
     siteInfo?.homepage_layout_config?.auth_security_config?.system_settings?.maintenance_mode;
-
   const isMaintenanceActive =
     !isAdminRoute &&
     pathname !== "/maintenance" &&
@@ -34,12 +33,12 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
   return (
     <ThemeProvider>
       <ClientLayoutEnhancer />
+      <VpnGuardModal />
       <div
         className="min-h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300"
         style={{ overflowX: "hidden" }}
       >
         {!isAdminRoute && <Header />}
-
         <main
           className={[
             "flex-1 w-full",
@@ -48,7 +47,6 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
         >
           {children}
         </main>
-
         {!isAdminRoute && (
           <>
             <Footer />

@@ -1,6 +1,5 @@
 // File Path: components/admin/AdminModularPages.tsx
 "use client";
-
 import React, { useState, useEffect } from "react";
 import { Puck, Data } from "@measured/puck";
 import "@measured/puck/puck.css";
@@ -11,6 +10,14 @@ import Link from "next/link";
 
 const STORAGE_PREFIX = "axon_puck_page_data_v2026_";
 const GLOBAL_NAV_KEY = "axon_global_header_footer_v2026";
+
+const CORE_DEFAULT_PAGES = [
+  { id: "core_home", slug: "home", title: "صفحه اصلی فروشگاه" },
+  { id: "core_products", slug: "products", title: "کاتالوگ محصولات" },
+  { id: "core_campaign", slug: "special-offer", title: "🎯 لندینگ‌پیج جشنواره فروش" },
+  { id: "core_about", slug: "about", title: "درباره آکسون کور" },
+  { id: "core_contact", slug: "contact", title: "تماس و پشتیبانی" },
+];
 
 const DEFAULT_GLOBAL_HEADER = {
   type: "HeaderCapsuleBar",
@@ -70,7 +77,6 @@ function getPageSpecificBody(slug: string, title?: string): any[] {
       },
     ];
   }
-
   if (slug === "home") {
     return [
       {
@@ -105,13 +111,12 @@ function getPageSpecificBody(slug: string, title?: string): any[] {
       },
     ];
   }
-
   return [
     {
       type: "RichTextBlock",
       props: {
         id: "custom-page-" + slug,
-        title: title || "صفحه جدید",
+        title: title || "صفحه اختصاصی",
         content:
           "محتوای اختصاصی این صفحه را از سایدبار تنظیم کنید یا بلوک‌های دلخواه را به آن اضافه نمایید.",
         bgColor: "transparent",
@@ -121,7 +126,10 @@ function getPageSpecificBody(slug: string, title?: string): any[] {
 }
 
 export default function AdminModularPages() {
-  const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string }>>([]);
+  const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string }>>(
+    CORE_DEFAULT_PAGES
+  );
+  const [products, setProducts] = useState<Array<{ id: string; title: string; price: number }>>([]);
   const [currentSlug, setCurrentSlug] = useState<string>("home");
   const [pageData, setPageData] = useState<Data | null>(null);
   const [renderKey, setRenderKey] = useState<string>("init");
@@ -132,6 +140,14 @@ export default function AdminModularPages() {
   const [showNewPageModal, setShowNewPageModal] = useState(false);
   const [newPageTitle, setNewPageTitle] = useState("");
   const [newPageSlug, setNewPageSlug] = useState("");
+
+  // مودال ساخت ۱-کلیکی لندینگ‌پیج تبلیغاتی متصل به محصول
+  const [showCampaignModal, setShowCampaignModal] = useState(false);
+  const [campaignTitle, setCampaignTitle] = useState("جشنواره فروش ویژه با ارسال رایگان");
+  const [campaignSlug, setCampaignSlug] = useState("offer-" + Math.floor(100 + Math.random() * 900));
+  const [campaignBadge, setCampaignBadge] = useState("🔥 تخفیف محدود ویژه کمپین تبلیغاتی");
+  const [campaignProductId, setCampaignProductId] = useState("");
+  const [campaignCouponCode, setCampaignCouponCode] = useState("VIP15");
 
   const getGlobalHeaderFooter = () => {
     if (typeof window !== "undefined") {
@@ -146,26 +162,41 @@ export default function AdminModularPages() {
     return { header: DEFAULT_GLOBAL_HEADER, footer: DEFAULT_GLOBAL_FOOTER };
   };
 
-  const CORE_DEFAULT_PAGES = [
-    { id: "core_home", slug: "home", title: "صفحه اصلی فروشگاه" },
-    { id: "core_products", slug: "products", title: "کاتالوگ محصولات" },
-    { id: "core_campaign", slug: "special-offer", title: "🎯 لندینگ‌پیج کمپین تبلیغاتی ویژه" },
-    { id: "core_about", slug: "about", title: "درباره آکسون کور" },
-    { id: "core_contact", slug: "contact", title: "تماس و پشتیبانی" },
-  ];
-  const fetchPages = async () => {
+  const fetchPagesAndProducts = async () => {
     try {
-      const res = await fetch("/api/pages", { cache: "no-store" });
-      const json = await res.json();
-      if (json.success && Array.isArray(json.pages)) {
+      const [res, pRes] = await Promise.all([
+        fetch("/api/pages", { cache: "no-store" }).catch(() => null),
+        fetch("/api/products", { cache: "no-store" }).catch(() => null),
+      ]);
+      if (res && res.ok) {
+        const json = await res.json();
         const map = new Map<string, { id: string; slug: string; title: string }>();
         CORE_DEFAULT_PAGES.forEach((cp) => map.set(cp.slug, cp));
-        json.pages.forEach((dbP: any) => {
-          if (dbP?.slug) map.set(dbP.slug, { id: String(dbP.id), slug: dbP.slug, title: dbP.title || dbP.slug });
-        });
+        if (json.success && Array.isArray(json.pages)) {
+          json.pages.forEach((dbP: any) => {
+            if (dbP?.slug) {
+              map.set(dbP.slug, {
+                id: String(dbP.id),
+                slug: dbP.slug,
+                title: dbP.title || dbP.slug,
+              });
+            }
+          });
+        }
         setPages(Array.from(map.values()));
-      } else {
-        setPages(CORE_DEFAULT_PAGES);
+      }
+      if (pRes && pRes.ok) {
+        const pJson = await pRes.json();
+        const pList = pJson.data || pJson.products || [];
+        const mapped = (Array.isArray(pList) ? pList : []).map((p: any) => ({
+          id: String(p.id),
+          title: p.title || p.name || "محصول",
+          price: Number(p.discount_price || p.price || 0),
+        }));
+        setProducts(mapped);
+        if (mapped.length > 0 && !campaignProductId) {
+          setCampaignProductId(mapped[0].id);
+        }
       }
     } catch {}
   };
@@ -174,7 +205,6 @@ export default function AdminModularPages() {
     setCurrentSlug(slug);
     setLoading(true);
     soundEngine.playClick();
-
     const { header: currentGlobalHeader, footer: currentGlobalFooter } = getGlobalHeaderFooter();
     let targetData: Data | null = null;
 
@@ -230,16 +260,14 @@ export default function AdminModularPages() {
   };
 
   useEffect(() => {
-    fetchPages();
+    fetchPagesAndProducts();
     loadPage("home");
-
     const ch = supabase
       .channel("realtime-admin-modular-pages")
       .on("postgres_changes", { event: "*", schema: "public", table: "modular_pages" }, () => {
-        fetchPages();
+        fetchPagesAndProducts();
       })
       .subscribe();
-
     return () => {
       supabase.removeChannel(ch);
     };
@@ -247,8 +275,7 @@ export default function AdminModularPages() {
 
   const handleSave = async (data: Data) => {
     soundEngine.playClick();
-    setToast("در حال انتشار سراسری تغییرات در تمام صفحات...");
-
+    setToast("در حال انتشار سراسری تغییرات در دیتابیس...");
     const cleanContent = (data.content || []).filter((b: any) => b.type !== "FeaturesGridBlock");
     const sanitizedData = { ...data, content: cleanContent };
 
@@ -274,7 +301,6 @@ export default function AdminModularPages() {
     try {
       const currentPageObj = pages.find((p) => p.slug === currentSlug);
       const pageTitle = currentPageObj?.title || currentSlug;
-
       await fetch("/api/pages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -285,20 +311,18 @@ export default function AdminModularPages() {
           is_published: true,
         }),
       });
-
       soundEngine.playSuccess();
-      setToast("✓ تغییرات صفحه و چیدمان ریسپانسیو با موفقیت در دیتابیس ذخیره و منتشر شد.");
+      setToast("✓ صفحه «/" + (currentSlug === "home" ? "" : currentSlug) + "» با موفقیت در دیتابیس ذخیره و منتشر شد.");
     } catch {
       setToast("خطا در ذخیره‌سازی.");
     } finally {
-      setTimeout(() => setToast(null), 3000);
+      setTimeout(() => setToast(null), 3500);
     }
   };
 
   const handleCreateNewPage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPageTitle.trim() || !newPageSlug.trim()) return;
-
     soundEngine.playSuccess();
     const cleanSlug = newPageSlug
       .trim()
@@ -306,13 +330,105 @@ export default function AdminModularPages() {
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9-]/g, "");
     const title = newPageTitle.trim();
-
     setPages((prev) => [...prev, { id: "page_" + Date.now(), slug: cleanSlug, title }]);
     setShowNewPageModal(false);
     setNewPageTitle("");
     setNewPageSlug("");
-
     loadPage(cleanSlug, title);
+  };
+
+  const handleGenerateCampaignLandingPage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    soundEngine.playClick();
+    const cleanSlug = campaignSlug
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
+
+    const selProd = products.find((p) => p.id === campaignProductId) || products[0];
+    const prodName = selProd ? selProd.title : "محصول ویژه آکسون کور";
+    const prodPrice = selProd ? selProd.price.toLocaleString("fa-IR") + " تومان" : "قیمت ویژه جشنواره";
+    const { header: currentGlobalHeader, footer: currentGlobalFooter } = getGlobalHeaderFooter();
+
+    const campaignData: Data = {
+      content: [
+        currentGlobalHeader,
+        {
+          type: "NativeHero3D",
+          props: {
+            id: "hero-campaign-" + Date.now(),
+            topBadge: campaignBadge,
+            badgeColor: "#38bdf8",
+            title: campaignTitle + " — " + prodName,
+            titleSize: 38,
+            subtitle:
+              "عرضه مستقیم " +
+              prodName +
+              " با قیمت استثنایی " +
+              prodPrice +
+              " + کد تخفیف ویژه «" +
+              campaignCouponCode +
+              "» و ۱۸ ماه گارانتی اصالت طلایی آکسون.",
+            bgColor: "transparent",
+          },
+        },
+        {
+          type: "RichTextBlock",
+          props: {
+            id: "campaign-details-" + Date.now(),
+            title: "چرا خرید " + prodName + " از جشنواره رسمی آکسون کور؟",
+            content:
+              "• تضمین ۱۰۰٪ اصالت فیزیکی و تست تخصصی قبل از ارسال | • بسته‌بندی ضدضربه و ارسال فوری با پست پیشتاز | • امکان استفاده از کد تخفیف «" +
+              campaignCouponCode +
+              "» در مرحله تسویه‌حساب.",
+            bgColor: "transparent",
+          },
+        },
+        {
+          type: "NativeProductCatalog",
+          props: {
+            id: "campaign-catalog-" + Date.now(),
+            heading: "انتخاب و خرید آنلاین با تخفیف جشنواره",
+            subtitle: "روی محصول کلیک کنید یا مستقیماً به سبد خرید اضافه نمایید",
+            limit: 8,
+          },
+        },
+        currentGlobalFooter,
+      ],
+      root: { props: { title: campaignTitle } },
+    };
+
+    try {
+      await fetch("/api/pages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug: cleanSlug,
+          title: campaignTitle,
+          puck_data: campaignData,
+          is_published: true,
+        }),
+      });
+      if (typeof window !== "undefined") {
+        localStorage.setItem(STORAGE_PREFIX + cleanSlug, JSON.stringify(campaignData));
+      }
+      setPages((prev) => [
+        ...prev.filter((x) => x.slug !== cleanSlug),
+        { id: "camp_" + Date.now(), slug: cleanSlug, title: "🎯 " + campaignTitle },
+      ]);
+      setCurrentSlug(cleanSlug);
+      setPageData(campaignData);
+      setRenderKey(cleanSlug + "_" + Date.now());
+      setShowCampaignModal(false);
+      soundEngine.playSuccess();
+      setToast(
+        "🎉 لندینگ‌پیج تبلیغاتی شما در آدرس «/" +
+          cleanSlug +
+          "» ساخته و منتشر شد! هم‌اکنون می‌توانید آن را ویرایش یا لینک آن را در تبلیغات قرار دهید."
+      );
+      setTimeout(() => setToast(null), 5000);
+    } catch {}
   };
 
   const targetLiveUrl = currentSlug === "home" ? "/" : "/" + currentSlug;
@@ -323,12 +439,12 @@ export default function AdminModularPages() {
       dir="rtl"
     >
       <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <div className="w-10 h-10 rounded-2xl bg-sky-500 text-white flex items-center justify-center text-xl shadow-md font-bold">
             ⚡
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[var(--text-secondary)]">انتخاب صفحه:</span>
+            <span className="text-xs font-bold text-[var(--text-secondary)]">صفحه فعال:</span>
             <select
               value={currentSlug}
               onChange={(e) => loadPage(e.target.value)}
@@ -341,21 +457,30 @@ export default function AdminModularPages() {
               ))}
             </select>
           </div>
-
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.playClick();
+              setShowCampaignModal(true);
+            }}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white text-xs font-black shadow-lg cursor-pointer transition flex items-center gap-1.5"
+          >
+            <span>🎯</span>
+            <span>ساخت ۱-کلیکی لندینگ‌پیج تبلیغاتی محصول</span>
+          </button>
           <button
             type="button"
             onClick={() => {
               soundEngine.playClick();
               setShowNewPageModal(true);
             }}
-            className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-xs font-black shadow-md cursor-pointer transition flex items-center gap-1"
+            className="px-3.5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-xs font-black shadow-md cursor-pointer transition flex items-center gap-1"
           >
             <span>➕</span>
-            <span>ایجاد صفحه جدید</span>
+            <span>صفحه جدید</span>
           </button>
         </div>
 
-        {/* سوئیچر پیش‌نمایش ریسپانسیو به ترتیب اولویت: دسکتاپ، موبایل و تبلت */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold">
             <button
@@ -389,21 +514,116 @@ export default function AdminModularPages() {
               📟 تبلت
             </button>
           </div>
-
           <Link
             href={targetLiveUrl}
             target="_blank"
             className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-sky-500 transition flex items-center gap-1.5"
           >
-            <span>مشاهده زنده صفحه</span>
+            <span>مشاهده زنده صفحه ({targetLiveUrl})</span>
             <span>🔗</span>
           </Link>
         </div>
       </div>
 
       {toast && (
-        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-xs font-bold animate-fadeIn">
+        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-xs font-black animate-fadeIn">
           {toast}
+        </div>
+      )}
+
+      {/* مودال ساخت ۱-کلیکی لندینگ‌پیج تبلیغاتی متصل به محصول */}
+      {showCampaignModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn font-sans"
+          dir="rtl"
+        >
+          <div className="max-w-lg w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 shadow-2xl text-[var(--text-primary)] text-xs">
+            <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
+              <h3 className="font-black text-sm text-emerald-400 flex items-center gap-2">
+                <span>🎯</span> ساخت ۱-کلیکی لندینگ‌پیج کمپین تبلیغاتی (متصل به محصول)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowCampaignModal(false)}
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleGenerateCampaignLandingPage} className="space-y-4">
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  ۱. انتخاب محصول هدف از کاتالوگ:
+                </label>
+                <select
+                  value={campaignProductId}
+                  onChange={(e) => setCampaignProductId(e.target.value)}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+                >
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      📦 {p.title} ({p.price.toLocaleString("fa-IR")} تومان)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  ۲. تیتر اصلی لندینگ‌پیج تبلیغاتی *:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={campaignTitle}
+                  onChange={(e) => setCampaignTitle(e.target.value)}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                    ۳. آدرس اختصاصی لندینگ‌پیج (Slug) *:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    dir="ltr"
+                    value={campaignSlug}
+                    onChange={(e) => setCampaignSlug(e.target.value)}
+                    placeholder="vip-offer"
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                    ۴. کد تخفیف نمایشی در لندینگ:
+                  </label>
+                  <input
+                    type="text"
+                    dir="ltr"
+                    value={campaignCouponCode}
+                    onChange={(e) => setCampaignCouponCode(e.target.value.toUpperCase())}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black outline-none"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-3 border-t border-[var(--card-border)]">
+                <button
+                  type="button"
+                  onClick={() => setShowCampaignModal(false)}
+                  className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] font-bold cursor-pointer"
+                >
+                  انصراف
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-lg cursor-pointer"
+                >
+                  🚀 تولید و انتشار فوری لندینگ‌پیج
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -425,7 +645,6 @@ export default function AdminModularPages() {
                 ✕
               </button>
             </div>
-
             <form onSubmit={handleCreateNewPage} className="space-y-4 text-xs">
               <div>
                 <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
@@ -440,7 +659,6 @@ export default function AdminModularPages() {
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs outline-none focus:border-sky-500"
                 />
               </div>
-
               <div>
                 <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
                   آدرس انگلیسی / نامک (Slug) *
@@ -455,7 +673,6 @@ export default function AdminModularPages() {
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-xs outline-none focus:border-sky-500"
                 />
               </div>
-
               <div className="flex justify-end gap-2 pt-2 border-t border-[var(--card-border)]">
                 <button
                   type="button"

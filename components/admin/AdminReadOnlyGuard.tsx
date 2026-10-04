@@ -1,8 +1,7 @@
 "use client";
 // File Path: components/admin/AdminReadOnlyGuard.tsx
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { soundEngine } from "@/lib/soundEngine";
 import { canRoleWriteOnAdminPage, canRoleMutateApi } from "@/lib/roleWriteFirewall";
 
 const ROUTE_PERM_MAP: Array<{ prefix: string; perms: string[] }> = [
@@ -32,59 +31,8 @@ const ROUTE_PERM_MAP: Array<{ prefix: string; perms: string[] }> = [
   { prefix: "/admin/roles", perms: ["roles", "all"] },
 ];
 
-const MUTATION_BUTTON_KEYWORDS = [
-  "ذخیره",
-  "ثبت",
-  "حذف",
-  "ویرایش",
-  "افزودن",
-  "ایجاد",
-  "جدید",
-  "آپلود",
-  "بارگذاری",
-  "انتشار",
-  "ارتقا",
-  "بهینه‌سازی",
-  "تولید",
-  "ارسال",
-  "پاکسازی",
-  "بازگردانی",
-  "بکاپ",
-  "تغییر",
-  "اعمال",
-  "تعمیرات",
-  "مسدود",
-  "تایید",
-  "لغو",
-  "صدور",
-  "درج",
-  "حساب جدید",
-  "کوپن",
-  "بنر جدید",
-  "مقاله جدید",
-  "کالای جدید",
-  "محصول جدید",
-  "پاسخ",
-  "فاکتور جدید",
-  "سند جدید",
-  "انبارگردانی",
-  "تست و ذخیره",
-  "حذف لوگو",
-  "پیش‌فرض",
-  "بازنشانی",
-  "همگام‌سازی",
-  "پایش و ترجمه",
-  "نمایش در هدر",
-  "پیامک",
-  "🗑️",
-  "✏️",
-  "➕",
-  "💾",
-  "☁️",
-];
-
-function isMutatingButton(btn: HTMLElement): boolean {
-  if (btn.getAttribute("type")?.toLowerCase() === "submit") return true;
+// تنها دکمه‌هایی که در حالت «فقط مشاهده» باز می‌مانند (جابه‌جایی بین تب‌ها، بستن پنجره، چاپ و دریافت گزارش)
+function isSafeNavigationOrViewButton(btn: HTMLElement): boolean {
   const text = (
     (btn.innerText || btn.textContent || "") +
     " " +
@@ -96,21 +44,48 @@ function isMutatingButton(btn: HTMLElement): boolean {
     .toLowerCase();
 
   if (
-    text === "✕" ||
-    text.includes("بستن") ||
-    text.includes("انصراف") ||
-    text.includes("مشاهده") ||
-    text.includes("چاپ") ||
-    text.includes("اکسل") ||
-    text.includes("csv") ||
-    text.includes("استعلام")
+    text.includes("ذخیره") ||
+    text.includes("حذف") ||
+    text.includes("ویرایش") ||
+    text.includes("افزودن") ||
+    text.includes("ایجاد") ||
+    text.includes("آپلود") ||
+    text.includes("بهینه‌سازی") ||
+    text.includes("ارتقا") ||
+    text.includes("تولید") ||
+    text.includes("ارسال")
   ) {
-    if (!text.includes("ذخیره") && !text.includes("حذف") && !text.includes("ویرایش")) {
-      return false;
-    }
+    return false;
   }
 
-  return MUTATION_BUTTON_KEYWORDS.some((kw) => text.includes(kw.toLowerCase()));
+  const allowedViewKeywords = [
+    "✕",
+    "بستن",
+    "انصراف",
+    "مشاهده",
+    "چاپ",
+    "اکسل",
+    "csv",
+    "استعلام",
+    "بروزرسانی",
+    "دسکتاپ",
+    "موبایل",
+    "تبلت",
+    "۱.",
+    "۲.",
+    "۳.",
+    "۴.",
+    "۵.",
+    "تب ",
+    "حسابداری و انبار",
+    "سفارشات و صدور",
+    "گزارشات مالی",
+    "رادار سلامت",
+    "اتوپایلوت",
+    "کوپایلوت بازار",
+  ];
+
+  return allowedViewKeywords.some((kw) => text.includes(kw.toLowerCase()));
 }
 
 export default function AdminReadOnlyGuard() {
@@ -121,17 +96,6 @@ export default function AdminReadOnlyGuard() {
     role?: string;
     permissions?: string[];
   } | null>(null);
-  const [blockedAlert, setBlockedAlert] = useState<string | null>(null);
-
-  const triggerAlert = useCallback(() => {
-    try {
-      soundEngine.playClick();
-    } catch {}
-    setBlockedAlert(
-      "⛔ حساب شما دارای دسترسی «بیننده (فقط مشاهده)» است و امکان تغییر یا حذف اطلاعات را ندارید."
-    );
-    setTimeout(() => setBlockedAlert(null), 3500);
-  }, []);
 
   useEffect(() => {
     fetch("/api/admin/auth?t=" + Date.now(), { cache: "no-store" })
@@ -193,21 +157,22 @@ export default function AdminReadOnlyGuard() {
           el.readOnly = true;
         }
         el.disabled = true;
-        el.style.opacity = "0.55";
+        el.style.opacity = "0.5";
         el.style.cursor = "not-allowed";
         el.style.pointerEvents = "none";
       });
 
+      // قفل کردن تمام دکمه‌های داخل صفحه (شامل دکمه‌های تغییر وضعیت تعمیرات و ایندکس گوگل) به جز تب‌ها و دکمه‌های مشاهده
       const buttons = workspace.querySelectorAll<HTMLButtonElement>("button");
       buttons.forEach((btn) => {
         if (btn.getAttribute("data-axon-readonly-btn") === "1") return;
-        if (isMutatingButton(btn)) {
+        if (!isSafeNavigationOrViewButton(btn)) {
           btn.setAttribute("data-axon-readonly-btn", "1");
           btn.disabled = true;
-          btn.style.opacity = "0.38";
+          btn.style.opacity = "0.4";
           btn.style.cursor = "not-allowed";
+          btn.style.pointerEvents = "none";
           btn.style.filter = "grayscale(100%)";
-          btn.title = "🔒 قفل شده (حالت فقط مشاهده)";
         }
       });
     };
@@ -224,17 +189,16 @@ export default function AdminReadOnlyGuard() {
       const target = e.target as HTMLElement | null;
       if (!target) return;
       const btn = target.closest("button");
-      if (btn && isMutatingButton(btn)) {
+      const workspaceEl = document.getElementById("axon-admin-main-workspace");
+      if (btn && workspaceEl && workspaceEl.contains(btn) && !isSafeNavigationOrViewButton(btn)) {
         e.preventDefault();
         e.stopPropagation();
-        triggerAlert();
       }
     };
 
     const handleCaptureSubmit = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
-      triggerAlert();
     };
 
     document.addEventListener("click", handleCaptureClick, true);
@@ -245,7 +209,7 @@ export default function AdminReadOnlyGuard() {
       document.removeEventListener("click", handleCaptureClick, true);
       document.removeEventListener("submit", handleCaptureSubmit, true);
     };
-  }, [isCurrentPageReadOnly, pathname, triggerAlert]);
+  }, [isCurrentPageReadOnly, pathname]);
 
   useEffect(() => {
     if (!adminUser || isSuperAdmin || typeof window === "undefined") return;
@@ -256,11 +220,15 @@ export default function AdminReadOnlyGuard() {
       const urlStr = typeof input === "string" ? input : input.toString();
 
       if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+        // اجازه ارسال تله‌متری بازدید دستگاه در پس‌زمینه بدون خطا
+        if (urlStr.includes("/api/analytics/device") || urlStr.includes("/api/admin/logout")) {
+          return originalFetch.apply(this, [input, init as any]);
+        }
+
         if (urlStr.includes(".supabase.co/rest/") || urlStr.includes(".supabase.co/storage/")) {
           if (isCurrentPageReadOnly || role === "viewer_reporter") {
-            triggerAlert();
             return new Response(
-              JSON.stringify({ message: "Read-only role cannot mutate database" }),
+              JSON.stringify({ success: false, readOnly: true }),
               { status: 403, headers: { "Content-Type": "application/json" } }
             );
           }
@@ -274,13 +242,11 @@ export default function AdminReadOnlyGuard() {
         } catch {}
 
         if (apiPath.startsWith("/api/") && !canRoleMutateApi(role, apiPath)) {
-          triggerAlert();
           return new Response(
             JSON.stringify({
               success: false,
               readOnly: true,
-              message:
-                "⛔ حساب شما دارای دسترسی «بیننده (فقط مشاهده)» است و امکان تغییر اطلاعات وجود ندارد.",
+              message: "دسترسی فقط مشاهده (Read-Only)",
             }),
             {
               status: 403,
@@ -295,15 +261,7 @@ export default function AdminReadOnlyGuard() {
     return () => {
       window.fetch = originalFetch;
     };
-  }, [adminUser, isSuperAdmin, isCurrentPageReadOnly, role, triggerAlert]);
+  }, [adminUser, isSuperAdmin, isCurrentPageReadOnly, role]);
 
-  if (!blockedAlert) return null;
-
-  return (
-    <div className="mb-4 font-sans select-text" dir="rtl">
-      <div className="p-3.5 rounded-2xl bg-rose-500/20 border border-rose-500/50 text-rose-400 text-xs font-black shadow-lg">
-        {blockedAlert}
-      </div>
-    </div>
-  );
+  return null;
 }

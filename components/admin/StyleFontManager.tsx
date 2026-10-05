@@ -1,563 +1,486 @@
 "use client";
-// File Path: components/admin/StyleFontManager.tsx
+
 import React, { useState, useEffect, useRef } from "react";
 import { soundEngine } from "@/lib/soundEngine";
-import {
-  GlobalBackgroundConfig,
-  PRESET_ANIMATED_SVGS,
-} from "@/components/GlobalSiteBackground";
-
-const FONT_OPTIONS = [
-  { id: "Vazirmatn", label: "فونت وزیرمتن (Vazirmatn - استاندارد و مدرن)" },
-  { id: "IRANSans", label: "ایران‌سنس (IRANSansX - رسمی و خوانا)" },
-  { id: "YekanBakh", label: "یکان‌بخ (Yekan Bakh - استارتاپی و ضخیم)" },
-  { id: "Dana", label: "فونت دانا (Dana - نرم و گرد)" },
-];
+import { fontEngine, CustomFontItem } from "@/lib/fontEngine";
+import { supabase } from "@/lib/supabase";
 
 export default function StyleFontManager() {
-  const [activeFont, setActiveFont] = useState("Vazirmatn");
-  const [accentColor, setAccentColor] = useState("#0ea5e9");
-  const [borderRadiusMode, setBorderRadiusMode] = useState("rounded-3xl");
+  const [primaryColor, setPrimaryColor] = useState("#0071e3");
+  const [secondaryColor, setSecondaryColor] = useState("#4f46e5");
+  const [selectedFont, setSelectedFont] = useState("Vazirmatn");
+  const [selectedWeight, setSelectedWeight] = useState(400);
+  const [borderRadius, setBorderRadius] = useState("1.5rem");
   const [customCss, setCustomCss] = useState("");
 
-  // تنظیمات پس‌زمینه سراسری کل سایت (عکس، GIF، SVG، WebP و ویدیو)
-  const [bgConfig, setBgConfig] = useState<GlobalBackgroundConfig>({
-    enabled: false,
-    mediaUrl: "",
-    mediaType: "auto",
-    presetId: "cyber_grid",
-    opacity: 35,
-    blurPx: 0,
-    overlayOpacity: 40,
-    sizeMode: "cover",
-    applyToAdmin: false,
-  });
+  // کنترلرهای استایل‌ساز بصری پیشرفته (Visual CSS Studio)
+  const [glassBlurPx, setGlassBlurPx] = useState<number>(20);
+  const [cardShadowStrength, setCardShadowStrength] = useState<"soft" | "medium" | "deep" | "neon">("medium");
+  const [buttonHoverScale, setButtonHoverScale] = useState<number>(1.03);
+  const [lineHeightScale, setLineHeightScale] = useState<number>(1.8);
+  const [headingTracking, setHeadingTracking] = useState<string>("-0.02em");
 
-  const [uploadingBg, setUploadingBg] = useState(false);
+  const [fontsList, setFontsList] = useState<CustomFontItem[]>([]);
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: "ok" | "err"; text: string } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const loadCurrentStylesAndBg = async () => {
+  const fontFileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchStyles = async () => {
     try {
-      const [stRes, tbRes] = await Promise.all([
-        fetch("/api/admin/styles?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
-        fetch("/api/theme-builder?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
-      ]);
-
-      if (stRes && stRes.ok) {
-        const stJson = await stRes.json();
-        const s = stJson.styles || stJson.data || {};
-        if (s.active_font_id || s.fontFamily) setActiveFont(s.active_font_id || s.fontFamily);
-        if (s.primary_color || s.accentColor) setAccentColor(s.primary_color || s.accentColor);
-        if (s.custom_css) setCustomCss(s.custom_css);
-      }
-
-      if (tbRes && tbRes.ok) {
-        const tbJson = await tbRes.json();
-        const cfg = tbJson.config || {};
-        if (cfg.globalBackground) {
-          setBgConfig((prev) => ({
-            ...prev,
-            ...cfg.globalBackground,
-          }));
+      setFontsList(fontEngine.getAllFonts());
+      const res = await fetch("/api/styles", { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          setPrimaryColor(json.data.primary_color || "#0071e3");
+          setSecondaryColor(json.data.secondary_color || "#4f46e5");
+          setSelectedFont(json.data.font_family || "Vazirmatn");
+          setBorderRadius(json.data.border_radius || "1.5rem");
+          setCustomCss(json.data.custom_css || "");
         }
       }
-    } catch {}
+    } catch (e) {
+      console.error("Error fetching site styles:", e);
+    }
   };
 
   useEffect(() => {
-    loadCurrentStylesAndBg();
+    fetchStyles();
+
+    const channel = supabase
+      .channel("realtime-style-font-manager")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_styles" }, () => {
+        fetchStyles();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  const handleUploadBackgroundMedia = async (file: File) => {
+  const buildGeneratedVisualCss = () => {
+    const shadowVal =
+      cardShadowStrength === "soft"
+        ? "0 8px 24px -6px rgba(0,0,0,0.12)"
+        : cardShadowStrength === "deep"
+        ? "0 20px 50px -12px rgba(0,0,0,0.45)"
+        : cardShadowStrength === "neon"
+        ? "0 12px 36px -8px " + primaryColor + "55"
+        : "0 14px 34px -10px rgba(0,0,0,0.25)";
+
+    return [
+      "/* === AXON VISUAL CSS ENGINE === */",
+      ":root { --accent-blue: " + primaryColor + "; --secondary-color: " + secondaryColor + "; --border-radius-card: " + borderRadius + "; }",
+      "body { line-height: " + lineHeightScale + "; font-weight: " + selectedWeight + "; }",
+      "h1, h2, h3, h4 { letter-spacing: " + headingTracking + "; }",
+      ".backdrop-blur-2xl, .backdrop-blur-xl { backdrop-filter: blur(" + glassBlurPx + "px) !important; }",
+      ".shadow-xl, .shadow-2xl { box-shadow: " + shadowVal + " !important; }",
+      "button:hover, a.rounded-2xl:hover { transform: scale(" + buttonHoverScale + "); }",
+    ].join("\n");
+  };
+
+  const applyVisualPreset = (presetName: string) => {
     soundEngine.playClick();
-    setUploadingBg(true);
-    setFeedback(null);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-
-      const res = await fetch("/api/admin/upload", {
-        method: "POST",
-        body: fd,
-      });
-      const json = await res.json();
-      if (res.ok && json.success && json.url) {
-        soundEngine.playSuccess();
-        const ext = (file.name.split(".").pop() || "").toLowerCase();
-        let detectedType: GlobalBackgroundConfig["mediaType"] = "image";
-        if (ext === "gif" || file.type.includes("gif")) detectedType = "gif";
-        else if (ext === "svg" || file.type.includes("svg")) detectedType = "svg";
-        else if (ext === "mp4" || ext === "webm" || file.type.includes("video"))
-          detectedType = "video";
-
-        setBgConfig((prev) => ({
-          ...prev,
-          enabled: true,
-          mediaUrl: json.url,
-          mediaType: detectedType,
-        }));
-        setFeedback({
-          type: "ok",
-          text:
-            "✓ فایل پس‌زمینه («" +
-            file.name +
-            "») آپلود شد. روی دکمه «ذخیره و انتشار بلادرنگ» کلیک کنید.",
-        });
-      } else {
-        setFeedback({
-          type: "err",
-          text: json.message || "خطا در آپلود فایل پس‌زمینه.",
-        });
-      }
-    } catch {
-      setFeedback({ type: "err", text: "خطا در ارتباط با سرور آپلود." });
-    } finally {
-      setUploadingBg(false);
+    if (presetName === "apple_glass") {
+      setPrimaryColor("#0071e3");
+      setSecondaryColor("#38bdf8");
+      setBorderRadius("1.75rem");
+      setGlassBlurPx(28);
+      setCardShadowStrength("medium");
+    } else if (presetName === "cyber_neon") {
+      setPrimaryColor("#0284c7");
+      setSecondaryColor("#6366f1");
+      setBorderRadius("1.5rem");
+      setGlassBlurPx(24);
+      setCardShadowStrength("neon");
+    } else if (presetName === "minimal_sharp") {
+      setPrimaryColor("#2563eb");
+      setSecondaryColor("#475569");
+      setBorderRadius("0.85rem");
+      setGlassBlurPx(12);
+      setCardShadowStrength("soft");
     }
   };
 
-  const handleSaveAll = async (e: React.FormEvent) => {
+  const handleFontUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const fontName =
+      prompt("نام این فونت را وارد کنید:", file.name.replace(/\.[^/.]+$/, "")) || "CustomFont";
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        const ext = file.name.split(".").pop()?.toLowerCase();
+        const format = ext === "woff2" ? "woff2" : ext === "woff" ? "woff" : "truetype";
+
+        const newFont: CustomFontItem = {
+          id: "custom_" + Date.now(),
+          name: fontName + " (اختصاصی)",
+          fontFamily: fontName,
+          fontUrlOrBase64: reader.result,
+          format,
+          weights: [100, 200, 300, 400, 500, 600, 700, 800, 900],
+          isCustom: true,
+        };
+
+        fontEngine.registerCustomFont(newFont);
+        setFontsList(fontEngine.getAllFonts());
+        setSelectedFont(fontName);
+        fontEngine.applyFontToTarget(fontName, "body");
+        soundEngine.playSuccess();
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     soundEngine.playClick();
     setSaving(true);
-    setFeedback(null);
+    setStatusMessage(null);
+
+    const cleanCustom = customCss.replace(/\/\* === AXON VISUAL CSS ENGINE === \*\/[\s\S]*?(?=\/\*|$)/g, "").trim();
+    const compiledCss = buildGeneratedVisualCss() + (cleanCustom ? "\n" + cleanCustom : "");
+
+    const payload = {
+      primary_color: primaryColor,
+      secondary_color: secondaryColor,
+      font_family: selectedFont,
+      border_radius: borderRadius,
+      custom_css: compiledCss,
+    };
 
     try {
-      const tbRes = await fetch("/api/theme-builder?t=" + Date.now(), { cache: "no-store" });
-      const tbJson = await tbRes.json().catch(() => ({}));
-      const prevConfig = tbJson?.config || {};
+      const res = await fetch("/api/styles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-      const [saveTb, saveSt] = await Promise.all([
-        fetch("/api/theme-builder", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            config: {
-              ...prevConfig,
-              globalBackground: bgConfig,
-            },
-          }),
-        }),
-        fetch("/api/admin/styles", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            active_font_id: activeFont,
-            fontFamily: activeFont,
-            primary_color: accentColor,
-            accentColor,
-            borderRadiusMode,
-            custom_css: customCss,
-          }),
-        }),
-      ]);
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || "خطا در ذخیره دیتابیس");
 
-      if (saveTb.ok || saveSt.ok) {
-        soundEngine.playSuccess();
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("theme_builder_updated"));
-          window.dispatchEvent(new CustomEvent("site_info_updated"));
-        }
-        setFeedback({
-          type: "ok",
-          text: "✓ تنظیمات پس‌زمینه سراسری (عکس/GIF/SVG)، فونت و استایل با موفقیت در کل سایت اعمال شد!",
-        });
-        setTimeout(() => setFeedback(null), 4500);
-      } else {
-        setFeedback({ type: "err", text: "خطا در ذخیره تنظیمات." });
-      }
-    } catch {
-      setFeedback({ type: "err", text: "خطا در ارتباط با سرور." });
+      setCustomCss(compiledCss);
+      soundEngine.playSuccess();
+      setStatusMessage({
+        type: "success",
+        text: "⚡ هویت بصری، تایپوگرافی و قوانین استایل‌ساز CSS با موفقیت در دیتابیس ذخیره و به صورت زنده در کل سایت اعمال شد.",
+      });
+
+      document.documentElement.style.setProperty("--accent-blue", primaryColor);
+      fontEngine.applyFontToTarget(selectedFont, "body");
+      window.dispatchEvent(new Event("site_styles_updated"));
+    } catch (err: any) {
+      setStatusMessage({
+        type: "error",
+        text: err.message || "خطا در ذخیره‌سازی استایل‌ها در دیتابیس.",
+      });
     } finally {
       setSaving(false);
+      setTimeout(() => setStatusMessage(null), 4000);
     }
   };
 
-  const previewUrl =
-    bgConfig.mediaType === "preset_svg"
-      ? PRESET_ANIMATED_SVGS[bgConfig.presetId || "cyber_grid"]?.dataUri
-      : bgConfig.mediaUrl;
-
   return (
-    <form
-      onSubmit={handleSaveAll}
-      className="space-y-6 font-sans select-text text-[var(--text-primary)]"
-      dir="rtl"
-    >
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
+      <input
+        type="file"
+        ref={fontFileInputRef}
+        onChange={handleFontUpload}
+        accept=".woff2,.woff,.ttf,.otf"
+        className="hidden"
+      />
+
+      <div className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>✨</span> استودیوی پس‌زمینه سراسری سایت (عکس، GIF، SVG و انیمیشن)، فونت‌ها و CSS
-          </h1>
+          <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>✨</span> استودیوی هویت بصری، فونت‌ها و استایل‌ساز پیشرفته CSS
+          </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            تنظیم تصویر ثابت، گیف متحرک، SVG و انیمیشن در پس‌زمینه کل سایت با رندر سخت‌افزاری (Zero-Lag) بدون افت سرعت لود
+            کنترل کامل تایپوگرافی کل سایت، آپلود فونت اختصاصی و تولیدکننده بصری استایل‌های CSS بدون نیاز به کدنویسی دستی
           </p>
         </div>
-
-        <button
-          type="submit"
-          disabled={saving}
-          className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black shadow-xl hover:opacity-90 transition cursor-pointer disabled:opacity-50"
-        >
-          {saving ? "در حال انتشار زنده..." : "💾 ذخیره و انتشار بلادرنگ در کل سایت"}
-        </button>
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => fontFileInputRef.current?.click()}
+            className="flex-1 sm:flex-initial justify-center px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition shadow-lg cursor-pointer flex items-center gap-1.5"
+          >
+            <span>🔤</span>
+            <span>+ آپلود فونت اختصاصی</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 sm:flex-initial px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50"
+          >
+            {saving ? "در حال انتشار..." : "💾 ذخیره و انتشار سراسری در سایت"}
+          </button>
+        </div>
       </div>
 
-      {feedback && (
+      {statusMessage && (
         <div
           className={
-            "p-4 rounded-2xl text-xs font-black border " +
-            (feedback.type === "ok"
-              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
-              : "bg-rose-500/15 border-rose-500/30 text-rose-400")
+            "p-4 rounded-2xl text-xs font-bold transition animate-fadeIn " +
+            (statusMessage.type === "success"
+              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+              : "bg-rose-500/15 text-rose-400 border border-rose-500/30")
           }
         >
-          {feedback.text}
+          {statusMessage.text}
         </div>
       )}
 
-      {/* بخش ۱: استودیوی پس‌زمینه سراسری کل سایت (پشتیبانی از عکس، GIF، SVG، WebP و ویدیو) */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--card-border)] pb-3">
-          <div>
-            <h2 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
-              <span>🖼️</span> پس‌زمینه سراسری کل سایت (پشتیبانی از JPG, PNG, WebP, GIF, SVG, MP4/WebM)
-            </h2>
-            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-              این تصویر یا انیمیشن در یک لایه GPU مجزا پس از لود محتوا اجرا می‌شود و سرعت سایت (LCP/FPS) را ۱٪ هم کاهش نمی‌دهد.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              soundEngine.playClick();
-              setBgConfig((prev) => ({ ...prev, enabled: !prev.enabled }));
-            }}
-            className={
-              "px-4 py-2.5 rounded-2xl font-black cursor-pointer transition " +
-              (bgConfig.enabled
-                ? "bg-emerald-600 text-white shadow-lg"
-                : "bg-[var(--input-bg)] border border-[var(--card-border)] text-slate-400")
-            }
-          >
-            {bgConfig.enabled
-              ? "✓ پس‌زمینه سراسری سایت: فعال"
-              : "⚪ پس‌زمینه سراسری سایت: غیرفعال"}
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* ستون تنظیمات فایل، لینک و الگوهای آماده */}
-          <div className="lg:col-span-7 space-y-4">
-            {/* انتخاب نوع منبع */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-              {[
-                { id: "auto", label: "🖼️ عکس / خودکار" },
-                { id: "gif", label: "🎞️ گیف متحرک (GIF)" },
-                { id: "svg", label: "✒️ برداری (SVG)" },
-                { id: "video", label: "🎬 ویدیو (MP4/WebM)" },
-                { id: "preset_svg", label: "⚡ SVG متحرک آماده" },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playClick();
-                    setBgConfig((prev) => ({
-                      ...prev,
-                      enabled: true,
-                      mediaType: t.id as any,
-                    }));
-                  }}
-                  className={
-                    "p-2.5 rounded-xl border font-black text-[11px] cursor-pointer transition " +
-                    (bgConfig.mediaType === t.id
-                      ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow"
-                      : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)]")
-                  }
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {bgConfig.mediaType === "preset_svg" ? (
-              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
-                <label className="block font-black text-[var(--accent-blue)]">
-                  ⚡ انتخاب انیمیشن برداری SVG آماده (حجم صفر کیلوبایت — ۶۰ فریم بر ثانیه):
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {Object.entries(PRESET_ANIMATED_SVGS).map(([key, item]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => {
-                        soundEngine.playClick();
-                        setBgConfig((prev) => ({
-                          ...prev,
-                          enabled: true,
-                          mediaType: "preset_svg",
-                          presetId: key,
-                        }));
-                      }}
-                      className={
-                        "p-3 rounded-xl border text-right font-bold cursor-pointer transition " +
-                        (bgConfig.presetId === key
-                          ? "bg-[var(--accent-blue)]/15 border-[var(--accent-blue)] text-[var(--text-primary)] font-black"
-                          : "bg-[var(--modal-bg)] border-[var(--card-border)] text-[var(--text-secondary)]")
-                      }
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <label className="font-black text-[var(--accent-blue)]">
-                    📤 آپلود مستقیم فایل (عکس، GIF، SVG، WebP یا ویدیو) یا وارد کردن لینک:
-                  </label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/svg+xml,.svg,.gif,video/mp4,video/webm"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files?.[0]) {
-                        handleUploadBackgroundMedia(e.target.files[0]);
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    disabled={uploadingBg}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black cursor-pointer shadow transition disabled:opacity-50"
-                  >
-                    {uploadingBg
-                      ? "در حال آپلود روی سرور..."
-                      : "📁 انتخاب و آپلود فایل (عکس / GIF / SVG)"}
-                  </button>
-                </div>
-
-                <input
-                  type="text"
-                  dir="ltr"
-                  value={bgConfig.mediaUrl}
-                  onChange={(e) =>
-                    setBgConfig((prev) => ({
-                      ...prev,
-                      enabled: true,
-                      mediaUrl: e.target.value,
-                    }))
-                  }
-                  placeholder="https://example.com/background.gif or .svg or .webp"
-                  className="w-full p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
-            )}
-
-            {/* اسلایدرهای تنظیم شفافیت، بلور و نحوه نمایش */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5">
-                <div className="flex justify-between font-bold">
-                  <span>وضوح تصویر (Opacity):</span>
-                  <span className="font-mono text-[var(--accent-blue)]">{bgConfig.opacity}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={5}
-                  max={100}
-                  value={bgConfig.opacity}
-                  onChange={(e) =>
-                    setBgConfig((prev) => ({ ...prev, opacity: Number(e.target.value) }))
-                  }
-                  className="w-full accent-[var(--accent-blue)] cursor-pointer"
-                />
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5">
-                <div className="flex justify-between font-bold">
-                  <span>تیرگی محافظ متن:</span>
-                  <span className="font-mono text-[var(--accent-blue)]">
-                    {bgConfig.overlayOpacity}%
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={90}
-                  value={bgConfig.overlayOpacity}
-                  onChange={(e) =>
-                    setBgConfig((prev) => ({
-                      ...prev,
-                      overlayOpacity: Number(e.target.value),
-                    }))
-                  }
-                  className="w-full accent-[var(--accent-blue)] cursor-pointer"
-                />
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5">
-                <div className="flex justify-between font-bold">
-                  <span>مات‌شدگی شیشه‌ای (Blur):</span>
-                  <span className="font-mono text-[var(--accent-blue)]">{bgConfig.blurPx}px</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={24}
-                  value={bgConfig.blurPx}
-                  onChange={(e) =>
-                    setBgConfig((prev) => ({ ...prev, blurPx: Number(e.target.value) }))
-                  }
-                  className="w-full accent-[var(--accent-blue)] cursor-pointer"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                  نحوه چیدمان تصویر در صفحه:
-                </label>
-                <select
-                  value={bgConfig.sizeMode}
-                  onChange={(e) =>
-                    setBgConfig((prev) => ({
-                      ...prev,
-                      sizeMode: e.target.value as any,
-                    }))
-                  }
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
-                >
-                  <option value="cover">🖼️ تمام‌صفحه یکدست (Cover)</option>
-                  <option value="repeat">🏁 تکرار الگوی کاشی‌وار (Repeat Pattern / SVG)</option>
-                  <option value="contain">📐 نمایش کامل در مرکز (Contain)</option>
-                </select>
-              </div>
-
-              <div className="flex items-end">
-                <label className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between cursor-pointer font-bold">
-                  <span>نمایش این پس‌زمینه در داخل پنل ادمین هم فعال باشد</span>
-                  <input
-                    type="checkbox"
-                    checked={bgConfig.applyToAdmin}
-                    onChange={(e) =>
-                      setBgConfig((prev) => ({ ...prev, applyToAdmin: e.target.checked }))
-                    }
-                    className="w-4 h-4 accent-[var(--accent-blue)]"
-                  />
-                </label>
-              </div>
-            </div>
-          </div>
-
-          {/* ستون پیش‌نمایش زنده پس‌زمینه انتخابی */}
-          <div className="lg:col-span-5 flex flex-col">
-            <span className="font-black text-[var(--text-secondary)] mb-2 block">
-              👁️ پیش‌نمایش زنده پس‌زمینه و خوانایی کارت‌های سایت:
-            </span>
-            <div className="relative flex-1 min-h-[250px] rounded-3xl border-2 border-[var(--card-border)] overflow-hidden bg-[#07090e] flex items-center justify-center p-6">
-              {bgConfig.enabled && previewUrl && (
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    backgroundImage: `url("${previewUrl}")`,
-                    backgroundSize:
-                      bgConfig.sizeMode === "repeat" ? "auto" : bgConfig.sizeMode,
-                    backgroundRepeat:
-                      bgConfig.sizeMode === "repeat" ? "repeat" : "no-repeat",
-                    backgroundPosition: "center",
-                    opacity: bgConfig.opacity / 100,
-                    filter: bgConfig.blurPx > 0 ? `blur(${bgConfig.blurPx}px)` : undefined,
-                  }}
-                />
-              )}
-              {bgConfig.enabled && (
-                <div
-                  className="absolute inset-0 bg-[#07090e]"
-                  style={{ opacity: bgConfig.overlayOpacity / 100 }}
-                />
-              )}
-
-              <div className="relative z-10 p-4 rounded-2xl bg-slate-900/80 backdrop-blur-md border border-white/15 text-white text-center space-y-1.5 shadow-2xl max-w-xs">
-                <div className="text-xs font-black text-sky-400">
-                  آکسون کور | AXON CORE
-                </div>
-                <p className="text-[11px] text-slate-200 leading-relaxed">
-                  نمونه نمایش کارت محصول روی پس‌زمینه فعلی شما با حفظ ۱۰۰٪ سرعت و خوانایی
-                </p>
-              </div>
-            </div>
+      <form
+        onSubmit={handleSave}
+        className="bg-[var(--modal-bg)] p-5 sm:p-8 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-xl text-xs"
+      >
+        {/* تمپلیت‌های آماده با یک کلیک */}
+        <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+          <span className="font-black text-[var(--accent-blue)] block">
+            🎨 پیش‌فرض‌های آماده طراحی (با یک کلیک اعمال کنید):
+          </span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <button
+              type="button"
+              onClick={() => applyVisualPreset("apple_glass")}
+              className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold text-right cursor-pointer transition"
+            >
+              🍎 استایل شیشه‌ای مدرن (Apple Glassmorphism)
+            </button>
+            <button
+              type="button"
+              onClick={() => applyVisualPreset("cyber_neon")}
+              className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-indigo-500 font-bold text-right cursor-pointer transition"
+            >
+              ⚡ استایل نئونی و درخشان (21st.dev Glow)
+            </button>
+            <button
+              type="button"
+              onClick={() => applyVisualPreset("minimal_sharp")}
+              className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-emerald-500 font-bold text-right cursor-pointer transition"
+            >
+              📐 استایل مینیمال و رسمی (Minimal Clean)
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* بخش ۲: تایپوگرافی، رنگ سازمانی و CSS سفارشی */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-xs">
-        <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
-          <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
-            🔤 تایپوگرافی و رنگ اصلی برند
-          </h2>
-
-          <div>
-            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
-              فونت اصلی کل وب‌سایت:
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="space-y-2">
+            <label className="block font-bold text-[var(--text-secondary)]">
+              تایپوگرافی و قلم اصلی کل سایت:
             </label>
             <select
-              value={activeFont}
-              onChange={(e) => setActiveFont(e.target.value)}
+              value={selectedFont}
+              onChange={(e) => {
+                setSelectedFont(e.target.value);
+                fontEngine.applyFontToTarget(e.target.value, "body");
+              }}
               className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
             >
-              {FONT_OPTIONS.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.label}
+              {fontsList.map((f) => (
+                <option key={f.id} value={f.fontFamily}>
+                  {f.name}
                 </option>
               ))}
             </select>
           </div>
 
-          <div>
-            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
-              رنگ تاکیدی دکمه‌ها و لینک‌ها (Accent Color):
+          <div className="space-y-2">
+            <label className="block font-bold text-[var(--text-secondary)]">
+              ضخامت پیش‌فرض متون (Font Weight):
             </label>
-            <div className="flex items-center gap-3">
+            <select
+              value={selectedWeight}
+              onChange={(e) => setSelectedWeight(Number(e.target.value))}
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold font-mono outline-none cursor-pointer"
+            >
+              <option value={300}>300 - ظریف (Light)</option>
+              <option value={400}>400 - استاندارد (Regular)</option>
+              <option value={500}>500 - متوسط (Medium)</option>
+              <option value={700}>700 - ضخیم (Bold)</option>
+              <option value={900}>900 - فوق ضخیم (Black)</option>
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block font-bold text-[var(--text-secondary)]">
+              گردی گوشه‌های کارت‌ها و دکمه‌ها:
+            </label>
+            <select
+              value={borderRadius}
+              onChange={(e) => setBorderRadius(e.target.value)}
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+            >
+              <option value="0.75rem">ملایم (12px)</option>
+              <option value="1.25rem">استاندارد مدرن (20px)</option>
+              <option value="1.5rem">گرد و شیشه‌ای (24px)</option>
+              <option value="2.2rem">حداکثر انحنا (35px)</option>
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block font-bold text-[var(--text-secondary)]">
+              رنگ اصلی سازمانی (Primary Accent):
+            </label>
+            <div className="flex items-center gap-2">
               <input
                 type="color"
-                value={accentColor}
-                onChange={(e) => setAccentColor(e.target.value)}
-                className="w-12 h-11 rounded-xl border border-[var(--card-border)] cursor-pointer bg-transparent"
+                value={primaryColor}
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                className="w-12 h-12 rounded-2xl border border-[var(--card-border)] cursor-pointer bg-transparent"
               />
               <input
                 type="text"
                 dir="ltr"
-                value={accentColor}
-                onChange={(e) => setAccentColor(e.target.value)}
-                className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none"
+                value={primaryColor}
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold uppercase outline-none"
               />
             </div>
           </div>
+
+          <div className="space-y-2">
+            <label className="block font-bold text-[var(--text-secondary)]">
+              رنگ مکمل (Secondary Accent):
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={secondaryColor}
+                onChange={(e) => setSecondaryColor(e.target.value)}
+                className="w-12 h-12 rounded-2xl border border-[var(--card-border)] cursor-pointer bg-transparent"
+              />
+              <input
+                type="text"
+                dir="ltr"
+                value={secondaryColor}
+                onChange={(e) => setSecondaryColor(e.target.value)}
+                className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold uppercase outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block font-bold text-[var(--text-secondary)]">
+              شدت سایه و عمق کارت‌ها (Shadow Depth):
+            </label>
+            <select
+              value={cardShadowStrength}
+              onChange={(e) => setCardShadowStrength(e.target.value as any)}
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+            >
+              <option value="soft">سایه نرم و ظریف</option>
+              <option value="medium">سایه استاندارد سه‌بعدی</option>
+              <option value="deep">سایه عمیق سینمایی</option>
+              <option value="neon">درخشش نئونی هم‌رنگ برند</option>
+            </select>
+          </div>
         </div>
 
-        <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
-          <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
-            💻 استایل اختصاصی (Custom CSS)
-          </h2>
-          <textarea
-            rows={5}
-            dir="ltr"
-            value={customCss}
-            onChange={(e) => setCustomCss(e.target.value)}
-            placeholder="/* کدهای CSS سفارشی شما */"
-            className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[11px] outline-none focus:border-[var(--accent-blue)]"
-          />
+        {/* کنترلرهای بصری استایل‌‌ساز CSS */}
+        <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4">
+          <h3 className="font-black text-sm text-[var(--accent-blue)]">
+            🎛️ کنترلرهای بصری استایل‌ساز پیشرفته CSS (تولید خودکار کدهای استایل)
+          </h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
+              <div className="flex justify-between">
+                <span className="font-bold">شدت ماتی شیشه‌ای (Backdrop Blur):</span>
+                <span className="font-mono font-black text-[var(--accent-blue)]">{glassBlurPx}px</span>
+              </div>
+              <input
+                type="range"
+                min={4}
+                max={40}
+                value={glassBlurPx}
+                onChange={(e) => setGlassBlurPx(Number(e.target.value))}
+                className="w-full accent-[var(--accent-blue)] cursor-pointer"
+              />
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
+              <div className="flex justify-between">
+                <span className="font-bold">ضریب بزرگنمایی دکمه‌ها (Hover Scale):</span>
+                <span className="font-mono font-black text-emerald-400">{buttonHoverScale}x</span>
+              </div>
+              <input
+                type="range"
+                min={1.0}
+                max={1.08}
+                step={0.01}
+                value={buttonHoverScale}
+                onChange={(e) => setButtonHoverScale(Number(e.target.value))}
+                className="w-full accent-emerald-500 cursor-pointer"
+              />
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
+              <div className="flex justify-between">
+                <span className="font-bold">فاصله خطوط متون (Line Height):</span>
+                <span className="font-mono font-black text-indigo-400">{lineHeightScale}</span>
+              </div>
+              <input
+                type="range"
+                min={1.4}
+                max={2.2}
+                step={0.1}
+                value={lineHeightScale}
+                onChange={(e) => setLineHeightScale(Number(e.target.value))}
+                className="w-full accent-indigo-500 cursor-pointer"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2 pt-2">
+            <label className="block font-bold text-[var(--text-secondary)]">
+              کدهای تکمیلی CSS (خروجی استایل‌ساز بصری + کدهای دلخواه شما):
+            </label>
+            <textarea
+              rows={4}
+              dir="ltr"
+              value={customCss}
+              onChange={(e) => setCustomCss(e.target.value)}
+              placeholder="/* کدهای سفارشی CSS */"
+              className="w-full p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[11px] outline-none leading-relaxed"
+            />
+          </div>
         </div>
-      </div>
-    </form>
+
+        {/* پیش‌نمایش زنده فونت و استایل */}
+        <div
+          style={{
+            fontFamily: "'" + selectedFont + "', sans-serif",
+            fontWeight: selectedWeight,
+            lineHeight: lineHeightScale,
+            borderRadius,
+          }}
+          className="p-6 border border-[var(--card-border)] bg-[var(--input-bg)] space-y-3"
+        >
+          <span className="text-[11px] font-bold text-[var(--accent-blue)] block">
+            👁️ پیش‌نمایش زنده تایپوگرافی، رنگ و انحنای انتخابی:
+          </span>
+          <h4 className="text-base sm:text-lg font-black text-[var(--text-primary)]">
+            فروشگاه تخصصی تکنولوژی، سخت‌افزار و گجت‌های هوشمند آکسون کور
+          </h4>
+          <p className="text-xs text-[var(--text-secondary)]">
+            تمامی تغییرات فونت، ضخامت قلم، رنگ‌های سازمانی و پارامترهای استایل‌ساز بصری به محض ذخیره، در دسکتاپ، موبایل و تبلت اعمال می‌شوند.
+          </p>
+          <span
+            style={{ backgroundColor: primaryColor, borderRadius }}
+            className="inline-block px-5 py-2.5 text-white font-black text-xs shadow-lg"
+          >
+            نمونه دکمه با رنگ و انحنای انتخابی
+          </span>
+        </div>
+      </form>
+    </div>
   );
 }

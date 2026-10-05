@@ -59,6 +59,25 @@ export default function AdminLiveChatAndMessagesPage() {
 
   const activeSession = sessions.find((s) => s.sessionId === selectedSessionId) || null;
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const qsId = new URLSearchParams(window.location.search).get("sessionId");
+      if (qsId) setSelectedSessionId(qsId);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!selectedSessionId || !canReply) return;
+    const found = sessions.find((s) => s.sessionId === selectedSessionId);
+    if (found && found.unreadForAdmin > 0) {
+      fetch("/api/live-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark_session_read", sessionId: selectedSessionId }),
+      }).catch(() => {});
+    }
+  }, [selectedSessionId, sessions, canReply]);
+
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canReply || !activeSession || (!replyText.trim() && !replyLink.trim())) return;

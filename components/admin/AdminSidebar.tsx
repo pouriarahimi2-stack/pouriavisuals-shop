@@ -52,6 +52,7 @@ export function AdminSidebar(props: any = {}) {
   const [sidebarFontSize, setSidebarFontSize] = useState<number>(12);
   const [isEditingLabels, setIsEditingLabels] = useState(false);
   const [savingLabels, setSavingLabels] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   const fetchSessionAndLabels = async () => {
     try {
@@ -85,9 +86,12 @@ export function AdminSidebar(props: any = {}) {
         fetchSessionAndLabels();
       })
       .subscribe();
+    const onUnreadChat = (e: any) => setUnreadChatCount(Number(e?.detail || 0));
+    window.addEventListener("axon_live_chat_unread_count", onUnreadChat);
     window.addEventListener("theme_builder_updated", fetchSessionAndLabels);
     return () => {
       supabase.removeChannel(ch);
+      window.removeEventListener("axon_live_chat_unread_count", onUnreadChat);
       window.removeEventListener("theme_builder_updated", fetchSessionAndLabels);
     };
   }, []);
@@ -307,7 +311,11 @@ export function AdminSidebar(props: any = {}) {
                   <span className="text-sm shrink-0">{displayIcon}</span>
                   <span className="truncate">{displayLabel}</span>
                 </div>
-                {item.badge ? (
+                {item.id === "messages" && unreadChatCount > 0 && userRole !== "viewer_reporter" ? (
+                  <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white font-mono text-[10px] font-black animate-pulse shrink-0">
+                    {unreadChatCount} پیام جدید
+                  </span>
+                ) : item.badge ? (
                   <span
                     className={
                       "px-2 py-0.5 rounded-md text-[9px] font-black shrink-0 " +

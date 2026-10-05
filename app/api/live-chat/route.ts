@@ -41,10 +41,19 @@ export interface LiveChatLeadSession {
   messages: LiveChatMessage[];
 }
 
-// محدودیت نرخ درخواست (Rate Limit) بر اساس IP
+export interface LiveChatNotificationAlert {
+  alertId: string;
+  sessionId: string;
+  customerName: string;
+  customerPhone: string;
+  previewText: string;
+  platform: string;
+  createdAt: string;
+}
+
 const ipRateMap = new Map<string, { count: number; resetAt: number }>();
 
-function checkRateLimit(ip: string, maxReq = 25, windowMs = 60_000): boolean {
+function checkRateLimit(ip: string, maxReq = 30, windowMs = 60_000): boolean {
   const now = Date.now();
   const entry = ipRateMap.get(ip);
   if (!entry || now > entry.resetAt) {
@@ -56,7 +65,6 @@ function checkRateLimit(ip: string, maxReq = 25, windowMs = 60_000): boolean {
   return true;
 }
 
-// تولید کپچای گرافیکی واقعی SVG در سمت سرور به همراه توکن رمزنگاری‌شده HMAC-SHA256
 function generateServerGraphicalCaptcha() {
   const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
   let code = "";
@@ -70,7 +78,6 @@ function generateServerGraphicalCaptcha() {
   const sig = crypto.createHmac("sha256", CHAT_SECRET).update(payload).digest("hex");
   const captchaToken = Buffer.from(`${expiresAt}:${nonce}:${sig}`).toString("base64");
 
-  // ساخت خطوط منحنی نویز و نقاط امنیتی تصادفی در SVG
   let noisePaths = "";
   const colors = ["#38bdf8", "#818cf8", "#34d399", "#f472b6", "#fbbf24"];
   for (let i = 0; i < 6; i++) {
@@ -152,42 +159,6 @@ function verifyServerGraphicalCaptcha(userInput: string, captchaToken: string): 
   }
 }
 
-// امضای دیجیتال بدون حالت (Stateless HMAC) برای کد تایید پیامکی (OTP) جهت کارکرد ۱۰۰٪ روی Vercel
-function createSignedOtpChallenge(phone: string, fullName: string, code: string): string {
-  const expiresAt = Date.now() + 5 * 60 * 1000;
-  const data = `${phone}|${fullName}|${code}|${expiresAt}`;
-  const sig = crypto.createHmac("sha256", CHAT_SECRET).update(data).digest("hex");
-  return Buffer.from(`${phone}|${fullName}|${expiresAt}|${sig}`).toString("base64");
-}
-
-function verifySignedOtpChallenge(
-  otpToken: string,
-  phoneInput: string,
-  codeInput: string
-): { valid: boolean; fullName: string } {
-  try {
-    const decoded = Buffer.from(otpToken, "base64").toString("utf8");
-    const [phone, fullName, expiresAtStr, providedSig] = decoded.split("|");
-    const expiresAt = Number(expiresAtStr);
-    if (!expiresAt || Date.now() > expiresAt) return { valid: false, fullName: "" };
-    if (phone !== phoneInput) return { valid: false, fullName: "" };
-
-    const expectedData = `${phone}|${fullName}|${String(codeInput).trim()}|${expiresAt}`;
-    const expectedSig = crypto
-      .createHmac("sha256", CHAT_SECRET)
-      .update(expectedData)
-      .digest("hex");
-
-    const isMatch = crypto.timingSafeEqual(
-      Buffer.from(providedSig, "hex"),
-      Buffer.from(expectedSig, "hex")
-    );
-    return { valid: isMatch, fullName };
-  } catch {
-    return { valid: false, fullName: "" };
-  }
-}
-
 function signChatToken(sessionId: string, phone: string): string {
   return crypto
     .createHmac("sha256", CHAT_SECRET)
@@ -243,7 +214,6 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const mode = searchParams.get("mode");
 
-    // تولید تصویر کپچای گرافیکی جدید از سمت سرور
     if (mode === "captcha") {
       const { captchaImage, captchaToken } = generateServerGraphicalCaptcha();
       return NextResponse.json(
@@ -257,16 +227,27 @@ export async function GET(req: NextRequest) {
     const sessions: LiveChatLeadSession[] = Array.isArray(layoutCfg.live_chat_sessions)
       ? layoutCfg.live_chat_sessions
       : [];
+    const lastAlert: LiveChatNotificationAlert | null =
+      layoutCfg.live_chat_last_alert || null;
 
     if (mode === "admin") {
       const adminUser = await resolveAdminResponder(req);
       if (!adminUser) {
         return NextResponse.json({ success: false, message: "عدم دسترسی" }, { status: 401 });
       }
+      const isViewer = adminUser.role === "viewer_reporter";
+      const totalUnread = sessions.reduce(
+        (acc, s) => acc + Number(s.unreadForAdmin || 0),
+        0
+      );
+
       return NextResponse.json(
         {
           success: true,
-          canReply: adminUser.role !== "viewer_reporter",
+          canReply: !isViewer,
+          shouldNotify: !isViewer,
+          totalUnread: isViewer ? 0 : totalUnread,
+          lastAlert: isViewer ? null : lastAlert,
           responder: adminUser,
           sessions: sessions.sort(
             (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
@@ -300,7 +281,7 @@ export async function POST(req: NextRequest) {
       req.headers.get("x-real-ip") ||
       "127.0.0.1";
 
-    if (!checkRateLimit(ip, 30, 60_000)) {
+    if (!checkRateLimit(ip, 35, 60_000)) {
       return NextResponse.json(
         { success: false, message: "تعداد درخواست‌های شما بیش از حد مجاز است. کمی صبر کنید." },
         { status: 429 }
@@ -310,13 +291,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action } = body;
 
-    // فیلد تله ضد ربات (Honeypot)
     if (body.website_hp && String(body.website_hp).trim().length > 0) {
-      return NextResponse.json({ success: false, message: "دسترسی ربات مسدود شد." }, { status: 403 });
+      return NextResponse.json(
+        { success: false, message: "دسترسی ربات مسدود شد." },
+        { status: 403 }
+      );
     }
 
-    // ۱. بررسی کپچای گرافیکی سرور و ارسال کد تایید پیامکی (OTP)
-    if (action === "request_otp") {
+    // ۱. شروع مستقیم گفتگوی زنده فقط با ثبت نام + شماره موبایل + وریفای کپچای گرافیکی سرور (بدون OTP)
+    if (action === "start_chat" || action === "request_otp") {
       const fullName = sanitizeText(body.fullName, 60);
       const phone = String(body.phone || "")
         .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
@@ -324,6 +307,7 @@ export async function POST(req: NextRequest) {
         .replace(/^98/, "0");
       const captchaInput = String(body.captchaInput || "").trim();
       const captchaToken = String(body.captchaToken || "").trim();
+      const platform = sanitizeText(body.platform || "دسکتاپ", 30);
 
       if (!fullName || fullName.length < 2) {
         return NextResponse.json(
@@ -352,54 +336,8 @@ export async function POST(req: NextRequest) {
             success: false,
             field: "captcha",
             ...freshCaptcha,
-            message: "حروف تصویر امنیتی (کپچا) اشتباه یا منقضی شده است. تصویر جدید را وارد کنید.",
-          },
-          { status: 400 }
-        );
-      }
-
-      const otpCode = String(crypto.randomInt(1000, 9999));
-      const otpChallengeToken = createSignedOtpChallenge(phone, fullName, otpCode);
-
-      // ارسال پیامک به شماره موبایل کاربر از طریق سرویس پیامک سایت
-      let smsDelivered = false;
-      try {
-        const origin = req.nextUrl.origin;
-        const smsRes = await fetch(origin + "/api/send-otp", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone, code: otpCode }),
-        });
-        if (smsRes.ok) smsDelivered = true;
-      } catch {}
-
-      return NextResponse.json({
-        success: true,
-        smsDelivered,
-        otpChallengeToken,
-        fallbackOtpCode: otpCode,
-        message: "✓ کد تایید ۴ رقمی برای شماره " + phone + " ارسال شد.",
-      });
-    }
-
-    // ۲. تایید کد OTP و ذخیره مخاطب به عنوان «مخاطب تاییدشده گفتگوی زنده (سرنخ فروش / Verified Lead)»
-    if (action === "verify_otp") {
-      const phone = String(body.phone || "")
-        .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
-        .replace(/[^0-9]/g, "")
-        .replace(/^98/, "0");
-      const code = String(body.code || "")
-        .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
-        .trim();
-      const otpChallengeToken = String(body.otpChallengeToken || "");
-      const platform = sanitizeText(body.platform || "دسکتاپ", 30);
-
-      const check = verifySignedOtpChallenge(otpChallengeToken, phone, code);
-      if (!check.valid) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "کد تایید ۴ رقمی واردشده اشتباه یا منقضی شده است.",
+            message:
+              "کد تصویر امنیتی (کپچا) اشتباه یا منقضی شده است. لطفاً تصویر جدید را وارد کنید.",
           },
           { status: 400 }
         );
@@ -413,15 +351,17 @@ export async function POST(req: NextRequest) {
 
       const nowIso = new Date().toISOString();
       let existing = sessions.find((s) => s.phone === phone);
+      let isNewSession = false;
 
       if (!existing) {
+        isNewSession = true;
         const sessionId = "chat_" + phone + "_" + Date.now().toString(36);
         existing = {
           sessionId,
-          fullName: check.fullName,
+          fullName,
           phone,
           verified: true,
-          leadCategory: "مخاطب تاییدشده گفتگوی زنده (سرنخ فروش / Lead)",
+          leadCategory: "مخاطب ثبت‌شده گفتگوی زنده (سرنخ فروش / Lead)",
           platform,
           ip,
           status: "open",
@@ -437,15 +377,15 @@ export async function POST(req: NextRequest) {
               senderRole: "پشتیبانی بلادرنگ",
               text:
                 "سلام " +
-                check.fullName +
-                " عزیز 👋 شماره شما با موفقیت تایید شد. کارشناسان ما آماده پاسخگویی زنده هستند؛ سوال، لینک یا فایل خود را ارسال کنید.",
+                fullName +
+                " عزیز 👋 خوش آمدید. کارشناسان ما آنلاین هستند؛ سوال، لینک یا فایل خود را ارسال کنید تا بلافاصله پاسخ دهیم.",
               createdAt: nowIso,
             },
           ],
         };
         sessions.unshift(existing);
       } else {
-        existing.fullName = check.fullName || existing.fullName;
+        existing.fullName = fullName || existing.fullName;
         existing.updatedAt = nowIso;
         existing.platform = platform;
       }
@@ -458,12 +398,24 @@ export async function POST(req: NextRequest) {
           id: existing.sessionId,
           full_name: existing.fullName,
           phone: existing.phone,
-          type: "مخاطب تاییدشده گفتگوی زنده (سرنخ فروش)",
+          type: "مخاطب ثبت‌شده گفتگوی زنده (سرنخ فروش)",
           platform,
           ip,
           created_at: nowIso,
         });
       }
+
+      const newAlert: LiveChatNotificationAlert = isNewSession
+        ? {
+            alertId: "alrt_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+            sessionId: existing.sessionId,
+            customerName: existing.fullName,
+            customerPhone: existing.phone,
+            previewText: "👋 شروع گفتگوی زنده جدید توسط " + existing.fullName,
+            platform,
+            createdAt: nowIso,
+          }
+        : layoutCfg.live_chat_last_alert || null;
 
       await saveMasterSiteInfoRow(
         siteRow,
@@ -471,6 +423,7 @@ export async function POST(req: NextRequest) {
           ...layoutCfg,
           live_chat_sessions: sessions.slice(0, 200),
           verified_chat_leads: crmLeads.slice(0, 500),
+          live_chat_last_alert: newAlert,
         },
         {}
       );
@@ -483,7 +436,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ۳. ارسال پیام، لینک یا فایل محدودشده توسط کاربر (با اعتبارسنجی کپچای گرافیکی سرور برای فایل/لینک)
+    // ۲. ارسال پیام، لینک یا فایل محدودشده توسط کاربر + ایجاد نوتیفیکیشن بلادرنگ برای مدیران (به‌جز بیننده)
     if (action === "send_customer_message") {
       const {
         sessionId,
@@ -530,7 +483,6 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // بررسی کپچای گرافیکی سرور هنگام ارسال فایل یا لینک
       if (hasAttachment || safeLink) {
         if (!verifyServerGraphicalCaptcha(captchaInput, captchaToken)) {
           const freshCaptcha = generateServerGraphicalCaptcha();
@@ -576,29 +528,44 @@ export async function POST(req: NextRequest) {
         targetSession.filesSentCount = Number(targetSession.filesSentCount || 0) + 1;
       }
 
+      const nowIso = new Date().toISOString();
+      const displayMsgText =
+        cleanText || (hasAttachment ? "📎 فایل ضمیمه ارسال شد" : "🔗 لینک ارسال شد");
+
       const newMsg: LiveChatMessage = {
         id: "cmsg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
         senderType: "customer",
         senderName: targetSession.fullName,
-        text: cleanText || (hasAttachment ? "📎 فایل ضمیمه ارسال شد" : "🔗 لینک ارسال شد"),
+        text: displayMsgText,
         linkUrl: safeLink,
         attachmentUrl: hasAttachment ? String(attachmentUrl) : undefined,
         attachmentName: hasAttachment ? sanitizeText(attachmentName || "file", 60) : undefined,
         attachmentMime: hasAttachment ? sanitizeText(attachmentMime || "", 40) : undefined,
-        createdAt: new Date().toISOString(),
+        createdAt: nowIso,
       };
 
       targetSession.messages.push(newMsg);
       targetSession.status = "open";
       targetSession.unreadForAdmin = Number(targetSession.unreadForAdmin || 0) + 1;
-      targetSession.updatedAt = newMsg.createdAt;
+      targetSession.updatedAt = nowIso;
       sessions[idx] = targetSession;
+
+      const newAlert: LiveChatNotificationAlert = {
+        alertId: "alrt_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+        sessionId: targetSession.sessionId,
+        customerName: targetSession.fullName,
+        customerPhone: targetSession.phone,
+        previewText: displayMsgText.slice(0, 120),
+        platform: targetSession.platform || "دسکتاپ",
+        createdAt: nowIso,
+      };
 
       await saveMasterSiteInfoRow(
         siteRow,
         {
           ...layoutCfg,
           live_chat_sessions: sessions,
+          live_chat_last_alert: newAlert,
         },
         {}
       );
@@ -607,7 +574,32 @@ export async function POST(req: NextRequest) {
         success: true,
         session: targetSession,
         message: newMsg,
+        alert: newAlert,
       });
+    }
+
+    // ۳. علامت‌گذاری گفتگو به عنوان خوانده‌شده وقتی ادمین (غیر از بیننده) آن را باز می‌کند
+    if (action === "mark_session_read") {
+      const responder = await resolveAdminResponder(req);
+      if (!responder || responder.role === "viewer_reporter") {
+        return NextResponse.json({ success: false }, { status: 403 });
+      }
+      const { sessionId } = body;
+      const siteRow = await getMasterSiteInfoRow();
+      const layoutCfg = siteRow?.homepage_layout_config || {};
+      const sessions: LiveChatLeadSession[] = Array.isArray(layoutCfg.live_chat_sessions)
+        ? layoutCfg.live_chat_sessions
+        : [];
+      const idx = sessions.findIndex((s) => s.sessionId === sessionId);
+      if (idx !== -1 && sessions[idx].unreadForAdmin > 0) {
+        sessions[idx].unreadForAdmin = 0;
+        await saveMasterSiteInfoRow(
+          siteRow,
+          { ...layoutCfg, live_chat_sessions: sessions },
+          {}
+        );
+      }
+      return NextResponse.json({ success: true });
     }
 
     // ۴. پاسخگویی بلادرنگ توسط مدیر ارشد و تمام نقش‌ها به‌جز نقش بیننده

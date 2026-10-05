@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminReadOnlyGuard from "@/components/admin/AdminReadOnlyGuard";
+import AdminLiveChatNotifier from "@/components/admin/AdminLiveChatNotifier";
 import { soundEngine } from "@/lib/soundEngine";
 import { themeEngine } from "@/lib/themeEngine";
 import { supabase } from "@/lib/supabase";
@@ -120,7 +121,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     []
   );
 
-  // کانال وب‌سوکت اختصاصی Layout برای همگام‌سازی بلادرنگ تم و دسترسی‌ها
   useEffect(() => {
     const channelId = "axon-admin-layout-sync-" + Math.random().toString(36).slice(2, 8);
     const ch = supabase
@@ -139,7 +139,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     };
   }, [syncAdminSessionAndTheme]);
 
-  // رصد بلادرنگ تغییر صفحه، کلیک روی تب‌ها و دکمه‌ها، و جستجوها
   useEffect(() => {
     if (pathname.startsWith("/admin/login") || pathname.startsWith("/admin/setup")) return;
 
@@ -166,7 +165,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       const text = (btn.textContent || btn.getAttribute("title") || "").trim().slice(0, 70);
       if (!text) return;
 
-      const isTabSwitch = /^[🧭🏛📑🌳⚡🏭📦📈🎯✏️📡💻📊📋🔍🚀📚🤖]*s*[۱۱۲۳۴۵12345]./.test(text);
+      const isTabSwitch = /^[🧭🏛📑🌳⚡🏭📦📈🎯✏️📡💻📊📋🔍🚀📚🤖]*\s*[۱۱۲۳۴۵12345]\./.test(text);
       if (isTabSwitch) {
         pushLiveTelemetry({
           eventType: "tab_switch",
@@ -363,6 +362,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         <div className="flex items-center gap-2 text-xs">
+          {adminUser && adminUser.role !== "viewer_reporter" && (
+            <AdminLiveChatNotifier userRole={adminUser.role} />
+          )}
+
           {isSuperAdmin && (
             <button
               type="button"

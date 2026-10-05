@@ -6,6 +6,7 @@ import Link from "next/link";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminReadOnlyGuard from "@/components/admin/AdminReadOnlyGuard";
 import AdminLiveChatNotifier from "@/components/admin/AdminLiveChatNotifier";
+import AdminGlobalSearch from "@/components/admin/AdminGlobalSearch";
 import { soundEngine } from "@/lib/soundEngine";
 import { themeEngine } from "@/lib/themeEngine";
 import { supabase } from "@/lib/supabase";
@@ -360,6 +361,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             مرکز فرماندهی و مدیریت یکپارچه سایت
           </span>
         </div>
+
+        <AdminGlobalSearch
+          userRole={adminUser?.role}
+          userPermissions={(adminUser as any)?.permissions}
+        />
 
         <div className="flex items-center gap-2 text-xs">
           {adminUser && adminUser.role !== "viewer_reporter" && (

@@ -14,7 +14,9 @@ export interface GlobalBackgroundConfig {
   overlayOpacity: number;
   sizeMode: "cover" | "contain" | "repeat";
   applyToAdmin: boolean;
-  footerScale?: number; // 65 to 100 (%)
+  footerScale?: number; // 60 to 100 (%)
+  footerBgPaddingY?: number; // 4 to 64 (px)
+  footerInnerGap?: number; // 4 to 48 (px)
   footerPadding?: "ultra_compact" | "compact" | "normal";
 }
 
@@ -28,7 +30,9 @@ const DEFAULT_BG_CONFIG: GlobalBackgroundConfig = {
   overlayOpacity: 40,
   sizeMode: "cover",
   applyToAdmin: false,
-  footerScale: 82,
+  footerScale: 80,
+  footerBgPaddingY: 16,
+  footerInnerGap: 12,
   footerPadding: "compact",
 };
 
@@ -149,6 +153,14 @@ export default function GlobalSiteBackground() {
     window.addEventListener("theme_builder_updated", onUpdate);
     window.addEventListener("site_info_updated", onUpdate);
 
+    // پیش‌نمایش زنده هنگام حرکت اسلایدرها در پنل ادمین
+    const onLivePreview = (e: any) => {
+      if (e?.detail && typeof e.detail === "object") {
+        setConfig((prev) => ({ ...prev, ...e.detail }));
+      }
+    };
+    window.addEventListener("axon_footer_live_preview", onLivePreview);
+
     const ch = supabase
       .channel("axon-global-bg-sync-" + Math.random().toString(36).slice(2, 7))
       .on(
@@ -165,6 +177,7 @@ export default function GlobalSiteBackground() {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("theme_builder_updated", onUpdate);
       window.removeEventListener("site_info_updated", onUpdate);
+      window.removeEventListener("axon_footer_live_preview", onLivePreview);
       supabase.removeChannel(ch);
     };
   }, [fetchBgConfig]);
@@ -183,10 +196,11 @@ export default function GlobalSiteBackground() {
     }
   }, [isActiveHere]);
 
-  const fScale = Math.max(60, Math.min(100, Number(config.footerScale ?? 82))) / 100;
-  const fPadMode = config.footerPadding || "compact";
-  const padRem =
-    fPadMode === "ultra_compact" ? "0.75rem" : fPadMode === "compact" ? "1.35rem" : "2.75rem";
+  // محاسبه دقیق مقیاس درجا (بدون جمع شدن عرض فوتر به وسط) و ارتفاع پس‌زمینه فوتر
+  const fScale = Math.max(60, Math.min(100, Number(config.footerScale ?? 80))) / 100;
+  const bgPadY = Math.max(4, Math.min(80, Number(config.footerBgPaddingY ?? 16)));
+  const innerGap = Math.max(4, Math.min(60, Number(config.footerInnerGap ?? 12)));
+  const compensatedMaxWidthRem = (80 / fScale).toFixed(3);
 
   const resolvedUrl =
     config.mediaType === "preset_svg"
@@ -211,30 +225,35 @@ export default function GlobalSiteBackground() {
 
   return (
     <>
-      {/* اعمال سراسری مقیاس و ارتفاع فشرده فوتر + شفاف‌سازی پس‌زمینه */}
+      {/* کنترل مهندسی ارتفاع پس‌زمینه فوتر و کوچک‌سازی درجا (In-Place Scaling) بدون به هم خوردن چیدمان افقی */}
       {hydrated && !isAdminRoute && (
         <style>{`
           footer {
-            padding-top: ${padRem} !important;
-            padding-bottom: ${padRem} !important;
+            padding-top: ${bgPadY}px !important;
+            padding-bottom: ${bgPadY}px !important;
+            min-height: 0 !important;
+            height: auto !important;
           }
           footer > div {
             zoom: ${fScale};
-            padding-top: 0.4rem !important;
-            padding-bottom: 0.4rem !important;
+            width: 100% !important;
+            max-width: ${compensatedMaxWidthRem}rem !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
           }
-          footer .mt-12,
-          footer .mt-10,
-          footer .mt-8 {
-            margin-top: 1rem !important;
+          footer > div > div:first-child {
+            margin-bottom: ${innerGap}px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            align-items: center !important;
           }
-          footer .pt-8,
-          footer .pt-6 {
-            padding-top: 0.75rem !important;
-          }
-          footer .gap-10,
-          footer .gap-8 {
-            gap: 1.25rem !important;
+          footer > div > div:last-child,
+          footer .border-t {
+            margin-top: ${innerGap}px !important;
+            padding-top: ${Math.max(6, Math.round(innerGap * 0.75))}px !important;
+            padding-bottom: 0 !important;
           }
         `}</style>
       )}

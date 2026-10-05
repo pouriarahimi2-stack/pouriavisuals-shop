@@ -18,7 +18,9 @@ export default function GlobalBackgroundStudio() {
     overlayOpacity: 40,
     sizeMode: "cover",
     applyToAdmin: false,
-    footerScale: 82,
+    footerScale: 80,
+    footerBgPaddingY: 16,
+    footerInnerGap: 12,
     footerPadding: "compact",
   });
 
@@ -40,6 +42,42 @@ export default function GlobalBackgroundStudio() {
       })
       .catch(() => {});
   }, []);
+
+  const updateFooterParam = (patch: Partial<GlobalBackgroundConfig>) => {
+    setBgConfig((prev) => {
+      const next = { ...prev, ...patch };
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("axon_footer_live_preview", { detail: next }));
+      }
+      return next;
+    });
+  };
+
+  const applyFooterPreset = (preset: "ultra_slim" | "compact_pro" | "original") => {
+    soundEngine.playClick();
+    if (preset === "ultra_slim") {
+      updateFooterParam({
+        footerScale: 74,
+        footerBgPaddingY: 8,
+        footerInnerGap: 8,
+        footerPadding: "ultra_compact",
+      });
+    } else if (preset === "compact_pro") {
+      updateFooterParam({
+        footerScale: 82,
+        footerBgPaddingY: 16,
+        footerInnerGap: 12,
+        footerPadding: "compact",
+      });
+    } else {
+      updateFooterParam({
+        footerScale: 100,
+        footerBgPaddingY: 40,
+        footerInnerGap: 32,
+        footerPadding: "normal",
+      });
+    }
+  };
 
   const handleSelectFile = async (file: File) => {
     soundEngine.playClick();
@@ -80,7 +118,7 @@ export default function GlobalBackgroundStudio() {
         }));
         setFeedback({
           type: "ok",
-          text: "✓ فایل «" + file.name + "» آپلود شد. اکنون روی «ذخیره و انتشار پس‌زمینه» کلیک کنید.",
+          text: "✓ فایل «" + file.name + "» آپلود شد. اکنون روی «ذخیره و انتشار» کلیک کنید.",
         });
         setUploading(false);
         return;
@@ -97,7 +135,7 @@ export default function GlobalBackgroundStudio() {
         }));
         setFeedback({
           type: "ok",
-          text: "✓ فایل «" + file.name + "» آماده شد. اکنون روی «ذخیره و انتشار پس‌زمینه» کلیک کنید.",
+          text: "✓ فایل «" + file.name + "» آماده شد. اکنون روی «ذخیره و انتشار» کلیک کنید.",
         });
         setUploading(false);
       };
@@ -140,11 +178,11 @@ export default function GlobalBackgroundStudio() {
         }
         setFeedback({
           type: "ok",
-          text: "✓ پس‌زمینه سراسری سایت (عکس/GIF/SVG) با موفقیت ذخیره و به صورت بلادرنگ در کل سایت فعال شد!",
+          text: "✓ تنظیمات پس‌زمینه سراسری و ابعاد/ارتفاع فوتر با موفقیت ذخیره و در کل سایت اعمال شد!",
         });
         setTimeout(() => setFeedback(null), 4500);
       } else {
-        setFeedback({ type: "err", text: "خطا در ذخیره تنظیمات پس‌زمینه." });
+        setFeedback({ type: "err", text: "خطا در ذخیره تنظیمات." });
       }
     } catch {
       setFeedback({ type: "err", text: "خطا در ارتباط با سرور." });
@@ -167,10 +205,10 @@ export default function GlobalBackgroundStudio() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--card-border)] pb-3">
         <div>
           <h2 className="font-black text-sm sm:text-base text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🖼️</span> استودیوی پس‌زمینه سراسری کل سایت (عکس، GIF، SVG و تصویر متحرک — بدون افت سرعت)
+            <span>🖼️</span> استودیوی پس‌زمینه سراسری سایت و کنترلر مهندسی ابعاد فوتر
           </h2>
           <p className="text-[11px] text-[var(--text-secondary)] mt-1">
-            پشتیبانی از آپلود مستقیم یا لینک عکس، گیف متحرک (GIF)، وکتور (SVG) و انیمیشن با رندر سخت‌افزاری (Zero-Lag)
+            تنظیم عکس، GIF و SVG پس‌زمینه کل سایت + کنترل دقیق ارتفاع کادر فوتر و کوچک‌سازی درجا (بدون به هم خوردن چیدمان ستون‌ها)
           </p>
         </div>
 
@@ -196,7 +234,7 @@ export default function GlobalBackgroundStudio() {
             disabled={saving}
             className="px-5 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black shadow-lg cursor-pointer hover:opacity-90 disabled:opacity-50"
           >
-            {saving ? "در حال ذخیره..." : "💾 ذخیره و انتشار پس‌زمینه"}
+            {saving ? "در حال ذخیره..." : "💾 ذخیره و انتشار در کل سایت"}
           </button>
         </div>
       </div>
@@ -382,54 +420,119 @@ export default function GlobalBackgroundStudio() {
             </div>
           </div>
 
-          {/* کنترل هم‌زمان ارتفاع و اندازه تمام اجزای داخل فوتر */}
-          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--accent-blue)]/40 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-black text-[var(--accent-blue)]">
-                📏 تنظیم هم‌زمان ارتفاع و مقیاس تمام اجزای فوتر (لوگو، اینماد، لینک‌ها و کادرها):
-              </span>
-              <span className="px-2.5 py-0.5 rounded-lg bg-[var(--modal-bg)] font-mono font-black text-emerald-400">
-                مقیاس فعلی: {bgConfig.footerScale ?? 82}%
-              </span>
+          {/* ===================================================================== */}
+          {/* استودیوی مهندسی کنترل ابعاد، مقیاس درجا و ارتفاع پس‌زمینه فوتر */}
+          {/* ===================================================================== */}
+          <div className="p-4 sm:p-5 rounded-3xl bg-[var(--input-bg)] border-2 border-[var(--accent-blue)]/40 space-y-4 shadow-md">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] pb-3">
+              <div>
+                <h3 className="font-black text-xs sm:text-sm text-[var(--accent-blue)] flex items-center gap-1.5">
+                  <span>📐</span> کنترلر حرفه‌ای ارتفاع پس‌زمینه فوتر و مقیاس درجا (حفظ ۱۰۰٪ جایگاه ستون‌ها)
+                </h3>
+                <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">
+                  لوگو، اینماد و ستون‌ها دقیقاً سر جای خودشان در کل عرض صفحه می‌مانند و هم‌زمان کوچک‌تر و جمع‌وجورتر می‌شوند.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => applyFooterPreset("ultra_slim")}
+                  className="px-3 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-black text-[10px] cursor-pointer transition"
+                >
+                  ⚡ فوق فشرده و ظریف
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyFooterPreset("compact_pro")}
+                  className="px-3 py-1.5 rounded-xl bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)] text-[var(--accent-blue)] font-black text-[10px] cursor-pointer transition"
+                >
+                  ✨ جمع‌وجور استاندارد (پیشنهادی)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyFooterPreset("original")}
+                  className="px-3 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold text-[10px] cursor-pointer transition"
+                >
+                  📏 پیش‌فرض (100%)
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-              <div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              {/* اسلایدر ۱: اندازه اجزای داخل فوتر در جای خودشان */}
+              <div className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-[11px]">۱. اندازه اجزای فوتر:</span>
+                  <span className="px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-500 font-mono font-black text-[11px]">
+                    {bgConfig.footerScale ?? 80}%
+                  </span>
+                </div>
                 <input
                   type="range"
-                  min={65}
+                  min={60}
                   max={100}
-                  value={bgConfig.footerScale ?? 82}
+                  value={bgConfig.footerScale ?? 80}
                   onChange={(e) =>
-                    setBgConfig((prev) => ({
-                      ...prev,
-                      footerScale: Number(e.target.value),
-                    }))
+                    updateFooterParam({ footerScale: Number(e.target.value) })
                   }
                   className="w-full accent-[var(--accent-blue)] cursor-pointer"
                 />
-                <div className="flex justify-between text-[10px] text-[var(--text-secondary)] font-mono mt-1">
-                  <span>65% (خیلی ظریف)</span>
-                  <span>82% (استاندارد جمع‌وجور)</span>
+                <div className="flex justify-between text-[9px] text-[var(--text-secondary)] font-bold">
+                  <span>60% (ظریف)</span>
+                  <span>80% (استاندارد)</span>
                   <span>100% (بزرگ)</span>
                 </div>
               </div>
 
-              <div>
-                <select
-                  value={bgConfig.footerPadding || "compact"}
+              {/* اسلایدر ۲: ارتفاع پس‌زمینه خودِ فوتر (Padding بالا و پایین) */}
+              <div className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-[11px]">۲. ارتفاع پس‌زمینه فوتر:</span>
+                  <span className="px-2 py-0.5 rounded-lg bg-sky-500/15 text-sky-400 font-mono font-black text-[11px]">
+                    {bgConfig.footerBgPaddingY ?? 16}px
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={4}
+                  max={64}
+                  value={bgConfig.footerBgPaddingY ?? 16}
                   onChange={(e) =>
-                    setBgConfig((prev) => ({
-                      ...prev,
-                      footerPadding: e.target.value as any,
-                    }))
+                    updateFooterParam({ footerBgPaddingY: Number(e.target.value) })
                   }
-                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
-                >
-                  <option value="ultra_compact">↕️ فاصله عمودی فوتر: خیلی فشرده (Ultra Compact)</option>
-                  <option value="compact">↕️ فاصله عمودی فوتر: جمع‌وجور و متناسب (Compact)</option>
-                  <option value="normal">↕️ فاصله عمودی فوتر: پیش‌فرض (Normal)</option>
-                </select>
+                  className="w-full accent-[var(--accent-blue)] cursor-pointer"
+                />
+                <div className="flex justify-between text-[9px] text-[var(--text-secondary)] font-bold">
+                  <span>4px (حداقل ارتفاع)</span>
+                  <span>16px (متناسب)</span>
+                  <span>64px (بلند)</span>
+                </div>
+              </div>
+
+              {/* اسلایدر ۳: فاصله عمودی خط کپی‌رایت پایین فوتر */}
+              <div className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-[11px]">۳. فاصله خط کپی‌‌رایت:</span>
+                  <span className="px-2 py-0.5 rounded-lg bg-indigo-500/15 text-indigo-400 font-mono font-black text-[11px]">
+                    {bgConfig.footerInnerGap ?? 12}px
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={4}
+                  max={48}
+                  value={bgConfig.footerInnerGap ?? 12}
+                  onChange={(e) =>
+                    updateFooterParam({ footerInnerGap: Number(e.target.value) })
+                  }
+                  className="w-full accent-[var(--accent-blue)] cursor-pointer"
+                />
+                <div className="flex justify-between text-[9px] text-[var(--text-secondary)] font-bold">
+                  <span>4px (چسبیده)</span>
+                  <span>12px (متناسب)</span>
+                  <span>48px (فاصله زیاد)</span>
+                </div>
               </div>
             </div>
           </div>
@@ -437,7 +540,7 @@ export default function GlobalBackgroundStudio() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                نحوه چیدمان تصویر در صفحه:
+                نحوه چیدمان تصویر پس‌زمینه سایت:
               </label>
               <select
                 value={bgConfig.sizeMode}
@@ -457,7 +560,7 @@ export default function GlobalBackgroundStudio() {
 
             <div className="flex items-end">
               <label className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between cursor-pointer font-bold">
-                <span>اعمال در داخل محیط پنل ادمین</span>
+                <span>اعمال پس‌زمینه در داخل پنل ادمین</span>
                 <input
                   type="checkbox"
                   checked={bgConfig.applyToAdmin}
@@ -473,9 +576,9 @@ export default function GlobalBackgroundStudio() {
 
         <div className="lg:col-span-5 flex flex-col">
           <span className="font-black text-[var(--text-secondary)] mb-2 block">
-            👁️ پیش‌نمایش زنده پس‌زمینه انتخابی:
+            👁️ پیش‌نمایش زنده پس‌زمینه و تناسب فوتر:
           </span>
-          <div className="relative flex-1 min-h-[230px] rounded-3xl border-2 border-[var(--card-border)] overflow-hidden bg-[#07090e] flex items-center justify-center p-6">
+          <div className="relative flex-1 min-h-[260px] rounded-3xl border-2 border-[var(--card-border)] overflow-hidden bg-[#07090e] flex flex-col justify-between p-5">
             {bgConfig.enabled && previewUrl && (
               <div
                 className="absolute inset-0"
@@ -498,13 +601,45 @@ export default function GlobalBackgroundStudio() {
               />
             )}
 
-            <div className="relative z-10 p-4 rounded-2xl bg-slate-900/80 backdrop-blur-md border border-white/15 text-white text-center space-y-1.5 shadow-2xl max-w-xs">
+            <div className="relative z-10 my-auto p-4 rounded-2xl bg-slate-900/80 backdrop-blur-md border border-white/15 text-white text-center space-y-1 shadow-2xl max-w-xs mx-auto">
               <div className="text-xs font-black text-sky-400">
                 آکسون کور | AXON CORE
               </div>
-              <p className="text-[11px] text-slate-200 leading-relaxed">
-                پیش‌نمایش کارت‌های سایت روی پس‌زمینه انتخابی شما بدون افت سرعت
+              <p className="text-[10px] text-slate-200 leading-relaxed">
+                کارت‌های بدنه سایت روی پس‌زمینه انتخابی
               </p>
+            </div>
+
+            {/* شبیه‌ساز زنده فوتر در پایین باکس پیش‌نمایش */}
+            <div
+              className="relative z-10 w-full rounded-2xl bg-slate-900/95 border border-slate-700/80 px-3 transition-all"
+              style={{
+                paddingTop: Math.max(4, Math.round((bgConfig.footerBgPaddingY ?? 16) * 0.45)) + "px",
+                paddingBottom: Math.max(4, Math.round((bgConfig.footerBgPaddingY ?? 16) * 0.45)) + "px",
+              }}
+            >
+              <div
+                className="w-full flex items-center justify-between text-[9px] text-slate-200 font-bold"
+                style={{
+                  transform: `scale(${(bgConfig.footerScale ?? 80) / 100})`,
+                  transformOrigin: "center center",
+                }}
+              >
+                <span className="px-2 py-1 rounded bg-sky-500/20 text-sky-300">لوگو (راست)</span>
+                <span>دسترسی سریع</span>
+                <span>ارتباط و پشتیبانی</span>
+                <span className="px-2 py-1 rounded bg-white text-slate-900">اینماد (چپ)</span>
+              </div>
+              <div
+                className="border-t border-slate-700/80 text-[8px] text-slate-400 flex justify-between"
+                style={{
+                  marginTop: Math.max(3, Math.round((bgConfig.footerInnerGap ?? 12) * 0.4)) + "px",
+                  paddingTop: "4px",
+                }}
+              >
+                <span>کپی‌رایت آکسون کور © 2026</span>
+                <span dir="ltr">AXON CORE</span>
+              </div>
             </div>
           </div>
         </div>

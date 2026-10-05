@@ -9,11 +9,13 @@ export interface GlobalBackgroundConfig {
   mediaUrl: string;
   mediaType: "auto" | "image" | "gif" | "svg" | "video" | "preset_svg";
   presetId?: string;
-  opacity: number; // 5 to 100
-  blurPx: number; // 0 to 24
-  overlayOpacity: number; // 0 to 90
+  opacity: number;
+  blurPx: number;
+  overlayOpacity: number;
   sizeMode: "cover" | "contain" | "repeat";
   applyToAdmin: boolean;
+  footerScale?: number; // 65 to 100 (%)
+  footerPadding?: "ultra_compact" | "compact" | "normal";
 }
 
 const DEFAULT_BG_CONFIG: GlobalBackgroundConfig = {
@@ -26,9 +28,10 @@ const DEFAULT_BG_CONFIG: GlobalBackgroundConfig = {
   overlayOpacity: 40,
   sizeMode: "cover",
   applyToAdmin: false,
+  footerScale: 82,
+  footerPadding: "compact",
 };
 
-// ۴ الگوی SVG متحرک فوق‌سبک (بدون نیاز به دانلود فایل خارجی و با سرعت ۶۰ فریم بر ثانیه)
 export const PRESET_ANIMATED_SVGS: Record<string, { label: string; dataUri: string }> = {
   cyber_grid: {
     label: "🌐 شبکه نئونی سایبرپانک (Cyber Grid SVG)",
@@ -131,7 +134,6 @@ export default function GlobalSiteBackground() {
     } catch {}
   }, []);
 
-  // بارگذاری غیرمسدودکننده پس از رندر شدن محتوای اصلی صفحه (تضمین عدم افت سرعت اولیه سایت)
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
       setHydrated(true);
@@ -181,7 +183,10 @@ export default function GlobalSiteBackground() {
     }
   }, [isActiveHere]);
 
-  if (!isActiveHere) return null;
+  const fScale = Math.max(60, Math.min(100, Number(config.footerScale ?? 82))) / 100;
+  const fPadMode = config.footerPadding || "compact";
+  const padRem =
+    fPadMode === "ultra_compact" ? "0.75rem" : fPadMode === "compact" ? "1.35rem" : "2.75rem";
 
   const resolvedUrl =
     config.mediaType === "preset_svg"
@@ -189,9 +194,7 @@ export default function GlobalSiteBackground() {
         PRESET_ANIMATED_SVGS.cyber_grid.dataUri
       : config.mediaUrl;
 
-  if (!resolvedUrl) return null;
-
-  const lowerUrl = resolvedUrl.toLowerCase();
+  const lowerUrl = String(resolvedUrl || "").toLowerCase();
   const isVideo =
     config.mediaType === "video" ||
     lowerUrl.endsWith(".mp4") ||
@@ -208,78 +211,108 @@ export default function GlobalSiteBackground() {
 
   return (
     <>
-      {/* استایل شفاف‌سازی هوشمند پس‌زمینه اصلی هنگام فعال بودن تصویر/گیف/SVG پس‌زمینه */}
-      <style>{`
-        html[data-has-custom-bg="true"] body,
-        html[data-has-custom-bg="true"] main,
-        html[data-has-custom-bg="true"] .min-h-screen {
-          background-color: transparent !important;
-        }
-      `}</style>
+      {/* اعمال سراسری مقیاس و ارتفاع فشرده فوتر + شفاف‌سازی پس‌زمینه */}
+      {hydrated && !isAdminRoute && (
+        <style>{`
+          footer {
+            padding-top: ${padRem} !important;
+            padding-bottom: ${padRem} !important;
+          }
+          footer > div {
+            zoom: ${fScale};
+            padding-top: 0.4rem !important;
+            padding-bottom: 0.4rem !important;
+          }
+          footer .mt-12,
+          footer .mt-10,
+          footer .mt-8 {
+            margin-top: 1rem !important;
+          }
+          footer .pt-8,
+          footer .pt-6 {
+            padding-top: 0.75rem !important;
+          }
+          footer .gap-10,
+          footer .gap-8 {
+            gap: 1.25rem !important;
+          }
+        `}</style>
+      )}
 
-      <div
-        aria-hidden="true"
-        className="fixed inset-0 pointer-events-none overflow-hidden select-none"
-        style={{
-          zIndex: 0,
-          contain: "strict",
-          willChange: "transform",
-          transform: "translateZ(0)",
-        }}
-      >
-        {isVideo ? (
-          tabVisible && (
-            <video
-              src={resolvedUrl}
-              autoPlay
-              loop
-              muted
-              playsInline
-              preload="metadata"
-              className="w-full h-full object-cover"
-              style={{
-                opacity: safeOpacity,
-                filter: safeBlur > 0 ? `blur(${safeBlur}px)` : undefined,
-              }}
-            />
-          )
-        ) : isPatternRepeat ? (
-          <div
-            className="w-full h-full"
-            style={{
-              backgroundImage: `url("${resolvedUrl}")`,
-              backgroundRepeat: "repeat",
-              backgroundPosition: "center center",
-              opacity: safeOpacity,
-              filter: safeBlur > 0 ? `blur(${safeBlur}px)` : undefined,
-            }}
-          />
-        ) : (
-          <img
-            src={resolvedUrl}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            fetchPriority="low"
-            className={
-              "w-full h-full " +
-              (config.sizeMode === "contain" ? "object-contain" : "object-cover")
+      {isActiveHere && resolvedUrl && (
+        <>
+          <style>{`
+            html[data-has-custom-bg="true"] body,
+            html[data-has-custom-bg="true"] main,
+            html[data-has-custom-bg="true"] .min-h-screen {
+              background-color: transparent !important;
             }
-            style={{
-              opacity: safeOpacity,
-              filter: safeBlur > 0 ? `blur(${safeBlur}px)` : undefined,
-            }}
-          />
-        )}
+          `}</style>
 
-        {/* لایه محافظ خوانایی متن‌ها (Adaptive Contrast Shield) */}
-        {safeOverlay > 0 && (
           <div
-            className="absolute inset-0 bg-[var(--bg-primary)] transition-opacity duration-300"
-            style={{ opacity: safeOverlay }}
-          />
-        )}
-      </div>
+            aria-hidden="true"
+            className="fixed inset-0 pointer-events-none overflow-hidden select-none"
+            style={{
+              zIndex: 0,
+              contain: "strict",
+              willChange: "transform",
+              transform: "translateZ(0)",
+            }}
+          >
+            {isVideo ? (
+              tabVisible && (
+                <video
+                  src={resolvedUrl}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="metadata"
+                  className="w-full h-full object-cover"
+                  style={{
+                    opacity: safeOpacity,
+                    filter: safeBlur > 0 ? `blur(${safeBlur}px)` : undefined,
+                  }}
+                />
+              )
+            ) : isPatternRepeat ? (
+              <div
+                className="w-full h-full"
+                style={{
+                  backgroundImage: `url("${resolvedUrl}")`,
+                  backgroundRepeat: "repeat",
+                  backgroundPosition: "center center",
+                  opacity: safeOpacity,
+                  filter: safeBlur > 0 ? `blur(${safeBlur}px)` : undefined,
+                }}
+              />
+            ) : (
+              <img
+                src={resolvedUrl}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                fetchPriority="low"
+                className={
+                  "w-full h-full " +
+                  (config.sizeMode === "contain" ? "object-contain" : "object-cover")
+                }
+                style={{
+                  opacity: safeOpacity,
+                  filter: safeBlur > 0 ? `blur(${safeBlur}px)` : undefined,
+                }}
+              />
+            )}
+
+            {safeOverlay > 0 && (
+              <div
+                className="absolute inset-0 bg-[var(--bg-primary)] transition-opacity duration-300"
+                style={{ opacity: safeOverlay }}
+              />
+            )}
+          </div>
+        </>
+      )}
     </>
   );
 }

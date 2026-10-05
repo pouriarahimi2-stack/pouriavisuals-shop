@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="tunnelCore" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#0ea5e9" stop-opacity="0.4"/>
+      <stop offset="40%" stop-color="#312e81" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#030712" stop-opacity="1"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1920" height="1080" fill="#030712"/>
+  <rect width="1920" height="1080" fill="url(#tunnelCore)"/>
+
+  <!-- خطوط شعاعی تونل پرسپکتیو از مرکز -->
+  <g stroke="#38bdf8" stroke-width="1.2" opacity="0.4">
+    <line x1="960" y1="540" x2="0" y2="0"/>
+    <line x1="960" y1="540" x2="480" y2="0"/>
+    <line x1="960" y1="540" x2="960" y2="0"/>
+    <line x1="960" y1="540" x2="1440" y2="0"/>
+    <line x1="960" y1="540" x2="1920" y2="0"/>
+    <line x1="960" y1="540" x2="1920" y2="540"/>
+    <line x1="960" y1="540" x2="1920" y2="1080"/>
+    <line x1="960" y1="540" x2="1440" y2="1080"/>
+    <line x1="960" y1="540" x2="960" y2="1080"/>
+    <line x1="960" y1="540" x2="480" y2="1080"/>
+    <line x1="960" y1="540" x2="0" y2="1080"/>
+    <line x1="960" y1="540" x2="0" y2="540"/>
+  </g>
+
+  <!-- قاب‌های نئونی هم‌مرکز تونل با پالس نوری -->
+  <g fill="none" transform="translate(960, 540)">
+    <rect x="-820" y="-460" width="1640" height="920" rx="30" stroke="#38bdf8" stroke-width="2" stroke-opacity="0.55">
+      <animate attributeName="stroke-opacity" values="0.2;0.85;0.2" dur="4s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="-640" y="-360" width="1280" height="720" rx="24" stroke="#818cf8" stroke-width="2" stroke-opacity="0.55">
+      <animate attributeName="stroke-opacity" values="0.8;0.2;0.8" dur="4s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="-460" y="-260" width="920" height="520" rx="20" stroke="#00f2fe" stroke-width="2.2" stroke-opacity="0.65">
+      <animate attributeName="stroke-opacity" values="0.25;0.95;0.25" dur="3s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="-280" y="-160" width="560" height="320" rx="16" stroke="#c084fc" stroke-width="2" stroke-opacity="0.7">
+      <animate attributeName="stroke-opacity" values="0.9;0.25;0.9" dur="3s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="-120" y="-70" width="240" height="140" rx="12" stroke="#34d399" stroke-width="2.5" stroke-opacity="0.85"/>
+  </g>
+
+  <!-- ستون‌های جریان داده عمودی (Cyber Matrix Data Streams) -->
+  <g stroke="#00f2fe" stroke-width="3" stroke-linecap="round" opacity="0.75">
+    <line x1="160" y1="-100" x2="160" y2="1180" stroke-dasharray="60 180">
+      <animate attributeName="stroke-dashoffset" from="480" to="0" dur="4s" repeatCount="indefinite"/>
+    </line>
+    <line x1="340" y1="-100" x2="340" y2="1180" stroke-dasharray="90 240" stroke="#34d399">
+      <animate attributeName="stroke-dashoffset" from="660" to="0" dur="5.5s" repeatCount="indefinite"/>
+    </line>
+    <line x1="1580" y1="-100" x2="1580" y2="1180" stroke-dasharray="90 240" stroke="#c084fc">
+      <animate attributeName="stroke-dashoffset" from="660" to="0" dur="5s" repeatCount="indefinite"/>
+    </line>
+    <line x1="1760" y1="-100" x2="1760" y2="1180" stroke-dasharray="60 180">
+      <animate attributeName="stroke-dashoffset" from="480" to="0" dur="3.8s" repeatCount="indefinite"/>
+    </line>
+  </g>
+</svg>

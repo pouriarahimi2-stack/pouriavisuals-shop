@@ -18,6 +18,8 @@ export default function GlobalBackgroundStudio() {
     overlayOpacity: 40,
     sizeMode: "cover",
     applyToAdmin: false,
+    footerScale: 82,
+    footerPadding: "compact",
   });
 
   const [uploading, setUploading] = useState(false);
@@ -377,6 +379,58 @@ export default function GlobalBackgroundStudio() {
                 }
                 className="w-full accent-[var(--accent-blue)] cursor-pointer"
               />
+            </div>
+          </div>
+
+          {/* کنترل هم‌زمان ارتفاع و اندازه تمام اجزای داخل فوتر */}
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--accent-blue)]/40 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-black text-[var(--accent-blue)]">
+                📏 تنظیم هم‌زمان ارتفاع و مقیاس تمام اجزای فوتر (لوگو، اینماد، لینک‌ها و کادرها):
+              </span>
+              <span className="px-2.5 py-0.5 rounded-lg bg-[var(--modal-bg)] font-mono font-black text-emerald-400">
+                مقیاس فعلی: {bgConfig.footerScale ?? 82}%
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+              <div>
+                <input
+                  type="range"
+                  min={65}
+                  max={100}
+                  value={bgConfig.footerScale ?? 82}
+                  onChange={(e) =>
+                    setBgConfig((prev) => ({
+                      ...prev,
+                      footerScale: Number(e.target.value),
+                    }))
+                  }
+                  className="w-full accent-[var(--accent-blue)] cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-[var(--text-secondary)] font-mono mt-1">
+                  <span>65% (خیلی ظریف)</span>
+                  <span>82% (استاندارد جمع‌وجور)</span>
+                  <span>100% (بزرگ)</span>
+                </div>
+              </div>
+
+              <div>
+                <select
+                  value={bgConfig.footerPadding || "compact"}
+                  onChange={(e) =>
+                    setBgConfig((prev) => ({
+                      ...prev,
+                      footerPadding: e.target.value as any,
+                    }))
+                  }
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+                >
+                  <option value="ultra_compact">↕️ فاصله عمودی فوتر: خیلی فشرده (Ultra Compact)</option>
+                  <option value="compact">↕️ فاصله عمودی فوتر: جمع‌وجور و متناسب (Compact)</option>
+                  <option value="normal">↕️ فاصله عمودی فوتر: پیش‌فرض (Normal)</option>
+                </select>
+              </div>
             </div>
           </div>
 

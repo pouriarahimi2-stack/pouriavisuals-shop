@@ -10,105 +10,111 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/jpg",
   "image/png",
   "image/webp",
-  "image/svg+xml",
+  "image/avif",
   "image/gif",
-  "image/x-icon",
-  "image/vnd.microsoft.icon",
+  "image/svg+xml",
+  "video/mp4",
+  "video/webm",
 ]);
 
-function sanitizeSvgSafely(rawSvg: string): string {
-  let clean = String(rawSvg || "")
+function sanitizeSvgContent(svgText: string): string {
+  return svgText
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
-    .replace(/\son[a-z]+\s*=\s*["'][^"']*["']/gi, "")
-    .replace(/javascript\s*:/gi, "");
-
-  if (clean.includes("<svg") && !clean.includes("xmlns=")) {
-    clean = clean.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
-  }
-  return clean;
+    .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, "")
+    .replace(/javascript:/gi, "");
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const auth = await requireAdmin(req);
-    if (!auth.ok) return auth.res;
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return auth.res;
 
+  try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
-    const targetBucket = (formData.get("bucket") as string) || "products";
 
-    if (!file || typeof file === "string") {
+    if (!file) {
       return NextResponse.json(
-        { success: false, message: "فایلی برای آپلود ارسال نشده است." },
+        { success: false, message: "فایلی برای آپلود انتخاب نشده است." },
         { status: 400 }
       );
     }
 
-    if (file.size > 5 * 1024 * 1024) {
+    const mime = String(file.type || "").toLowerCase();
+    const ext = (file.name.split(".").pop() || "bin").toLowerCase();
+    const isSvg = mime === "image/svg+xml" || ext === "svg";
+    const isGif = mime === "image/gif" || ext === "gif";
+
+    if (!ALLOWED_MIME_TYPES.has(mime) && !isSvg && !isGif) {
       return NextResponse.json(
-        { success: false, message: "حجم فایل نباید بیش از ۵ مگابایت باشد." },
+        {
+          success: false,
+          message:
+            "فرمت فایل مجاز نیست. فرمت‌های مجاز: JPG, PNG, WebP, AVIF, GIF, SVG, MP4, WebM",
+        },
         { status: 400 }
       );
     }
 
-    if (!ALLOWED_MIME_TYPES.has(file.type)) {
+    // سقف مجاز ۸ مگابایت برای جلوگیری از افت سرعت شبکه
+    if (file.size > 8 * 1024 * 1024) {
       return NextResponse.json(
-        { success: false, message: "فرمت فایل تصویری مجاز نیست." },
+        { success: false, message: "حجم فایل نباید بیشتر از ۸ مگابایت باشد." },
         { status: 400 }
       );
     }
 
-    const bytes = await file.arrayBuffer();
-    let buffer = Buffer.from(bytes);
+    let arrayBuffer = await file.arrayBuffer();
+    let buffer = Buffer.from(arrayBuffer);
 
-    if (file.type === "image/svg+xml") {
-      const cleanSvg = sanitizeSvgSafely(buffer.toString("utf8"));
+    if (isSvg) {
+      const cleanSvg = sanitizeSvgContent(buffer.toString("utf8"));
       buffer = Buffer.from(cleanSvg, "utf8");
     }
 
-    // برای لوگوها و آیکون‌ها، بازگرداندن مستقیم Data URI با حفظ کامل شفافیت و وکتور
-    if (targetBucket === "site-assets" || file.size <= 350 * 1024) {
-      const base64Data = `data:${file.type};base64,${buffer.toString("base64")}`;
-      return NextResponse.json(
-        {
-          success: true,
-          url: base64Data,
-          timestamp: Date.now(),
-          message: "✓ تصویر جدید با موفقیت پردازش شد.",
-        },
-        { headers: { "Cache-Control": "no-store, max-age=0" } }
-      );
-    }
+    const safeFileName = `axon_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2, 7)}.${ext.replace(/[^a-z0-9]/g, "") || "png"}`;
 
-    const originalExt =
-      file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "webp";
-    const cleanFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${originalExt}`;
-    const filePath = `uploads/${cleanFileName}`;
+    const contentType = isSvg
+      ? "image/svg+xml"
+      : isGif
+      ? "image/gif"
+      : mime || "image/png";
 
-    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-      .from("products")
-      .upload(filePath, buffer, {
-        contentType: file.type,
-        upsert: true,
-      });
+    // تلاش اول: آپلود در Supabase Storage با کش طولانی‌مدت CDN جهت حداکثر سرعت لود
+    try {
+      const bucketName = "products";
+      const filePath = `backgrounds/${safeFileName}`;
+      const { error: upErr } = await supabaseAdmin.storage
+        .from(bucketName)
+        .upload(filePath, buffer, {
+          contentType,
+          cacheControl: "31536000",
+          upsert: true,
+        });
 
-    if (uploadError) {
-      const base64Data = `data:${file.type};base64,${buffer.toString("base64")}`;
-      return NextResponse.json({
-        success: true,
-        url: base64Data,
-        fileName: cleanFileName,
-      });
-    }
+      if (!upErr) {
+        const { data: pubUrl } = supabaseAdmin.storage
+          .from(bucketName)
+          .getPublicUrl(filePath);
+        if (pubUrl?.publicUrl) {
+          return NextResponse.json({
+            success: true,
+            url: pubUrl.publicUrl,
+            mime: contentType,
+            message: "✓ فایل با موفقیت روی CDN ابری آپلود شد.",
+          });
+        }
+      }
+    } catch {}
 
-    const { data: publicUrlData } = supabaseAdmin.storage
-      .from("products")
-      .getPublicUrl(uploadData.path);
-
+    // پشتیبان تضمین‌شده: تبدیل به Data URL بهینه در صورت عدم دسترسی به باکت
+    const base64Url = `data:${contentType};base64,${buffer.toString("base64")}`;
     return NextResponse.json({
       success: true,
-      url: publicUrlData.publicUrl,
-      fileName: cleanFileName,
+      url: base64Url,
+      mime: contentType,
+      message: "✓ تصویر/انیمیشن با موفقیت پردازش و آماده نمایش شد.",
     });
   } catch (err: any) {
     return NextResponse.json(

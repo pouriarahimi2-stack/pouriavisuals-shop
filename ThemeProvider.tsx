@@ -1,29 +1,23 @@
-// File Path: ThemeProvider.tsx
 "use client";
-
-import React, { useEffect, useState } from "react";
+// File Path: components/ThemeProvider.tsx
+import React, { useEffect } from "react";
 import { themeEngine } from "@/lib/themeEngine";
+import GlobalSiteBackground from "@/components/GlobalSiteBackground";
 
-export default function ThemeProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [mounted, setMounted] = useState(false);
-
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    setMounted(true);
-    themeEngine.applyTheme();
-
-    const interval = setInterval(() => {
-      const isManual = localStorage.getItem("axon_theme_manual_override") === "true";
-      if (!isManual) {
-        themeEngine.applyTheme();
-      }
-    }, 60000);
-
-    return () => clearInterval(interval);
+    try {
+      themeEngine.applyTheme();
+      themeEngine.initThemeListener();
+    } catch {}
   }, []);
 
-  return <>{children}</>;
+  return (
+    <>
+      <GlobalSiteBackground />
+      <div className="relative z-10">{children}</div>
+    </>
+  );
 }
+
+export default ThemeProvider;

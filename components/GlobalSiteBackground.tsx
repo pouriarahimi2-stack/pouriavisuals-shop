@@ -15,23 +15,24 @@ export interface GlobalBackgroundConfig {
   sizeMode: "cover" | "contain" | "repeat";
   applyToAdmin: boolean;
 
-  // کنترل مهندسی فوتر
   footerScale?: number;
   footerBgPaddingY?: number;
   footerInnerGap?: number;
   footerPadding?: "ultra_compact" | "compact" | "normal";
 
-  // کنترل استایل Liquid Glass در موبایل، تبلت و دسکتاپ (سازگار با هر دو تم تیره و روشن)
   liquidGlassEnabled?: boolean;
+  forceDarkGlassMode?: boolean;
   glassBlurPx?: number;
   glassSurfaceOpacity?: number;
   glassBorderGlow?: number;
 
-  // کنترل هدر موبایل و آیکونی بودن دکمه گفتگوی زنده
   chatButtonIconOnly?: boolean;
+  chatButtonSide?: "left" | "right";
+  chatButtonBottomPx?: number;
   fixMobileHeaderBrand?: boolean;
+  mobileHeaderFontSizePx?: number;
+  showMobileBottomNav?: boolean;
 
-  // کنترل متون کارت محصول و تیترها در هر ۳ پلتفرم
   showShowcaseHeader?: boolean;
   showCatalogHeader?: boolean;
   showCardBrand?: boolean;
@@ -58,12 +59,17 @@ export const DEFAULT_BG_CONFIG: GlobalBackgroundConfig = {
   footerPadding: "compact",
 
   liquidGlassEnabled: true,
+  forceDarkGlassMode: false,
   glassBlurPx: 24,
   glassSurfaceOpacity: 64,
   glassBorderGlow: 42,
 
   chatButtonIconOnly: true,
+  chatButtonSide: "left",
+  chatButtonBottomPx: 80,
   fixMobileHeaderBrand: true,
+  mobileHeaderFontSizePx: 14,
+  showMobileBottomNav: true,
 
   showShowcaseHeader: false,
   showCatalogHeader: false,
@@ -153,7 +159,6 @@ export const PRESET_ANIMATED_SVGS: Record<string, { label: string; dataUri: stri
   },
 };
 
-// تبدیل خودکار لینک‌های مستقیم supabase.co به پروکسی داخلی برای جلوگیری ۱۰۰٪ از خطای شبکه در ایران
 function toIranSafeUrl(rawUrl: string): string {
   const u = String(rawUrl || "").trim();
   if (!u) return "";
@@ -210,7 +215,6 @@ export default function GlobalSiteBackground() {
   const isActiveHere =
     hydrated && config.enabled && (!isAdminRoute || config.applyToAdmin);
 
-  // علامت‌گذاری ایمن و فقط روی تگ‌های برگ (بدون دست زدن به هیچ کادر یا div)
   useEffect(() => {
     if (typeof document === "undefined" || isAdminRoute) return;
     const root = document.documentElement;
@@ -223,7 +227,6 @@ export default function GlobalSiteBackground() {
     const markLeafNodesSafely = () => {
       if (window.location.pathname.startsWith("/admin")) return;
 
-      // ۱. اصلاح نام برند در هدر موبایل تا بخش انگلیسی "| Axon Core" روی دکمه تم نیفتد
       const isMobile = window.innerWidth < 768;
       document.querySelectorAll("header span, header a, header h1").forEach((node) => {
         const el = node as HTMLElement;
@@ -240,7 +243,6 @@ export default function GlobalSiteBackground() {
         }
       });
 
-      // ۲. علامت‌گذاری دکمه شناور گفتگوی زنده برای تبدیل به آیکون دایره‌ای در هر ۳ پلتفرم
       document.querySelectorAll("button").forEach((btn) => {
         const txt = (btn.textContent || "").trim();
         if (txt.includes("گفتگوی زنده با پشتیبانی") || txt.includes("LIVE SUPPORT")) {
@@ -248,10 +250,9 @@ export default function GlobalSiteBackground() {
         }
       });
 
-      // ۳. علامت‌گذاری تگ‌های متنی برگ (فقط span, p, h2 بدون هیچ عنصر فرزند!)
       document.querySelectorAll("span, p, h2").forEach((node) => {
         const el = node as HTMLElement;
-        if (el.children.length > 0) return; // هرگز کادرهای والد را لمس نکن
+        if (el.children.length > 0) return;
         const txt = (el.textContent || "").trim();
         if (!txt || txt.length > 110) return;
 
@@ -299,6 +300,8 @@ export default function GlobalSiteBackground() {
   const gAlphaLight = Math.max(0.55, Math.min(0.94, Number(config.glassSurfaceOpacity ?? 64) / 100));
   const gBorderAlpha = Math.max(0.18, Math.min(0.85, Number(config.glassBorderGlow ?? 42) / 100));
 
+  const chatSide = config.chatButtonSide === "right" ? "right" : "left";
+
   const rawResolved =
     config.mediaType === "preset_svg"
       ? PRESET_ANIMATED_SVGS[config.presetId || "cyber_grid"]?.dataUri ||
@@ -321,7 +324,6 @@ export default function GlobalSiteBackground() {
           ${
             glassEnabled
               ? `
-          /* ۱. استایل Liquid Glass در تم تیره (Dark Mode) — حفظ کامل سوییچر تم */
           html.dark article,
           html.dark .axon-liquid-glass-surface,
           html.dark header > div,
@@ -333,7 +335,6 @@ export default function GlobalSiteBackground() {
             box-shadow: 0 18px 42px -12px rgba(2, 6, 23, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.16) !important;
           }
 
-          /* ۲. استایل Liquid Glass در تم روشن (Light Mode) — شیشه‌ای یخی کریستالی به جای سفید ساده در موبایل و دسکتاپ */
           html.light article,
           html:not(.dark) article,
           html.light .axon-liquid-glass-surface,
@@ -352,7 +353,10 @@ export default function GlobalSiteBackground() {
               : ""
           }
 
-          /* ۳. تبدیل دکمه شناور گفتگوی زنده به «فقط آیکون دایره‌ای» در موبایل، تبلت و دسکتاپ */
+          button[data-axon-livechat-fab="true"] {
+            ${chatSide === "right" ? "right: 1rem !important; left: auto !important;" : "left: 1rem !important; right: auto !important;"}
+          }
+
           ${
             config.chatButtonIconOnly !== false
               ? `
@@ -394,7 +398,6 @@ export default function GlobalSiteBackground() {
               : ""
           }
 
-          /* ۴. اصلاح چیدمان هدر در موبایل تا نام سایت هرگز روی دکمه تم نیفتد */
           @media (max-width: 767px) {
             header > div {
               padding-left: 0.65rem !important;
@@ -403,7 +406,17 @@ export default function GlobalSiteBackground() {
             }
           }
 
-          /* ۵. کنترل نمایش یا حذف متون کارت‌ها در هر ۳ پلتفرم طبق کلیدهای پنل ادمین */
+          ${
+            config.showMobileBottomNav === false
+              ? `
+          nav.fixed.bottom-0,
+          div.fixed.bottom-0.left-0.right-0 {
+            display: none !important;
+          }
+          `
+              : ""
+          }
+
           ${!config.showShowcaseHeader ? `[data-axon-leaf-role="showcase_header"] { display: none !important; }` : ""}
           ${!config.showCatalogHeader ? `[data-axon-leaf-role="catalog_header"] { display: none !important; }` : ""}
           ${!config.showCardBrand ? `[data-axon-leaf-role="card_brand"] { display: none !important; }` : ""}
@@ -420,7 +433,6 @@ export default function GlobalSiteBackground() {
           ${!config.showCardStockText ? `[data-axon-leaf-role="card_stock"] { display: none !important; }` : ""}
           ${!config.showCardCartCountText ? `[data-axon-leaf-role="card_cartcount"] { display: none !important; }` : ""}
 
-          /* ۶. ابعاد مهندسی فوتر با حفظ ۱۰۰٪ جایگاه ستون‌ها */
           footer {
             padding-top: ${bgPadY}px !important;
             padding-bottom: ${bgPadY}px !important;
@@ -509,7 +521,6 @@ export default function GlobalSiteBackground() {
         </>
       )}
 
-      {/* رندر بلوک‌های سفارشی صفحه‌ساز ماژولار در بالای صفحات انتخابی */}
       <div className="relative z-10">
         <LivePageSectionsRenderer position="top" />
       </div>

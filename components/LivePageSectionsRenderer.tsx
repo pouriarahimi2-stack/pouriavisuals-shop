@@ -6,22 +6,27 @@ import Link from "next/link";
 
 export interface CustomPageSection {
   id: string;
-  targetRoute: string; // "/", "/products", "/about", "/contact", or custom "/slug"
+  targetRoute: string;
   position: "top" | "bottom";
   type:
     | "hero_banner"
     | "bento_grid"
+    | "product_showcase"
     | "comparison_table"
     | "faq_accordion"
     | "countdown_offer"
     | "trust_badges"
-    | "glass_callout";
+    | "glass_callout"
+    | "custom_html";
   title: string;
   subtitle: string;
   badgeText?: string;
   ctaText?: string;
   ctaLink?: string;
   mediaUrl?: string;
+  categoryFilter?: string;
+  onlyDiscounted?: boolean;
+  customHtml?: string;
   glassStyle: boolean;
   paddingY: number;
   items?: Array<{
@@ -33,6 +38,15 @@ export interface CustomPageSection {
   enabled: boolean;
 }
 
+function toSafeImgUrl(url?: string): string {
+  const u = String(url || "").trim();
+  if (!u) return "/placeholder.png";
+  if (u.includes(".supabase.co/")) {
+    return "/api/media-proxy?url=" + encodeURIComponent(u);
+  }
+  return u;
+}
+
 export default function LivePageSectionsRenderer({
   position,
 }: {
@@ -40,6 +54,7 @@ export default function LivePageSectionsRenderer({
 }) {
   const pathname = usePathname() || "/";
   const [sections, setSections] = useState<CustomPageSection[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [openFaqIdx, setOpenFaqIdx] = useState<Record<string, number>>({});
 
   const fetchSections = useCallback(async () => {
@@ -50,6 +65,15 @@ export default function LivePageSectionsRenderer({
       const list = json?.config?.customPageSections;
       if (Array.isArray(list)) {
         setSections(list);
+        if (list.some((s: any) => s.type === "product_showcase" && s.enabled !== false)) {
+          fetch("/api/products", { cache: "no-store" })
+            .then((r) => r.json())
+            .then((pJson) => {
+              const pList = pJson.products || pJson.data || [];
+              if (Array.isArray(pList)) setProducts(pList);
+            })
+            .catch(() => {});
+        }
       }
     } catch {}
   }, []);
@@ -83,6 +107,18 @@ export default function LivePageSectionsRenderer({
           ? "axon-liquid-glass-surface border border-sky-500/30 shadow-2xl"
           : "bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl";
 
+        const filteredProducts = products
+          .filter((p) => {
+            if (sec.categoryFilter && sec.categoryFilter !== "all") {
+              if (String(p.category || "").trim() !== sec.categoryFilter.trim()) return false;
+            }
+            if (sec.onlyDiscounted) {
+              return Number(p.discount_price || 0) > 0 && Number(p.discount_price) < Number(p.price);
+            }
+            return true;
+          })
+          .slice(0, 4);
+
         return (
           <section
             key={sec.id}
@@ -92,7 +128,6 @@ export default function LivePageSectionsRenderer({
             }}
             className={"rounded-3xl px-5 sm:px-8 transition-all " + cardSurfaceClass}
           >
-            {/* ۱. بلوک بنر هیرو پیشرفته */}
             {sec.type === "hero_banner" && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
                 <div className="lg:col-span-7 space-y-4 text-right">
@@ -124,7 +159,7 @@ export default function LivePageSectionsRenderer({
                 {sec.mediaUrl && (
                   <div className="lg:col-span-5 flex justify-center">
                     <img
-                      src={sec.mediaUrl}
+                      src={toSafeImgUrl(sec.mediaUrl)}
                       alt={sec.title}
                       className="max-h-64 rounded-2xl object-contain"
                     />
@@ -133,7 +168,6 @@ export default function LivePageSectionsRenderer({
               </div>
             )}
 
-            {/* ۲. شبکه بنتو به سبک اپل (Apple Bento Grid) */}
             {sec.type === "bento_grid" && (
               <div className="space-y-5">
                 <div className="text-center space-y-1.5">
@@ -175,7 +209,66 @@ export default function LivePageSectionsRenderer({
               </div>
             )}
 
-            {/* ۳. جدول مقایسه تخصصی */}
+            {sec.type === "product_showcase" && (
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--card-border)] pb-3">
+                  <div>
+                    {sec.badgeText && (
+                      <span className="px-3 py-0.5 rounded-full bg-sky-500/15 text-sky-400 text-[10px] font-black">
+                        {sec.badgeText}
+                      </span>
+                    )}
+                    <h2 className="text-base sm:text-xl font-black text-[var(--text-primary)] mt-1">
+                      {sec.title}
+                    </h2>
+                    {sec.subtitle && (
+                      <p className="text-xs text-[var(--text-secondary)]">{sec.subtitle}</p>
+                    )}
+                  </div>
+                  <Link
+                    href={sec.ctaLink || "/products"}
+                    className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-sky-500 text-xs font-black transition"
+                  >
+                    {sec.ctaText || "مشاهده همه کالاها ←"}
+                  </Link>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {filteredProducts.map((prod: any) => {
+                    const finalPrice = Number(prod.discount_price || prod.price || 0);
+                    return (
+                      <Link
+                        key={prod.id}
+                        href={"/products/" + prod.id}
+                        className="p-4 rounded-2xl bg-[var(--input-bg)]/80 border border-[var(--card-border)] hover:border-sky-500/50 transition flex flex-col justify-between gap-3 group"
+                      >
+                        <div className="h-36 rounded-xl bg-white/5 flex items-center justify-center p-2 overflow-hidden">
+                          <img
+                            src={toSafeImgUrl(prod.image_url || prod.image)}
+                            alt={prod.title}
+                            className="max-h-full object-contain group-hover:scale-105 transition"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <h3 className="font-black text-xs text-[var(--text-primary)] line-clamp-2">
+                            {prod.title}
+                          </h3>
+                          <div className="flex items-center justify-between pt-2 border-t border-[var(--card-border)]">
+                            <span className="font-mono font-black text-xs text-sky-400">
+                              {finalPrice.toLocaleString("fa-IR")} تومان
+                            </span>
+                            <span className="text-[10px] font-black text-emerald-400">
+                              خرید ←
+                            </span>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {sec.type === "comparison_table" && (
               <div className="space-y-4">
                 <div className="space-y-1">
@@ -215,7 +308,6 @@ export default function LivePageSectionsRenderer({
               </div>
             )}
 
-            {/* ۴. سوالات متداول آکاردئونی (FAQ) */}
             {sec.type === "faq_accordion" && (
               <div className="space-y-4">
                 <div className="text-center space-y-1">
@@ -259,7 +351,24 @@ export default function LivePageSectionsRenderer({
               </div>
             )}
 
-            {/* ۵. بنر جشنواره و پیشنهاد ویژه یا نوار ضمانت */}
+            {sec.type === "custom_html" && (
+              <div className="space-y-3">
+                {sec.title && (
+                  <h2 className="text-base sm:text-xl font-black text-[var(--text-primary)]">
+                    {sec.title}
+                  </h2>
+                )}
+                {sec.customHtml && (
+                  <div
+                    className="text-xs leading-relaxed"
+                    dangerouslySetInnerHTML={{
+                      __html: sec.customHtml.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, ""),
+                    }}
+                  />
+                )}
+              </div>
+            )}
+
             {(sec.type === "countdown_offer" ||
               sec.type === "trust_badges" ||
               sec.type === "glass_callout") && (

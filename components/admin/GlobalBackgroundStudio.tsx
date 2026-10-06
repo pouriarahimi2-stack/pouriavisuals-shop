@@ -256,6 +256,28 @@ export default function GlobalBackgroundStudio() {
             </label>
 
             <label className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-between gap-2 cursor-pointer font-bold">
+              <span>📱 نمایش نوار ناوبری پایین در موبایل</span>
+              <input
+                type="checkbox"
+                checked={bgConfig.showMobileBottomNav !== false}
+                onChange={(e) => updateLiveParam({ showMobileBottomNav: e.target.checked })}
+                className="w-4 h-4 accent-sky-500 shrink-0"
+              />
+            </label>
+
+            <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-between gap-2 font-bold">
+              <span>📍 جهت دکمه شناور چت:</span>
+              <select
+                value={bgConfig.chatButtonSide || "left"}
+                onChange={(e) => updateLiveParam({ chatButtonSide: e.target.value as any })}
+                className="p-1.5 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] font-black outline-none cursor-pointer"
+              >
+                <option value="left">⬅️ گوشه چپ صفحه</option>
+                <option value="right">➡️ گوشه راست صفحه</option>
+              </select>
+            </div>
+
+            <label className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-between gap-2 cursor-pointer font-bold">
               <span>📱 بهینه‌سازی خودکار نام برند در هدر موبایل</span>
               <input
                 type="checkbox"

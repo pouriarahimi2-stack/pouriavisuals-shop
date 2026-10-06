@@ -13,13 +13,18 @@ const BLOCK_TEMPLATES: Record<
     defaultTitle: "نسل جدید تجهیزات دیجیتال و گجت‌های هوشمند در آکسون کور",
     defaultSub: "با ضمانت اصالت طلایی، ارسال سریع سراسری و پشتیبانی تخصصی آنلاین",
   },
+  product_showcase: {
+    label: "🛍️ ویترین داینامیک محصولات (بر اساس دسته یا تخفیف)",
+    defaultTitle: "منتخب‌ترین تجهیزات پرچمدار آکسون کور",
+    defaultSub: "ارسال فوری با گارانتی معتبر و تضمین اصالت",
+  },
   bento_grid: {
     label: "🍱 شبکه بنتو به سبک اپل (Apple Bento Grid)",
     defaultTitle: "چرا حرفه‌ای‌ها آکسون کور را انتخاب می‌کنند؟",
     defaultSub: "ترکیبی از اصالت سخت‌افزاری، قیمت رقابتی و گارانتی معتبر",
     defaultItems: [
       {
-        icon: "🛡️️",
+        icon: "🛡️",
         title: "ضمانت ۱۰۰٪ اصالت کالا",
         desc: "تمامی محصولات با تست سلامت و تضمین اورجینال بودن عرضه می‌شوند.",
         badge: "VIP Guarantee",
@@ -62,7 +67,7 @@ const BLOCK_TEMPLATES: Record<
     defaultItems: [
       {
         title: "ارسال سفارشات چقدر زمان می‌برد؟",
-        desc: "تمامی سفارشات در سریع‌ترین زمان ممکن پردازش و تحویل پست پیشتاز یا تیپاکس می‌شوند و کد رهگیری پیامک می‌گردد.",
+        desc: "تمامی سفارشات در سریع‌ترین زمان ممکن پردازش و تحویل پست پیشتاز می‌شوند و کد رهگیری پیامک می‌گردد.",
       },
       {
         title: "آیا تمامی کالاها دارای ضمانت اصالت هستند؟",
@@ -84,6 +89,11 @@ const BLOCK_TEMPLATES: Record<
     label: "💎 کارت شیشه‌ای فراخوان (Liquid Glass Callout)",
     defaultTitle: "نیاز به راهنمایی تخصصی برای انتخاب محصول دارید؟",
     defaultSub: "همین حالا از طریق آیکون گفتگوی زنده در پایین صفحه با کارشناسان ما در ارتباط باشید.",
+  },
+  custom_html: {
+    label: "💻 بلوک کد آزاد HTML / بنر سفارشی",
+    defaultTitle: "بخش سفارشی آکسون کور",
+    defaultSub: "",
   },
 };
 
@@ -119,9 +129,15 @@ export default function ProPageDesignStudio() {
       ctaText: "مشاهده کاتالوگ محصولات",
       ctaLink: "/products",
       mediaUrl: "",
+      categoryFilter: "all",
+      onlyDiscounted: false,
+      customHtml:
+        type === "custom_html"
+          ? '<div class="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/30 text-center font-bold">محتوای سفارشی HTML شما در اینجا قرار می‌گیرد</div>'
+          : "",
       glassStyle: true,
       paddingY: 28,
-      items: tpl.defaultItems ? [...tpl.defaultItems] : [],
+      items: tpl.defaultItems ? JSON.parse(JSON.stringify(tpl.defaultItems)) : [],
       enabled: true,
     };
     setSections((prev) => [...prev, newBlock]);
@@ -209,7 +225,6 @@ export default function ProPageDesignStudio() {
         </div>
       )}
 
-      {/* انتخاب صفحه هدف برای ویرایش */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-black text-[var(--text-secondary)] ml-2">
           📍 انتخاب صفحه جهت طراحی یا ویرایش:
@@ -241,12 +256,11 @@ export default function ProPageDesignStudio() {
         ))}
       </div>
 
-      {/* نوار افزودن بلوک‌های آماده */}
       <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
         <div className="font-black text-[var(--accent-blue)]">
           ➕ افزودن بلوک جدید به صفحه انتخاب‌شده ({selectedRoute}):
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {(Object.keys(BLOCK_TEMPLATES) as Array<CustomPageSection["type"]>).map(
             (typeKey) => (
               <button
@@ -263,7 +277,6 @@ export default function ProPageDesignStudio() {
         </div>
       </div>
 
-      {/* لیست بلوک‌های صفحه فعلی و بازرس جزئیات */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         <div className="lg:col-span-5 space-y-2.5">
           <div className="font-black text-[var(--text-secondary)]">
@@ -326,11 +339,10 @@ export default function ProPageDesignStudio() {
           )}
         </div>
 
-        {/* بازرس ویرایش جزئیات کامل بلوک انتخاب‌شده */}
         <div className="lg:col-span-7">
           {activeBlock ? (
             <div className="p-4 sm:p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--accent-blue)]/50 space-y-4">
-              <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] pb-2.5">
                 <span className="font-black text-sm text-[var(--accent-blue)]">
                   ⚙️ ویرایش جزئیات بلوک: {BLOCK_TEMPLATES[activeBlock.type]?.label}
                 </span>
@@ -385,6 +397,122 @@ export default function ProPageDesignStudio() {
                   className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none"
                 />
               </div>
+
+              {activeBlock.type === "product_showcase" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
+                  <div>
+                    <label className="block mb-1 font-bold">فیلتر دسته‌بندی محصولات:</label>
+                    <input
+                      type="text"
+                      value={activeBlock.categoryFilter || "all"}
+                      onChange={(e) =>
+                        handleUpdateBlock(activeBlock.id, { categoryFilter: e.target.value })
+                      }
+                      placeholder="all یا نام دسته (مثلاً اتوبخار)"
+                      className="w-full p-2 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] outline-none"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <label className="w-full p-2 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between cursor-pointer font-bold">
+                      <span>فقط نمایش کالاهای تخفیف‌دار</span>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(activeBlock.onlyDiscounted)}
+                        onChange={(e) =>
+                          handleUpdateBlock(activeBlock.id, {
+                            onlyDiscounted: e.target.checked,
+                          })
+                        }
+                        className="w-4 h-4 accent-sky-500"
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {activeBlock.type === "custom_html" && (
+                <div>
+                  <label className="block mb-1 font-bold">کد سفارشی HTML / Tailwind:</label>
+                  <textarea
+                    rows={4}
+                    dir="ltr"
+                    value={activeBlock.customHtml || ""}
+                    onChange={(e) =>
+                      handleUpdateBlock(activeBlock.id, { customHtml: e.target.value })
+                    }
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none"
+                  />
+                </div>
+              )}
+
+              {(activeBlock.type === "bento_grid" ||
+                activeBlock.type === "comparison_table" ||
+                activeBlock.type === "faq_accordion") && (
+                <div className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-[var(--accent-blue)]">
+                      📋 مدیریت آیتم‌های زیرمجموعه این بلوک ({(activeBlock.items || []).length} مورد):
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextItems = [
+                          ...(activeBlock.items || []),
+                          { title: "عنوان آیتم جدید", desc: "توضیحات این آیتم...", badge: "VIP", icon: "✨" },
+                        ];
+                        handleUpdateBlock(activeBlock.id, { items: nextItems });
+                      }}
+                      className="px-3 py-1 rounded-lg bg-emerald-600 text-white font-black text-[10px] cursor-pointer"
+                    >
+                      + افزودن آیتم جدید
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {(activeBlock.items || []).map((it, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={it.title}
+                            onChange={(e) => {
+                              const copy = [...(activeBlock.items || [])];
+                              copy[idx] = { ...copy[idx], title: e.target.value };
+                              handleUpdateBlock(activeBlock.id, { items: copy });
+                            }}
+                            placeholder="عنوان آیتم"
+                            className="flex-1 p-1.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const copy = (activeBlock.items || []).filter((_, i) => i !== idx);
+                              handleUpdateBlock(activeBlock.id, { items: copy });
+                            }}
+                            className="px-2 py-1 rounded-lg bg-rose-500/20 text-rose-400 font-bold cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={it.desc}
+                          onChange={(e) => {
+                            const copy = [...(activeBlock.items || [])];
+                            copy[idx] = { ...copy[idx], desc: e.target.value };
+                            handleUpdateBlock(activeBlock.id, { items: copy });
+                          }}
+                          placeholder="توضیحات آیتم"
+                          className="w-full p-1.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>

@@ -151,12 +151,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     });
 
     const hbTimer = setInterval(() => {
-      pushLiveTelemetry({
-        eventType: "heartbeat",
-        path: pathname,
-        details: "🟢 حضور آنلاین در " + pathname,
-      });
-    }, 8000);
+      if (document.visibilityState === "visible") {
+        pushLiveTelemetry({
+          eventType: "heartbeat",
+          path: pathname,
+          details: "🟢 حضور آنلاین در " + pathname,
+        });
+      }
+    }, 25000);
 
     const handleGlobalClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
@@ -227,7 +229,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     };
 
     const onFocus = () => syncAdminSessionAndTheme();
-    const interval = setInterval(syncAdminSessionAndTheme, 4000);
+    const interval = setInterval(() => { if (document.visibilityState === 'visible') syncAdminSessionAndTheme(); }, 25000);
 
     window.addEventListener("axon_admin_theme_changed", onCustomThemeEvent);
     window.addEventListener("focus", onFocus);

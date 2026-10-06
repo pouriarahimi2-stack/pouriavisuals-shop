@@ -14,6 +14,12 @@ export default function AdminLiveChatAndMessagesPage() {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const QUICK_REPLIES_DEFAULT = [
+    "سلام وقت بخیر 🌸 کالای مورد نظر شما موجود و آماده ارسال فوری با گارانتی اصالت است.",
+    "سفارش شما پردازش شده و کد رهگیری مرسوله در پنل کاربری شما ثبت گردید 📦",
+    "تمامی محصولات آکسون کور دارای ضمانت ۱۰۰٪ اصالت و مهلت تست سلامت فیزیکی هستند 🛡️",
+    "در صورت نیاز به راهنمایی بیشتر، شماره تماس یا مدل دقیق مدنظرتان را بفرمایید تا کارشناسان بررسی کنند.",
+  ];
 
   const fetchAllChats = useCallback(async () => {
     try {
@@ -288,8 +294,26 @@ export default function AdminLiveChatAndMessagesPage() {
               {canReply ? (
                 <form
                   onSubmit={handleSendReply}
-                  className="pt-3 border-t border-[var(--card-border)] space-y-2"
+                  className="pt-3 border-t border-[var(--card-border)] space-y-2.5"
                 >
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                    <span className="text-[10px] font-black text-[var(--accent-blue)] shrink-0">
+                      ⚡ پاسخ سریع:
+                    </span>
+                    {QUICK_REPLIES_DEFAULT.map((qr, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          soundEngine.playClick();
+                          setReplyText(qr);
+                        }}
+                        className="px-2.5 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[10px] font-bold whitespace-nowrap cursor-pointer transition"
+                      >
+                        {qr.slice(0, 38)}...
+                      </button>
+                    ))}
+                  </div>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="text"

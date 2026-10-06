@@ -46,16 +46,11 @@ export async function POST(req: NextRequest) {
 
     if (!ALLOWED_MIME_TYPES.has(mime) && !isSvg && !isGif) {
       return NextResponse.json(
-        {
-          success: false,
-          message:
-            "فرمت فایل مجاز نیست. فرمت‌های مجاز: JPG, PNG, WebP, AVIF, GIF, SVG, MP4, WebM",
-        },
+        { success: false, message: "فرمت فایل مجاز نیست." },
         { status: 400 }
       );
     }
 
-    // سقف مجاز ۸ مگابایت برای جلوگیری از افت سرعت شبکه
     if (file.size > 8 * 1024 * 1024) {
       return NextResponse.json(
         { success: false, message: "حجم فایل نباید بیشتر از ۸ مگابایت باشد." },
@@ -63,28 +58,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let arrayBuffer = await file.arrayBuffer();
+    const arrayBuffer = await file.arrayBuffer();
     let buffer = Buffer.from(arrayBuffer);
-
-    if (isSvg) {
-      const cleanSvg = sanitizeSvgContent(buffer.toString("utf8"));
-      buffer = Buffer.from(cleanSvg, "utf8");
-    }
-
-    const safeFileName = `axon_${Date.now()}_${Math.random()
-      .toString(36)
-      .slice(2, 7)}.${ext.replace(/[^a-z0-9]/g, "") || "png"}`;
-
     const contentType = isSvg
       ? "image/svg+xml"
       : isGif
       ? "image/gif"
       : mime || "image/png";
 
-    // تلاش اول: آپلود در Supabase Storage با کش طولانی‌مدت CDN جهت حداکثر سرعت لود
+    // تحویل مستقیم SVG به صورت Data URI برای لود آنی در ایران بدون نیاز به ارتباط با دامنه خارجی
+    if (isSvg) {
+      const cleanSvg = sanitizeSvgContent(buffer.toString("utf8"));
+      buffer = Buffer.from(cleanSvg, "utf8");
+      const dataUrl = `data:image/svg+xml;base64,${buffer.toString("base64")}`;
+      return NextResponse.json({
+        success: true,
+        url: dataUrl,
+        mime: contentType,
+      });
+    }
+
+    const safeFileName = `axon_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2, 7)}.${ext.replace(/[^a-z0-9]/g, "") || "png"}`;
+
     try {
       const bucketName = "products";
-      const filePath = `backgrounds/${safeFileName}`;
+      const filePath = `uploads/${safeFileName}`;
       const { error: upErr } = await supabaseAdmin.storage
         .from(bucketName)
         .upload(filePath, buffer, {
@@ -100,21 +100,19 @@ export async function POST(req: NextRequest) {
         if (pubUrl?.publicUrl) {
           return NextResponse.json({
             success: true,
-            url: pubUrl.publicUrl,
+            url: "/api/media-proxy?url=" + encodeURIComponent(pubUrl.publicUrl),
+            rawUrl: pubUrl.publicUrl,
             mime: contentType,
-            message: "✓ فایل با موفقیت روی CDN ابری آپلود شد.",
           });
         }
       }
     } catch {}
 
-    // پشتیبان تضمین‌شده: تبدیل به Data URL بهینه در صورت عدم دسترسی به باکت
     const base64Url = `data:${contentType};base64,${buffer.toString("base64")}`;
     return NextResponse.json({
       success: true,
       url: base64Url,
       mime: contentType,
-      message: "✓ تصویر/انیمیشن با موفقیت پردازش و آماده نمایش شد.",
     });
   } catch (err: any) {
     return NextResponse.json(

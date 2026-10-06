@@ -1,5 +1,6 @@
 "use client";
 import GlobalSiteBackground from "@/components/GlobalSiteBackground";
+import LivePageSectionsRenderer from "@/components/LivePageSectionsRenderer";
 
 import React, { useEffect } from "react";
 
@@ -49,7 +50,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   return (
     <>
       <GlobalSiteBackground />
-      <div className="relative z-10">{children}</div>
+      <div className="relative z-10">{children}<LivePageSectionsRenderer position="bottom" /></div>
     </>
   );
 }

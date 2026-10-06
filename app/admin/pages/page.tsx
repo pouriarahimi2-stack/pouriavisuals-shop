@@ -1,3 +1,4 @@
+import ProPageDesignStudio from "@/components/admin/ProPageDesignStudio";
 import React from "react";
 import StorefrontLayoutStudio from "@/components/admin/StorefrontLayoutStudio";
 

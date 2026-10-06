@@ -2,7 +2,7 @@
 // File Path: components/GlobalSiteBackground.tsx
 import React, { useEffect, useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import LivePageSectionsRenderer from "@/components/LivePageSectionsRenderer";
 
 export interface GlobalBackgroundConfig {
   enabled: boolean;
@@ -14,26 +14,64 @@ export interface GlobalBackgroundConfig {
   overlayOpacity: number;
   sizeMode: "cover" | "contain" | "repeat";
   applyToAdmin: boolean;
-  footerScale?: number; // 60 to 100 (%)
-  footerBgPaddingY?: number; // 4 to 64 (px)
-  footerInnerGap?: number; // 4 to 48 (px)
+
+  // کنترل مهندسی فوتر
+  footerScale?: number;
+  footerBgPaddingY?: number;
+  footerInnerGap?: number;
   footerPadding?: "ultra_compact" | "compact" | "normal";
+
+  // کنترل استایل Liquid Glass در موبایل، تبلت و دسکتاپ (سازگار با هر دو تم تیره و روشن)
+  liquidGlassEnabled?: boolean;
+  glassBlurPx?: number;
+  glassSurfaceOpacity?: number;
+  glassBorderGlow?: number;
+
+  // کنترل هدر موبایل و آیکونی بودن دکمه گفتگوی زنده
+  chatButtonIconOnly?: boolean;
+  fixMobileHeaderBrand?: boolean;
+
+  // کنترل متون کارت محصول و تیترها در هر ۳ پلتفرم
+  showShowcaseHeader?: boolean;
+  showCatalogHeader?: boolean;
+  showCardBrand?: boolean;
+  showCardCategory?: boolean;
+  showCardSubtitle?: boolean;
+  showCardStockText?: boolean;
+  showCardCartCountText?: boolean;
 }
 
-const DEFAULT_BG_CONFIG: GlobalBackgroundConfig = {
+export const DEFAULT_BG_CONFIG: GlobalBackgroundConfig = {
   enabled: false,
   mediaUrl: "",
   mediaType: "auto",
   presetId: "cyber_grid",
-  opacity: 35,
+  opacity: 55,
   blurPx: 0,
-  overlayOpacity: 40,
+  overlayOpacity: 20,
   sizeMode: "cover",
   applyToAdmin: false,
+
   footerScale: 80,
   footerBgPaddingY: 16,
   footerInnerGap: 12,
   footerPadding: "compact",
+
+  liquidGlassEnabled: true,
+  glassBlurPx: 24,
+  glassSurfaceOpacity: 64,
+  glassBorderGlow: 42,
+
+  chatButtonIconOnly: true,
+  fixMobileHeaderBrand: true,
+
+  showShowcaseHeader: false,
+  showCatalogHeader: false,
+  showCardBrand: false,
+  showCardCategory: false,
+  showCardSubtitle: false,
+  showCardStockText: false,
+  showCardCartCountText: false,
 };
 
 export const PRESET_ANIMATED_SVGS: Record<string, { label: string; dataUri: string }> = {
@@ -115,17 +153,25 @@ export const PRESET_ANIMATED_SVGS: Record<string, { label: string; dataUri: stri
   },
 };
 
+// تبدیل خودکار لینک‌های مستقیم supabase.co به پروکسی داخلی برای جلوگیری ۱۰۰٪ از خطای شبکه در ایران
+function toIranSafeUrl(rawUrl: string): string {
+  const u = String(rawUrl || "").trim();
+  if (!u) return "";
+  if (u.startsWith("data:") || u.startsWith("/")) return u;
+  if (u.includes(".supabase.co/")) {
+    return "/api/media-proxy?url=" + encodeURIComponent(u);
+  }
+  return u;
+}
+
 export default function GlobalSiteBackground() {
   const pathname = usePathname() || "";
   const [config, setConfig] = useState<GlobalBackgroundConfig>(DEFAULT_BG_CONFIG);
   const [hydrated, setHydrated] = useState(false);
-  const [tabVisible, setTabVisible] = useState(true);
 
   const fetchBgConfig = useCallback(async () => {
     try {
-      const res = await fetch("/api/theme-builder?t=" + Date.now(), {
-        cache: "no-store",
-      });
+      const res = await fetch("/api/theme-builder", { cache: "no-store" });
       if (!res.ok) return;
       const json = await res.json();
       const gb = json?.config?.globalBackground;
@@ -139,21 +185,13 @@ export default function GlobalSiteBackground() {
   }, []);
 
   useEffect(() => {
-    const raf = requestAnimationFrame(() => {
-      setHydrated(true);
-      fetchBgConfig();
-    });
-
-    const onVisibility = () => {
-      setTabVisible(document.visibilityState === "visible");
-    };
-    document.addEventListener("visibilitychange", onVisibility);
+    setHydrated(true);
+    fetchBgConfig();
 
     const onUpdate = () => fetchBgConfig();
     window.addEventListener("theme_builder_updated", onUpdate);
     window.addEventListener("site_info_updated", onUpdate);
 
-    // پیش‌نمایش زنده هنگام حرکت اسلایدرها در پنل ادمین
     const onLivePreview = (e: any) => {
       if (e?.detail && typeof e.detail === "object") {
         setConfig((prev) => ({ ...prev, ...e.detail }));
@@ -161,24 +199,10 @@ export default function GlobalSiteBackground() {
     };
     window.addEventListener("axon_footer_live_preview", onLivePreview);
 
-    const ch = supabase
-      .channel("axon-global-bg-sync-" + Math.random().toString(36).slice(2, 7))
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "site_info" },
-        () => {
-          fetchBgConfig();
-        }
-      )
-      .subscribe();
-
     return () => {
-      cancelAnimationFrame(raf);
-      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("theme_builder_updated", onUpdate);
       window.removeEventListener("site_info_updated", onUpdate);
       window.removeEventListener("axon_footer_live_preview", onLivePreview);
-      supabase.removeChannel(ch);
     };
   }, [fetchBgConfig]);
 
@@ -186,48 +210,217 @@ export default function GlobalSiteBackground() {
   const isActiveHere =
     hydrated && config.enabled && (!isAdminRoute || config.applyToAdmin);
 
+  // علامت‌گذاری ایمن و فقط روی تگ‌های برگ (بدون دست زدن به هیچ کادر یا div)
   useEffect(() => {
-    if (typeof document === "undefined") return;
+    if (typeof document === "undefined" || isAdminRoute) return;
     const root = document.documentElement;
     if (isActiveHere) {
       root.setAttribute("data-has-custom-bg", "true");
     } else {
       root.removeAttribute("data-has-custom-bg");
     }
-  }, [isActiveHere]);
 
-  // محاسبه دقیق مقیاس درجا (بدون جمع شدن عرض فوتر به وسط) و ارتفاع پس‌زمینه فوتر
+    const markLeafNodesSafely = () => {
+      if (window.location.pathname.startsWith("/admin")) return;
+
+      // ۱. اصلاح نام برند در هدر موبایل تا بخش انگلیسی "| Axon Core" روی دکمه تم نیفتد
+      const isMobile = window.innerWidth < 768;
+      document.querySelectorAll("header span, header a, header h1").forEach((node) => {
+        const el = node as HTMLElement;
+        if (el.children.length > 0) return;
+        const orig = el.getAttribute("data-axon-orig-brand") || el.textContent || "";
+        if (orig.includes("|") && (orig.includes("آکسون") || orig.toLowerCase().includes("axon"))) {
+          if (!el.getAttribute("data-axon-orig-brand")) {
+            el.setAttribute("data-axon-orig-brand", orig);
+          }
+          el.textContent =
+            config.fixMobileHeaderBrand !== false && isMobile
+              ? orig.split("|")[0].trim()
+              : orig;
+        }
+      });
+
+      // ۲. علامت‌گذاری دکمه شناور گفتگوی زنده برای تبدیل به آیکون دایره‌ای در هر ۳ پلتفرم
+      document.querySelectorAll("button").forEach((btn) => {
+        const txt = (btn.textContent || "").trim();
+        if (txt.includes("گفتگوی زنده با پشتیبانی") || txt.includes("LIVE SUPPORT")) {
+          btn.setAttribute("data-axon-livechat-fab", "true");
+        }
+      });
+
+      // ۳. علامت‌گذاری تگ‌های متنی برگ (فقط span, p, h2 بدون هیچ عنصر فرزند!)
+      document.querySelectorAll("span, p, h2").forEach((node) => {
+        const el = node as HTMLElement;
+        if (el.children.length > 0) return; // هرگز کادرهای والد را لمس نکن
+        const txt = (el.textContent || "").trim();
+        if (!txt || txt.length > 110) return;
+
+        if (
+          txt === "نمایشگاه سه‌بعدی تجهیزات پرچمدار" ||
+          txt === "پیمایش لمسی جهت بررسی دقیق مشخصات و گارانتی" ||
+          txt.startsWith("پیمایش با سوایپ لمسی")
+        ) {
+          el.setAttribute("data-axon-leaf-role", "showcase_header");
+        } else if (
+          txt === "کاتالوگ تجهیزات تخصصی و کالای دیجیتال" ||
+          txt === "تمامی کالاها با گارانتی اصالت طلایی عرضه می‌شوند"
+        ) {
+          el.setAttribute("data-axon-leaf-role", "catalog_header");
+        } else if (txt.toUpperCase() === "APPLE" || txt === "اپل") {
+          el.setAttribute("data-axon-leaf-role", "card_brand");
+        } else if (txt === "موجود ✓" || txt === "✓ موجود") {
+          el.setAttribute("data-axon-leaf-role", "card_stock");
+        } else if (txt.endsWith("عدد در سبد شما") && txt.length < 28) {
+          el.setAttribute("data-axon-leaf-role", "card_cartcount");
+        }
+      });
+    };
+
+    markLeafNodesSafely();
+    const t1 = setTimeout(markLeafNodesSafely, 400);
+    const t2 = setTimeout(markLeafNodesSafely, 1500);
+    window.addEventListener("resize", markLeafNodesSafely);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      window.removeEventListener("resize", markLeafNodesSafely);
+    };
+  }, [pathname, isActiveHere, isAdminRoute, config.fixMobileHeaderBrand]);
+
   const fScale = Math.max(60, Math.min(100, Number(config.footerScale ?? 80))) / 100;
   const bgPadY = Math.max(4, Math.min(80, Number(config.footerBgPaddingY ?? 16)));
   const innerGap = Math.max(4, Math.min(60, Number(config.footerInnerGap ?? 12)));
   const compensatedMaxWidthRem = (80 / fScale).toFixed(3);
 
-  const resolvedUrl =
+  const glassEnabled = config.liquidGlassEnabled !== false;
+  const gBlur = Math.max(8, Math.min(40, Number(config.glassBlurPx ?? 24)));
+  const gAlphaDark = Math.max(0.35, Math.min(0.92, Number(config.glassSurfaceOpacity ?? 64) / 100));
+  const gAlphaLight = Math.max(0.55, Math.min(0.94, Number(config.glassSurfaceOpacity ?? 64) / 100));
+  const gBorderAlpha = Math.max(0.18, Math.min(0.85, Number(config.glassBorderGlow ?? 42) / 100));
+
+  const rawResolved =
     config.mediaType === "preset_svg"
       ? PRESET_ANIMATED_SVGS[config.presetId || "cyber_grid"]?.dataUri ||
         PRESET_ANIMATED_SVGS.cyber_grid.dataUri
       : config.mediaUrl;
 
-  const lowerUrl = String(resolvedUrl || "").toLowerCase();
-  const isVideo =
-    config.mediaType === "video" ||
-    lowerUrl.endsWith(".mp4") ||
-    lowerUrl.endsWith(".webm") ||
-    lowerUrl.startsWith("data:video/");
-
+  const resolvedUrl = toIranSafeUrl(rawResolved);
   const isPatternRepeat =
     config.sizeMode === "repeat" ||
     (config.mediaType === "preset_svg" && config.presetId !== "aurora_waves");
 
-  const safeOpacity = Math.max(0.05, Math.min(1, Number(config.opacity ?? 35) / 100));
-  const safeOverlay = Math.max(0, Math.min(0.92, Number(config.overlayOpacity ?? 40) / 100));
+  const safeOpacity = Math.max(0.05, Math.min(1, Number(config.opacity ?? 55) / 100));
+  const safeOverlay = Math.max(0, Math.min(0.92, Number(config.overlayOpacity ?? 20) / 100));
   const safeBlur = Math.max(0, Math.min(24, Number(config.blurPx ?? 0)));
 
   return (
     <>
-      {/* کنترل مهندسی ارتفاع پس‌زمینه فوتر و کوچک‌سازی درجا (In-Place Scaling) بدون به هم خوردن چیدمان افقی */}
       {hydrated && !isAdminRoute && (
         <style>{`
+          ${
+            glassEnabled
+              ? `
+          /* ۱. استایل Liquid Glass در تم تیره (Dark Mode) — حفظ کامل سوییچر تم */
+          html.dark article,
+          html.dark .axon-liquid-glass-surface,
+          html.dark header > div,
+          html.dark footer {
+            background-color: rgba(15, 23, 42, ${gAlphaDark}) !important;
+            backdrop-filter: blur(${gBlur}px) saturate(190%) !important;
+            -webkit-backdrop-filter: blur(${gBlur}px) saturate(190%) !important;
+            border-color: rgba(56, 189, 248, ${gBorderAlpha}) !important;
+            box-shadow: 0 18px 42px -12px rgba(2, 6, 23, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.16) !important;
+          }
+
+          /* ۲. استایل Liquid Glass در تم روشن (Light Mode) — شیشه‌ای یخی کریستالی به جای سفید ساده در موبایل و دسکتاپ */
+          html.light article,
+          html:not(.dark) article,
+          html.light .axon-liquid-glass-surface,
+          html:not(.dark) .axon-liquid-glass-surface,
+          html.light header > div,
+          html:not(.dark) header > div,
+          html.light footer,
+          html:not(.dark) footer {
+            background: linear-gradient(135deg, rgba(240, 249, 255, ${gAlphaLight}), rgba(224, 242, 254, ${Math.max(0.42, gAlphaLight - 0.12)})) !important;
+            backdrop-filter: blur(${gBlur}px) saturate(190%) !important;
+            -webkit-backdrop-filter: blur(${gBlur}px) saturate(190%) !important;
+            border-color: rgba(14, 165, 233, ${Math.min(0.65, gBorderAlpha)}) !important;
+            box-shadow: 0 16px 36px -10px rgba(14, 165, 233, 0.14), inset 0 1px 2px rgba(255, 255, 255, 0.92) !important;
+          }
+          `
+              : ""
+          }
+
+          /* ۳. تبدیل دکمه شناور گفتگوی زنده به «فقط آیکون دایره‌ای» در موبایل، تبلت و دسکتاپ */
+          ${
+            config.chatButtonIconOnly !== false
+              ? `
+          button[data-axon-livechat-fab="true"] {
+            width: 54px !important;
+            height: 54px !important;
+            min-width: 54px !important;
+            padding: 0 !important;
+            border-radius: 9999px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 0 !important;
+            line-height: 0 !important;
+            overflow: visible !important;
+            background: linear-gradient(135deg, #2563eb, #4f46e5) !important;
+            box-shadow: 0 10px 28px rgba(37, 99, 235, 0.48), inset 0 1px 1px rgba(255, 255, 255, 0.35) !important;
+          }
+          button[data-axon-livechat-fab="true"] * {
+            font-size: 0 !important;
+          }
+          button[data-axon-livechat-fab="true"]::before {
+            content: "💬";
+            font-size: 22px !important;
+            line-height: 1 !important;
+          }
+          button[data-axon-livechat-fab="true"]::after {
+            content: "";
+            position: absolute;
+            top: 3px;
+            right: 3px;
+            width: 11px;
+            height: 11px;
+            border-radius: 9999px;
+            background-color: #34d399;
+            border: 2px solid #1e1b4b;
+          }
+          `
+              : ""
+          }
+
+          /* ۴. اصلاح چیدمان هدر در موبایل تا نام سایت هرگز روی دکمه تم نیفتد */
+          @media (max-width: 767px) {
+            header > div {
+              padding-left: 0.65rem !important;
+              padding-right: 0.65rem !important;
+              gap: 0.35rem !important;
+            }
+          }
+
+          /* ۵. کنترل نمایش یا حذف متون کارت‌ها در هر ۳ پلتفرم طبق کلیدهای پنل ادمین */
+          ${!config.showShowcaseHeader ? `[data-axon-leaf-role="showcase_header"] { display: none !important; }` : ""}
+          ${!config.showCatalogHeader ? `[data-axon-leaf-role="catalog_header"] { display: none !important; }` : ""}
+          ${!config.showCardBrand ? `[data-axon-leaf-role="card_brand"] { display: none !important; }` : ""}
+          ${
+            !config.showCardCategory
+              ? `article > div:first-child > span.rounded-full { display: none !important; }`
+              : ""
+          }
+          ${
+            !config.showCardSubtitle
+              ? `article p.line-clamp-2 { display: none !important; }`
+              : ""
+          }
+          ${!config.showCardStockText ? `[data-axon-leaf-role="card_stock"] { display: none !important; }` : ""}
+          ${!config.showCardCartCountText ? `[data-axon-leaf-role="card_cartcount"] { display: none !important; }` : ""}
+
+          /* ۶. ابعاد مهندسی فوتر با حفظ ۱۰۰٪ جایگاه ستون‌ها */
           footer {
             padding-top: ${bgPadY}px !important;
             padding-bottom: ${bgPadY}px !important;
@@ -278,23 +471,7 @@ export default function GlobalSiteBackground() {
               transform: "translateZ(0)",
             }}
           >
-            {isVideo ? (
-              tabVisible && (
-                <video
-                  src={resolvedUrl}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  preload="metadata"
-                  className="w-full h-full object-cover"
-                  style={{
-                    opacity: safeOpacity,
-                    filter: safeBlur > 0 ? `blur(${safeBlur}px)` : undefined,
-                  }}
-                />
-              )
-            ) : isPatternRepeat ? (
+            {isPatternRepeat ? (
               <div
                 className="w-full h-full"
                 style={{
@@ -311,7 +488,6 @@ export default function GlobalSiteBackground() {
                 alt=""
                 loading="lazy"
                 decoding="async"
-                fetchPriority="low"
                 className={
                   "w-full h-full " +
                   (config.sizeMode === "contain" ? "object-contain" : "object-cover")
@@ -332,6 +508,11 @@ export default function GlobalSiteBackground() {
           </div>
         </>
       )}
+
+      {/* رندر بلوک‌های سفارشی صفحه‌ساز ماژولار در بالای صفحات انتخابی */}
+      <div className="relative z-10">
+        <LivePageSectionsRenderer position="top" />
+      </div>
     </>
   );
 }

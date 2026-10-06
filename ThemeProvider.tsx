@@ -1,6 +1,7 @@
 // File Path: ThemeProvider.tsx
 "use client";
 import GlobalSiteBackground from "@/components/GlobalSiteBackground";
+import LivePageSectionsRenderer from "@/components/LivePageSectionsRenderer";
 
 import React, { useEffect, useState } from "react";
 import { themeEngine } from "@/lib/themeEngine";
@@ -29,7 +30,7 @@ export default function ThemeProvider({
   return (
     <>
       <GlobalSiteBackground />
-      <div className="relative z-10">{children}</div>
+      <div className="relative z-10">{children}<LivePageSectionsRenderer position="bottom" /></div>
     </>
   );
 }

@@ -23,7 +23,7 @@ export const UNIFIED_ADMIN_NAV: SidebarNavItem[] = [
   { id: "banners", permKey: "banners", label: "بنرها و اسلایدر محصولات", href: "/admin/banners", icon: "🖼️", requiredPerm: ["banners", "all"] },
   { id: "customers", permKey: "customers", label: "مشتریان (CRM) و پیامک", href: "/admin/customers", icon: "👥", requiredPerm: ["customers", "all"] },
   { id: "coupons", permKey: "coupons", label: "کدهای تخفیف زمان‌دار و هدفمند", href: "/admin/coupons", icon: "🏷️", requiredPerm: ["coupons", "all"] },
-  { id: "appearance_hub", permKey: "appearance", label: "استودیوی ظاهر، منوها و صفحه‌ساز", href: "/admin/appearance", icon: "🎨", badge: "یکپارچه", requiredPerm: ["appearance", "menu", "pages", "all"] },
+  { id: "appearance_hub", permKey: "appearance", label: "استودیوی ظاهر، منوها و صفحه‌ساز", href: "/admin/pages", icon: "🎨", badge: "یکپارچه", requiredPerm: ["appearance", "menu", "pages", "all"] },
   { id: "styles", permKey: "styles", label: "هویت بصری، فونت‌ها و CSS", href: "/admin/styles", icon: "✨", requiredPerm: ["appearance", "styles", "all"] },
   { id: "seo", permKey: "seo", label: "دستیار تخصصی سئو (رنک ۱)", href: "/admin/seo", icon: "🚀", badge: "SEO", requiredPerm: ["seo", "all"] },
   { id: "blog", permKey: "blog", label: "وبلاگ و مقالات سئو (متصل به کالا)", href: "/admin/blog", icon: "📚", requiredPerm: ["blog", "seo", "all"] },
@@ -274,8 +274,8 @@ export function AdminSidebar(props: any = {}) {
                   pathname?.startsWith("/admin/financial") ||
                   pathname?.startsWith("/admin/reports"))) ||
               (item.id === "appearance_hub" &&
-                (pathname?.startsWith("/admin/appearance") ||
-                  pathname?.startsWith("/admin/menu") ||
+                (pathname?.startsWith("/admin/pages") ||
+                  pathname?.startsWith("/admin/pages") ||
                   pathname?.startsWith("/admin/pages")));
 
             const displayLabel =
@@ -349,3 +349,5 @@ export function AdminSidebar(props: any = {}) {
   );
 }
 export default AdminSidebar;
+
+// Sidebar Route Fixed: 1791382671242

@@ -14,6 +14,14 @@ function withSecurityHeaders(res: NextResponse): NextResponse {
 }
 
 export async function middleware(req: NextRequest) {
+  // --- [ BOT WHITELIST ] ---
+  // اجازه عبور مستقیم به ربات‌های ترب، ایمالز و گوگل بدون درگیر شدن با ریدایرکت‌ها و سکوریتی
+  const userAgent = req.headers.get("user-agent") || "";
+  const isSearchBot = /torob|emalls|googlebot|bingbot|yandex|baiduspider/i.test(userAgent);
+  if (isSearchBot) {
+    return NextResponse.next();
+  }
+  // -------------------------
   const { pathname } = req.nextUrl;
 
   if (!pathname.startsWith("/admin")) {

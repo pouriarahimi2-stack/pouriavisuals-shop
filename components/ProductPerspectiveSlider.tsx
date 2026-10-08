@@ -19,8 +19,19 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
   const [products, setProducts] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fade, setFade] = useState(true);
+  const [sliderConfig, setSliderConfig] = useState({ opacity: 30, customBg: "" });
 
   useEffect(() => {
+    fetch("/api/theme-builder", { cache: "no-store" })
+      .then(r => r.json())
+      .then(json => {
+        const bg = json?.config?.globalBackground || {};
+        setSliderConfig({
+          opacity: Number(bg.sliderBgOpacity ?? 30),
+          customBg: bg.sliderCustomBgUrl || ""
+        });
+      }).catch(() => {});
+
     if (propProducts && propProducts.length > 0) {
       setProducts(propProducts.slice(0, 5));
       return;
@@ -37,56 +48,62 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
   useEffect(() => {
     if (products.length <= 1) return;
     const timer = setInterval(() => {
-      changeSlide((currentIndex + 1) % products.length);
+      setFade(false);
+      setTimeout(() => {
+        setCurrentIndex((prev) => (prev + 1) % products.length);
+        setFade(true);
+      }, 400);
     }, 6000);
     return () => clearInterval(timer);
-  }, [products.length, currentIndex]);
+  }, [products.length]);
 
-  const changeSlide = (newIndex: number) => {
+  const manualChangeSlide = (newIndex: number) => {
     setFade(false);
     setTimeout(() => {
       setCurrentIndex(newIndex);
       setFade(true);
-    }, 400); // زمان لازم برای محو شدن قبل از نمایش اسلاید جدید
+    }, 400);
   };
 
   if (products.length === 0) return null;
 
   const prod = products[currentIndex];
   const finalPrice = Number(prod.discount_price || prod.price || 0);
+  
+  // اگر ادمین عکسی ست کرده باشد آن را نشان می‌دهد، در غیر این صورت عکس خود محصول بک‌گراند می‌شود
+  const backgroundUrl = sliderConfig.customBg ? toSafeImgUrl(sliderConfig.customBg) : toSafeImgUrl(prod.image_url || prod.image);
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 my-8 space-y-4">
-      {/* نمایش عناوین سفارشی در بالای اسلایدر (دریافت شده از پنل ادمین) */}
       {(customTitle || customSubtitle) && (
-        <div className="text-center space-y-1.5 mb-2" data-axon-leaf-role="showcase_header">
+        <div className="text-center space-y-1.5 mb-2">
           {customTitle && <h2 className="text-xl sm:text-2xl font-black text-[var(--text-primary)]">{customTitle}</h2>}
           {customSubtitle && <p className="text-xs text-[var(--text-secondary)]">{customSubtitle}</p>}
         </div>
       )}
 
-      <div className="relative w-full h-[400px] sm:h-[450px] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] overflow-hidden shadow-2xl flex flex-col justify-center">
+      {/* ارتفاع مینیمم برای جلوگیری از روی هم افتادن عناصر در موبایل */}
+      <div className="relative w-full min-h-[520px] md:h-[450px] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] overflow-hidden shadow-2xl flex flex-col justify-between">
         
-        {/* لایه پس‌زمینه: عکس شاخص محصول به صورت مات و فیت‌شده */}
+        {/* لایه تصویر پس‌زمینه (فیت‌شده با قابلیت تنظیم شفافیت) */}
         <div
           className={`absolute inset-0 z-0 pointer-events-none transition-all duration-700 ease-in-out ${fade ? 'scale-100' : 'scale-105 opacity-0'}`}
-          style={{ opacity: fade ? "var(--axon-slider-bg-op, 0.3)" : 0 }}
+          style={{ opacity: sliderConfig.opacity / 100 }}
         >
           <img
-            src={toSafeImgUrl(prod.image_url || prod.image)}
+            src={backgroundUrl}
             alt=""
-            className="w-full h-full object-cover blur-2xl scale-125"
+            className="w-full h-full object-cover blur-2xl"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[var(--modal-bg)] via-[var(--modal-bg)]/70 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[var(--modal-bg)] via-transparent to-[var(--modal-bg)] opacity-50" />
         </div>
 
-        {/* لایه محتوا و اطلاعات محصول */}
+        {/* لایه محتوای محصول (چیدمان ستونی در موبایل و سطری در دسکتاپ) */}
         <div
-          className={`relative z-10 w-full h-full flex flex-col md:flex-row items-center justify-center md:justify-between gap-6 p-6 sm:p-12 transition-all duration-500 ease-in-out ${fade ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}
+          className={`relative z-10 flex-1 flex flex-col md:flex-row items-center justify-center gap-6 p-6 md:p-12 transition-all duration-500 ease-in-out ${fade ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
         >
-          {/* عکس محصول */}
-          <div className="w-40 h-40 sm:w-64 sm:h-64 relative shrink-0">
+          {/* بخش تصویر محصول */}
+          <div className="w-48 h-48 md:w-64 md:h-64 relative shrink-0 mt-2 md:mt-0">
             <div className="absolute inset-0 bg-[var(--bg-primary)] rounded-full blur-3xl opacity-60 animate-pulse" />
             <img
               src={toSafeImgUrl(prod.image_url || prod.image)}
@@ -95,25 +112,25 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
             />
           </div>
 
-          {/* توضیحات و دکمه خرید */}
-          <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-right space-y-3 sm:space-y-4 max-w-lg w-full">
-            <div data-axon-leaf-role="card_category" className="px-3 py-1.5 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-[10px] sm:text-[11px] font-black">
+          {/* بخش متون و دکمه خرید */}
+          <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-right space-y-3 md:space-y-4 w-full max-w-lg">
+            <div className="px-3 py-1.5 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-[10px] sm:text-[11px] font-black">
               {prod.category || "پیشنهاد ویژه"}
             </div>
-            <h2 className="text-xl sm:text-3xl font-black text-[var(--text-primary)] leading-tight line-clamp-2">
+            <h2 className="text-lg sm:text-3xl font-black text-[var(--text-primary)] leading-tight line-clamp-2">
               {prod.title}
             </h2>
-            <p data-axon-leaf-role="card_subtitle" className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-2">
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-2">
               {prod.short_description || prod.description || "پرفروش‌ترین تجهیزات تخصصی در آکسون کور"}
             </p>
             
-            <div className="w-full pt-3 sm:pt-4 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
+            <div className="w-full pt-4 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
               <div className="text-lg sm:text-xl font-black text-emerald-500 font-mono">
                 {finalPrice.toLocaleString("fa-IR")} <span className="text-xs font-sans">تومان</span>
               </div>
               <Link
                 href={"/products/" + prod.id}
-                className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black shadow-lg shadow-blue-500/30 hover:scale-105 transition-transform text-center"
+                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black shadow-lg shadow-blue-500/30 hover:scale-105 transition-transform text-center"
               >
                 مشاهده و خرید محصول ←
               </Link>
@@ -121,11 +138,11 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
           </div>
         </div>
 
-        {/* دکمه‌های ناوبری */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3">
+        {/* نوار ناوبری پایین (تثبیت شده، بدون همپوشانی) */}
+        <div className="relative z-20 pb-5 md:pb-6 flex items-center justify-center gap-4">
           <button
-            onClick={() => changeSlide((currentIndex - 1 + products.length) % products.length)}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[var(--input-bg)]/80 backdrop-blur border border-[var(--card-border)] flex items-center justify-center shadow-lg text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
+            onClick={() => manualChangeSlide((currentIndex - 1 + products.length) % products.length)}
+            className="w-10 h-10 rounded-full bg-[var(--input-bg)]/90 backdrop-blur border border-[var(--card-border)] flex items-center justify-center shadow-lg hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer font-bold"
           >
             →
           </button>
@@ -133,13 +150,14 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
             {products.map((_, idx) => (
               <span
                 key={idx}
-                className={"h-1.5 rounded-full transition-all " + (idx === currentIndex ? "w-6 bg-[var(--accent-blue)]" : "w-1.5 bg-[var(--card-border)]")}
+                onClick={() => manualChangeSlide(idx)}
+                className={"h-2 cursor-pointer rounded-full transition-all " + (idx === currentIndex ? "w-6 bg-[var(--accent-blue)]" : "w-2 bg-[var(--card-border)]")}
               />
             ))}
           </div>
           <button
-            onClick={() => changeSlide((currentIndex + 1) % products.length)}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[var(--input-bg)]/80 backdrop-blur border border-[var(--card-border)] flex items-center justify-center shadow-lg text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
+            onClick={() => manualChangeSlide((currentIndex + 1) % products.length)}
+            className="w-10 h-10 rounded-full bg-[var(--input-bg)]/90 backdrop-blur border border-[var(--card-border)] flex items-center justify-center shadow-lg hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer font-bold"
           >
             ←
           </button>

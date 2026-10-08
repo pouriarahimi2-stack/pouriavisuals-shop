@@ -33,6 +33,7 @@ export interface GlobalBackgroundConfig {
   chatSizeDesktop?: number;
   chatIconSvg?: string;
   sliderBgOpacity?: number;
+  sliderCustomBgUrl?: string;
   fixMobileHeaderBrand?: boolean;
   mobileHeaderFontSizePx?: number;
   showMobileBottomNav?: boolean;
@@ -75,6 +76,7 @@ export const DEFAULT_BG_CONFIG: GlobalBackgroundConfig = {
   chatSizeDesktop: 56,
   chatIconSvg: "",
   sliderBgOpacity: 30,
+  sliderCustomBgUrl: "",
   fixMobileHeaderBrand: true,
   mobileHeaderFontSizePx: 14,
   showMobileBottomNav: true,
@@ -365,28 +367,13 @@ export default function GlobalSiteBackground() {
               : ""
           }
 
-          button[data-axon-livechat-fab="true"] {
-            ${chatSide === "right" ? "right: 1rem !important; left: auto !important;" : "left: 1rem !important; right: auto !important;"}
+          
           }
 
           ${
             config.chatButtonIconOnly !== false
               ? `
-          button[data-axon-livechat-fab="true"] {
-            width: 54px !important;
-            height: 54px !important;
-            min-width: 54px !important;
-            padding: 0 !important;
-            border-radius: 9999px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            font-size: 0 !important;
-            line-height: 0 !important;
-            overflow: visible !important;
-            background: linear-gradient(135deg, #2563eb, #4f46e5) !important;
-            box-shadow: 0 10px 28px rgba(37, 99, 235, 0.48), inset 0 1px 1px rgba(255, 255, 255, 0.35) !important;
-          }
+          
           button[data-axon-livechat-fab="true"] * {
             font-size: 0 !important;
           }

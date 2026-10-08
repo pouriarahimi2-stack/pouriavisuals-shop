@@ -22,7 +22,7 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
   const [fade, setFade] = useState(true);
   const [sliderConfig, setSliderConfig] = useState({ opacity: 30, customBg: "" });
 
-  // استیت‌های مربوط به تاچ (سوایپ در موبایل)
+  // استیت‌های مربوط به تشخیص لمس در موبایل
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
 
@@ -50,6 +50,9 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
       .catch(() => {});
   }, [propProducts]);
 
+  // حذف اسکرول خودکار (تایمر) بنا به درخواست کاربر
+  // حرکت بین اسلایدها فقط با دکمه یا تاچ انجام می‌شود
+
   const manualChangeSlide = (newIndex: number) => {
     setFade(false);
     setTimeout(() => {
@@ -70,19 +73,15 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
   const handleTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
     const distance = touchStart - touchEnd;
-    
-    // اگر کاربر انگشتش را بیشتر از 50 پیکسل کشیده باشد
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
     
     if (isLeftSwipe) {
       manualChangeSlide((currentIndex + 1) % products.length);
-    }
-    if (isRightSwipe) {
+    } else if (isRightSwipe) {
       manualChangeSlide((currentIndex - 1 + products.length) % products.length);
     }
     
-    // ریست کردن تاچ
     setTouchStart(0);
     setTouchEnd(0);
   };
@@ -103,15 +102,16 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
         </div>
       )}
 
-      {/* ناحیه حساس به تاچ */}
+      {/* کانتینر اصلی اسلایدر با قابلیت تشخیص تاچ */}
       <div 
-        className="relative w-full min-h-[520px] md:h-[450px] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] overflow-hidden shadow-2xl flex flex-col justify-between touch-pan-y"
+        className="relative w-full rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] overflow-hidden shadow-2xl flex flex-col justify-between touch-pan-y"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        style={{ minHeight: "540px" }}
       >
         
-        {/* لایه تصویر پس‌زمینه */}
+        {/* لایه تصویر پس‌زمینه (مات و فیت‌شده) */}
         <div
           className={`absolute inset-0 z-0 pointer-events-none transition-all duration-700 ease-in-out ${fade ? 'scale-100' : 'scale-105 opacity-0'}`}
           style={{ opacity: sliderConfig.opacity / 100 }}
@@ -119,33 +119,35 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
           <img
             src={backgroundUrl}
             alt=""
-            className="w-full h-full object-cover blur-2xl"
+            className="w-full h-full object-cover blur-2xl scale-110"
             draggable={false}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[var(--modal-bg)] via-[var(--modal-bg)]/70 to-transparent" />
         </div>
 
-        {/* لایه محتوای محصول */}
+        {/* لایه محتوای محصول (چیدمان قطعی ۱۰۰٪ عرض در موبایل برای جلوگیری از به هم ریختگی) */}
         <div
-          className={`relative z-10 flex-1 flex flex-col md:flex-row items-center justify-center gap-6 p-6 md:p-12 transition-all duration-500 ease-in-out ${fade ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+          className={`relative z-10 flex-1 w-full h-full flex flex-col md:flex-row items-center justify-center p-5 sm:p-10 gap-4 sm:gap-8 transition-all duration-500 ease-in-out ${fade ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
         >
           {/* بخش تصویر محصول */}
-          <div className="w-48 h-48 md:w-64 md:h-64 relative shrink-0 mt-2 md:mt-0 pointer-events-none">
-            <div className="absolute inset-0 bg-[var(--bg-primary)] rounded-full blur-3xl opacity-60 animate-pulse" />
-            <img
-              src={toSafeImgUrl(prod.image_url || prod.image)}
-              className="relative z-10 w-full h-full object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-500"
-              alt={prod.title}
-              draggable={false}
-            />
+          <div className="w-full md:w-1/2 flex items-center justify-center shrink-0 pointer-events-none">
+            <div className="w-40 h-40 sm:w-64 sm:h-64 relative">
+              <div className="absolute inset-0 bg-[var(--bg-primary)] rounded-full blur-3xl opacity-60 animate-pulse" />
+              <img
+                src={toSafeImgUrl(prod.image_url || prod.image)}
+                className="relative z-10 w-full h-full object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-500"
+                alt={prod.title}
+                draggable={false}
+              />
+            </div>
           </div>
 
           {/* بخش متون و دکمه خرید */}
-          <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-right space-y-3 md:space-y-4 w-full max-w-lg">
-            <div className="px-3 py-1.5 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-[10px] sm:text-[11px] font-black">
+          <div className="w-full md:w-1/2 flex flex-col items-center md:items-start text-center md:text-right space-y-3 sm:space-y-4">
+            <div className="px-3 py-1.5 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-[11px] font-black">
               {prod.category || "پیشنهاد ویژه"}
             </div>
-            <h2 className="text-lg sm:text-3xl font-black text-[var(--text-primary)] leading-tight line-clamp-2">
+            <h2 className="text-xl sm:text-3xl font-black text-[var(--text-primary)] leading-tight line-clamp-2">
               {prod.title}
             </h2>
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-2">
@@ -158,7 +160,7 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
               </div>
               <Link
                 href={"/products/" + prod.id}
-                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black shadow-lg shadow-blue-500/30 hover:scale-105 transition-transform text-center"
+                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black shadow-lg shadow-blue-500/30 hover:scale-105 transition-transform text-center pointer-events-auto"
               >
                 مشاهده و خرید محصول ←
               </Link>
@@ -166,8 +168,8 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
           </div>
         </div>
 
-        {/* نوار ناوبری پایین */}
-        <div className="relative z-20 pb-5 md:pb-6 flex items-center justify-center gap-4">
+        {/* نوار ناوبری پایین (اندیکاتورها) */}
+        <div className="relative z-20 pb-5 flex items-center justify-center gap-4">
           <button
             onClick={() => manualChangeSlide((currentIndex - 1 + products.length) % products.length)}
             className="w-10 h-10 rounded-full bg-[var(--input-bg)]/90 backdrop-blur border border-[var(--card-border)] flex items-center justify-center shadow-lg hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer font-bold"

@@ -1,4 +1,5 @@
 "use client";
+// File Path: components/ProductPerspectiveSlider.tsx
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 
@@ -20,6 +21,10 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fade, setFade] = useState(true);
   const [sliderConfig, setSliderConfig] = useState({ opacity: 30, customBg: "" });
+
+  // استیت‌های مربوط به تاچ (سوایپ در موبایل)
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
 
   useEffect(() => {
     fetch("/api/theme-builder", { cache: "no-store" })
@@ -45,18 +50,6 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
       .catch(() => {});
   }, [propProducts]);
 
-  useEffect(() => {
-    if (products.length <= 1) return;
-    const timer = setInterval(() => {
-      setFade(false);
-      setTimeout(() => {
-        setCurrentIndex((prev) => (prev + 1) % products.length);
-        setFade(true);
-      }, 400);
-    }, 6000);
-    return () => clearInterval(timer);
-  }, [products.length]);
-
   const manualChangeSlide = (newIndex: number) => {
     setFade(false);
     setTimeout(() => {
@@ -65,12 +58,40 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
     }, 400);
   };
 
+  // هندلرهای سوایپ لمسی
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+  
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+  
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    
+    // اگر کاربر انگشتش را بیشتر از 50 پیکسل کشیده باشد
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+    
+    if (isLeftSwipe) {
+      manualChangeSlide((currentIndex + 1) % products.length);
+    }
+    if (isRightSwipe) {
+      manualChangeSlide((currentIndex - 1 + products.length) % products.length);
+    }
+    
+    // ریست کردن تاچ
+    setTouchStart(0);
+    setTouchEnd(0);
+  };
+
   if (products.length === 0) return null;
 
   const prod = products[currentIndex];
   const finalPrice = Number(prod.discount_price || prod.price || 0);
   
-  // اگر ادمین عکسی ست کرده باشد آن را نشان می‌دهد، در غیر این صورت عکس خود محصول بک‌گراند می‌شود
   const backgroundUrl = sliderConfig.customBg ? toSafeImgUrl(sliderConfig.customBg) : toSafeImgUrl(prod.image_url || prod.image);
 
   return (
@@ -82,10 +103,15 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
         </div>
       )}
 
-      {/* ارتفاع مینیمم برای جلوگیری از روی هم افتادن عناصر در موبایل */}
-      <div className="relative w-full min-h-[520px] md:h-[450px] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] overflow-hidden shadow-2xl flex flex-col justify-between">
+      {/* ناحیه حساس به تاچ */}
+      <div 
+        className="relative w-full min-h-[520px] md:h-[450px] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] overflow-hidden shadow-2xl flex flex-col justify-between touch-pan-y"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         
-        {/* لایه تصویر پس‌زمینه (فیت‌شده با قابلیت تنظیم شفافیت) */}
+        {/* لایه تصویر پس‌زمینه */}
         <div
           className={`absolute inset-0 z-0 pointer-events-none transition-all duration-700 ease-in-out ${fade ? 'scale-100' : 'scale-105 opacity-0'}`}
           style={{ opacity: sliderConfig.opacity / 100 }}
@@ -94,21 +120,23 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
             src={backgroundUrl}
             alt=""
             className="w-full h-full object-cover blur-2xl"
+            draggable={false}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[var(--modal-bg)] via-[var(--modal-bg)]/70 to-transparent" />
         </div>
 
-        {/* لایه محتوای محصول (چیدمان ستونی در موبایل و سطری در دسکتاپ) */}
+        {/* لایه محتوای محصول */}
         <div
           className={`relative z-10 flex-1 flex flex-col md:flex-row items-center justify-center gap-6 p-6 md:p-12 transition-all duration-500 ease-in-out ${fade ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
         >
           {/* بخش تصویر محصول */}
-          <div className="w-48 h-48 md:w-64 md:h-64 relative shrink-0 mt-2 md:mt-0">
+          <div className="w-48 h-48 md:w-64 md:h-64 relative shrink-0 mt-2 md:mt-0 pointer-events-none">
             <div className="absolute inset-0 bg-[var(--bg-primary)] rounded-full blur-3xl opacity-60 animate-pulse" />
             <img
               src={toSafeImgUrl(prod.image_url || prod.image)}
               className="relative z-10 w-full h-full object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-500"
               alt={prod.title}
+              draggable={false}
             />
           </div>
 
@@ -138,7 +166,7 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
           </div>
         </div>
 
-        {/* نوار ناوبری پایین (تثبیت شده، بدون همپوشانی) */}
+        {/* نوار ناوبری پایین */}
         <div className="relative z-20 pb-5 md:pb-6 flex items-center justify-center gap-4">
           <button
             onClick={() => manualChangeSlide((currentIndex - 1 + products.length) % products.length)}

@@ -19,10 +19,9 @@ function toSafeImgUrl(url?: string): string {
 export default function ProductPerspectiveSlider({ products: propProducts, customTitle, customSubtitle }: Props = {}) {
   const [products, setProducts] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [fade, setFade] = useState(true);
   const [sliderConfig, setSliderConfig] = useState({ opacity: 30, customBg: "" });
 
-  // استیت‌های مربوط به تشخیص لمس در موبایل
+  // استیت‌های تاچ برای سوایپ موبایل
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
 
@@ -50,18 +49,6 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
       .catch(() => {});
   }, [propProducts]);
 
-  // حذف اسکرول خودکار (تایمر) بنا به درخواست کاربر
-  // حرکت بین اسلایدها فقط با دکمه یا تاچ انجام می‌شود
-
-  const manualChangeSlide = (newIndex: number) => {
-    setFade(false);
-    setTimeout(() => {
-      setCurrentIndex(newIndex);
-      setFade(true);
-    }, 400);
-  };
-
-  // هندلرهای سوایپ لمسی
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.targetTouches[0].clientX);
   };
@@ -73,13 +60,12 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
   const handleTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
     const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > 50;
-    const isRightSwipe = distance < -50;
     
-    if (isLeftSwipe) {
-      manualChangeSlide((currentIndex + 1) % products.length);
-    } else if (isRightSwipe) {
-      manualChangeSlide((currentIndex - 1 + products.length) % products.length);
+    // در حالت RTL کشیدن به چپ (فاصله مثبت) یعنی رفتن به اسلاید بعدی
+    if (distance > 40) {
+      setCurrentIndex((prev) => (prev + 1) % products.length);
+    } else if (distance < -40) {
+      setCurrentIndex((prev) => (prev - 1 + products.length) % products.length);
     }
     
     setTouchStart(0);
@@ -88,13 +74,13 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
 
   if (products.length === 0) return null;
 
-  const prod = products[currentIndex];
-  const finalPrice = Number(prod.discount_price || prod.price || 0);
-  
-  const backgroundUrl = sliderConfig.customBg ? toSafeImgUrl(sliderConfig.customBg) : toSafeImgUrl(prod.image_url || prod.image);
+  // انتخاب عکس پس زمینه (یا عکس سفارشی ادمین یا عکس محصول فعلی)
+  const currentProd = products[currentIndex];
+  const backgroundUrl = sliderConfig.customBg ? toSafeImgUrl(sliderConfig.customBg) : toSafeImgUrl(currentProd?.image_url || currentProd?.image);
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 my-8 space-y-4">
+      {/* هدر سفارشی اسلایدر */}
       {(customTitle || customSubtitle) && (
         <div className="text-center space-y-1.5 mb-2">
           {customTitle && <h2 className="text-xl sm:text-2xl font-black text-[var(--text-primary)]">{customTitle}</h2>}
@@ -102,96 +88,103 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
         </div>
       )}
 
-      {/* کانتینر اصلی اسلایدر با قابلیت تشخیص تاچ */}
+      {/* کانتینر اصلی اسلایدر */}
       <div 
-        className="relative w-full rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] overflow-hidden shadow-2xl flex flex-col justify-between touch-pan-y"
+        className="relative w-full min-h-[580px] md:min-h-[450px] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] overflow-hidden shadow-2xl touch-pan-y"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        style={{ minHeight: "540px" }}
+        dir="rtl"
       >
-        
-        {/* لایه تصویر پس‌زمینه (مات و فیت‌شده) */}
-        <div
-          className={`absolute inset-0 z-0 pointer-events-none transition-all duration-700 ease-in-out ${fade ? 'scale-100' : 'scale-105 opacity-0'}`}
-          style={{ opacity: sliderConfig.opacity / 100 }}
-        >
+        {/* بک‌گراند بلور شده (خارج از Track برای اینکه ثابت بماند و فقط محو شود) */}
+        <div className="absolute inset-0 z-0 pointer-events-none transition-opacity duration-700 ease-in-out" style={{ opacity: sliderConfig.opacity / 100 }}>
           <img
+            key={backgroundUrl} // تعویض نرم عکس با تغییر کلید
             src={backgroundUrl}
             alt=""
-            className="w-full h-full object-cover blur-2xl scale-110"
+            className="w-full h-full object-cover blur-2xl scale-110 animate-fadeIn"
             draggable={false}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[var(--modal-bg)] via-[var(--modal-bg)]/70 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[var(--modal-bg)] via-[var(--modal-bg)]/80 to-[var(--modal-bg)]/30" />
         </div>
 
-        {/* لایه محتوای محصول (چیدمان قطعی ۱۰۰٪ عرض در موبایل برای جلوگیری از به هم ریختگی) */}
-        <div
-          className={`relative z-10 flex-1 w-full h-full flex flex-col md:flex-row items-center justify-center p-5 sm:p-10 gap-4 sm:gap-8 transition-all duration-500 ease-in-out ${fade ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+        {/* Track افقی اسلایدر (حرکت نرم بدون پرش ارتفاع) */}
+        <div 
+          className="relative z-10 flex w-full h-full transition-transform duration-500 ease-out"
+          style={{ transform: `translate3d(${currentIndex * 100}%, 0, 0)` }}
         >
-          {/* بخش تصویر محصول */}
-          <div className="w-full md:w-1/2 flex items-center justify-center shrink-0 pointer-events-none">
-            <div className="w-40 h-40 sm:w-64 sm:h-64 relative">
-              <div className="absolute inset-0 bg-[var(--bg-primary)] rounded-full blur-3xl opacity-60 animate-pulse" />
-              <img
-                src={toSafeImgUrl(prod.image_url || prod.image)}
-                className="relative z-10 w-full h-full object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-500"
-                alt={prod.title}
-                draggable={false}
-              />
-            </div>
-          </div>
-
-          {/* بخش متون و دکمه خرید */}
-          <div className="w-full md:w-1/2 flex flex-col items-center md:items-start text-center md:text-right space-y-3 sm:space-y-4">
-            <div className="px-3 py-1.5 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-[11px] font-black">
-              {prod.category || "پیشنهاد ویژه"}
-            </div>
-            <h2 className="text-xl sm:text-3xl font-black text-[var(--text-primary)] leading-tight line-clamp-2">
-              {prod.title}
-            </h2>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-2">
-              {prod.short_description || prod.description || "پرفروش‌ترین تجهیزات تخصصی در آکسون کور"}
-            </p>
+          {products.map((prod, idx) => {
+            const finalPrice = Number(prod.discount_price || prod.price || 0);
             
-            <div className="w-full pt-4 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
-              <div className="text-lg sm:text-xl font-black text-emerald-500 font-mono">
-                {finalPrice.toLocaleString("fa-IR")} <span className="text-xs font-sans">تومان</span>
+            return (
+              <div key={prod.id} className="min-w-full w-full h-full flex flex-col md:flex-row items-center justify-center p-6 pb-24 md:p-12 md:pb-12 gap-6 md:gap-12">
+                
+                {/* عکس محصول */}
+                <div className="w-48 h-48 md:w-64 md:h-64 relative shrink-0 flex items-center justify-center pointer-events-none">
+                  <div className="absolute inset-0 bg-[var(--bg-primary)] rounded-full blur-3xl opacity-60 animate-pulse" />
+                  <img
+                    src={toSafeImgUrl(prod.image_url || prod.image)}
+                    className="relative z-10 w-full h-full object-contain drop-shadow-2xl transition-transform duration-500 hover:scale-105"
+                    alt={prod.title}
+                    draggable={false}
+                  />
+                </div>
+
+                {/* متون و دکمه */}
+                <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-right space-y-3 md:space-y-4 w-full max-w-lg">
+                  <div className="px-3 py-1.5 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-[11px] font-black">
+                    {prod.category || "پیشنهاد ویژه"}
+                  </div>
+                  <h2 className="text-xl sm:text-3xl font-black text-[var(--text-primary)] leading-tight line-clamp-2">
+                    {prod.title}
+                  </h2>
+                  <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-2">
+                    {prod.short_description || prod.description || "پرفروش‌ترین تجهیزات تخصصی در آکسون کور"}
+                  </p>
+                  
+                  <div className="w-full pt-4 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
+                    <div className="text-lg sm:text-xl font-black text-emerald-500 font-mono">
+                      {finalPrice.toLocaleString("fa-IR")} <span className="text-xs font-sans">تومان</span>
+                    </div>
+                    <Link
+                      href={"/products/" + prod.id}
+                      className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black shadow-lg hover:scale-105 transition-transform text-center pointer-events-auto"
+                    >
+                      مشاهده و خرید محصول ←
+                    </Link>
+                  </div>
+                </div>
+
               </div>
-              <Link
-                href={"/products/" + prod.id}
-                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black shadow-lg shadow-blue-500/30 hover:scale-105 transition-transform text-center pointer-events-auto"
-              >
-                مشاهده و خرید محصول ←
-              </Link>
-            </div>
-          </div>
+            );
+          })}
         </div>
 
-        {/* نوار ناوبری پایین (اندیکاتورها) */}
-        <div className="relative z-20 pb-5 flex items-center justify-center gap-4">
+        {/* نوار ناوبری (ثابت در پایین اسلایدر، جدا از محتوای اسلایدها) */}
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center justify-center gap-4 bg-[var(--modal-bg)]/80 backdrop-blur-md px-5 py-2.5 rounded-full border border-[var(--card-border)] shadow-xl">
           <button
-            onClick={() => manualChangeSlide((currentIndex - 1 + products.length) % products.length)}
-            className="w-10 h-10 rounded-full bg-[var(--input-bg)]/90 backdrop-blur border border-[var(--card-border)] flex items-center justify-center shadow-lg hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer font-bold"
+            onClick={() => setCurrentIndex((prev) => (prev - 1 + products.length) % products.length)}
+            className="w-8 h-8 rounded-full bg-[var(--input-bg)] flex items-center justify-center text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer font-bold border border-[var(--card-border)]"
           >
             →
           </button>
-          <div className="flex gap-1.5">
+          <div className="flex gap-2">
             {products.map((_, idx) => (
               <span
                 key={idx}
-                onClick={() => manualChangeSlide(idx)}
-                className={"h-2 cursor-pointer rounded-full transition-all " + (idx === currentIndex ? "w-6 bg-[var(--accent-blue)]" : "w-2 bg-[var(--card-border)]")}
+                onClick={() => setCurrentIndex(idx)}
+                className={"h-2 cursor-pointer rounded-full transition-all duration-300 " + (idx === currentIndex ? "w-6 bg-[var(--accent-blue)]" : "w-2 bg-[var(--card-border)]")}
               />
             ))}
           </div>
           <button
-            onClick={() => manualChangeSlide((currentIndex + 1) % products.length)}
-            className="w-10 h-10 rounded-full bg-[var(--input-bg)]/90 backdrop-blur border border-[var(--card-border)] flex items-center justify-center shadow-lg hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer font-bold"
+            onClick={() => setCurrentIndex((prev) => (prev + 1) % products.length)}
+            className="w-8 h-8 rounded-full bg-[var(--input-bg)] flex items-center justify-center text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer font-bold border border-[var(--card-border)]"
           >
             ←
           </button>
         </div>
+
       </div>
     </div>
   );

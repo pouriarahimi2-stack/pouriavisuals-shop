@@ -61,9 +61,9 @@ export async function POST(req: NextRequest) {
       userRecord &&
       currentPassword &&
       targetUsername === String(session.username || "").toLowerCase() &&
-      (userRecord.password_hash || userRecord.password)
+      (userRecord.password || userRecord.password)
     ) {
-      const storedHash = userRecord.password_hash || userRecord.password;
+      const storedHash = userRecord.password || userRecord.password;
       const isMatch =
         authSecurity.verifyPassword(currentPassword, storedHash) ||
         currentPassword === storedHash;
@@ -80,7 +80,6 @@ export async function POST(req: NextRequest) {
         .from("admin_users")
         .update({
           password: hashedNewPassword,
-          password_hash: hashedNewPassword,
         })
         .eq("id", userRecord.id);
 
@@ -90,7 +89,6 @@ export async function POST(req: NextRequest) {
         {
           username: targetUsername,
           password: hashedNewPassword,
-          password_hash: hashedNewPassword,
           full_name: session.full_name || targetUsername,
           role: session.role || "superadmin",
           created_at: new Date().toISOString(),

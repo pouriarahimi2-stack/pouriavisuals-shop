@@ -1,339 +1,150 @@
-// File Path: components/ProductPerspectiveSlider.tsx
 "use client";
-
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { soundEngine } from "@/lib/soundEngine";
-import { formatPrice } from "@/lib/formatters";
-import AddToCartButton from "@/components/AddToCartButton";
-import ProductExplodedView from "@/components/ProductExplodedView";
-import { productService } from "@/services/productService";
-import { supabase } from "@/lib/supabase";
 
-export interface ProductPerspectiveSliderProps {
+interface Props {
   products?: any[];
   customTitle?: string;
   customSubtitle?: string;
-  cardScale?: "compact" | "standard" | "large";
 }
 
-export default function ProductPerspectiveSlider({
-  products: initialProducts,
-  customTitle,
-  customSubtitle,
-  cardScale = "standard",
-}: ProductPerspectiveSliderProps) {
-  const [products, setProducts] = useState<any[]>(initialProducts || []);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [teardownProduct, setTeardownProduct] = useState<any | null>(null);
-  const [viewportMode, setViewportMode] = useState<"mobile" | "tablet" | "desktop">("desktop");
+function toSafeImgUrl(url?: string): string {
+  const u = String(url || "").trim();
+  if (!u) return "/placeholder.png";
+  if (u.includes(".supabase.co/")) return "/api/media-proxy?url=" + encodeURIComponent(u);
+  return u;
+}
 
-  const touchStartXRef = useRef<number>(0);
-  const isDraggingRef = useRef<boolean>(false);
-
-  const loadLiveProducts = () => {
-    productService.getAll().then((data) => {
-      if (data && data.length > 0) setProducts(data);
-    });
-  };
+export default function ProductPerspectiveSlider({ products: propProducts, customTitle, customSubtitle }: Props = {}) {
+  const [products, setProducts] = useState<any[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [fade, setFade] = useState(true);
 
   useEffect(() => {
-    if (!initialProducts || initialProducts.length === 0) {
-      loadLiveProducts();
-    } else {
-      setProducts(initialProducts);
+    if (propProducts && propProducts.length > 0) {
+      setProducts(propProducts.slice(0, 5));
+      return;
     }
-
-    const updateViewport = () => {
-      if (typeof window === "undefined") return;
-      if (window.innerWidth < 640) setViewportMode("mobile");
-      else if (window.innerWidth < 1024) setViewportMode("tablet");
-      else setViewportMode("desktop");
-    };
-
-    updateViewport();
-    window.addEventListener("resize", updateViewport, { passive: true });
-
-    const channel = supabase
-      .channel("realtime-perspective-slider-products")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
-        loadLiveProducts();
+    fetch("/api/products", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((json) => {
+        const list = Array.isArray(json.data) ? json.data : json.products || [];
+        setProducts(list.slice(0, 5));
       })
-      .subscribe();
+      .catch(() => {});
+  }, [propProducts]);
 
-    return () => {
-      window.removeEventListener("resize", updateViewport);
-      supabase.removeChannel(channel);
-    };
-  }, [initialProducts]);
+  useEffect(() => {
+    if (products.length <= 1) return;
+    const timer = setInterval(() => {
+      changeSlide((currentIndex + 1) % products.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [products.length, currentIndex]);
 
-  if (!products || products.length === 0) return null;
-
-  const total = products.length;
-
-  const handleNext = () => {
-    soundEngine.playClick();
-    setActiveIndex((prev) => (prev + 1) % total);
+  const changeSlide = (newIndex: number) => {
+    setFade(false);
+    setTimeout(() => {
+      setCurrentIndex(newIndex);
+      setFade(true);
+    }, 400); // زمان لازم برای محو شدن قبل از نمایش اسلاید جدید
   };
 
-  const handlePrev = () => {
-    soundEngine.playClick();
-    setActiveIndex((prev) => (prev - 1 + total) % total);
-  };
+  if (products.length === 0) return null;
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartXRef.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const touchEndX = e.changedTouches[0].clientX;
-    const diff = touchStartXRef.current - touchEndX;
-
-    if (Math.abs(diff) > 40) {
-      if (diff > 0) handleNext();
-      else handlePrev();
-    }
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    isDraggingRef.current = true;
-    touchStartXRef.current = e.clientX;
-  };
-
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (!isDraggingRef.current) return;
-    isDraggingRef.current = false;
-    const diff = touchStartXRef.current - e.clientX;
-
-    if (Math.abs(diff) > 40) {
-      if (diff > 0) handleNext();
-      else handlePrev();
-    }
-  };
-
-  const cardSizeClasses =
-    cardScale === "compact"
-      ? "w-[250px] sm:w-[300px] h-[400px] sm:h-[450px]"
-      : cardScale === "large"
-      ? "w-[280px] sm:w-[370px] h-[460px] sm:h-[540px]"
-      : "w-[265px] sm:w-[340px] h-[435px] sm:h-[490px]";
-
-  const containerHeightClass =
-    cardScale === "compact"
-      ? "h-[430px] sm:h-[480px]"
-      : cardScale === "large"
-      ? "h-[490px] sm:h-[580px]"
-      : "h-[465px] sm:h-[530px]";
-
-  const baseStepX =
-    viewportMode === "mobile"
-      ? 115
-      : viewportMode === "tablet"
-      ? 165
-      : cardScale === "compact"
-      ? 180
-      : cardScale === "large"
-      ? 230
-      : 210;
+  const prod = products[currentIndex];
+  const finalPrice = Number(prod.discount_price || prod.price || 0);
 
   return (
-    <section
-      id="products-slider"
-      className="w-full py-4 select-text font-sans space-y-4 overflow-hidden"
-      dir="rtl"
-      suppressHydrationWarning
-    >
-      <div className="text-center space-y-1 px-4">
-        <h2 className="text-xl sm:text-3xl font-black tracking-tight text-[var(--text-primary)]">
-          {customTitle || "نمایشگاه سه‌بعدی تجهیزات پرچمدار"}
-        </h2>
-        <p className="text-xs text-[var(--text-secondary)] font-medium">
-          {customSubtitle || "پیمایش با سوایپ لمسی، درگ یا کلیدهای کنترل جهت بررسی مشخصات کالا"}
-        </p>
-      </div>
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 my-8 space-y-4">
+      {/* نمایش عناوین سفارشی در بالای اسلایدر (دریافت شده از پنل ادمین) */}
+      {(customTitle || customSubtitle) && (
+        <div className="text-center space-y-1.5 mb-2" data-axon-leaf-role="showcase_header">
+          {customTitle && <h2 className="text-xl sm:text-2xl font-black text-[var(--text-primary)]">{customTitle}</h2>}
+          {customSubtitle && <p className="text-xs text-[var(--text-secondary)]">{customSubtitle}</p>}
+        </div>
+      )}
 
-      <div
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        className={
-          "relative w-full max-w-5xl mx-auto flex items-center justify-center overflow-hidden [perspective:1200px] cursor-grab active:cursor-grabbing " +
-          containerHeightClass
-        }
-      >
-        {products.map((p, idx) => {
-          let offset = idx - activeIndex;
-          if (offset < -Math.floor(total / 2)) offset += total;
-          if (offset > Math.floor(total / 2)) offset -= total;
+      <div className="relative w-full h-[400px] sm:h-[450px] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] overflow-hidden shadow-2xl flex flex-col justify-center">
+        
+        {/* لایه پس‌زمینه: عکس شاخص محصول به صورت مات و فیت‌شده */}
+        <div
+          className={`absolute inset-0 z-0 pointer-events-none transition-all duration-700 ease-in-out ${fade ? 'scale-100' : 'scale-105 opacity-0'}`}
+          style={{ opacity: fade ? "var(--axon-slider-bg-op, 0.3)" : 0 }}
+        >
+          <img
+            src={toSafeImgUrl(prod.image_url || prod.image)}
+            alt=""
+            className="w-full h-full object-cover blur-2xl scale-125"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[var(--modal-bg)] via-[var(--modal-bg)]/70 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[var(--modal-bg)] via-transparent to-[var(--modal-bg)] opacity-50" />
+        </div>
 
-          const isActive = offset === 0;
-          const isVisible = Math.abs(offset) <= 2;
+        {/* لایه محتوا و اطلاعات محصول */}
+        <div
+          className={`relative z-10 w-full h-full flex flex-col md:flex-row items-center justify-center md:justify-between gap-6 p-6 sm:p-12 transition-all duration-500 ease-in-out ${fade ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}
+        >
+          {/* عکس محصول */}
+          <div className="w-40 h-40 sm:w-64 sm:h-64 relative shrink-0">
+            <div className="absolute inset-0 bg-[var(--bg-primary)] rounded-full blur-3xl opacity-60 animate-pulse" />
+            <img
+              src={toSafeImgUrl(prod.image_url || prod.image)}
+              className="relative z-10 w-full h-full object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-500"
+              alt={prod.title}
+            />
+          </div>
 
-          if (!isVisible) return null;
-
-          const translateX = offset * baseStepX;
-          const translateZ = -Math.abs(offset) * (viewportMode === "mobile" ? 130 : 170);
-          const rotateY = -offset * (viewportMode === "mobile" ? 16 : 22);
-          const opacity = isActive ? 1 : Math.max(0.2, 0.65 - Math.abs(offset) * 0.25);
-          const filter = isActive ? "none" : "grayscale(95%) opacity(50%) blur(0.5px)";
-          const zIndex = 20 - Math.abs(offset);
-
-          const isAvail =
-            (p.stock ?? 10) > 0 && p.is_available !== false && p.isAvailable !== false;
-          const finalPrice = p.discountPrice || p.discount_price || p.price;
-          const displayImage = p.image || (p.images && p.images[0]) || "/placeholder.png";
-
-          return (
-            <div
-              key={p.id || idx}
-              onClick={() => {
-                if (!isActive) {
-                  soundEngine.playClick();
-                  setActiveIndex(idx);
-                }
-              }}
-              style={{
-                transform:
-                  "translateX(" +
-                  translateX +
-                  "px) translateZ(" +
-                  translateZ +
-                  "px) rotateY(" +
-                  rotateY +
-                  "deg)",
-                opacity,
-                filter,
-                zIndex,
-              }}
-              className={
-                "absolute rounded-[2.2rem] sm:rounded-[2.5rem] p-4 sm:p-6 glass-morphism border transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] flex flex-col justify-between cursor-pointer " +
-                cardSizeClasses +
-                " " +
-                (isActive
-                  ? "border-[var(--accent-blue)] shadow-[0_20px_60px_rgba(2,132,199,0.35)] scale-100 ring-2 ring-blue-500/20"
-                  : "border-[var(--card-border)] scale-95")
-              }
-            >
-              <div className="space-y-2 text-right">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white font-bold text-[10px] border border-white/10 truncate max-w-[130px]">
-                    {p.category || "تکنولوژی"}
-                  </span>
-                  <span className="font-mono text-[10px] text-[var(--accent-blue)] font-black uppercase">
-                    {p.brand || "AXON"}
-                  </span>
-                </div>
-
-                <div className="relative w-full h-40 sm:h-52 rounded-2xl bg-[var(--input-bg)] p-3 border border-[var(--card-border)] flex items-center justify-center overflow-hidden group">
-                  <Link
-                    href={"/products/" + p.id}
-                    className="w-full h-full flex items-center justify-center"
-                  >
-                    <img
-                      src={displayImage}
-                      alt={p.title || "کالا"}
-                      className="w-full h-full object-contain transition-transform duration-500 hover:scale-105"
-                    />
-                  </Link>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      soundEngine.playExplodeShift();
-                      setTeardownProduct(p);
-                    }}
-                    className="hidden"
-                    title="کالبدشکافی سه‌بعدی لایه‌ها"
-                  >
-                    <span>🧬</span>
-                    <span>کالبدشکافی ۳D</span>
-                  </button>
-                </div>
-
-                <div>
-                  <Link href={"/products/" + p.id}>
-                    <h3 className="font-extrabold text-xs sm:text-sm text-[var(--text-primary)] line-clamp-2 leading-snug hover:text-[var(--accent-blue)] transition">
-                      {p.title || p.name}
-                    </h3>
-                  </Link>
-                  <p className="text-[11px] text-[var(--text-secondary)] line-clamp-1 font-medium mt-1">
-                    {p.short_description || p.description || "دارای ۱۸ ماه گارانتی اصالت طلایی"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-2.5 border-t border-[var(--card-border)]">
-                <div className="flex justify-between items-center" suppressHydrationWarning>
-                  <span className="font-mono font-black text-xs sm:text-base text-emerald-600 dark:text-emerald-400">
-                    {formatPrice(finalPrice)} تومان
-                  </span>
-                  <span
-                    className={
-                      "text-[10px] font-bold " +
-                      (isAvail ? "text-emerald-500" : "text-rose-500")
-                    }
-                  >
-                    {isAvail ? "موجود ✓" : "ناموجود"}
-                  </span>
-                </div>
-
-                {isActive ? (
-                  <AddToCartButton product={p} />
-                ) : (
-                  <button
-                    type="button"
-                    className="w-full py-2 rounded-xl bg-[var(--input-bg)] text-xs font-bold text-[var(--text-secondary)]"
-                  >
-                    انتخاب کالا
-                  </button>
-                )}
-              </div>
+          {/* توضیحات و دکمه خرید */}
+          <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-right space-y-3 sm:space-y-4 max-w-lg w-full">
+            <div data-axon-leaf-role="card_category" className="px-3 py-1.5 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-[10px] sm:text-[11px] font-black">
+              {prod.category || "پیشنهاد ویژه"}
             </div>
-          );
-        })}
-      </div>
+            <h2 className="text-xl sm:text-3xl font-black text-[var(--text-primary)] leading-tight line-clamp-2">
+              {prod.title}
+            </h2>
+            <p data-axon-leaf-role="card_subtitle" className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-2">
+              {prod.short_description || prod.description || "پرفروش‌ترین تجهیزات تخصصی در آکسون کور"}
+            </p>
+            
+            <div className="w-full pt-3 sm:pt-4 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
+              <div className="text-lg sm:text-xl font-black text-emerald-500 font-mono">
+                {finalPrice.toLocaleString("fa-IR")} <span className="text-xs font-sans">تومان</span>
+              </div>
+              <Link
+                href={"/products/" + prod.id}
+                className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black shadow-lg shadow-blue-500/30 hover:scale-105 transition-transform text-center"
+              >
+                مشاهده و خرید محصول ←
+              </Link>
+            </div>
+          </div>
+        </div>
 
-      <div className="flex flex-col items-center gap-2">
-        <div className="flex items-center gap-4">
+        {/* دکمه‌های ناوبری */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3">
           <button
-            type="button"
-            onClick={handlePrev}
-            className="w-10 h-10 rounded-full bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-sm font-black transition cursor-pointer shadow-sm active:scale-90"
-            title="قبلی"
+            onClick={() => changeSlide((currentIndex - 1 + products.length) % products.length)}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[var(--input-bg)]/80 backdrop-blur border border-[var(--card-border)] flex items-center justify-center shadow-lg text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
           >
             →
           </button>
-
-          <span
-            className="font-mono font-black text-sm text-[var(--text-primary)] tracking-widest px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]"
-            suppressHydrationWarning
-          >
-            {String(activeIndex + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
-          </span>
-
+          <div className="flex gap-1.5">
+            {products.map((_, idx) => (
+              <span
+                key={idx}
+                className={"h-1.5 rounded-full transition-all " + (idx === currentIndex ? "w-6 bg-[var(--accent-blue)]" : "w-1.5 bg-[var(--card-border)]")}
+              />
+            ))}
+          </div>
           <button
-            type="button"
-            onClick={handleNext}
-            className="w-10 h-10 rounded-full bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-sm font-black transition cursor-pointer shadow-sm active:scale-90"
-            title="بعدی"
+            onClick={() => changeSlide((currentIndex + 1) % products.length)}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[var(--input-bg)]/80 backdrop-blur border border-[var(--card-border)] flex items-center justify-center shadow-lg text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
           >
             ←
           </button>
         </div>
       </div>
-
-      {teardownProduct && (
-        <ProductExplodedView
-          productId={teardownProduct.id}
-          productTitle={teardownProduct.title || teardownProduct.name}
-          category={teardownProduct.category}
-          isOpen={!!teardownProduct}
-          onClose={() => setTeardownProduct(null)}
-        />
-      )}
-    </section>
+    </div>
   );
 }

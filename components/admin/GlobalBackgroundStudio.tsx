@@ -244,6 +244,67 @@ export default function GlobalBackgroundStudio() {
             </button>
           </div>
 
+          
+          {/* تنظیمات جدید اسلایدر و آیکون چت */}
+          <div className="p-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4 mb-4">
+            <h4 className="font-black text-[var(--accent-blue)] text-xs border-b border-[var(--card-border)] pb-2">
+               🎨 تنظیمات عکس پس‌زمینه اسلایدر و سایز آیکون چت
+            </h4>
+            
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <div className="flex justify-between font-bold text-[11px]">
+                  <span>شفافیت عکس محصول در پس‌زمینه اسلایدر (Opacity):</span>
+                  <span className="font-mono text-sky-400">{bgConfig.sliderBgOpacity ?? 30}%</span>
+                </div>
+                <input
+                  type="range" min={0} max={100}
+                  value={bgConfig.sliderBgOpacity ?? 30}
+                  onChange={(e) => updateLiveParam({ sliderBgOpacity: Number(e.target.value) })}
+                  className="w-full accent-sky-500 cursor-pointer"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <div className="flex justify-between font-bold text-[10px]">
+                    <span>سایز دکمه چت در موبایل:</span>
+                    <span className="font-mono text-emerald-400">{bgConfig.chatSizeMobile ?? 48}px</span>
+                  </div>
+                  <input
+                    type="range" min={30} max={80}
+                    value={bgConfig.chatSizeMobile ?? 48}
+                    onChange={(e) => updateLiveParam({ chatSizeMobile: Number(e.target.value) })}
+                    className="w-full accent-emerald-500 cursor-pointer"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between font-bold text-[10px]">
+                    <span>سایز دکمه چت در دسکتاپ:</span>
+                    <span className="font-mono text-indigo-400">{bgConfig.chatSizeDesktop ?? 56}px</span>
+                  </div>
+                  <input
+                    type="range" min={40} max={100}
+                    value={bgConfig.chatSizeDesktop ?? 56}
+                    onChange={(e) => updateLiveParam({ chatSizeDesktop: Number(e.target.value) })}
+                    className="w-full accent-indigo-500 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                 <label className="font-bold text-[11px] block">کد آیکون اختصاصی چت (SVG خام):</label>
+                 <textarea
+                   rows={2} dir="ltr"
+                   placeholder="<svg viewBox='0 0 24 24'>...</svg>"
+                   value={bgConfig.chatIconSvg || ""}
+                   onChange={(e) => updateLiveParam({ chatIconSvg: e.target.value })}
+                   className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[10px] outline-none"
+                 />
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <label className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-between gap-2 cursor-pointer font-bold">
               <span>💬 دکمه گفتگوی زنده: فقط آیکون دایره‌ای (در هر ۳ پلتفرم)</span>

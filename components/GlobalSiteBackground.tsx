@@ -29,6 +29,10 @@ export interface GlobalBackgroundConfig {
   chatButtonIconOnly?: boolean;
   chatButtonSide?: "left" | "right";
   chatButtonBottomPx?: number;
+  chatSizeMobile?: number;
+  chatSizeDesktop?: number;
+  chatIconSvg?: string;
+  sliderBgOpacity?: number;
   fixMobileHeaderBrand?: boolean;
   mobileHeaderFontSizePx?: number;
   showMobileBottomNav?: boolean;
@@ -67,6 +71,10 @@ export const DEFAULT_BG_CONFIG: GlobalBackgroundConfig = {
   chatButtonIconOnly: true,
   chatButtonSide: "left",
   chatButtonBottomPx: 80,
+  chatSizeMobile: 48,
+  chatSizeDesktop: 56,
+  chatIconSvg: "",
+  sliderBgOpacity: 30,
   fixMobileHeaderBrand: true,
   mobileHeaderFontSizePx: 14,
   showMobileBottomNav: true,
@@ -300,6 +308,7 @@ export default function GlobalSiteBackground() {
   const gAlphaLight = Math.max(0.55, Math.min(0.94, Number(config.glassSurfaceOpacity ?? 64) / 100));
   const gBorderAlpha = Math.max(0.18, Math.min(0.85, Number(config.glassBorderGlow ?? 42) / 100));
 
+  const sliderOp = Math.max(0, Math.min(100, Number(config.sliderBgOpacity ?? 30))) / 100;
   const chatSide = config.chatButtonSide === "right" ? "right" : "left";
 
   const rawResolved =
@@ -321,6 +330,9 @@ export default function GlobalSiteBackground() {
     <>
       {hydrated && !isAdminRoute && (
         <style>{`
+          :root {
+            --axon-slider-bg-op: ${sliderOp};
+          }
           ${
             glassEnabled
               ? `

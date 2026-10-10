@@ -24,27 +24,36 @@ export default function Footer() {
 
   useEffect(() => {
     let isMounted = true;
-    const loadLinks = async () => {
-      try {
-        const r = await fetch("/api/admin/footer-links?t=" + Date.now(), { cache: "no-store" });
-        const json = await r.json();
-        if (isMounted && json.success && Array.isArray(json.links)) {
-          setFooterLinks(json.links);
+    const load = () => {
+      fetch("/api/admin/footer-links").then(r => r.json()).then(d => {
+        if (isMounted && d.success && Array.isArray(d.links)) {
+          setFooterLinks(d.links);
         }
-      } catch (err) {}
+      }).catch(() => {});
     };
     
-    loadLinks();
+    // ۱. دریافت اولیه اطلاعات
+    load();
     
-    // اتصال فوق‌سریع و بالادرنگ با وب‌سوکت برای دریافت تغییرات بدون رفرش
-    const { supabase } = require("@/lib/supabase");
-    const channel = supabase.channel("realtime-footer-links")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, loadLinks)
-      .subscribe();
-      
+    // ۲. سیستم تنزل برازنده (Graceful Degradation): آپدیت بی‌صدا هر ۱۵ ثانیه برای دور زدن فیلترینگ ایران
+    const interval = setInterval(load, 15000); 
+    
+    // ۳. تلاش برای اتصال وب‌سوکت (اگر اینترنت کاربر اجازه داد)
+    let channel: any;
+    try {
+      const { supabase } = require("@/lib/supabase");
+      channel = supabase.channel("footer-realtime-sync")
+        .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, load)
+        .subscribe();
+    } catch (e) {}
+
     return () => { 
-      isMounted = false;
-      supabase.removeChannel(channel); 
+      isMounted = false; 
+      clearInterval(interval); 
+      if (channel) {
+        const { supabase } = require("@/lib/supabase");
+        supabase.removeChannel(channel);
+      }
     };
   }, []);
 

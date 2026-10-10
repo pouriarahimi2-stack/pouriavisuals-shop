@@ -7,15 +7,8 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const { data } = await supabaseAdmin.from("site_info").select("homepage_layout_config").limit(1).maybeSingle();
-    
-    // خواندن دقیق از مسیری که فوتر انتظار دارد
-    const links = data?.homepage_layout_config?.globalBackground?.dynamicFooterLinks;
-    
-    if (Array.isArray(links)) {
-      return NextResponse.json({ success: true, links });
-    }
-    
-    return NextResponse.json({ success: true, links: [] });
+    const links = data?.homepage_layout_config?.footer_links || [];
+    return NextResponse.json({ success: true, links });
   } catch (e) {
     return NextResponse.json({ success: false, links: [] });
   }
@@ -31,22 +24,15 @@ export async function POST(req: NextRequest) {
 
     if (siteRow && siteRow.id) {
       const layoutCfg = siteRow.homepage_layout_config || {};
-      const gbCfg = layoutCfg.globalBackground || {};
-      
       await supabaseAdmin.from("site_info").update({
-        homepage_layout_config: { 
-          ...layoutCfg, 
-          globalBackground: { ...gbCfg, dynamicFooterLinks: links } 
-        }
+        homepage_layout_config: { ...layoutCfg, footer_links: links }
       }).eq("id", siteRow.id);
     } else {
       await supabaseAdmin.from("site_info").insert([{
-        homepage_layout_config: {
-          globalBackground: { dynamicFooterLinks: links }
-        }
+        homepage_layout_config: { footer_links: links }
       }]);
     }
-    return NextResponse.json({ success: true, message: "لینک‌های فوتر با موفقیت ذخیره شدند." });
+    return NextResponse.json({ success: true, message: "لینک‌های فوتر ذخیره شدند." });
   } catch (e: any) {
     return NextResponse.json({ success: false, error: e.message }, { status: 500 });
   }

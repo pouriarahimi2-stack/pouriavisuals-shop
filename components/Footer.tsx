@@ -1,6 +1,6 @@
 "use client";
 // File Path: components/Footer.tsx
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSiteInfo } from "@/context/SiteInfoContext";
 import EnamadBadge from "@/components/EnamadBadge";
@@ -16,6 +16,19 @@ function resolveSafeUrl(val: any): string {
 }
 
 export default function Footer() {
+
+  const [footerLinks, setFooterLinks] = useState<{title: string, url: string}[]>([
+    { title: "قوانین و مقررات سایت", url: "/terms" },
+    { title: "تماس با ما", url: "/contact" }
+  ]);
+
+  useEffect(() => {
+    fetch("/api/theme-builder", { cache: "no-store" }).then(r => r.json()).then(json => {
+      const links = json?.config?.globalBackground?.dynamicFooterLinks;
+      if (Array.isArray(links) && links.length > 0) setFooterLinks(links);
+    }).catch(() => {});
+  }, []);
+
   const { siteInfo } = useSiteInfo();
   const [logoImgFailed, setLogoImgFailed] = useState(false);
 

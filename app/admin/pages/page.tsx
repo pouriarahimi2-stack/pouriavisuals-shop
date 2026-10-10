@@ -1,14 +1,13 @@
-// File Path: app/admin/pages/page.tsx
 import React from "react";
-import ProPageDesignStudio from "@/components/admin/ProPageDesignStudio";
+import CmsManagerStudio from "@/components/admin/CmsManagerStudio";
 import StorefrontLayoutStudio from "@/components/admin/StorefrontLayoutStudio";
 
 export const dynamic = "force-dynamic";
 
-export default function AdminRoutePage() {
+export default function AdminPagesRoute() {
   return (
     <div className="space-y-8">
-      <ProPageDesignStudio />
+      <CmsManagerStudio />
       <StorefrontLayoutStudio defaultTab="page_builder" />
     </div>
   );

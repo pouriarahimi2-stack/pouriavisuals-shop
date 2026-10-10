@@ -1,23 +1,45 @@
-import React from "react";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import ModularPageRenderer from "@/components/modular/ModularPageRenderer";
+import dynamic from "next/dynamic";
+import { Metadata } from "next";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-export default async function DynamicSlugPage({ params }: { params: Promise<{ slug: string }> }) {
+// بارگذاری داینامیک کامپوننت رندر با تایپ صحیح
+const ModularPageRenderer = dynamic(
+  () => import("@/components/modular/ModularPageRenderer").catch(() => {
+    return function Fallback() {
+      return <div className="p-10 text-center font-bold text-slate-400">سیستم رندر صفحات در حال بارگذاری است...</div>;
+    };
+  }),
+  { ssr: true }
+);
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const cleanSlug = String(slug || "").trim().toLowerCase();
+  const { data } = await supabaseAdmin.from("pages").select("title").eq("slug", slug).maybeSingle();
+  return { title: data?.title ? `${data.title} | آکسون کور` : "آکسون کور" };
+}
 
-  const { data: pageRecord } = await supabaseAdmin
-    .from("modular_pages")
-    .select("*")
-    .eq("slug", cleanSlug)
+export default async function DynamicPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  if (!slug) return notFound();
+
+  // خواندن محتوای صفحه ساخته شده از دیتابیس
+  const { data, error } = await supabaseAdmin
+    .from("pages")
+    .select("content, title")
+    .eq("slug", slug)
     .maybeSingle();
 
-  if (pageRecord && pageRecord.puck_data && pageRecord.puck_data.content?.length > 0) {
-    return <ModularPageRenderer initialPage={pageRecord} slug={cleanSlug} />;
+  // اگر صفحه‌ای با این آدرس ساخته نشده بود، ارور ۴۰۴ بدهد
+  if (error || !data || !data.content) {
+    return notFound();
   }
 
-  notFound();
+  return (
+    <div className="min-h-screen pt-28 pb-20">
+      <ModularPageRenderer initialPage={data.content} slug={slug} />
+    </div>
+  );
 }

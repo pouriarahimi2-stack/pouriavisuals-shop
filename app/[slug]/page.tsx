@@ -5,7 +5,6 @@ import { Metadata } from "next";
 
 export const revalidate = 0;
 
-// بارگذاری داینامیک کامپوننت رندر با تایپ صحیح
 const ModularPageRenderer = dynamic(
   () => import("@/components/modular/ModularPageRenderer").catch(() => {
     return function Fallback() {
@@ -25,14 +24,12 @@ export default async function DynamicPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   if (!slug) return notFound();
 
-  // خواندن محتوای صفحه ساخته شده از دیتابیس
   const { data, error } = await supabaseAdmin
     .from("pages")
     .select("content, title")
     .eq("slug", slug)
     .maybeSingle();
 
-  // اگر صفحه‌ای با این آدرس ساخته نشده بود، ارور ۴۰۴ بدهد
   if (error || !data || !data.content) {
     return notFound();
   }

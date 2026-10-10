@@ -70,11 +70,30 @@ const COLUMN_LABELS: Record<string, string> = {
 };
 
 export default function StorefrontLayoutStudio({
+
   defaultTab = "header",
 }: {
   defaultTab?: StudioTabType;
 }) {
   const { refresh: refreshGlobalSiteInfo } = useSiteInfo();
+  const [dynamicPagesList, setDynamicPagesList] = React.useState<any[]>([]);
+  React.useEffect(() => {
+    let isMounted = true;
+    const fetchPages = () => {
+      fetch('/api/pages').then(r => r.json()).then(d => {
+        if (isMounted && Array.isArray(d)) setDynamicPagesList(d);
+      }).catch(()=>{});
+    };
+    fetchPages();
+    try {
+      const { supabase } = require("@/lib/supabase");
+      const channel = supabase.channel("layout-pages-sync")
+        .on("postgres_changes", { event: "*", schema: "public", table: "pages" }, fetchPages)
+        .subscribe();
+      return () => { isMounted = false; supabase.removeChannel(channel); };
+    } catch(e) {}
+  }, []);
+
   const [activeTab, setActiveTab] = useState<StudioTabType>(defaultTab);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [offerDeviceTab, setOfferDeviceTab] = useState<"mobile" | "tablet" | "desktop">("mobile");

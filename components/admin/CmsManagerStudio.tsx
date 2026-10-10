@@ -52,7 +52,6 @@ export default function CmsManagerStudio() {
     setSavingFooter(true);
     setFeedback(null);
     try {
-      // حذف لینک‌های کاملاً خالی قبل از ارسال به دیتابیس
       const validLinks = footerLinks.filter(l => l.title.trim() !== "" && l.url.trim() !== "");
       
       const res = await fetch("/api/admin/footer-links", {
@@ -63,7 +62,7 @@ export default function CmsManagerStudio() {
 
       if (res.ok) {
         soundEngine.playSuccess();
-        setFeedback({ type: "ok", text: "✓ لینک‌های فوتر با امنیت کامل ذخیره شدند." });
+        setFeedback({ type: "ok", text: "✓ لینک‌های فوتر با موفقیت متصل شدند." });
         if (validLinks.length === 0) setFooterLinks([{ title: "", url: "" }]);
         setTimeout(() => setFeedback(null), 4000);
       }
@@ -93,12 +92,12 @@ export default function CmsManagerStudio() {
 
   return (
     <div className="space-y-8 font-sans text-[var(--text-primary)] select-text" dir="rtl">
-      {/* لیست لندینگ‌پیج‌ها */}
+      {/* جدول صفحات (لندینگ‌پیج‌ها) */}
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
         <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
           <div>
             <h2 className="text-lg font-black text-[var(--accent-blue)]">📄 مدیریت لندینگ‌پیج‌ها (CMS)</h2>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">لیست تمام صفحاتی که با صفحه‌ساز درگ‌اند‌دراپ ساخته‌اید</p>
+            <p className="text-xs text-[var(--text-secondary)] mt-1">لیست صفحاتی که با صفحه‌ساز درگ‌اند‌دراپ ساخته‌اید. برای ویرایش، آن‌ها را در منوی کشویی پایین انتخاب کنید.</p>
           </div>
           <button onClick={fetchData} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition">
             🔄 بروزرسانی لیست
@@ -144,12 +143,12 @@ export default function CmsManagerStudio() {
         )}
       </div>
 
-      {/* بخش اتصال به فوتر سایت */}
+      {/* اتصال صفحات به فوتر سایت */}
       <form onSubmit={handleSaveFooterLinks} className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
         <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
           <div>
             <h2 className="text-lg font-black text-emerald-500">📑 اتصال صفحات به فوتر سایت</h2>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">آدرس صفحاتی که بالا ساخته‌اید (مثل /terms) را اینجا وارد کنید تا در پایین سایت نمایش داده شوند</p>
+            <p className="text-xs text-[var(--text-secondary)] mt-1">آدرس صفحاتی که ساخته‌اید (مثل /terms) را اینجا وارد کنید تا در فوتر سایت نمایش داده شوند</p>
           </div>
           <button type="submit" disabled={savingFooter} className="px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black shadow-lg disabled:opacity-50 hover:bg-emerald-500 transition">
             {savingFooter ? "در حال ذخیره..." : "💾 ذخیره لینک‌های فوتر"}

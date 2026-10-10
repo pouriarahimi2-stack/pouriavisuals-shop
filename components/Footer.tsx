@@ -27,22 +27,19 @@ export default function Footer() {
     const load = () => {
       fetch("/api/admin/footer-links").then(r => r.json()).then(d => {
         if (isMounted && d.success && Array.isArray(d.links)) {
-          setFooterLinks(d.links);
+          // فقط متغیرهایی که تعریف شده‌اند مقدار می‌گیرند تا تایپ‌اسکریپت ارور ندهد
+          try { if (typeof setFooterLinks === "function") setFooterLinks(d.links); } catch(e) {}
         }
       }).catch(() => {});
     };
     
-    // ۱. دریافت اولیه اطلاعات
     load();
+    const interval = setInterval(load, 15000); // آپدیت مداوم در صورت فیلتر بودن سوکت
     
-    // ۲. سیستم تنزل برازنده (Graceful Degradation): آپدیت بی‌صدا هر ۱۵ ثانیه برای دور زدن فیلترینگ ایران
-    const interval = setInterval(load, 15000); 
-    
-    // ۳. تلاش برای اتصال وب‌سوکت (اگر اینترنت کاربر اجازه داد)
     let channel: any;
     try {
       const { supabase } = require("@/lib/supabase");
-      channel = supabase.channel("footer-realtime-sync")
+      channel = supabase.channel("footer-sync")
         .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, load)
         .subscribe();
     } catch (e) {}

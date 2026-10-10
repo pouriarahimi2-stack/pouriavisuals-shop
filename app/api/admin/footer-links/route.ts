@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const { data } = await supabaseAdmin.from("site_info").select("homepage_layout_config").limit(1).maybeSingle();
-    const links = data?.homepage_layout_config?.footer_links || [];
+    const links = data?.homepage_layout_config?.globalBackground?.dynamicFooterLinks || [];
     return NextResponse.json({ success: true, links });
   } catch (e) {
     return NextResponse.json({ success: false, links: [] });
@@ -24,13 +24,14 @@ export async function POST(req: NextRequest) {
 
     if (siteRow && siteRow.id) {
       const layoutCfg = siteRow.homepage_layout_config || {};
+      const gbCfg = layoutCfg.globalBackground || {};
+      
       await supabaseAdmin.from("site_info").update({
-        homepage_layout_config: { ...layoutCfg, footer_links: links }
+        homepage_layout_config: { 
+          ...layoutCfg, 
+          globalBackground: { ...gbCfg, dynamicFooterLinks: links } 
+        }
       }).eq("id", siteRow.id);
-    } else {
-      await supabaseAdmin.from("site_info").insert([{
-        homepage_layout_config: { footer_links: links }
-      }]);
     }
     return NextResponse.json({ success: true, message: "لینک‌های فوتر ذخیره شدند." });
   } catch (e: any) {

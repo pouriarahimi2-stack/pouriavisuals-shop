@@ -23,10 +23,21 @@ export default function Footer() {
   ]);
 
   useEffect(() => {
-    fetch("/api/theme-builder", { cache: "no-store" }).then(r => r.json()).then(json => {
-      const links = json?.config?.globalBackground?.dynamicFooterLinks;
-      if (Array.isArray(links) && links.length > 0) setFooterLinks(links);
-    }).catch(() => {});
+    const loadLinks = () => {
+      fetch("/api/admin/footer-links")
+        .then(r => r.json())
+        .then(d => { if (d.success && Array.isArray(d.links)) setFooterLinks(d.links); })
+        .catch(() => {});
+    };
+    loadLinks();
+    
+    // تکنولوژی بالادرنگ (Realtime) برای هماهنگی آنی در موبایل، تبلت و دسکتاپ
+    const { supabase } = require("@/lib/supabase");
+    const channel = supabase.channel("realtime-footer-links")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, loadLinks)
+      .subscribe();
+      
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const { siteInfo } = useSiteInfo();

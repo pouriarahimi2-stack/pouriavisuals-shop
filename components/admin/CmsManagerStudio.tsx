@@ -17,9 +17,9 @@ export default function CmsManagerStudio() {
       const pRes = await fetch("/api/pages");
       if (pRes.ok) setPages(await pRes.json());
 
-      const tRes = await fetch("/api/theme-builder?t=" + Date.now(), { cache: "no-store" });
+      const tRes = await fetch("/api/admin/footer-links", { cache: "no-store" });
       const tJson = await tRes.json();
-      const links = tJson?.config?.globalBackground?.dynamicFooterLinks;
+      const links = tJson?.links;
       if (Array.isArray(links) && links.length > 0) {
         setFooterLinks(links);
       } else {
@@ -57,22 +57,14 @@ export default function CmsManagerStudio() {
     setSavingFooter(true);
     setFeedback(null);
     try {
-      const tbRes = await fetch("/api/theme-builder?t=" + Date.now(), { cache: "no-store" });
+      const tbRes = await fetch("/api/admin/footer-links", { cache: "no-store" });
       const tbJson = await tbRes.json().catch(() => ({}));
       const prevConfig = tbJson?.config || {};
 
-      const res = await fetch("/api/theme-builder", {
+      const res = await fetch("/api/admin/footer-links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          config: {
-            ...prevConfig,
-            globalBackground: {
-              ...(prevConfig.globalBackground || {}),
-              dynamicFooterLinks: footerLinks,
-            }
-          },
-        }),
+        body: JSON.stringify({ links: footerLinks }),
       });
 
       if (res.ok) {

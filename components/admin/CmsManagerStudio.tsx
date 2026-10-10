@@ -17,16 +17,12 @@ export default function CmsManagerStudio() {
       const pRes = await fetch("/api/pages");
       if (pRes.ok) setPages(await pRes.json());
 
-      const tRes = await fetch("/api/admin/footer-links", { cache: "no-store" });
+      const tRes = await fetch("/api/admin/footer-links?t=" + Date.now(), { cache: "no-store" });
       const tJson = await tRes.json();
-      const links = tJson?.links;
-      if (Array.isArray(links) && links.length > 0) {
-        setFooterLinks(links);
+      if (tJson.success && Array.isArray(tJson.links)) {
+        setFooterLinks(tJson.links);
       } else {
-        setFooterLinks([
-          { title: "قوانین و مقررات سایت", url: "/terms" },
-          { title: "تماس با ما", url: "/contact" }
-        ]);
+        setFooterLinks([]); // اگر دیتابیس خالی بود، پنل هم باید خالی بماند!
       }
     } catch (e) {
       console.error(e);

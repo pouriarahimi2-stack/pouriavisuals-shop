@@ -7,11 +7,15 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const { data } = await supabaseAdmin.from("site_info").select("homepage_layout_config").limit(1).maybeSingle();
-    const links = data?.homepage_layout_config?.footer?.quickLinks || [
-      { title: "قوانین و مقررات", url: "/terms" },
-      { title: "تماس با ما", url: "/contact" }
-    ];
-    return NextResponse.json({ success: true, links });
+    
+    // خواندن دقیق از مسیری که فوتر انتظار دارد
+    const links = data?.homepage_layout_config?.globalBackground?.dynamicFooterLinks;
+    
+    if (Array.isArray(links)) {
+      return NextResponse.json({ success: true, links });
+    }
+    
+    return NextResponse.json({ success: true, links: [] });
   } catch (e) {
     return NextResponse.json({ success: false, links: [] });
   }
@@ -27,10 +31,20 @@ export async function POST(req: NextRequest) {
 
     if (siteRow && siteRow.id) {
       const layoutCfg = siteRow.homepage_layout_config || {};
-      const footerCfg = layoutCfg.footer || {};
+      const gbCfg = layoutCfg.globalBackground || {};
+      
       await supabaseAdmin.from("site_info").update({
-        homepage_layout_config: { ...layoutCfg, footer: { ...footerCfg, quickLinks: links } }
+        homepage_layout_config: { 
+          ...layoutCfg, 
+          globalBackground: { ...gbCfg, dynamicFooterLinks: links } 
+        }
       }).eq("id", siteRow.id);
+    } else {
+      await supabaseAdmin.from("site_info").insert([{
+        homepage_layout_config: {
+          globalBackground: { dynamicFooterLinks: links }
+        }
+      }]);
     }
     return NextResponse.json({ success: true, message: "لینک‌های فوتر با موفقیت ذخیره شدند." });
   } catch (e: any) {

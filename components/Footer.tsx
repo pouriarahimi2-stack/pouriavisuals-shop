@@ -23,21 +23,29 @@ export default function Footer() {
   ]);
 
   useEffect(() => {
-    const loadLinks = () => {
-      fetch("/api/admin/footer-links")
-        .then(r => r.json())
-        .then(d => { if (d.success && Array.isArray(d.links)) setFooterLinks(d.links); })
-        .catch(() => {});
+    let isMounted = true;
+    const loadLinks = async () => {
+      try {
+        const r = await fetch("/api/admin/footer-links?t=" + Date.now(), { cache: "no-store" });
+        const json = await r.json();
+        if (isMounted && json.success && Array.isArray(json.links)) {
+          setFooterLinks(json.links);
+        }
+      } catch (err) {}
     };
+    
     loadLinks();
     
-    // تکنولوژی بالادرنگ (Realtime) برای هماهنگی آنی در موبایل، تبلت و دسکتاپ
+    // اتصال فوق‌سریع و بالادرنگ با وب‌سوکت برای دریافت تغییرات بدون رفرش
     const { supabase } = require("@/lib/supabase");
     const channel = supabase.channel("realtime-footer-links")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, loadLinks)
       .subscribe();
       
-    return () => { supabase.removeChannel(channel); };
+    return () => { 
+      isMounted = false;
+      supabase.removeChannel(channel); 
+    };
   }, []);
 
   const { siteInfo } = useSiteInfo();

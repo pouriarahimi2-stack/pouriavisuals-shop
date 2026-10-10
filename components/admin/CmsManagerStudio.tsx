@@ -7,27 +7,25 @@ export default function CmsManagerStudio() {
   const [pages, setPages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // سیستم حرفه‌ای مدیریت لینک‌های فوتر
+  // سیستم پیشرفته مدیریت لینک‌های فوتر
   const [footerLinks, setFooterLinks] = useState<{title: string, url: string}[]>([]);
   const [savingFooter, setSavingFooter] = useState(false);
   const [feedback, setFeedback] = useState<{type: "ok" | "err", text: string} | null>(null);
 
   const fetchData = async () => {
     try {
-      // دریافت لیست تمام صفحات ساخته شده
       const pRes = await fetch("/api/pages");
       if (pRes.ok) setPages(await pRes.json());
 
-      // دریافت لینک‌های فعلی فوتر
-      const tRes = await fetch("/api/theme-builder", { cache: "no-store" });
+      const tRes = await fetch("/api/theme-builder?t=" + Date.now(), { cache: "no-store" });
       const tJson = await tRes.json();
       const links = tJson?.config?.globalBackground?.dynamicFooterLinks;
-      if (Array.isArray(links)) {
+      if (Array.isArray(links) && links.length > 0) {
         setFooterLinks(links);
       } else {
         setFooterLinks([
           { title: "قوانین و مقررات سایت", url: "/terms" },
-          { title: "شرایط بازگرداندن کالا", url: "/return-policy" },
+          { title: "تماس با ما", url: "/contact" }
         ]);
       }
     } catch (e) {
@@ -79,11 +77,11 @@ export default function CmsManagerStudio() {
 
       if (res.ok) {
         soundEngine.playSuccess();
-        setFeedback({ type: "ok", text: "لینک‌های فوتر با موفقیت ذخیره و در سایت منتشر شدند." });
+        setFeedback({ type: "ok", text: "✓ لینک‌های فوتر به صورت امن و دائمی ذخیره شدند." });
         setTimeout(() => setFeedback(null), 4000);
       }
     } catch {
-      setFeedback({ type: "err", text: "خطا در ارتباط با سرور." });
+      setFeedback({ type: "err", text: "خطا در برقراری ارتباط با سرور." });
     } finally {
       setSavingFooter(false);
     }
@@ -108,7 +106,7 @@ export default function CmsManagerStudio() {
   return (
     <div className="space-y-8 font-sans text-[var(--text-primary)] select-text" dir="rtl">
       
-      {/* بخش اول: مدیریت صفحات ساخته شده */}
+      {/* جدول مدیریت صفحات */}
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
         <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
           <div>
@@ -121,11 +119,9 @@ export default function CmsManagerStudio() {
         </div>
 
         {loading ? (
-          <div className="text-center text-xs text-slate-400 py-10">در حال بارگذاری...</div>
+          <div className="text-center text-xs text-slate-400 py-10">در حال دریافت امن اطلاعات...</div>
         ) : pages.length === 0 ? (
-          <div className="text-center text-xs text-slate-400 py-10">
-            هنوز صفحه‌ای نساخته‌اید. از ابزار صفحه‌ساز پایین استفاده کنید.
-          </div>
+          <div className="text-center text-xs text-slate-400 py-10">هنوز صفحه‌ای نساخته‌اید.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-right text-xs">
@@ -161,15 +157,15 @@ export default function CmsManagerStudio() {
         )}
       </div>
 
-      {/* بخش دوم: مدیریت کاملاً حرفه‌ای لینک‌های فوتر */}
+      {/* سیستم امن مدیریت لینک‌های فوتر */}
       <form onSubmit={handleSaveFooterLinks} className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
         <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
           <div>
             <h2 className="text-lg font-black text-emerald-500">📑 مدیریت پیشرفته لینک‌های فوتر</h2>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">لینک صفحاتی که ساخته‌اید را اینجا وارد کنید تا در فوتر نمایش داده شوند</p>
+            <p className="text-xs text-[var(--text-secondary)] mt-1">لینک‌ها را با دقت وارد کنید تا به صورت خودکار در سایت نمایش داده شوند</p>
           </div>
           <button type="submit" disabled={savingFooter} className="px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black shadow-lg disabled:opacity-50 hover:bg-emerald-500 transition">
-            {savingFooter ? "در حال ذخیره..." : "💾 ذخیره لینک‌های فوتر"}
+            {savingFooter ? "در حال ذخیره امن..." : "💾 ذخیره لینک‌های فوتر"}
           </button>
         </div>
 
@@ -184,41 +180,22 @@ export default function CmsManagerStudio() {
             <div key={idx} className="flex flex-col sm:flex-row gap-3 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] items-center">
               <div className="w-full sm:w-1/2">
                 <label className="text-[10px] text-[var(--text-secondary)] font-bold ml-2">عنوان نمایشی:</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="مثلاً: شرایط مرجوعی کالا"
-                  value={link.title}
-                  onChange={(e) => updateFooterLink(idx, "title", e.target.value)}
-                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-emerald-500"
-                />
+                <input type="text" required placeholder="مثلاً: شرایط مرجوعی کالا" value={link.title} onChange={(e) => updateFooterLink(idx, "title", e.target.value)} className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-emerald-500" />
               </div>
               <div className="w-full sm:w-1/2">
                 <label className="text-[10px] text-[var(--text-secondary)] font-bold ml-2">آدرس لینک (URL):</label>
                 <div className="flex gap-2 items-center">
-                  <input
-                    type="text"
-                    required
-                    dir="ltr"
-                    placeholder="/return-policy"
-                    value={link.url}
-                    onChange={(e) => updateFooterLink(idx, "url", e.target.value)}
-                    className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-mono outline-none focus:border-emerald-500"
-                  />
-                  <button type="button" onClick={() => removeFooterLink(idx)} className="w-10 h-10 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center font-bold">
-                    ✕
-                  </button>
+                  <input type="text" required dir="ltr" placeholder="/return-policy" value={link.url} onChange={(e) => updateFooterLink(idx, "url", e.target.value)} className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-mono outline-none focus:border-emerald-500" />
+                  <button type="button" onClick={() => removeFooterLink(idx)} className="w-10 h-10 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center font-bold">✕</button>
                 </div>
               </div>
             </div>
           ))}
-          
           <button type="button" onClick={addFooterLink} className="w-full py-3 rounded-2xl border-2 border-dashed border-[var(--card-border)] text-[var(--text-secondary)] font-bold text-xs hover:border-emerald-500 hover:text-emerald-500 transition">
-            + افزودن لینک جدید به فوتر
+            + افزودن کادر لینک جدید به فوتر
           </button>
         </div>
       </form>
-
     </div>
   );
 }

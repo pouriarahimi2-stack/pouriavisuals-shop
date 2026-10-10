@@ -76,6 +76,43 @@ export default function StorefrontLayoutStudio({
   defaultTab?: StudioTabType;
 }) {
   const { refresh: refreshGlobalSiteInfo } = useSiteInfo();
+  const [dynamicPagesDbListX, setDynamicPagesDbListX] = React.useState<any[]>([]);
+  React.useEffect(() => {
+    let isMounted = true;
+    fetch('/api/pages').then(r=>r.json()).then(d => {
+      if(isMounted && Array.isArray(d)) setDynamicPagesDbListX(d);
+    }).catch(()=>{});
+
+    // دریافت سیگنال از دکمه "ویرایش صفحه"
+    const handleEdit = (e: any) => {
+      const slug = e.detail;
+      if (slug) {
+        const selects = document.querySelectorAll('select');
+        selects.forEach(s => {
+          if (s.innerHTML.includes('about') || s.innerHTML.includes('contact') || s.innerHTML.includes('لندینگ‌پیج')) {
+            const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value")?.set;
+            setter?.call(s, slug);
+            s.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        });
+        document.getElementById('axon-admin-main-workspace')?.scrollTo({ top: 800, behavior: 'smooth' });
+      }
+    };
+    window.addEventListener('axon_edit_page', handleEdit);
+    
+    // باز کردن مستقیم صفحه‌ساز با پارامتر آدرس (?edit=slug)
+    const params = new URLSearchParams(window.location.search);
+    const editSlug = params.get('edit');
+    if (editSlug) {
+      setTimeout(() => handleEdit({ detail: editSlug }), 600);
+    }
+
+    return () => { 
+      isMounted = false; 
+      window.removeEventListener('axon_edit_page', handleEdit);
+    };
+  }, []);
+
   const [dynamicPagesList, setDynamicPagesList] = React.useState<any[]>([]);
   React.useEffect(() => {
     let isMounted = true;

@@ -16,43 +16,26 @@ function resolveSafeUrl(val: any): string {
 }
 
 export default function Footer() {
+  const [dynamicFooterLinksXYZ, setDynamicFooterLinksXYZ] = React.useState<any[]>([]);
+  React.useEffect(() => {
+    let isMounted = true;
+    const load = () => {
+      fetch('/api/admin/footer-links').then(r=>r.json()).then(d=>{
+        if(isMounted && d.success && Array.isArray(d.links)) setDynamicFooterLinksXYZ(d.links);
+      }).catch(()=>{});
+    };
+    load();
+    const interval = setInterval(load, 15000); 
+    return () => { isMounted = false; clearInterval(interval); };
+  }, []);
+
 
   const [footerLinks, setFooterLinks] = useState<{title: string, url: string}[]>([
     { title: "قوانین و مقررات سایت", url: "/terms" },
     { title: "تماس با ما", url: "/contact" }
   ]);
 
-  useEffect(() => {
-    let isMounted = true;
-    const load = () => {
-      fetch("/api/admin/footer-links").then(r => r.json()).then(d => {
-        if (isMounted && d.success && Array.isArray(d.links)) {
-          // فقط متغیرهایی که تعریف شده‌اند مقدار می‌گیرند تا تایپ‌اسکریپت ارور ندهد
-          try { if (typeof setFooterLinks === "function") setFooterLinks(d.links); } catch(e) {}
-        }
-      }).catch(() => {});
-    };
-    
-    load();
-    const interval = setInterval(load, 15000); // آپدیت مداوم در صورت فیلتر بودن سوکت
-    
-    let channel: any;
-    try {
-      const { supabase } = require("@/lib/supabase");
-      channel = supabase.channel("footer-sync")
-        .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, load)
-        .subscribe();
-    } catch (e) {}
-
-    return () => { 
-      isMounted = false; 
-      clearInterval(interval); 
-      if (channel) {
-        const { supabase } = require("@/lib/supabase");
-        supabase.removeChannel(channel);
-      }
-    };
-  }, []);
+  
 
   const { siteInfo } = useSiteInfo();
   const [logoImgFailed, setLogoImgFailed] = useState(false);
@@ -376,6 +359,17 @@ export default function Footer() {
           </div>
         )}
       </div>
+    
+      {/* 🟢 لینک‌های داینامیک فوتر */}
+      {dynamicFooterLinksXYZ && dynamicFooterLinksXYZ.length > 0 && (
+        <div className="w-full border-t border-[var(--card-border)]/50 mt-6 pt-4 pb-4">
+          <div className="max-w-7xl mx-auto flex flex-wrap justify-center items-center gap-6">
+            {dynamicFooterLinksXYZ.map((l: any, i: number) => (
+              <a key={i} href={l.url} className="text-[13px] font-bold text-[var(--accent-blue)] hover:underline">{l.title}</a>
+            ))}
+          </div>
+        </div>
+      )}
     </footer>
   );
 }

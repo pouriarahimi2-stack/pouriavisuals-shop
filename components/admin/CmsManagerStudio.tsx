@@ -5,8 +5,6 @@ import { soundEngine } from "@/lib/soundEngine";
 export default function CmsManagerStudio() {
   const [pages, setPages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // کادر لینک فوتر (حداقل یک ردیف برای جلوگیری از غیب شدن کادر)
   const [footerLinks, setFooterLinks] = useState<{title: string, url: string}[]>([{title: "", url: ""}]);
   const [savingFooter, setSavingFooter] = useState(false);
   const [feedback, setFeedback] = useState<{type: "ok" | "err", text: string} | null>(null);
@@ -30,9 +28,14 @@ export default function CmsManagerStudio() {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
+
+  // 🟢 هندل کردن دکمه ویرایش (ارسال سیگنال به صفحه‌ساز پایینی یا تغییر آدرس)
+  const triggerEdit = (slug: string) => {
+    soundEngine.playClick();
+    window.dispatchEvent(new CustomEvent('axon_edit_page', { detail: slug }));
+    window.history.pushState({}, '', '?edit=' + slug);
+  };
 
   const handleDeletePage = async (slug: string) => {
     if (!confirm(`آیا از حذف کامل صفحه (${slug}) مطمئن هستید؟`)) return;
@@ -46,21 +49,13 @@ export default function CmsManagerStudio() {
     } catch {}
   };
 
-  // 🟢 اتصال هوشمند دکمه ویرایش به صفحه‌ساز پایینی
-  const triggerEdit = (slug: string) => {
-    soundEngine.playClick();
-    window.dispatchEvent(new CustomEvent('axon_edit_page', { detail: slug }));
-  };
-
   const handleSaveFooterLinks = async (e: React.FormEvent) => {
     e.preventDefault();
     soundEngine.playClick();
     setSavingFooter(true);
     setFeedback(null);
     try {
-      // فقط لینک‌هایی ذخیره شوند که مقدار دارند
       const validLinks = footerLinks.filter(l => l.title.trim() !== "" && l.url.trim() !== "");
-      
       const res = await fetch("/api/admin/footer-links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -69,12 +64,12 @@ export default function CmsManagerStudio() {
 
       if (res.ok) {
         soundEngine.playSuccess();
-        setFeedback({ type: "ok", text: "✓ لینک‌های شما با موفقیت در فوتر سایت قرار گرفتند." });
+        setFeedback({ type: "ok", text: "✓ لینک‌های فوتر با موفقیت در سایت ثبت شدند." });
         if (validLinks.length === 0) setFooterLinks([{ title: "", url: "" }]);
         setTimeout(() => setFeedback(null), 4000);
       }
     } catch {
-      setFeedback({ type: "err", text: "خطا در ارتباط با دیتابیس." });
+      setFeedback({ type: "err", text: "خطا در ارتباط با سرور." });
     } finally {
       setSavingFooter(false);
     }
@@ -82,16 +77,14 @@ export default function CmsManagerStudio() {
 
   return (
     <div className="space-y-8 font-sans text-[var(--text-primary)] select-text" dir="rtl">
-      
-      {/* 🟢 بخش اول: جدول مدیریت لندینگ‌پیج‌ها */}
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
         <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b border-[var(--card-border)] pb-4 gap-4">
           <div>
             <h2 className="text-lg font-black text-[var(--accent-blue)]">📄 سیستم هوشمند مدیریت لندینگ‌پیج‌ها (CMS)</h2>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">با زدن دکمه «ویرایش صفحه»، لندینگ‌پیج شما فوراً در صفحه‌ساز گرافیکی پایین باز می‌شود.</p>
+            <p className="text-xs text-[var(--text-secondary)] mt-1">با کلیک روی «ویرایش صفحه»، لندینگ‌پیج شما فوراً در صفحه‌ساز گرافیکی پایین باز می‌شود.</p>
           </div>
           <button onClick={fetchData} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition">
-            🔄 بروزرسانی لیست
+            🔄 بروزرسانی
           </button>
         </div>
 
@@ -104,9 +97,9 @@ export default function CmsManagerStudio() {
             <table className="w-full text-right text-xs">
               <thead className="text-[var(--text-secondary)] border-b border-[var(--card-border)]">
                 <tr>
-                  <th className="pb-3 px-2">عنوان لندینگ‌پیج</th>
+                  <th className="pb-3 px-2">عنوان صفحه</th>
                   <th className="pb-3 px-2">لینک (URL)</th>
-                  <th className="pb-3 px-2 text-left">ابزارهای مدیریت</th>
+                  <th className="pb-3 px-2 text-left">عملیات مدیریت</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--card-border)]">
@@ -121,7 +114,7 @@ export default function CmsManagerStudio() {
                     <td className="py-4 px-2 text-left">
                       <div className="flex items-center justify-end gap-2">
                         <a href={`/${p.slug}`} target="_blank" className="px-3 py-1.5 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] font-bold">👁️ مشاهده</a>
-                        {/* دکمه ویرایش هوشمند */}
+                        {/* 🟢 دکمه ویرایش */}
                         <button onClick={() => triggerEdit(p.slug)} className="px-3 py-1.5 rounded-lg bg-amber-500/15 text-amber-500 font-bold border border-amber-500/30 hover:bg-amber-500 hover:text-black transition">
                           ✏️ ویرایش صفحه
                         </button>
@@ -136,14 +129,13 @@ export default function CmsManagerStudio() {
         )}
       </div>
 
-      {/* 🟢 بخش دوم: مدیریت لینک‌های فوتر سایت */}
       <form onSubmit={handleSaveFooterLinks} className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
         <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
           <div>
             <h2 className="text-lg font-black text-emerald-500">📑 نمایش صفحات در فوتر سایت</h2>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">آدرس صفحاتی که بالا ساخته‌اید (مثل /terms) را اینجا وارد کنید تا در منوی پایینی سایت قرار گیرند.</p>
+            <p className="text-xs text-[var(--text-secondary)] mt-1">آدرس لندینگ‌پیج‌ها را وارد کنید تا در فوتر پایین سایت نمایش داده شوند.</p>
           </div>
-          <button type="submit" disabled={savingFooter} className="px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black shadow-lg disabled:opacity-50 hover:bg-emerald-500 transition">
+          <button type="submit" disabled={savingFooter} className="px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black shadow-lg hover:bg-emerald-500 transition">
             {savingFooter ? "در حال ذخیره..." : "💾 ذخیره لینک‌های فوتر"}
           </button>
         </div>

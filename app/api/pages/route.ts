@@ -4,90 +4,106 @@ import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    // 🔒 لایه اول: سد امنیتی اصولی (تایید هویت متمرکز)
-    const isAuthorized = await verifyAdminSession(req);
-    if (!isAuthorized) {
-      return NextResponse.json(
-        { error: "دسترسی غیرمجاز (HTTP 403): شما مجوز مدیریتی برای این عملیات را ندارید." },
-        { status: 403 }
-      );
+    const { searchParams } = new URL(req.url);
+    const slug = searchParams.get("slug");
+    const id = searchParams.get("id");
+
+    if (slug || id) {
+      let query = supabaseAdmin.from("modular_pages").select("*");
+      if (id) query = query.eq("id", id);
+      else if (slug) query = query.eq("slug", slug.trim().toLowerCase());
+
+      const { data, error } = await query.maybeSingle();
+      if (error) throw error;
+      return NextResponse.json({ success: true, page: data, data });
     }
 
-    const body = await req.json();
-    let rawPath = body.path || body.slug || "";
-    let slug = rawPath.startsWith("/") ? rawPath.substring(1) : rawPath;
-    if (!slug) slug = "home";
+    const { data: pages, error } = await supabaseAdmin
+      .from("modular_pages")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-    const content = body.data || body.content || body;
-    const title = body.title || slug;
-
-    // 🟢 لایه دوم: اجرای عملیات با کلاینت ادمین
-    const { error } = await supabaseAdmin
-      .from("pages")
-      .upsert({ slug, title, content }, { onConflict: "slug" });
-
-    if (error) {
-      // ⚠️ اصول مهندسی: ارور زیرساختی نباید مخفی شود!
-      console.error("❌ [DATABASE ERROR]:", error);
-      if (error.code === '42P01') {
-        return NextResponse.json(
-          { error: "جدول pages در دیتابیس Supabase وجود ندارد. لطفاً ابتدا جدول را بسازید." },
-          { status: 500 }
-        );
-      }
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-    
-    return NextResponse.json({ success: true, message: "صفحه با موفقیت، امن و اصولی ذخیره شد." });
+    if (error) throw error;
+    return NextResponse.json({ success: true, pages: pages || [], data: pages || [] });
   } catch (err: any) {
-    return NextResponse.json({ error: "خطای داخلی سرور" }, { status: 500 });
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const isAuthorized = await verifyAdminSession(req);
-    const { searchParams } = new URL(req.url);
-    let rawPath = searchParams.get("path") || searchParams.get("slug") || "";
-    let slug = rawPath.startsWith("/") ? rawPath.substring(1) : rawPath;
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
 
-    if (slug) {
-      // دریافت محتوای یک صفحه برای ویترین سایت (آزاد برای همه)
-      const { data, error } = await supabaseAdmin.from("pages").select("content").eq("slug", slug).maybeSingle();
-      if (error && error.code !== '42P01') throw error;
-      if (!data) return NextResponse.json(null, { status: 404 });
-      return NextResponse.json(data.content);
-    } else {
-      // دریافت لیست تمام صفحات (محرمانه، فقط برای ادمین مجاز است)
-      if (!isAuthorized) return NextResponse.json({ error: "Access Denied" }, { status: 403 });
-      
-      const { data, error } = await supabaseAdmin.from("pages").select("id, slug, title, created_at").order("created_at", { ascending: false });
-      
-      // اگر جدول نبود، برای ادمین ارور برمی‌گردانیم تا مطلع شود زیرساخت ناقص است
+    const body = await req.json();
+    const title = String(body.title || "").trim();
+    const rawSlug = String(body.slug || title).trim();
+
+    if (!title || !rawSlug) {
+      return NextResponse.json({ success: false, message: "عنوان و نامک صفحه الزامی هستند." }, { status: 400 });
+    }
+
+    const cleanSlug = rawSlug
+      .toLowerCase()
+      .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+    const payload = {
+      title,
+      slug: cleanSlug,
+      puck_data: body.puck_data || body.data || { content: [], root: {} },
+      is_published: body.is_published !== false,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (body.id) {
+      const { data: updated, error } = await supabaseAdmin
+        .from("modular_pages")
+        .update(payload)
+        .eq("id", body.id)
+        .select()
+        .single();
+
       if (error) throw error;
-      return NextResponse.json(data || []);
+      return NextResponse.json({ success: true, message: "صفحه با موفقیت به‌روزرسانی شد.", page: updated });
+    } else {
+      const { data: inserted, error } = await supabaseAdmin
+        .from("modular_pages")
+        .insert([{ ...payload, created_at: new Date().toISOString() }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return NextResponse.json({ success: true, message: "صفحه جدید با موفقیت ایجاد شد.", page: inserted });
     }
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest) {
   try {
-    const isAuthorized = await verifyAdminSession(req);
-    if (!isAuthorized) return NextResponse.json({ error: "Access Denied" }, { status: 403 });
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
 
     const { searchParams } = new URL(req.url);
-    const slug = searchParams.get("slug");
-    if (!slug) return NextResponse.json({ error: "Slug required" }, { status: 400 });
+    const id = searchParams.get("id");
 
-    const { error } = await supabaseAdmin.from("pages").delete().eq("slug", slug);
+    if (!id) {
+      return NextResponse.json({ success: false, message: "شناسه صفحه الزامی است." }, { status: 400 });
+    }
+
+    const { error } = await supabaseAdmin.from("modular_pages").delete().eq("id", id);
     if (error) throw error;
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: "صفحه با موفقیت حذف شد." });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }

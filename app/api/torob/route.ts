@@ -1,32 +1,51 @@
 // File Path: app/api/torob/route.ts
+// API ترب نسخه ۱ — پشتیبانی کامل از GET و POST
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
-// هدرهای مشترک برای همه پاسخ‌ها
-function torobHeaders() {
+const BASE_URL =
+  (process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir").replace(/\/$/, "");
+
+function corsHeaders() {
   return {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, User-Agent",
-    "Cache-Control": "no-cache, no-store, must-revalidate",
-    "X-Robots-Tag": "noindex",
+    "Access-Control-Allow-Headers": "Content-Type, Accept, User-Agent",
+    "Cache-Control": "no-store",
   };
 }
 
-// هندلر OPTIONS برای preflight
+// OPTIONS — preflight
 export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: torobHeaders() });
+  return new NextResponse(null, { status: 204, headers: corsHeaders() });
 }
 
-// هندلر اصلی — هم GET هم POST پشتیبانی می‌شود
+// ─── هندلر اصلی ─────────────────────────────────────────────────────────────
 async function handler(req: NextRequest): Promise<NextResponse> {
   try {
-    const { searchParams } = new URL(req.url);
-    const page   = Math.max(1, parseInt(searchParams.get("page")  || "1"));
-    const limit  = Math.min(200, parseInt(searchParams.get("limit") || "100"));
+    // page می‌تواند از query string (GET) یا body (POST) بیاید
+    let page = 1;
+    let limit = 100;
+
+    if (req.method === "POST") {
+      try {
+        const body = await req.json().catch(() => ({}));
+        if (body?.page)  page  = Number(body.page);
+        if (body?.limit) limit = Number(body.limit);
+      } catch {
+        // body خالی یا invalid — مشکلی نیست، page=1 می‌ماند
+      }
+    } else {
+      const sp = new URL(req.url).searchParams;
+      if (sp.get("page"))  page  = Number(sp.get("page"));
+      if (sp.get("limit")) limit = Number(sp.get("limit"));
+    }
+
+    page  = Math.max(1, isNaN(page)  ? 1   : page);
+    limit = Math.min(200, isNaN(limit) ? 100 : limit);
     const offset = (page - 1) * limit;
 
     const { data: products, error, count } = await supabaseAdmin
@@ -40,23 +59,20 @@ async function handler(req: NextRequest): Promise<NextResponse> {
       .range(offset, offset + limit - 1);
 
     if (error) {
-      console.error("[torob] supabase error:", error.message);
+      console.error("[torob] db error:", error.message);
       return NextResponse.json(
-        { error: "Failed to fetch products" },
-        { status: 500, headers: torobHeaders() }
+        { error: "خطا در دریافت محصولات" },
+        { status: 500, headers: corsHeaders() }
       );
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://axoncore.ir";
-
-    // فرمت دقیق نسخه ۱ ترب
-    // https://panel.torob.com/api-docs/v1
     const catalog = (products || []).map((p) => {
+      // قیمت‌ها
       const hasDiscount = p.discount_price && Number(p.discount_price) > 0;
       const price    = Number(hasDiscount ? p.discount_price : p.price) || 0;
       const oldPrice = Number(hasDiscount ? p.price : price) || 0;
 
-      // لینک تصویر اول
+      // تصویر اول
       let imageUrl = "";
       if (Array.isArray(p.images) && p.images.length > 0) {
         imageUrl = String(p.images[0]);
@@ -64,44 +80,43 @@ async function handler(req: NextRequest): Promise<NextResponse> {
         imageUrl = String(p.image_url);
       }
       if (imageUrl && !imageUrl.startsWith("http")) {
-        imageUrl = baseUrl + (imageUrl.startsWith("/") ? "" : "/") + imageUrl;
+        imageUrl = BASE_URL + (imageUrl.startsWith("/") ? "" : "/") + imageUrl;
       }
 
+      // فرمت دقیق نسخه ۱ ترب
       return {
-        // فیلدهای اجباری نسخه ۱ ترب
         title:        String(p.title || "").trim(),
-        subtitle:     "",                                          // زیرعنوان (اختیاری)
-        page_url:     `${baseUrl}/products/${p.id}`,
-        price:        price,                                       // قیمت نهایی (تومان)
-        old_price:    oldPrice > price ? oldPrice : price,        // قیمت قبل از تخفیف
-        availability: "instock",                                   // چون فقط موجود می‌فرستیم
+        subtitle:     "",
+        page_url:     `${BASE_URL}/products/${p.id}`,
+        price:        price,
+        old_price:    oldPrice > price ? oldPrice : price,
+        availability: "instock",
         image_url:    imageUrl,
       };
     });
 
-    // pagination info (برای ترب اختیاریه ولی مفیده)
-    const totalCount = count || 0;
-    const hasNext    = offset + limit < totalCount;
+    const total   = count || 0;
+    const hasNext = offset + limit < total;
 
     return NextResponse.json(catalog, {
       status: 200,
       headers: {
-        ...torobHeaders(),
-        "X-Total-Count": String(totalCount),
+        ...corsHeaders(),
+        "X-Total-Count": String(total),
         "X-Page":        String(page),
         "X-Has-Next":    String(hasNext),
         "X-Next-Page":   hasNext ? String(page + 1) : "",
       },
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    console.error("[torob] handler error:", msg);
+    const msg = err instanceof Error ? err.message : "خطای ناشناخته";
+    console.error("[torob] error:", msg);
     return NextResponse.json(
       { error: msg },
-      { status: 500, headers: torobHeaders() }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }
 
 export const GET  = handler;
-export const POST = handler;  // ترب گاهی POST می‌فرستد
+export const POST = handler;

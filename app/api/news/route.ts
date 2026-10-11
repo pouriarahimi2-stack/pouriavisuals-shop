@@ -6,10 +6,9 @@ import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
 
-let lastAutoNewsSeedCheckAt = 0;
-async function autoSeedWeeklySeoNewsIfNeeded() {
-  if (Date.now() - lastAutoNewsSeedCheckAt < 6 * 60 * 60 * 1000) return;
-  lastAutoNewsSeedCheckAt = Date.now();
+// ─── autoSeed: فقط از /api/cron/news صدا زده می‌شود (نه از GET عمومی)
+// تابع export شده تا cron بتواند مستقیم صدایش بزند
+export async function autoSeedWeeklySeoNewsIfNeeded(): Promise<void> {
   try {
     const { data: existing } = await supabaseAdmin
       .from("tech_news")
@@ -37,22 +36,19 @@ async function autoSeedWeeklySeoNewsIfNeeded() {
     const autonomousNews = [
       {
         id: randomUUID(),
-        title:
-          "تحول بزرگ در گجت‌های هوشمند کاربردی ۲۰۲۶؛ چرا ابزارهای پرتابل نسل جدید پرفروش‌ترین‌های بازار شدند؟",
+        title: "تحول بزرگ در گجت‌های هوشمند کاربردی ۲۰۲۶؛ چرا ابزارهای پرتابل نسل جدید پرفروش‌ترین‌های بازار شدند؟",
         slug: "smart-portable-gadgets-trends-2026-" + Date.now().toString().slice(-4),
-        summary:
-          "بررسی تخصصی جدیدترین فناوری‌های به‌‌کاررفته در گجت‌های هوشمند خانگی و پرتابل با مصرف بهینه انرژی و ارگونومی پیشرفته.",
+        summary: "بررسی تخصصی جدیدترین فناوری‌های به‌‌کاررفته در گجت‌های هوشمند خانگی و پرتابل با مصرف بهینه انرژی و ارگونومی پیشرفته.",
         content: [
           "<h2>عصر جدید گجت‌های هوشمند و پرتابل در سال ۲۰۲۶</h2>",
           "<p>امروزه کاربران حرفه‌ای به دنبال ابزارهایی هستند که علاوه بر اشغال کمترین فضا، بالاترین بازدهی و سرعت را در استفاده روزمره و سفر ارائه دهند.</p>",
           p1
-            ? "<h3>پیشنهاد ویژه: " + p1.title + "</h3><p>یکی از برجسته‌ترین محصولات موجود، <strong>" + p1.title + '</strong> است که با ضمانت اصالت و ارسال سریع در <a href="/products/' + p1.id + '">کاتالوگ محصولات</a> عرضه می‌شود.</p>'
+            ? "<h3>پیشنهاد ویژه در کاتالوگ آکسون: " + p1.title + "</h3><p>یکی از برجسته‌ترین محصولات موجود در این رده، <strong>" + p1.title + '</strong> است که با ضمانت اصالت و ارسال سریع در <a href="/products/' + p1.id + '">کاتالوگ رسمی آکسون کور</a> عرضه می‌شود.</p>'
             : "",
-          "<h3>جمع‌بندی و آینده بازار سخت‌افزار</h3>",
           "<p>انتظار می‌رود تقاضا برای گجت‌های هوشمند چندکاره در نیمه دوم سال بیش از ۴۵ درصد رشد داشته باشد.</p>",
         ].join("\n"),
         category: "gadgets",
-        source_name: "رادار فناوری",
+        source_name: "رادار فناوری آکسون",
         image_url: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
         tags: ["گجت هوشمند", "تکنولوژی ۲۰۲۶", "کالای دیجیتال", "راهنمای خرید"],
         is_published: true,
@@ -63,16 +59,14 @@ async function autoSeedWeeklySeoNewsIfNeeded() {
       },
       {
         id: randomUUID(),
-        title:
-          "استاندارد تاندربولت ۵ و USB4؛ جهش ۳ برابری سرعت انتقال داده و شارژ فوق سریع در تجهیزات دیجیتال",
+        title: "استاندارد تاندربولت ۵ و USB4؛ جهش ۳ برابری سرعت انتقال داده و شارژ فوق سریع در تجهیزات دیجیتال",
         slug: "thunderbolt-5-usb4-hardware-revolution-" + (Date.now() + 1).toString().slice(-4),
-        summary:
-          "تحلیل فنی پهنای باند ۱۲۰ گیگابیت بر ثانیه در استاندارد Thunderbolt 5 و تاثیر آن بر نمایشگرها و گجت‌های نسل جدید.",
+        summary: "تحلیل فنی پهنای باند ۱۲۰ گیگابیت بر ثانیه در استاندارد Thunderbolt 5 و تاثیر آن بر نمایشگرها و گجت‌های نسل جدید.",
         content: [
-          "<h2>پایان عصر کابل‌های کند با Thunderbolt 5</h2>",
-          "<p>استاندارد جدید تاندربولت ۵ با ارائه پهنای باند دوطرفه ۸۰ گیگابیت بر ثانیه، امکان انتقال هم‌زمان تصویر، داده و توان شارژ تا ۲۴۰ وات را روی یک کابل واحد فراهم می‌کند.</p>",
+          "<h2>پایان عصر کابل‌های کند و شلوغ با Thunderbolt 5</h2>",
+          "<p>استاندارد جدید تاندربولت ۵ با ارائه پهنای باند دوطرفه ۸۰ گیگابیت بر ثانیه و حالت Bandwidth Boost تا ۱۲۰ گیگابیت بر ثانیه، امکان انتقال هم‌زمان تصویر، داده و توان شارژ تا ۲۴۰ وات را روی یک کابل واحد فراهم می‌کند.</p>",
           p2
-            ? '<p>جهت بررسی جدیدترین تجهیزات دیجیتال به صفحه <a href="/products/' + p2.id + '"><strong>' + p2.title + "</strong></a> مراجعه فرمایید.</p>"
+            ? '<p>جهت بررسی و خرید جدیدترین تجهیزات دیجیتال استاندارد، به صفحه <a href="/products/' + p2.id + '"><strong>' + p2.title + "</strong></a> مراجعه فرمایید.</p>"
             : "",
         ].join("\n"),
         category: "hardware",
@@ -88,57 +82,61 @@ async function autoSeedWeeklySeoNewsIfNeeded() {
     ];
 
     await supabaseAdmin.from("tech_news").insert(autonomousNews);
-  } catch {}
+  } catch {
+    // سایلنت — شکست در autoSeed نباید GET عمومی رو خراب کنه
+  }
 }
 
+// ─── GET عمومی: فقط خواندن — بدون هیچ‌گونه نوشتن
 export async function GET(req: NextRequest) {
   try {
-    await autoSeedWeeklySeoNewsIfNeeded();
-
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get("slug");
 
     if (slug) {
-      // ✅ FIX: فقط اخبار منتشرشده به کاربر عمومی نمایش داده می‌شود
       const { data: newsItem, error } = await supabaseAdmin
         .from("tech_news")
         .select("*")
         .eq("slug", slug)
-        .eq("is_published", true)
+        .eq("is_published", true)   // فقط منتشرشده
         .maybeSingle();
-
       if (error) throw error;
+      if (!newsItem) {
+        return NextResponse.json(
+          { success: false, data: null, news: null, message: "خبر یافت نشد." },
+          { status: 404 }
+        );
+      }
       return NextResponse.json({ success: true, data: newsItem, news: newsItem });
     }
 
-    // ✅ FIX: فقط اخبار منتشرشده در لیست عمومی
     const { data, error } = await supabaseAdmin
       .from("tech_news")
       .select("*")
-      .eq("is_published", true)
+      .eq("is_published", true)     // فقط منتشرشده‌ها
       .order("created_at", { ascending: false });
-
     if (error) throw error;
     return NextResponse.json({ success: true, data: data || [], news: data || [] });
   } catch (err: any) {
-    return NextResponse.json({ success: false, data: [], news: [], message: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, data: [], news: [], message: err.message },
+      { status: 500 }
+    );
   }
 }
 
+// ─── POST: ایجاد یا ویرایش خبر (فقط ادمین)
 export async function POST(req: NextRequest) {
   try {
     const session = await verifyAdminSession(req);
     if (!session) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
-
     const body = await req.json();
     const cleanTitle = String(body.title || "").trim();
-
     if (!cleanTitle) {
       return NextResponse.json({ success: false, message: "تیتر خبر الزامی است." }, { status: 400 });
     }
-
     const newsId = body.id && String(body.id).length > 10 ? body.id : randomUUID();
     const cleanSlug = String(body.slug || cleanTitle)
       .trim()
@@ -153,9 +151,10 @@ export async function POST(req: NextRequest) {
       summary: body.summary ? String(body.summary).trim() : cleanTitle,
       content: body.content ? String(body.content).trim() : "",
       category: body.category || "hardware",
-      source_name: body.source_name ? String(body.source_name).trim() : "رادار فناوری",
+      source_name: body.source_name ? String(body.source_name).trim() : "رادار فناوری آکسون",
       image_url:
-        body.image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
+        body.image_url ||
+        "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
       tags: Array.isArray(body.tags) ? body.tags : ["تکنولوژی", "سخت افزار"],
       is_published: body.is_published !== undefined ? Boolean(body.is_published) : true,
       trending_score: body.trending_score ? Number(body.trending_score) : 95,
@@ -169,7 +168,6 @@ export async function POST(req: NextRequest) {
         .eq("id", body.id)
         .select()
         .single();
-
       if (error) throw error;
       return NextResponse.json({ success: true, message: "خبر با موفقیت به‌روزرسانی شد.", data });
     } else {
@@ -180,7 +178,6 @@ export async function POST(req: NextRequest) {
         .insert([payload])
         .select()
         .single();
-
       if (error) throw error;
       return NextResponse.json({ success: true, message: "خبر با موفقیت منتشر گردید.", data });
     }
@@ -199,17 +196,13 @@ export async function DELETE(req: NextRequest) {
     if (!session) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
-
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
-
     if (!id) {
       return NextResponse.json({ success: false, message: "شناسه خبر الزامی است." }, { status: 400 });
     }
-
     const { error } = await supabaseAdmin.from("tech_news").delete().eq("id", id);
     if (error) throw error;
-
     return NextResponse.json({ success: true, message: "خبر با موفقیت از سیستم حذف گردید." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });

@@ -11,31 +11,57 @@ const NOCACHE_HEADERS = {
   "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
 };
 
+// فیلدهایی که هرگز نباید در پاسخ عمومی دیده شوند
+const SENSITIVE_TOP_LEVEL_FIELDS: string[] = [
+  "gemini_api_key",
+  "auth_security_config",
+  "zarinpal_merchant_id",
+  "ippanel_api_key",
+  "smtp_password",
+  "supabase_service_key",
+];
+
+// فیلدهایی که هرگز نباید در layout_config دیده شوند
+const SENSITIVE_LAYOUT_FIELDS: string[] = [
+  "ai_provider_config",
+  "auth_security_config",
+  "gemini_api_key",
+];
+
+function stripSensitive<T extends Record<string, any>>(obj: T, fields: string[]): T {
+  const clone = { ...obj };
+  fields.forEach((f) => delete clone[f]);
+  return clone as T;
+}
+
 export async function GET() {
   try {
-    const safeRow = (await getMasterSiteInfoRow()) || {};
-    const layoutCfg =
-      safeRow.homepage_layout_config && typeof safeRow.homepage_layout_config === "object"
-        ? safeRow.homepage_layout_config
+    const rawRow = (await getMasterSiteInfoRow()) || {};
+
+    // حذف فیلدهای حساس از root رکورد
+    const safeRow = stripSensitive(rawRow, SENSITIVE_TOP_LEVEL_FIELDS);
+
+    const rawLayout =
+      rawRow.homepage_layout_config && typeof rawRow.homepage_layout_config === "object"
+        ? rawRow.homepage_layout_config
         : {};
 
-    const persisted = layoutCfg._persisted_identity || {};
-    const systemSettings = normalizeSystemSettings(layoutCfg);
-    const cleanLayoutCfg = { ...layoutCfg };
-    delete cleanLayoutCfg.ai_provider_config;
-    delete (safeRow as any).gemini_api_key;
-    delete (safeRow as any).auth_security_config;
+    // حذف فیلدهای حساس از layout
+    const cleanLayoutCfg = stripSensitive(rawLayout, SENSITIVE_LAYOUT_FIELDS);
 
-    if (cleanLayoutCfg.auth_security_config) {
+    // اگر auth_security_config وجود داشت فقط بخش عمومی‌اش رو برگردون
+    if (rawLayout.auth_security_config) {
       cleanLayoutCfg.auth_security_config = {
-        userDeck: cleanLayoutCfg.auth_security_config.userDeck || { otpLength: 4 },
+        userDeck: rawLayout.auth_security_config.userDeck || { otpLength: 4 },
       };
     }
+
+    const persisted = cleanLayoutCfg._persisted_identity || {};
+    const systemSettings = normalizeSystemSettings(cleanLayoutCfg);
 
     const tbFooter = cleanLayoutCfg?.theme_builder_config?.globalFooter || {};
     const tbHeader = cleanLayoutCfg?.theme_builder_config?.globalHeader || {};
 
-    // احترام ۱۰۰٪ به مقدار ذخیره شده در استودیوی ظاهر (حتی اگر رشته خالی "" باشد)
     const resolvedHeaderLogo =
       tbHeader.logoUrl !== undefined
         ? String(tbHeader.logoUrl).trim()

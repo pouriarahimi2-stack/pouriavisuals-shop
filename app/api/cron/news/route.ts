@@ -1,26 +1,27 @@
+// File Path: app/api/cron/news/route.ts
+// این endpoint توسط Vercel Cron Job روزانه ساعت ۶ صبح اجرا می‌شود
 import { NextRequest, NextResponse } from "next/server";
-import { ensureFreshAutonomousNews } from "@/lib/techNewsHarvester";
+import { autoSeedWeeklySeoNewsIfNeeded } from "@/app/api/news/route";
 
 export const dynamic = "force-dynamic";
 
-// این route توسط Vercel Cron یا هر cron scheduler دیگری فراخوانی می‌شود
 export async function GET(req: NextRequest) {
+  // بررسی CRON_SECRET برای امنیت
   const authHeader = req.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET || process.env.ADMIN_SESSION_SECRET;
-
-  // امنیت: فقط با کلید مجاز
+  const cronSecret = process.env.CRON_SECRET;
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const updated = await ensureFreshAutonomousNews();
+    await autoSeedWeeklySeoNewsIfNeeded();
     return NextResponse.json({
       success: true,
-      message: updated ? "اخبار جدید تولید و منتشر شد." : "اخبار به‌روز است.",
+      message: "بررسی و به‌روزرسانی اخبار با موفقیت انجام شد.",
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    console.error("[cron/news] error:", err.message);
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }

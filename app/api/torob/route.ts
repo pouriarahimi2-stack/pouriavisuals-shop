@@ -1,5 +1,5 @@
 // File Path: app/api/torob/route.ts
-// API ترب نسخه ۱ — پشتیبانی کامل از GET و POST
+// API ترب نسخه ۱ — فرمت Dictionary با pagination صحیح
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
@@ -26,7 +26,6 @@ export async function OPTIONS() {
 // ─── هندلر اصلی ─────────────────────────────────────────────────────────────
 async function handler(req: NextRequest): Promise<NextResponse> {
   try {
-    // page می‌تواند از query string (GET) یا body (POST) بیاید
     let page = 1;
     let limit = 100;
 
@@ -36,7 +35,7 @@ async function handler(req: NextRequest): Promise<NextResponse> {
         if (body?.page)  page  = Number(body.page);
         if (body?.limit) limit = Number(body.limit);
       } catch {
-        // body خالی یا invalid — مشکلی نیست، page=1 می‌ماند
+        // body خالی یا invalid
       }
     } else {
       const sp = new URL(req.url).searchParams;
@@ -66,13 +65,15 @@ async function handler(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const catalog = (products || []).map((p) => {
-      // قیمت‌ها
+    const total   = count || 0;
+    const hasNext = offset + limit < total;
+    const hasPrev = page > 1;
+
+    const results = (products || []).map((p) => {
       const hasDiscount = p.discount_price && Number(p.discount_price) > 0;
       const price    = Number(hasDiscount ? p.discount_price : p.price) || 0;
       const oldPrice = Number(hasDiscount ? p.price : price) || 0;
 
-      // تصویر اول
       let imageUrl = "";
       if (Array.isArray(p.images) && p.images.length > 0) {
         imageUrl = String(p.images[0]);
@@ -83,7 +84,6 @@ async function handler(req: NextRequest): Promise<NextResponse> {
         imageUrl = BASE_URL + (imageUrl.startsWith("/") ? "" : "/") + imageUrl;
       }
 
-      // فرمت دقیق نسخه ۱ ترب
       return {
         title:        String(p.title || "").trim(),
         subtitle:     "",
@@ -95,18 +95,17 @@ async function handler(req: NextRequest): Promise<NextResponse> {
       };
     });
 
-    const total   = count || 0;
-    const hasNext = offset + limit < total;
+    // فرمت Dictionary که ترب نسخه ۱ انتظار دارد
+    const responseBody = {
+      count:    total,
+      next:     hasNext ? `${BASE_URL}/api/torob?page=${page + 1}` : null,
+      previous: hasPrev ? `${BASE_URL}/api/torob?page=${page - 1}` : null,
+      results,
+    };
 
-    return NextResponse.json(catalog, {
+    return NextResponse.json(responseBody, {
       status: 200,
-      headers: {
-        ...corsHeaders(),
-        "X-Total-Count": String(total),
-        "X-Page":        String(page),
-        "X-Has-Next":    String(hasNext),
-        "X-Next-Page":   hasNext ? String(page + 1) : "",
-      },
+      headers: corsHeaders(),
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "خطای ناشناخته";

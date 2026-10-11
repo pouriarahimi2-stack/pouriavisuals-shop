@@ -1,3 +1,4 @@
+// File Path: app/api/news/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
@@ -43,21 +44,15 @@ async function autoSeedWeeklySeoNewsIfNeeded() {
           "بررسی تخصصی جدیدترین فناوری‌های به‌‌کاررفته در گجت‌های هوشمند خانگی و پرتابل با مصرف بهینه انرژی و ارگونومی پیشرفته.",
         content: [
           "<h2>عصر جدید گجت‌های هوشمند و پرتابل در سال ۲۰۲۶</h2>",
-          "<p>امروزه کاربران حرفه‌ای به دنبال ابزارهایی هستند که علاوه بر اشغال کمترین فضا، بالاترین بازدهی و سرعت را در استفاده روزمره و سفر ارائه دهند. فناوری‌های نوین گرمایش سریع، موتورهای کم‌مصرف و طراحی ارگونومیک چرخشی، استانداردهای بازار کالای دیجیتال را تغییر داده‌اند.</p>",
+          "<p>امروزه کاربران حرفه‌ای به دنبال ابزارهایی هستند که علاوه بر اشغال کمترین فضا، بالاترین بازدهی و سرعت را در استفاده روزمره و سفر ارائه دهند.</p>",
           p1
-            ? "<h3>پیشنهاد ویژه در کاتالوگ آکسون: " +
-              p1.title +
-              "</h3><p>یکی از برجسته‌ترین محصولات موجود در این رده، <strong>" +
-              p1.title +
-              '</strong> است که با ضمانت اصالت و ارسال سریع در <a href="/products/' +
-              p1.id +
-              '">کاتالوگ رسمی آکسون کور</a> عرضه می‌شود.</p>'
+            ? "<h3>پیشنهاد ویژه: " + p1.title + "</h3><p>یکی از برجسته‌ترین محصولات موجود، <strong>" + p1.title + '</strong> است که با ضمانت اصالت و ارسال سریع در <a href="/products/' + p1.id + '">کاتالوگ محصولات</a> عرضه می‌شود.</p>'
             : "",
           "<h3>جمع‌بندی و آینده بازار سخت‌افزار</h3>",
           "<p>انتظار می‌رود تقاضا برای گجت‌های هوشمند چندکاره در نیمه دوم سال بیش از ۴۵ درصد رشد داشته باشد.</p>",
         ].join("\n"),
         category: "gadgets",
-        source_name: "رادار فناوری آکسون",
+        source_name: "رادار فناوری",
         image_url: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
         tags: ["گجت هوشمند", "تکنولوژی ۲۰۲۶", "کالای دیجیتال", "راهنمای خرید"],
         is_published: true,
@@ -74,14 +69,10 @@ async function autoSeedWeeklySeoNewsIfNeeded() {
         summary:
           "تحلیل فنی پهنای باند ۱۲۰ گیگابیت بر ثانیه در استاندارد Thunderbolt 5 و تاثیر آن بر نمایشگرها و گجت‌های نسل جدید.",
         content: [
-          "<h2>پایان عصر کابل‌های کند و شلوغ با Thunderbolt 5</h2>",
-          "<p>استاندارد جدید تاندربولت ۵ با ارائه پهنای باند دوطرفه ۸۰ گیگابیت بر ثانیه و حالت Bandwidth Boost تا ۱۲۰ گیگابیت بر ثانیه، امکان انتقال هم‌زمان تصویر، داده و توان شارژ تا ۲۴۰ وات را روی یک کابل واحد فراهم می‌کند.</p>",
+          "<h2>پایان عصر کابل‌های کند با Thunderbolt 5</h2>",
+          "<p>استاندارد جدید تاندربولت ۵ با ارائه پهنای باند دوطرفه ۸۰ گیگابیت بر ثانیه، امکان انتقال هم‌زمان تصویر، داده و توان شارژ تا ۲۴۰ وات را روی یک کابل واحد فراهم می‌کند.</p>",
           p2
-            ? '<p>جهت بررسی و خرید جدیدترین تجهیزات دیجیتال استاندارد، به صفحه <a href="/products/' +
-              p2.id +
-              '"><strong>' +
-              p2.title +
-              "</strong></a> مراجعه فرمایید.</p>"
+            ? '<p>جهت بررسی جدیدترین تجهیزات دیجیتال به صفحه <a href="/products/' + p2.id + '"><strong>' + p2.title + "</strong></a> مراجعه فرمایید.</p>"
             : "",
         ].join("\n"),
         category: "hardware",
@@ -108,19 +99,23 @@ export async function GET(req: NextRequest) {
     const slug = searchParams.get("slug");
 
     if (slug) {
+      // ✅ FIX: فقط اخبار منتشرشده به کاربر عمومی نمایش داده می‌شود
       const { data: newsItem, error } = await supabaseAdmin
         .from("tech_news")
         .select("*")
         .eq("slug", slug)
+        .eq("is_published", true)
         .maybeSingle();
 
       if (error) throw error;
       return NextResponse.json({ success: true, data: newsItem, news: newsItem });
     }
 
+    // ✅ FIX: فقط اخبار منتشرشده در لیست عمومی
     const { data, error } = await supabaseAdmin
       .from("tech_news")
       .select("*")
+      .eq("is_published", true)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -158,7 +153,7 @@ export async function POST(req: NextRequest) {
       summary: body.summary ? String(body.summary).trim() : cleanTitle,
       content: body.content ? String(body.content).trim() : "",
       category: body.category || "hardware",
-      source_name: body.source_name ? String(body.source_name).trim() : "رادار فناوری آکسون",
+      source_name: body.source_name ? String(body.source_name).trim() : "رادار فناوری",
       image_url:
         body.image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
       tags: Array.isArray(body.tags) ? body.tags : ["تکنولوژی", "سخت افزار"],

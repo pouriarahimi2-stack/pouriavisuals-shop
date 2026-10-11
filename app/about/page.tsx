@@ -1,3 +1,4 @@
+// File Path: app/about/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -13,7 +14,8 @@ const FEATURES = [
   { icon: <Star        size={22} />, color: "text-amber-400  bg-amber-400/10",    title: "بهترین قیمت بازار",   desc: "کمترین قیمت ممکن با امکان مقایسه و بازگشت وجه ۷ روزه." },
 ];
 
-const STATS = [
+// مقادیر پیش‌فرض — اگر ادمین چیزی ست نکرده باشد
+const DEFAULT_STATS = [
   { value: "+500",  label: "محصول فعال" },
   { value: "+2000", label: "مشتری راضی" },
   { value: "98٪",   label: "رضایت خریداران" },
@@ -35,6 +37,11 @@ export default function AboutPage() {
   const aboutText  =
     siteInfo?.description || footerCfg?.description ||
     `مجموعه ${storeName} مرجع تخصصی تأمین و عرضه جدیدترین محصولات فناوری، گجت‌های هوشمند و تجهیزات دیجیتال در ایران است.\n\nما با بیش از سال‌ها تجربه در حوزه تجارت الکترونیک، متعهد به ارائه بهترین کالاها با تضمین اصالت، قیمت منصفانه و خدمات پس از فروش قابل‌اعتماد هستیم.`;
+
+  // ✅ FIX: آمار از DB خوانده می‌شود — ادمین می‌تواند از پنل تغییر دهد
+  // مسیر: site_info.homepage_layout_config.about_stats یا site_info.about_stats
+  const dbStats = siteInfo?.homepage_layout_config?.about_stats || siteInfo?.about_stats;
+  const stats = Array.isArray(dbStats) && dbStats.length > 0 ? dbStats : DEFAULT_STATS;
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-text pb-32 md:pb-12" dir="rtl">
@@ -72,9 +79,9 @@ export default function AboutPage() {
             {aboutText}
           </div>
 
-          {/* آمار */}
+          {/* آمار — داینامیک از DB */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {STATS.map((s, i) => (
+            {stats.map((s: any, i: number) => (
               <div key={i} className="text-center p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
                 <div className="text-2xl font-black text-[var(--accent-blue)] font-mono">{s.value}</div>
                 <div className="text-[11px] text-[var(--text-secondary)] font-bold mt-1">{s.label}</div>

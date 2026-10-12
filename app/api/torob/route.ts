@@ -1,11 +1,10 @@
 // File Path: app/api/torob/route.ts
-// API ترب — api_version: "torob_api_v3" (string اجباری طبق مستندات ترب)
+// API ترب v3 — فقط URL واقعی در image_links (بدون base64)
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
-// طبق مستندات ترب: api_version باید string "torob_api_v3" باشد
 const TOROB_API_VERSION = "torob_api_v3";
 
 const BASE_URL =
@@ -31,23 +30,48 @@ function toAbsolute(url: string): string {
   return BASE_URL + (url.startsWith("/") ? "" : "/") + url;
 }
 
+/** بررسی اینکه آیا string یک URL واقعی است (نه base64) */
+function isRealUrl(s: string): boolean {
+  if (!s) return false;
+  // base64 معمولاً با data: شروع می‌شه یا طولانی است و / یا . ندارد
+  if (s.startsWith("data:")) return false;
+  // base64 خام: اگر string خیلی طولانی است و شامل http نیست
+  if (s.length > 500 && !s.startsWith("http")) return false;
+  // URL واقعی باید با http شروع شود یا / برای relative
+  return s.startsWith("http://") || s.startsWith("https://") || s.startsWith("/");
+}
+
 function resolveImageLinks(p: Record<string, unknown>): string[] {
   const links: string[] = [];
 
   let raw: unknown = p.images;
   if (typeof raw === "string") {
-    try { raw = JSON.parse(raw); } catch { raw = null; }
+    // اگر کل رشته base64 است
+    if (raw.startsWith("data:") || (raw.length > 500 && !raw.includes("http") && !raw.startsWith("["))) {
+      raw = null;
+    } else {
+      try { raw = JSON.parse(raw); } catch { raw = null; }
+    }
   }
 
   if (Array.isArray(raw)) {
     for (const item of raw) {
       const s = String(item ?? "").trim();
-      if (s) links.push(toAbsolute(s));
+      if (s && isRealUrl(s)) {
+        links.push(toAbsolute(s));
+      }
     }
   }
 
-  if (links.length === 0 && p.image_url) links.push(toAbsolute(String(p.image_url)));
-  if (links.length === 0 && p.image)     links.push(toAbsolute(String(p.image)));
+  // fallback به image_url یا image تکی — فقط اگر URL واقعی باشد
+  if (links.length === 0 && p.image_url) {
+    const u = String(p.image_url).trim();
+    if (isRealUrl(u)) links.push(toAbsolute(u));
+  }
+  if (links.length === 0 && p.image) {
+    const u = String(p.image).trim();
+    if (isRealUrl(u)) links.push(toAbsolute(u));
+  }
 
   return links;
 }
@@ -146,14 +170,12 @@ async function handler(req: NextRequest): Promise<NextResponse> {
         : new Date().toISOString().split("T")[0];
 
       return {
-        // فیلدهای اجباری ترب v3
         page_unique:   productUrl,
         current_price: currentPrice,
         availability:  true,
-        image_links:   imageLinks,
+        image_links:   imageLinks,   // فقط URL واقعی — بدون base64
         spec,
         date_added:    dateAdded,
-        // فیلدهای تکمیلی
         title,
         subtitle:      "",
         page_url:      productUrl,
@@ -165,7 +187,7 @@ async function handler(req: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(
       {
-        api_version: TOROB_API_VERSION,   // "torob_api_v3" — string
+        api_version: TOROB_API_VERSION,
         count:    total,
         next:     hasNext ? pageUrl(page + 1) : null,
         previous: hasPrev ? pageUrl(page - 1) : null,

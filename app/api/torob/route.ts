@@ -1,11 +1,12 @@
 // File Path: app/api/torob/route.ts
-// API ترب نسخه ۳ — تمام فیلدهای اجباری v3
+// API ترب — api_version: "torob_api_v3" (string اجباری طبق مستندات ترب)
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
-const TOROB_API_VERSION = 3;
+// طبق مستندات ترب: api_version باید string "torob_api_v3" باشد
+const TOROB_API_VERSION = "torob_api_v3";
 
 const BASE_URL =
   (process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir").replace(/\/$/, "");
@@ -15,7 +16,7 @@ function corsHeaders() {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Accept, User-Agent",
+    "Access-Control-Allow-Headers": "Content-Type, Accept, User-Agent, X-Torob-Token",
     "Cache-Control": "no-store",
   };
 }
@@ -145,26 +146,26 @@ async function handler(req: NextRequest): Promise<NextResponse> {
         : new Date().toISOString().split("T")[0];
 
       return {
-        // ── فیلدهای اجباری ترب v3 ──────────────────────
+        // فیلدهای اجباری ترب v3
         page_unique:   productUrl,
         current_price: currentPrice,
         availability:  true,
         image_links:   imageLinks,
         spec,
         date_added:    dateAdded,
-        // ── فیلدهای تکمیلی ──────────────────────────────
+        // فیلدهای تکمیلی
         title,
-        subtitle:  "",
-        page_url:  productUrl,
-        old_price: oldPrice,
-        id:        String(p.id),
-        category:  String(p.category ?? ""),
+        subtitle:      "",
+        page_url:      productUrl,
+        old_price:     oldPrice,
+        id:            String(p.id),
+        category:      String(p.category ?? ""),
       };
     });
 
     return NextResponse.json(
       {
-        api_version: TOROB_API_VERSION,
+        api_version: TOROB_API_VERSION,   // "torob_api_v3" — string
         count:    total,
         next:     hasNext ? pageUrl(page + 1) : null,
         previous: hasPrev ? pageUrl(page - 1) : null,
@@ -174,7 +175,7 @@ async function handler(req: NextRequest): Promise<NextResponse> {
     );
 
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "خطای ناشناخته";
+    const msg = err instanceof Error ? err.message : "unknown error";
     console.error("[torob] error:", msg);
     return NextResponse.json(
       { api_version: TOROB_API_VERSION, products: [], count: 0, next: null, previous: null },

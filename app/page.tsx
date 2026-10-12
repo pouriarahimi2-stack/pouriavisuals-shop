@@ -20,6 +20,14 @@ export const metadata: Metadata = {
   },
 };
 
+/** JSON-LD ایمن: از تزریق </script> جلوگیری می‌کند (M-03) */
+function safeJsonLd(obj: Record<string, any>): string {
+  return JSON.stringify(obj)
+    .replace(/</g, "\u003c")
+    .replace(/>/g, "\u003e")
+    .replace(/&/g, "\u0026");
+}
+
 export default async function HomePage() {
   let products: any[] = [];
   let banners: any[] = [];
@@ -55,7 +63,6 @@ export default async function HomePage() {
   const storeName =
     siteSettings?.storeName || siteSettings?.site_name || "آکسون کور | Axon Core";
 
-  // شبکه‌های اجتماعی از DB — اگر تعریف نشده بود آرایه خالی
   const socialLinks: string[] = [];
   if (siteSettings?.instagram_url) socialLinks.push(String(siteSettings.instagram_url));
   if (siteSettings?.youtube_url)   socialLinks.push(String(siteSettings.youtube_url));
@@ -63,7 +70,6 @@ export default async function HomePage() {
   if (siteSettings?.twitter_url)   socialLinks.push(String(siteSettings.twitter_url));
   if (siteSettings?.linkedin_url)  socialLinks.push(String(siteSettings.linkedin_url));
 
-  // شماره تماس از DB — اگر نبود فیلد telephone حذف می‌شود (بهتر از هاردکد)
   const phone = siteSettings?.phone ? String(siteSettings.phone).trim() : null;
 
   const organizationJsonLd: Record<string, any> = {
@@ -94,7 +100,7 @@ export default async function HomePage() {
     >
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(organizationJsonLd) }}
       />
       <DynamicHomeSections
         initialProducts={products}

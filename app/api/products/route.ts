@@ -9,13 +9,19 @@ export const dynamic = "force-dynamic";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const { data, error } = await supabaseAdmin
+    const isAdmin = await verifyAdminSession(req);
+    let query = supabaseAdmin
       .from("products")
       .select("*")
       .order("created_at", { ascending: false });
 
+    if (!isAdmin) {
+      query = query.eq("is_available", true);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     const unpacked = (data || []).map(unpackProductRow);
     return NextResponse.json(
@@ -97,56 +103,87 @@ export async function POST(req: NextRequest) {
       name: cleanTitle,
       category: String(body.category || "کالای دیجیتال").trim(),
       price: basePrice,
-      discount_price: discountPrice,
       stock: numericStock,
-      is_available: body.is_available !== undefined ? Boolean(body.is_available) : numericStock > 0,
+      is_available: body.is_available !== false,
+      image: primaryImage,
       image_url: primaryImage,
+      images: JSON.stringify(imagesList),
       description: packagedDescription,
-      updated_at: new Date().toISOString(),
+      short_description: mediaMeta.short_description,
+      meta_title: mediaMeta.meta_title,
+      meta_description: mediaMeta.meta_description,
+      brand: mediaMeta.brand,
+      sku: mediaMeta.sku,
+      warranty: mediaMeta.warranty,
+      specs: JSON.stringify(mediaMeta.specs),
+      purchase_price: purchasePrice,
+      discount_price: discountPrice,
+      tags: Array.isArray(body.tags) ? JSON.stringify(body.tags) : (body.tags || null),
+      slug: String(body.slug || "").trim() || null,
     };
 
-    const { data: existing } = await supabaseAdmin
+    const { data: inserted, error: insertErr } = await supabaseAdmin
       .from("products")
-      .select("id")
-      .eq("id", productId)
-      .maybeSingle();
+      .insert(safePayload)
+      .select("*")
+      .single();
 
-    let savedRecord: any = null;
-
-    if (existing) {
-      const { data, error } = await supabaseAdmin
-        .from("products")
-        .update(safePayload)
-        .eq("id", productId)
-        .select()
-        .single();
-      if (error) throw error;
-      savedRecord = data;
-    } else {
-      safePayload.created_at = new Date().toISOString();
-      const { data, error } = await supabaseAdmin
-        .from("products")
-        .insert([safePayload])
-        .select()
-        .single();
-      if (error) throw error;
-      savedRecord = data;
-    }
-
-    const unpacked = unpackProductRow(savedRecord);
-    return NextResponse.json({
-      success: true,
-      data: unpacked,
-      product: unpacked,
-      message: "✓ محصول با موفقیت در کاتالوگ و انبار ذخیره شد.",
-    });
+    if (insertErr) throw insertErr;
+    return NextResponse.json({ success: true, data: unpackProductRow(inserted) }, { status: 201 });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: err.message || "خطا در ثبت محصول." },
+      { status: 500 }
+    );
   }
 }
 
 export async function PUT(req: NextRequest) {
-  return POST(req);
+  try {
+    if (!(await verifyAdminSession(req))) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const id = String(body.id || "").trim();
+    if (!id) {
+      return NextResponse.json({ success: false, message: "شناسه محصول الزامی است." }, { status: 400 });
+    }
+
+    const updates: Record<string, any> = {};
+    if (body.title !== undefined) updates.title = String(body.title).trim();
+    if (body.name !== undefined) updates.name = String(body.name).trim();
+    if (body.category !== undefined) updates.category = String(body.category).trim();
+    if (body.price !== undefined) updates.price = Number(body.price);
+    if (body.stock !== undefined) updates.stock = Math.max(0, Number(body.stock));
+    if (body.is_available !== undefined) updates.is_available = Boolean(body.is_available);
+    if (body.description !== undefined) updates.description = String(body.description);
+    if (body.meta_title !== undefined) updates.meta_title = String(body.meta_title);
+    if (body.meta_description !== undefined) updates.meta_description = String(body.meta_description);
+    if (body.brand !== undefined) updates.brand = String(body.brand);
+    if (body.sku !== undefined) updates.sku = String(body.sku);
+    if (body.warranty !== undefined) updates.warranty = String(body.warranty);
+    if (body.discount_price !== undefined) updates.discount_price = body.discount_price ? Number(body.discount_price) : null;
+    if (body.purchase_price !== undefined) updates.purchase_price = Number(body.purchase_price);
+    if (Array.isArray(body.images)) updates.images = JSON.stringify(body.images);
+    if (body.tags !== undefined) updates.tags = Array.isArray(body.tags) ? JSON.stringify(body.tags) : body.tags;
+    if (body.slug !== undefined) updates.slug = String(body.slug).trim() || null;
+
+    const { data: updated, error: updateErr } = await supabaseAdmin
+      .from("products")
+      .update(updates)
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (updateErr) throw updateErr;
+    return NextResponse.json({ success: true, data: unpackProductRow(updated) });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, message: err.message || "خطا در ویرایش محصول." },
+      { status: 500 }
+    );
+  }
 }
 
 export async function DELETE(req: NextRequest) {
@@ -156,17 +193,18 @@ export async function DELETE(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
-
+    const id = searchParams.get("id") || "";
     if (!id) {
-      return NextResponse.json({ success: false, message: "شناسه کالا الزامی است." }, { status: 400 });
+      return NextResponse.json({ success: false, message: "شناسه محصول الزامی است." }, { status: 400 });
     }
 
     const { error } = await supabaseAdmin.from("products").delete().eq("id", id);
     if (error) throw error;
-
-    return NextResponse.json({ success: true, message: "کالا با موفقیت از کاتالوگ حذف شد." });
+    return NextResponse.json({ success: true, message: "محصول با موفقیت حذف شد." });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: err.message || "خطا در حذف محصول." },
+      { status: 500 }
+    );
   }
 }

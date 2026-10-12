@@ -5,6 +5,31 @@ import { verifyCustomerToken, CUSTOMER_COOKIE_NAME } from "@/lib/customerSession
 
 export const dynamic = "force-dynamic";
 
+// Rate limiting ساده در حافظه (per-IP)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT_MAX) return false;
+  entry.count++;
+  return true;
+}
+
+function getClientIp(req: NextRequest): string {
+  return (
+    req.headers.get("x-real-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown"
+  );
+}
+
 function normalizeDigits(val: any): string {
   return String(val || "")
     .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
@@ -52,72 +77,107 @@ function normalizeOrderRecord(row: any) {
   };
 }
 
-async function searchOrdersOptimized(params: { phone?: string; code?: string; query?: string }) {
-  let cleanPhone = normalizePhone(params.phone);
-  let cleanCode = normalizeDigits(params.code).toUpperCase();
-  const rawQuery = normalizeDigits(params.query);
+const MIN_CODE_LENGTH = 4;
+const MIN_PHONE_DIGITS = 10;
 
-  if (rawQuery) {
-    const digitsOnly = rawQuery.replace(/\D/g, "");
-    if (/^0?9\d{9}$/.test(digitsOnly) || /^989\d{9}$/.test(digitsOnly)) {
-      cleanPhone = normalizePhone(digitsOnly);
-    } else {
-      cleanCode = rawQuery.toUpperCase();
-    }
-  }
+async function searchOrdersWithBothParams(phone: string, code: string) {
+  const cleanPhone = normalizePhone(phone);
+  const cleanCode = normalizeDigits(code).toUpperCase();
 
-  // اگر فقط بر اساس شماره موبایل جستجو می‌شود، ابتدا کوئری مستقیم و سریع روی ستون phone زده شود
-  if (cleanPhone && !cleanCode) {
-    const { data: directPhoneOrders, error: directErr } = await supabaseAdmin
-      .from("orders")
-      .select("*")
-      .eq("phone", cleanPhone)
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    if (!directErr && Array.isArray(directPhoneOrders) && directPhoneOrders.length > 0) {
-      return directPhoneOrders.map(normalizeOrderRecord);
-    }
-  }
-
-  const { data: recentOrders, error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("orders")
     .select("*")
+    .eq("phone", cleanPhone)
     .order("created_at", { ascending: false })
-    .limit(120);
+    .limit(20);
 
-  if (error || !Array.isArray(recentOrders)) {
-    return [];
+  if (error || !Array.isArray(data)) return [];
+
+  return data
+    .map(normalizeOrderRecord)
+    .filter((row: any) => {
+      const rowId = String(row.id || "").toUpperCase();
+      const rowOrderNum = String(row.order_number || "").toUpperCase();
+      const rowTracking = String(row.tracking_code || "").toUpperCase();
+      return (
+        rowId === cleanCode ||
+        rowOrderNum === cleanCode ||
+        rowTracking === cleanCode ||
+        rowId.includes(cleanCode) ||
+        rowOrderNum.includes(cleanCode) ||
+        rowTracking.includes(cleanCode)
+      );
+    });
+}
+
+async function handleTrackRequest(
+  phone: string,
+  code: string,
+  req: NextRequest
+): Promise<NextResponse> {
+  const ip = getClientIp(req);
+
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json(
+      { success: false, message: "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً چند دقیقه دیگر امتحان کنید." },
+      { status: 429 }
+    );
   }
 
-  return recentOrders
-    .filter((row: any) => {
-      const normalized = normalizeOrderRecord(row);
-      const rowPhone = normalizePhone(normalized.phone || "");
-      const rowId = String(row.id || "").toUpperCase();
-      const rowOrderNum = String(normalized.order_number || "").toUpperCase();
-      const rowTracking = String(normalized.tracking_code || "").toUpperCase();
+  const cleanPhone = normalizePhone(phone);
+  const cleanCode = normalizeDigits(code);
 
-      const phoneMatches =
-        Boolean(cleanPhone) &&
-        (rowPhone === cleanPhone ||
-          (cleanPhone.length >= 10 && rowPhone.endsWith(cleanPhone.slice(-10))));
+  if (!cleanPhone || cleanPhone.replace(/\D/g, "").length < MIN_PHONE_DIGITS) {
+    return NextResponse.json(
+      { success: false, message: "شماره موبایل معتبر وارد نمایید." },
+      { status: 400 }
+    );
+  }
+  if (!cleanCode || cleanCode.length < MIN_CODE_LENGTH) {
+    return NextResponse.json(
+      { success: false, message: "کد رهگیری سفارش را وارد نمایید." },
+      { status: 400 }
+    );
+  }
 
-      const codeMatches =
-        Boolean(cleanCode) &&
-        (rowId === cleanCode ||
-          rowOrderNum === cleanCode ||
-          rowTracking === cleanCode ||
-          rowId.includes(cleanCode) ||
-          rowOrderNum.includes(cleanCode) ||
-          rowTracking.includes(cleanCode));
+  const cookieToken = req.cookies.get(CUSTOMER_COOKIE_NAME)?.value;
+  if (cookieToken) {
+    const session = await verifyCustomerToken(cookieToken);
+    if (session) {
+      const sessionPhone = normalizePhone(session.phone);
+      if (sessionPhone !== cleanPhone) {
+        return NextResponse.json(
+          { success: false, message: "شماره موبایل با حساب شما مطابقت ندارد." },
+          { status: 403 }
+        );
+      }
+    }
+  }
 
-      if (cleanPhone && cleanCode) return phoneMatches && codeMatches;
-      if (cleanPhone) return phoneMatches;
-      if (cleanCode) return codeMatches;
-      return false;
-    })
-    .map(normalizeOrderRecord);
+  const matched = await searchOrdersWithBothParams(cleanPhone, cleanCode);
+
+  if (matched.length === 0) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: "سفارشی با این مشخصات یافت نشد. لطفاً شماره موبایل و کد رهگیری را بررسی نمایید.",
+        order: null,
+        orders: [],
+        data: null,
+      },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
+    );
+  }
+
+  return NextResponse.json(
+    {
+      success: true,
+      order: matched[0] || null,
+      orders: matched,
+      data: matched[0] || null,
+    },
+    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
+  );
 }
 
 export async function GET(req: NextRequest) {
@@ -135,31 +195,10 @@ export async function GET(req: NextRequest) {
       searchParams.get("orderId") ||
       searchParams.get("id") ||
       "";
-    const query = searchParams.get("query") || "";
-
-    if (!phone && !code && !query) {
-      return NextResponse.json(
-        { success: false, message: "لطفاً شماره موبایل یا کد رهگیری سفارش را وارد نمایید." },
-        { status: 400 }
-      );
-    }
-
-    const matched = await searchOrdersOptimized({ phone, code, query });
-
+    return await handleTrackRequest(phone, code, req);
+  } catch {
     return NextResponse.json(
-      {
-        success: true,
-        order: matched[0] || null,
-        orders: matched,
-        data: matched[0] || null,
-      },
-      {
-        headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" },
-      }
-    );
-  } catch (err: any) {
-    return NextResponse.json(
-      { success: false, message: err.message || "خطا در رهگیری سفارش." },
+      { success: false, message: "خطا در رهگیری سفارش." },
       { status: 500 }
     );
   }
@@ -178,142 +217,11 @@ export async function POST(req: NextRequest) {
       body.order_number ||
       body.id ||
       "";
-    const query = body.query || "";
-
-    if (!phone && !code && !query) {
-      return NextResponse.json(
-        { success: false, message: "لطفاً شماره موبایل یا کد رهگیری سفارش را وارد نمایید." },
-        { status: 400 }
-      );
-    }
-
-    const matched = await searchOrdersOptimized({ phone, code, query });
-
+    return await handleTrackRequest(phone, code, req);
+  } catch {
     return NextResponse.json(
-      {
-        success: matched.length > 0,
-        order: matched[0] || null,
-        orders: matched,
-        data: matched[0] || null,
-        message: matched.length > 0 ? "سفارش یافت شد." : "سفارشی با این مشخصات یافت نشد.",
-      },
-      {
-        status: matched.length > 0 ? 200 : 404,
-        headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" },
-      }
-    );
-  } catch (err: any) {
-    return NextResponse.json(
-      { success: false, message: err.message || "خطا در رهگیری سفارش." },
+      { success: false, message: "خطا در رهگیری سفارش." },
       { status: 500 }
     );
-  }
-}
-
-export async function PATCH(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const cleanPhone = normalizePhone(body.phone);
-    const fullName = String(body.fullName || "").trim();
-
-    if (!cleanPhone || cleanPhone.length !== 11) {
-      return NextResponse.json({ success: false, message: "شماره معتبر نیست." }, { status: 400 });
-    }
-
-    await supabaseAdmin.from("crm_customers").upsert([
-      {
-        id: "cust_" + cleanPhone,
-        full_name: fullName || "مشتری گرامی",
-        phone: cleanPhone,
-        province: body.province || "فارس",
-        city: body.city || "شیراز",
-        address: body.address || "",
-        postal_code: body.postalCode || null,
-        updated_at: new Date().toISOString(),
-      },
-    ]);
-
-    return NextResponse.json({ success: true, message: "پروفایل بروزرسانی شد." });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id") || "";
-    let phone = normalizePhone(searchParams.get("phone") || "");
-
-    if (!phone) {
-      const custCookie = req.cookies.get(CUSTOMER_COOKIE_NAME)?.value || "";
-      if (custCookie) {
-        const session = await verifyCustomerToken(custCookie);
-        if (session?.phone) phone = normalizePhone(session.phone);
-      }
-    }
-
-    if (!id || !phone) {
-      return NextResponse.json(
-        { success: false, message: "شناسه سفارش و شماره همراه تاییدشده الزامی است." },
-        { status: 400 }
-      );
-    }
-
-    const { data: ord } = await supabaseAdmin
-      .from("orders")
-      .select("id, phone, customer_phone, status, payment_status, items")
-      .eq("id", id)
-      .maybeSingle();
-
-    if (!ord) {
-      return NextResponse.json({ success: false, message: "سفارش یافت نشد." }, { status: 404 });
-    }
-
-    const ordPhone = normalizePhone(ord.phone || ord.customer_phone || "");
-    if (!ordPhone || ordPhone !== phone) {
-      return NextResponse.json(
-        { success: false, message: "عدم تطابق شماره همراه مالک سفارش." },
-        { status: 403 }
-      );
-    }
-
-    if (ord.status === "paid" || ord.payment_status === "paid" || ord.status === "shipped") {
-      return NextResponse.json(
-        { success: false, message: "سفارش‌های پرداخت‌شده قابل حذف مستقیم نیستند." },
-        { status: 400 }
-      );
-    }
-
-    // بازگردانی خودکار موجودی کالاهای این سفارش ناتمام به انبار قبل از حذف
-    if (ord.status !== "cancelled" && Array.isArray(ord.items)) {
-      for (const it of ord.items) {
-        const pId = String(it.id || it.productId || it.product_id || "");
-        const qty = Math.max(1, Number(it.quantity || 1));
-        if (!pId) continue;
-        try {
-          const { data: pRow } = await supabaseAdmin
-            .from("products")
-            .select("id, stock")
-            .eq("id", pId)
-            .maybeSingle();
-          if (pRow) {
-            const restored = Number(pRow.stock || 0) + qty;
-            await supabaseAdmin
-              .from("products")
-              .update({ stock: restored, is_available: restored > 0 })
-              .eq("id", pRow.id);
-          }
-        } catch {}
-      }
-    }
-
-    await supabaseAdmin.from("orders").delete().eq("id", id);
-    return NextResponse.json({
-      success: true,
-      message: "✓ سفارش ناتمام حذف شد و موجودی کالا به انبار بازگردانده شد.",
-    });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }

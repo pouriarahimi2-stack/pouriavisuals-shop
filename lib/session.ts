@@ -1,5 +1,7 @@
+// File Path: lib/session.ts
 /**
  * Strict Cryptographic Session Engine using WebCrypto (Edge & Node Compatible)
+ * هیچ fallback هاردکدی وجود ندارد — در صورت نبود متغیر محیطی خطا پرتاب می‌شود.
  */
 
 export interface AdminSessionPayload {
@@ -16,14 +18,14 @@ export const COOKIE_NAME = "admin_session_token";
 const SESSION_EXPIRY_SECONDS = 72 * 60 * 60; // 72 hours
 
 function getSecretKey(): string {
-  const secret = (() => {
-  const key = process.env.ADMIN_SESSION_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!key && process.env.NODE_ENV === "production") {
-    console.warn("CRITICAL: ADMIN_SESSION_SECRET environment variable is not defined!");
+  const key = process.env.ADMIN_SESSION_SECRET;
+  if (!key || key.trim().length < 32) {
+    throw new Error(
+      "FATAL: ADMIN_SESSION_SECRET environment variable is missing or too short (min 32 chars). " +
+      "Set it in your .env.local / Vercel environment variables and restart."
+    );
   }
-  return key || "axon_core_production_fixed_secure_key_fallback_2026";
-})();
-  return secret.trim();
+  return key.trim();
 }
 
 function base64UrlEncode(str: string): string {

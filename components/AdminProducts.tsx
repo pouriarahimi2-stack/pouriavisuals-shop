@@ -1,10 +1,9 @@
 // File Path: components/AdminProducts.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
-import MediaUploadModal from "@/components/admin/MediaUploadModal";
 
 export interface FullCatalogProduct {
   id: string;
@@ -32,7 +31,7 @@ export function AdminProducts(_props: any = {}) {
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [uploadMode, setUploadMode] = useState<"main" | "gallery" | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -46,6 +45,7 @@ export function AdminProducts(_props: any = {}) {
   const [specKeyInput, setSpecKeyInput] = useState("");
   const [specValInput, setSpecValInput] = useState("");
   const [galleryUrlInput, setGalleryUrlInput] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const notify = (text: string, type: "success" | "error" = "success") => {
     setFeedback({ type, text });
@@ -104,18 +104,45 @@ export function AdminProducts(_props: any = {}) {
 
   useEffect(() => {
     fetchCatalog();
-
     const ch = supabase
       .channel("realtime-admin-catalog-products")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
         fetchCatalog();
       })
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(ch);
-    };
+    return () => { supabase.removeChannel(ch); };
   }, []);
+
+  /** آپلود تصویر به Supabase Storage از طریق API */
+  const handleImageUpload = async (file: File, productId?: string) => {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      if (productId) fd.append("product_id", productId);
+
+      const res = await fetch("/api/admin/upload-image", {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json();
+      if (res.ok && json.success && json.url) {
+        setEditingProd((prev) => {
+          if (!prev) return prev;
+          const existing = Array.isArray(prev.images) ? prev.images.filter((u) => !u.startsWith("data:")) : [];
+          const newImages = [json.url, ...existing.filter((u) => u !== json.url)];
+          return { ...prev, image: json.url, images: newImages };
+        });
+        notify("✓ تصویر با موفقیت آپلود شد.");
+      } else {
+        notify(json.message || "خطا در آپلود تصویر.", "error");
+      }
+    } catch (e: any) {
+      notify("خطا در ارتباط با سرور: " + e.message, "error");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleOpenNewProduct = () => {
     soundEngine.playClick();
@@ -164,19 +191,39 @@ export function AdminProducts(_props: any = {}) {
     soundEngine.playClick();
     setSaving(true);
     try {
-      const mainImg = editingProd.image?.trim() || editingProd.images?.[0] || "/placeholder.png";
+      // فقط URL واقعی — حذف base64
+      const filterReal = (arr: string[]) =>
+        arr.filter((u) => u && !u.startsWith("data:") && u.length < 2000);
+
+      const mainImg =
+        editingProd.image && !editingProd.image.startsWith("data:")
+          ? editingProd.image.trim()
+          : filterReal(editingProd.images || [])[0] || "/placeholder.png";
+
       const allImgs = Array.from(
-        new Set([mainImg, ...(editingProd.images || [])].map((x) => x.trim()).filter(Boolean))
+        new Set([mainImg, ...filterReal(editingProd.images || [])])
       );
 
       const payload = {
-        ...editingProd,
         id: editingProd.id || undefined,
         name: editingProd.title.trim(),
         title: editingProd.title.trim(),
+        category: editingProd.category,
+        price: editingProd.price,
+        discount_price: editingProd.discount_price,
+        purchase_price: editingProd.purchase_price,
+        stock: editingProd.stock,
+        is_available: editingProd.is_available,
         image: mainImg,
         image_url: mainImg,
         images: allImgs,
+        description: editingProd.description || "",
+        warranty: editingProd.warranty,
+        meta_title: editingProd.meta_title,
+        meta_description: editingProd.meta_description,
+        specs: editingProd.specs || {},
+        sku: editingProd.sku,
+        brand: editingProd.brand,
       };
 
       const res = await fetch("/api/products", {
@@ -203,9 +250,7 @@ export function AdminProducts(_props: any = {}) {
     if (!confirm("آیا از حذف کامل محصول «" + title + "» از کاتالوگ اطمینان دارید؟")) return;
     soundEngine.playClick();
     try {
-      const res = await fetch("/api/products?id=" + encodeURIComponent(id), {
-        method: "DELETE",
-      });
+      const res = await fetch("/api/products?id=" + encodeURIComponent(id), { method: "DELETE" });
       if (res.ok) {
         soundEngine.playSuccess();
         notify("محصول با موفقیت از کاتالوگ حذف گردید.");
@@ -234,7 +279,6 @@ export function AdminProducts(_props: any = {}) {
         discountFilter === "all"
           ? true
           : Boolean(p.discount_price && p.discount_price > 0 && p.discount_price < p.price);
-
       return matchSearch && matchCat && matchStock && matchDisc;
     })
     .sort((a, b) => {
@@ -246,39 +290,36 @@ export function AdminProducts(_props: any = {}) {
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
+      {/* هدر پنل */}
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🛍️</span> مدیریت پیشرفته کاتالوگ محصولات (آپلود چندتصویری، مشخصات فنی، سئو و انبار)
+            <span>🛍️</span> مدیریت پیشرفته کاتالوگ محصولات
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            ثبت و ویرایش ۱۰۰٪ مشخصات کالاها، گالری تصاویر، قیمت خرید حسابداری، گارانتی و متاتگ‌های سئو
+            ثبت و ویرایش مشخصات کالاها، گالری تصاویر، قیمت خرید، گارانتی و متاتگ‌های سئو
           </p>
         </div>
-
         <button
           type="button"
           onClick={handleOpenNewProduct}
           className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-xl hover:opacity-90 transition cursor-pointer"
         >
-          ➕ افزودن محصول جدید به کاتالوگ
+          ➕ افزودن محصول جدید
         </button>
       </div>
 
       {feedback && (
-        <div
-          className={
-            "p-4 rounded-2xl text-xs font-bold animate-fadeIn " +
-            (feedback.type === "success"
-              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-500"
-              : "bg-rose-500/15 border border-rose-500/30 text-rose-500")
-          }
-        >
+        <div className={"p-4 rounded-2xl text-xs font-bold animate-fadeIn " +
+          (feedback.type === "success"
+            ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-500"
+            : "bg-rose-500/15 border border-rose-500/30 text-rose-500")
+        }>
           {feedback.text}
         </div>
       )}
 
-      {/* نوار فیلترهای کاتالوگ */}
+      {/* فیلترها */}
       <div className="p-4 sm:p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
         <input
           type="text"
@@ -287,45 +328,25 @@ export function AdminProducts(_props: any = {}) {
           placeholder="🔍 جستجو در نام، برند، کد SKU..."
           className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
         />
-
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
-        >
+        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
+          className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer">
           <option value="all">📁 همه دسته‌بندی‌ها ({categories.length})</option>
-          {categories.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
-            </option>
-          ))}
+          {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
         </select>
-
-        <select
-          value={stockFilter}
-          onChange={(e) => setStockFilter(e.target.value as any)}
-          className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
-        >
+        <select value={stockFilter} onChange={(e) => setStockFilter(e.target.value as any)}
+          className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer">
           <option value="all">📦 همه وضعیت‌های موجودی</option>
           <option value="instock">🟢 فقط کالاهای موجود</option>
           <option value="lowstock">⚠️ موجودی کم (کمتر از ۳)</option>
           <option value="outofstock">🔴 ناموجودها</option>
         </select>
-
-        <select
-          value={discountFilter}
-          onChange={(e) => setDiscountFilter(e.target.value as any)}
-          className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
-        >
+        <select value={discountFilter} onChange={(e) => setDiscountFilter(e.target.value as any)}
+          className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer">
           <option value="all">🏷️ همه قیمت‌ها</option>
           <option value="discounted">🔥 فقط کالاهای تخفیف‌دار</option>
         </select>
-
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as any)}
-          className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
-        >
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}
+          className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer">
           <option value="newest">🕒 مرتب‌سازی: جدیدترین</option>
           <option value="price_desc">💎 گران‌ترین به ارزان‌ترین</option>
           <option value="price_asc">💰 ارزان‌ترین به گران‌ترین</option>
@@ -333,38 +354,34 @@ export function AdminProducts(_props: any = {}) {
         </select>
       </div>
 
-      {/* گرید محصولات در پنل ادمین */}
+      {/* گرید محصولات */}
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl text-xs">
         {loading ? (
           <div className="py-12 text-center text-slate-400 font-bold">در حال بارگذاری کاتالوگ...</div>
         ) : filteredProducts.length === 0 ? (
           <div className="py-12 text-center text-slate-400 font-bold">
-            محصولی یافت نشد. روی «➕ افزودن محصول جدید به کاتالوگ» کلیک کنید.
+            محصولی یافت نشد. روی «➕ افزودن محصول جدید» کلیک کنید.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredProducts.map((p) => (
-              <div
-                key={p.id}
-                className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition flex flex-col justify-between space-y-3"
-              >
+              <div key={p.id}
+                className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition flex flex-col justify-between space-y-3">
                 <div className="flex items-start gap-3">
                   <img
                     src={p.image || "/placeholder.png"}
                     alt={p.title}
                     className="w-20 h-20 rounded-2xl object-contain border border-[var(--card-border)] shrink-0 bg-white dark:bg-slate-900 p-1"
+                    onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
                   />
                   <div className="space-y-1 overflow-hidden flex-1">
                     <div className="flex items-center justify-between gap-1">
                       <span className="text-[10px] font-mono text-slate-400">{p.sku}</span>
-                      <span
-                        className={
-                          "px-2 py-0.5 rounded-md text-[9px] font-bold " +
-                          (p.stock > 0 && p.is_available
-                            ? "bg-emerald-500/15 text-emerald-500"
-                            : "bg-rose-500/15 text-rose-500")
-                        }
-                      >
+                      <span className={"px-2 py-0.5 rounded-md text-[9px] font-bold " +
+                        (p.stock > 0 && p.is_available
+                          ? "bg-emerald-500/15 text-emerald-500"
+                          : "bg-rose-500/15 text-rose-500")
+                      }>
                         {p.stock > 0 && p.is_available ? p.stock + " عدد موجود" : "ناموجود"}
                       </span>
                     </div>
@@ -374,7 +391,6 @@ export function AdminProducts(_props: any = {}) {
                     </span>
                   </div>
                 </div>
-
                 <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between">
                   <div>
                     {p.discount_price && p.discount_price < p.price ? (
@@ -392,35 +408,19 @@ export function AdminProducts(_props: any = {}) {
                       </span>
                     )}
                   </div>
-
                   <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const url = "https://axoncore.ir/products/" + p.id;
-                        navigator.clipboard?.writeText(url);
-                        soundEngine.playSuccess();
-                        notify("✓ لینک محصول برای ترب کپی شد: " + url);
-                      }}
-                      className="px-2.5 py-1.5 rounded-xl bg-sky-500/15 text-sky-400 border border-sky-500/30 font-bold cursor-pointer"
-                      title="کپی لینک مستقیم صفحه محصول برای ترب"
-                    >
-                      🔗 کپی لینک
-                    </button>
-                    <button
-                      type="button"
+                    <button type="button"
+                      onClick={() => window.open("https://axoncore.ir/products/" + p.id, "_blank")}
+                      className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition cursor-pointer"
+                      title="مشاهده در سایت">👁️</button>
+                    <button type="button"
                       onClick={() => handleOpenEditProduct(p)}
-                      className="px-3 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-black cursor-pointer"
-                    >
-                      ✏️ ویرایش کامل
-                    </button>
-                    <button
-                      type="button"
+                      className="p-2 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 hover:bg-[var(--accent-blue)]/30 transition cursor-pointer"
+                      title="ویرایش">✏️</button>
+                    <button type="button"
                       onClick={() => handleDeleteProduct(p.id, p.title)}
-                      className="p-1.5 px-2.5 rounded-xl bg-rose-500/15 text-rose-500 font-bold cursor-pointer"
-                    >
-                      🗑️
-                    </button>
+                      className="p-2 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30 transition cursor-pointer"
+                      title="حذف">🗑️</button>
                   </div>
                 </div>
               </div>
@@ -429,402 +429,255 @@ export function AdminProducts(_props: any = {}) {
         )}
       </div>
 
-      {/* مودال جامع افزودن و ویرایش ۱۰۰٪ محصول */}
+      {/* مودال ویرایش/افزودن محصول */}
       {isModalOpen && editingProd && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-          <div className="w-full max-w-3xl rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-5 sm:p-7 space-y-5 shadow-2xl text-xs max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
-              <h3 className="text-sm font-black text-[var(--accent-blue)]">
-                {editingProd.id ? "✏️ ویرایش کامل مشخصات محصول" : "➕ افزودن محصول جدید به فروشگاه"}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
-              >
-                ✕
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setIsModalOpen(false); }}
+        >
+          <form
+            onSubmit={handleSaveProduct}
+            className="w-full max-w-2xl max-h-[95vh] overflow-y-auto bg-[var(--modal-bg)] rounded-3xl shadow-2xl border border-[var(--card-border)] p-5 sm:p-7 space-y-5 text-xs"
+            dir="rtl"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="font-black text-sm text-[var(--accent-blue)]">
+                {editingProd.id ? "✏️ ویرایش محصول" : "➕ افزودن محصول جدید"}
+              </h2>
+              <button type="button" onClick={() => setIsModalOpen(false)}
+                className="p-2 rounded-xl hover:bg-rose-500/15 text-rose-400 cursor-pointer">✕</button>
+            </div>
+
+            {/* تصویر اصلی */}
+            <div className="space-y-2">
+              <label className="font-bold text-[var(--text-secondary)] block">🖼️ تصویر اصلی محصول</label>
+              <div className="flex flex-col sm:flex-row gap-3 items-start">
+                <img
+                  src={editingProd.image && !editingProd.image.startsWith("data:")
+                    ? editingProd.image : "/placeholder.png"}
+                  alt="preview"
+                  className="w-24 h-24 rounded-2xl object-contain border border-[var(--card-border)] bg-white dark:bg-slate-900 p-1 shrink-0"
+                  onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
+                />
+                <div className="flex-1 space-y-2">
+                  <input
+                    type="text"
+                    value={editingProd.image && !editingProd.image.startsWith("data:") ? editingProd.image : ""}
+                    onChange={(e) => setEditingProd({ ...editingProd, image: e.target.value })}
+                    placeholder="https://... آدرس تصویر"
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none focus:border-[var(--accent-blue)]"
+                  />
+                  <div className="flex gap-2">
+                    <button type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="flex-1 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black cursor-pointer disabled:opacity-50">
+                      {uploading ? "⏳ در حال آپلود..." : "📁 آپلود از رایانه"}
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleImageUpload(f, editingProd.id || undefined);
+                        e.target.value = "";
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* گالری تصاویر */}
+            {editingProd.images && editingProd.images.filter(u => !u.startsWith("data:")).length > 0 && (
+              <div className="space-y-2">
+                <label className="font-bold text-[var(--text-secondary)] block">🖼️ گالری تصاویر</label>
+                <div className="flex flex-wrap gap-2">
+                  {editingProd.images.filter(u => !u.startsWith("data:")).map((url, i) => (
+                    <div key={i} className="relative group">
+                      <img src={url} alt={"gallery-" + i}
+                        className="w-16 h-16 rounded-xl object-contain border border-[var(--card-border)] bg-white p-1"
+                        onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
+                      />
+                      <button type="button"
+                        onClick={() => setEditingProd({
+                          ...editingProd,
+                          images: editingProd.images!.filter((_, idx) => idx !== i)
+                        })}
+                        className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition">
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <input type="text" value={galleryUrlInput}
+                onChange={(e) => setGalleryUrlInput(e.target.value)}
+                placeholder="https://... اضافه کردن URL به گالری"
+                className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)]"
+              />
+              <button type="button"
+                onClick={() => {
+                  const url = galleryUrlInput.trim();
+                  if (url && !url.startsWith("data:")) {
+                    setEditingProd({
+                      ...editingProd,
+                      images: [...(editingProd.images || []).filter(u => !u.startsWith("data:")), url],
+                    });
+                    setGalleryUrlInput("");
+                  }
+                }}
+                className="px-4 py-3 rounded-2xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 font-bold cursor-pointer">
+                ➕
               </button>
             </div>
 
-            <form onSubmit={handleSaveProduct} className="space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                <div className="sm:col-span-2 lg:col-span-3">
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                    عنوان کامل محصول *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editingProd.title}
-                    onChange={(e) => setEditingProd({ ...editingProd, title: e.target.value })}
-                    placeholder="مثال: اتوبخار پرتابل هوشمند با چرخش ۱۸۰ درجه"
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                    انتخاب یا تایپ دسته‌بندی:
-                  </label>
-                  <input
-                    type="text"
-                    list="axon-categories-datalist"
-                    value={editingProd.category}
-                    onChange={(e) => setEditingProd({ ...editingProd, category: e.target.value })}
-                    placeholder="نام دسته‌بندی..."
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
-                  />
-                  <datalist id="axon-categories-datalist">
-                    {categories.map((cat) => (
-                      <option key={cat} value={cat} />
-                    ))}
-                  </datalist>
-                </div>
-
-                <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">برند سازنده:</label>
-                  <input
-                    type="text"
-                    value={editingProd.brand || ""}
-                    onChange={(e) => setEditingProd({ ...editingProd, brand: e.target.value })}
-                    placeholder="Apple / Axon / ..."
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                    کد اختصاصی کالا (SKU):
-                  </label>
-                  <input
-                    type="text"
-                    dir="ltr"
-                    value={editingProd.sku || ""}
-                    onChange={(e) => setEditingProd({ ...editingProd, sku: e.target.value })}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                    قیمت فروش اصلی (تومان) *
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    required
-                    value={editingProd.price}
-                    onChange={(e) => setEditingProd({ ...editingProd, price: Number(e.target.value) })}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                    قیمت با تخفیف ویژه (اختیاری - تومان):
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={editingProd.discount_price || ""}
-                    onChange={(e) =>
-                      setEditingProd({
-                        ...editingProd,
-                        discount_price: e.target.value ? Number(e.target.value) : null,
-                      })
-                    }
-                    placeholder="خالی = بدون تخفیف"
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                    قیمت خرید واحد (ویژه حسابداری - تومان):
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={editingProd.purchase_price ?? ""}
-                    onChange={(e) =>
-                      setEditingProd({
-                        ...editingProd,
-                        purchase_price: e.target.value ? Number(e.target.value) : 0,
-                      })
-                    }
-                    placeholder="بهای تمام‌شده خرید"
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                    موجودی انبار (تعداد):
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={editingProd.stock}
-                    onChange={(e) => setEditingProd({ ...editingProd, stock: Number(e.target.value) })}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black outline-none"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                    شرح گارانتی و ضمانت اصالت:
-                  </label>
-                  <input
-                    type="text"
-                    value={editingProd.warranty || ""}
-                    onChange={(e) => setEditingProd({ ...editingProd, warranty: e.target.value })}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* تصویر اصلی و گالری چندتصویری محصول */}
-              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
-                <span className="font-black text-[var(--accent-blue)] block">
-                  🖼️ تصویر شاخص و گالری تصاویر محصول:
-                </span>
-
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="text"
-                    dir="ltr"
-                    value={editingProd.image || ""}
-                    onChange={(e) => setEditingProd({ ...editingProd, image: e.target.value })}
-                    placeholder="آدرس تصویر اصلی محصول (URL یا آپلود)..."
-                    className="flex-1 p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setUploadMode("main")}
-                    className="px-4 py-3 rounded-xl bg-[var(--accent-blue)] text-white font-black cursor-pointer shrink-0"
-                  >
-                    ☁️ آپلود تصویر اصلی
-                  </button>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-[var(--card-border)]">
-                  <input
-                    type="text"
-                    dir="ltr"
-                    value={galleryUrlInput}
-                    onChange={(e) => setGalleryUrlInput(e.target.value)}
-                    placeholder="افزودن لینک تصویر جدید به گالری..."
-                    className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!galleryUrlInput.trim()) return;
-                      const nextImgs = Array.from(
-                        new Set([...(editingProd.images || []), galleryUrlInput.trim()])
-                      );
-                      setEditingProd({
-                        ...editingProd,
-                        image: editingProd.image || galleryUrlInput.trim(),
-                        images: nextImgs,
-                      });
-                      setGalleryUrlInput("");
-                    }}
-                    className="px-4 py-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold cursor-pointer"
-                  >
-                    + افزودن لینک به گالری
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setUploadMode("gallery")}
-                    className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-black cursor-pointer shrink-0"
-                  >
-                    ☁️ آپلود عکس جدید به گالری
-                  </button>
-                </div>
-
-                {(editingProd.images || []).length > 0 && (
-                  <div className="flex flex-wrap gap-2.5 pt-2">
-                    {(editingProd.images || []).map((imgUrl, idx) => (
-                      <div
-                        key={idx}
-                        className="relative w-16 h-16 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-1 flex items-center justify-center group"
-                      >
-                        <img src={imgUrl} alt="" className="w-full h-full object-contain rounded-lg" />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const filtered = (editingProd.images || []).filter((_, i) => i !== idx);
-                            setEditingProd({
-                              ...editingProd,
-                              images: filtered,
-                              image: editingProd.image === imgUrl ? filtered[0] || "" : editingProd.image,
-                            });
-                          }}
-                          className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-rose-600 text-white text-[10px] font-bold flex items-center justify-center cursor-pointer shadow"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* توضیحات کامل */}
+            {/* اطلاعات اصلی */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                  توضیحات کامل، نقد و بررسی و معرفی محصول:
-                </label>
-                <textarea
-                  rows={4}
-                  value={editingProd.description || ""}
-                  onChange={(e) => setEditingProd({ ...editingProd, description: e.target.value })}
-                  placeholder="توضیحات کامل ویژگی‌ها و کاربردهای محصول..."
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-relaxed"
-                />
+                <label className="font-bold text-[var(--text-secondary)] block mb-1">عنوان محصول *</label>
+                <input required value={editingProd.title}
+                  onChange={(e) => setEditingProd({ ...editingProd, title: e.target.value })}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)]" />
               </div>
+              <div>
+                <label className="font-bold text-[var(--text-secondary)] block mb-1">دسته‌بندی</label>
+                <select value={editingProd.category}
+                  onChange={(e) => setEditingProd({ ...editingProd, category: e.target.value })}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none cursor-pointer">
+                  {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="font-bold text-[var(--text-secondary)] block mb-1">برند</label>
+                <input value={editingProd.brand || ""}
+                  onChange={(e) => setEditingProd({ ...editingProd, brand: e.target.value })}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)]" />
+              </div>
+              <div>
+                <label className="font-bold text-[var(--text-secondary)] block mb-1">کد SKU</label>
+                <input value={editingProd.sku || ""}
+                  onChange={(e) => setEditingProd({ ...editingProd, sku: e.target.value })}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)]" />
+              </div>
+              <div>
+                <label className="font-bold text-[var(--text-secondary)] block mb-1">قیمت پایه (تومان)</label>
+                <input type="number" min="0" value={editingProd.price}
+                  onChange={(e) => setEditingProd({ ...editingProd, price: Number(e.target.value) })}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] font-mono" />
+              </div>
+              <div>
+                <label className="font-bold text-[var(--text-secondary)] block mb-1">قیمت با تخفیف (تومان)</label>
+                <input type="number" min="0" value={editingProd.discount_price || ""}
+                  onChange={(e) => setEditingProd({ ...editingProd, discount_price: e.target.value ? Number(e.target.value) : null })}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] font-mono" />
+              </div>
+              <div>
+                <label className="font-bold text-[var(--text-secondary)] block mb-1">قیمت خرید (تومان)</label>
+                <input type="number" min="0" value={editingProd.purchase_price || 0}
+                  onChange={(e) => setEditingProd({ ...editingProd, purchase_price: Number(e.target.value) })}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] font-mono" />
+              </div>
+              <div>
+                <label className="font-bold text-[var(--text-secondary)] block mb-1">موجودی انبار</label>
+                <input type="number" min="0" value={editingProd.stock}
+                  onChange={(e) => setEditingProd({ ...editingProd, stock: Number(e.target.value) })}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] font-mono" />
+              </div>
+            </div>
 
-              {/* جدول مشخصات فنی (Specs) */}
-              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
-                <span className="font-black text-[var(--accent-blue)] block">
-                  ⚙️ جدول مشخصات فنی محصول (Specs):
-                </span>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="text"
-                    value={specKeyInput}
-                    onChange={(e) => setSpecKeyInput(e.target.value)}
-                    placeholder="عنوان مشخصه (مثلاً: توان مصرفی)"
-                    className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none"
-                  />
-                  <input
-                    type="text"
-                    value={specValInput}
-                    onChange={(e) => setSpecValInput(e.target.value)}
-                    placeholder="مقدار (مثلاً: ۱۲۰۰ وات)"
-                    className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none"
-                  />
-                  <button
-                    type="button"
+            {/* گارانتی */}
+            <div>
+              <label className="font-bold text-[var(--text-secondary)] block mb-1">گارانتی</label>
+              <input value={editingProd.warranty || ""}
+                onChange={(e) => setEditingProd({ ...editingProd, warranty: e.target.value })}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)]" />
+            </div>
+
+            {/* توضیحات */}
+            <div>
+              <label className="font-bold text-[var(--text-secondary)] block mb-1">توضیحات محصول</label>
+              <textarea rows={3} value={editingProd.description || ""}
+                onChange={(e) => setEditingProd({ ...editingProd, description: e.target.value })}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] resize-y" />
+            </div>
+
+            {/* مشخصات فنی */}
+            <div className="space-y-2">
+              <label className="font-bold text-[var(--text-secondary)] block">⚙️ مشخصات فنی</label>
+              {Object.entries(editingProd.specs || {}).map(([k, v]) => (
+                <div key={k} className="flex items-center gap-2">
+                  <span className="flex-1 p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[10px]">{k}: {String(v)}</span>
+                  <button type="button"
                     onClick={() => {
-                      if (!specKeyInput.trim()) return;
-                      setEditingProd({
-                        ...editingProd,
-                        specs: {
-                          ...(editingProd.specs || {}),
-                          [specKeyInput.trim()]: specValInput.trim(),
-                        },
-                      });
-                      setSpecKeyInput("");
-                      setSpecValInput("");
+                      const s = { ...editingProd.specs };
+                      delete s[k];
+                      setEditingProd({ ...editingProd, specs: s });
                     }}
-                    className="px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black cursor-pointer"
-                  >
-                    + افزودن مشخصه
-                  </button>
+                    className="p-2 rounded-xl bg-rose-500/15 text-rose-400 cursor-pointer">🗑️</button>
                 </div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {Object.entries(editingProd.specs || {})
-                    .filter(([k]) => k !== "teardown_data")
-                    .map(([k, v]) => (
-                      <span
-                        key={k}
-                        className="px-3 py-1 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] flex items-center gap-1.5"
-                      >
-                        <strong>{k}:</strong> {String(v)}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const nextSpecs = { ...(editingProd.specs || {}) };
-                            delete nextSpecs[k];
-                            setEditingProd({ ...editingProd, specs: nextSpecs });
-                          }}
-                          className="text-rose-500 font-bold cursor-pointer"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    ))}
-                </div>
-              </div>
-
-              {/* تنظیمات سئو اختصاصی محصول */}
-              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
-                <span className="font-black text-[var(--accent-blue)] block">
-                  🚀 تنظیمات سئو و متاتگ‌های گوگل (اختیاری - در صورت خالی بودن خودکار پر می‌شود):
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <input
-                    type="text"
-                    value={editingProd.meta_title || ""}
-                    onChange={(e) => setEditingProd({ ...editingProd, meta_title: e.target.value })}
-                    placeholder="عنوان سئو (Meta Title)"
-                    className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none"
-                  />
-                  <input
-                    type="text"
-                    value={editingProd.meta_description || ""}
-                    onChange={(e) =>
-                      setEditingProd({ ...editingProd, meta_description: e.target.value })
+              ))}
+              <div className="flex gap-2">
+                <input placeholder="کلید (مثلا: RAM)"
+                  value={specKeyInput} onChange={(e) => setSpecKeyInput(e.target.value)}
+                  className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)]" />
+                <input placeholder="مقدار (مثلا: 8GB)"
+                  value={specValInput} onChange={(e) => setSpecValInput(e.target.value)}
+                  className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)]" />
+                <button type="button"
+                  onClick={() => {
+                    if (specKeyInput.trim() && specValInput.trim()) {
+                      setEditingProd({ ...editingProd, specs: { ...(editingProd.specs || {}), [specKeyInput.trim()]: specValInput.trim() } });
+                      setSpecKeyInput(""); setSpecValInput("");
                     }
-                    placeholder="توضیحات متا سئو (Meta Description)"
-                    className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none"
-                  />
-                </div>
+                  }}
+                  className="px-4 rounded-xl bg-[var(--accent-blue)] text-white font-black cursor-pointer">+</button>
               </div>
+            </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-[var(--card-border)]">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-3 rounded-2xl bg-[var(--input-bg)] font-bold cursor-pointer"
-                >
-                  انصراف
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-8 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black shadow-xl cursor-pointer disabled:opacity-50"
-                >
-                  {saving ? "در حال ذخیره..." : "💾 ذخیره و انتشار محصول در سایت"}
-                </button>
-              </div>
-            </form>
-          </div>
+            {/* سئو */}
+            <div className="space-y-2">
+              <label className="font-bold text-[var(--text-secondary)] block">🔍 متاتگ‌های سئو</label>
+              <input placeholder="meta title"
+                value={editingProd.meta_title || ""}
+                onChange={(e) => setEditingProd({ ...editingProd, meta_title: e.target.value })}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)]" />
+              <textarea rows={2} placeholder="meta description"
+                value={editingProd.meta_description || ""}
+                onChange={(e) => setEditingProd({ ...editingProd, meta_description: e.target.value })}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] resize-y" />
+            </div>
+
+            {/* وضعیت موجودی */}
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input type="checkbox" checked={editingProd.is_available}
+                onChange={(e) => setEditingProd({ ...editingProd, is_available: e.target.checked })}
+                className="w-5 h-5 rounded-lg cursor-pointer" />
+              <span className="font-bold">موجود و قابل سفارش است</span>
+            </label>
+
+            {/* دکمه‌های عمل */}
+            <div className="flex gap-3 pt-2">
+              <button type="submit" disabled={saving || uploading}
+                className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black cursor-pointer disabled:opacity-50">
+                {saving ? "⏳ در حال ذخیره..." : "✓ ذخیره محصول"}
+              </button>
+              <button type="button" onClick={() => setIsModalOpen(false)}
+                className="px-6 py-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold cursor-pointer">
+                انصراف
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
-      <MediaUploadModal
-        isOpen={uploadMode !== null}
-        bucket="products"
-        title={
-          uploadMode === "gallery"
-            ? "آپلود تصویر جدید در گالری محصول"
-            : "آپلود تصویر اصلی محصول"
-        }
-        currentValue={uploadMode === "main" ? editingProd?.image || "" : ""}
-        onClose={() => setUploadMode(null)}
-        onUploadSuccess={(url) => {
-          if (!editingProd) return;
-          if (uploadMode === "gallery") {
-            const nextImgs = Array.from(new Set([...(editingProd.images || []), url]));
-            setEditingProd({
-              ...editingProd,
-              image: editingProd.image || url,
-              images: nextImgs,
-            });
-          } else {
-            const nextImgs = Array.from(new Set([url, ...(editingProd.images || [])]));
-            setEditingProd({
-              ...editingProd,
-              image: url,
-              images: nextImgs,
-            });
-          }
-          setUploadMode(null);
-        }}
-      />
+      {/* hidden input */}
+      <input ref={fileInputRef} type="file" className="hidden" accept="image/*" />
     </div>
   );
 }

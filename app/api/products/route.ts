@@ -9,19 +9,25 @@ export const dynamic = "force-dynamic";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function GET(req: NextRequest) {
+/** فیلتر کردن base64 از آرایه تصاویر — فقط URL واقعی نگه می‌داریم */
+function filterRealUrls(arr: unknown[]): string[] {
+  return arr
+    .map((x) => String(x || "").trim())
+    .filter((s) => {
+      if (!s) return false;
+      if (s.startsWith("data:")) return false;      // base64 blob
+      if (s.length > 600 && !s.includes("/")) return false; // base64 بدون http
+      return true; // /placeholder.png یا https://...
+    });
+}
+
+export async function GET() {
   try {
-    const isAdmin = await verifyAdminSession(req);
-    let query = supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from("products")
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (!isAdmin) {
-      query = query.eq("is_available", true);
-    }
-
-    const { data, error } = await query;
     if (error) throw error;
     const unpacked = (data || []).map(unpackProductRow);
     return NextResponse.json(
@@ -29,6 +35,7 @@ export async function GET(req: NextRequest) {
       { headers: { "Cache-Control": "no-store, max-age=0" } }
     );
   } catch (err: any) {
+    console.error("[GET /api/products]", err);
     return NextResponse.json(
       { success: false, data: [], products: [], message: err.message },
       { status: 500 }
@@ -42,9 +49,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
-    const body = await req.json();
-    const cleanTitle = String(body.title || body.name || "").trim();
+    let body: Record<string, any>;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ success: false, message: "JSON payload نامعتبر است." }, { status: 400 });
+    }
 
+    const cleanTitle = String(body.title || body.name || "").trim();
     if (!cleanTitle) {
       return NextResponse.json({ success: false, message: "عنوان کالا الزامی است." }, { status: 400 });
     }
@@ -52,15 +64,17 @@ export async function POST(req: NextRequest) {
     const rawId = String(body.id || "").trim();
     const productId = UUID_REGEX.test(rawId) ? rawId : randomUUID();
 
+    // ── تصاویر: حذف base64 و نگه داشتن فقط URL واقعی ──
     const rawImages = Array.isArray(body.images)
-      ? body.images.map((x: any) => String(x || "").trim()).filter(Boolean)
+      ? filterRealUrls(body.images)
       : [];
 
-    const primaryImage =
-      String(body.image || body.image_url || rawImages[0] || "/placeholder.png").trim() ||
-      "/placeholder.png";
+    const primaryImageRaw = String(body.image || body.image_url || rawImages[0] || "").trim();
+    const primaryImage = primaryImageRaw.startsWith("data:")
+      ? (rawImages[0] || "/placeholder.png")
+      : (primaryImageRaw || "/placeholder.png");
 
-    const imagesList = Array.from(new Set([primaryImage, ...rawImages]));
+    const imagesList = Array.from(new Set([primaryImage, ...rawImages].filter(Boolean)));
 
     const basePrice = Math.max(0, Number(body.price || 0));
     const discountPrice =
@@ -78,11 +92,12 @@ export async function POST(req: NextRequest) {
 
     const numericStock = body.stock !== undefined ? Math.max(0, Number(body.stock)) : 10;
 
+    // ── توضیحات: حذف base64 قدیمی از metadata ──
     const cleanDesc = String(body.description || "")
-      .replace(/<!--MEDIA_METADATA:[\s\S]*?-->/g, "")
+      .replace(/<!--MEDIA_METADATA:[sS]*?-->/g, "")
       .trim();
 
-    const mediaMeta = {
+    const mediaMeta: Record<string, unknown> = {
       images: imagesList,
       specs: typeof body.specs === "object" && body.specs ? body.specs : {},
       warranty: String(body.warranty || "۱۸ ماه گارانتی اصالت طلایی").trim(),
@@ -103,87 +118,67 @@ export async function POST(req: NextRequest) {
       name: cleanTitle,
       category: String(body.category || "کالای دیجیتال").trim(),
       price: basePrice,
-      stock: numericStock,
-      is_available: body.is_available !== false,
-      image: primaryImage,
-      image_url: primaryImage,
-      images: JSON.stringify(imagesList),
-      description: packagedDescription,
-      short_description: mediaMeta.short_description,
-      meta_title: mediaMeta.meta_title,
-      meta_description: mediaMeta.meta_description,
-      brand: mediaMeta.brand,
-      sku: mediaMeta.sku,
-      warranty: mediaMeta.warranty,
-      specs: JSON.stringify(mediaMeta.specs),
-      purchase_price: purchasePrice,
       discount_price: discountPrice,
-      tags: Array.isArray(body.tags) ? JSON.stringify(body.tags) : (body.tags || null),
-      slug: String(body.slug || "").trim() || null,
+      stock: numericStock,
+      is_available: body.is_available !== undefined ? Boolean(body.is_available) : numericStock > 0,
+      image_url: primaryImage,
+      description: packagedDescription,
+      updated_at: new Date().toISOString(),
     };
 
-    const { data: inserted, error: insertErr } = await supabaseAdmin
+    // بررسی وجود محصول
+    const { data: existing } = await supabaseAdmin
       .from("products")
-      .insert(safePayload)
-      .select("*")
-      .single();
+      .select("id")
+      .eq("id", productId)
+      .maybeSingle();
 
-    if (insertErr) throw insertErr;
-    return NextResponse.json({ success: true, data: unpackProductRow(inserted) }, { status: 201 });
+    let savedRecord: any = null;
+
+    if (existing) {
+      const { data, error } = await supabaseAdmin
+        .from("products")
+        .update(safePayload)
+        .eq("id", productId)
+        .select()
+        .single();
+      if (error) {
+        console.error("[POST /api/products UPDATE]", JSON.stringify(error));
+        throw new Error(error.message || "خطا در به‌روزرسانی محصول");
+      }
+      savedRecord = data;
+    } else {
+      safePayload.created_at = new Date().toISOString();
+      const { data, error } = await supabaseAdmin
+        .from("products")
+        .insert([safePayload])
+        .select()
+        .single();
+      if (error) {
+        console.error("[POST /api/products INSERT]", JSON.stringify(error));
+        throw new Error(error.message || "خطا در ثبت محصول جدید");
+      }
+      savedRecord = data;
+    }
+
+    const unpacked = unpackProductRow(savedRecord);
+    return NextResponse.json({
+      success: true,
+      data: unpacked,
+      product: unpacked,
+      message: "✓ محصول با موفقیت در کاتالوگ و انبار ذخیره شد.",
+    });
   } catch (err: any) {
+    console.error("[POST /api/products CATCH]", err?.message, err?.stack);
     return NextResponse.json(
-      { success: false, message: err.message || "خطا در ثبت محصول." },
+      { success: false, message: err?.message || "خطای سرور داخلی" },
       { status: 500 }
     );
   }
 }
 
 export async function PUT(req: NextRequest) {
-  try {
-    if (!(await verifyAdminSession(req))) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
-    }
-
-    const body = await req.json();
-    const id = String(body.id || "").trim();
-    if (!id) {
-      return NextResponse.json({ success: false, message: "شناسه محصول الزامی است." }, { status: 400 });
-    }
-
-    const updates: Record<string, any> = {};
-    if (body.title !== undefined) updates.title = String(body.title).trim();
-    if (body.name !== undefined) updates.name = String(body.name).trim();
-    if (body.category !== undefined) updates.category = String(body.category).trim();
-    if (body.price !== undefined) updates.price = Number(body.price);
-    if (body.stock !== undefined) updates.stock = Math.max(0, Number(body.stock));
-    if (body.is_available !== undefined) updates.is_available = Boolean(body.is_available);
-    if (body.description !== undefined) updates.description = String(body.description);
-    if (body.meta_title !== undefined) updates.meta_title = String(body.meta_title);
-    if (body.meta_description !== undefined) updates.meta_description = String(body.meta_description);
-    if (body.brand !== undefined) updates.brand = String(body.brand);
-    if (body.sku !== undefined) updates.sku = String(body.sku);
-    if (body.warranty !== undefined) updates.warranty = String(body.warranty);
-    if (body.discount_price !== undefined) updates.discount_price = body.discount_price ? Number(body.discount_price) : null;
-    if (body.purchase_price !== undefined) updates.purchase_price = Number(body.purchase_price);
-    if (Array.isArray(body.images)) updates.images = JSON.stringify(body.images);
-    if (body.tags !== undefined) updates.tags = Array.isArray(body.tags) ? JSON.stringify(body.tags) : body.tags;
-    if (body.slug !== undefined) updates.slug = String(body.slug).trim() || null;
-
-    const { data: updated, error: updateErr } = await supabaseAdmin
-      .from("products")
-      .update(updates)
-      .eq("id", id)
-      .select("*")
-      .single();
-
-    if (updateErr) throw updateErr;
-    return NextResponse.json({ success: true, data: unpackProductRow(updated) });
-  } catch (err: any) {
-    return NextResponse.json(
-      { success: false, message: err.message || "خطا در ویرایش محصول." },
-      { status: 500 }
-    );
-  }
+  return POST(req);
 }
 
 export async function DELETE(req: NextRequest) {
@@ -193,18 +188,18 @@ export async function DELETE(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id") || "";
+    const id = searchParams.get("id");
+
     if (!id) {
-      return NextResponse.json({ success: false, message: "شناسه محصول الزامی است." }, { status: 400 });
+      return NextResponse.json({ success: false, message: "شناسه کالا الزامی است." }, { status: 400 });
     }
 
     const { error } = await supabaseAdmin.from("products").delete().eq("id", id);
     if (error) throw error;
-    return NextResponse.json({ success: true, message: "محصول با موفقیت حذف شد." });
+
+    return NextResponse.json({ success: true, message: "کالا با موفقیت از کاتالوگ حذف شد." });
   } catch (err: any) {
-    return NextResponse.json(
-      { success: false, message: err.message || "خطا در حذف محصول." },
-      { status: 500 }
-    );
+    console.error("[DELETE /api/products]", err?.message);
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }

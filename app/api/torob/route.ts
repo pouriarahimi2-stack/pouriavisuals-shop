@@ -84,14 +84,12 @@ async function getProducts(page: number, limit: number) {
       } catch (e) {
         // نادیده گرفتن خطای پارس JSON
       }
-      // پاک کردن کدهای اضافی متادیتا از متن توضیحات
       rawDescription = rawDescription.replace(/<!--MEDIA_METADATA:.*?-->/g, "").trim();
     }
 
     const rawImages = Array.isArray(row.images) ? row.images : [];
     const mainImage = typeof row.image === "string" ? row.image : "";
     
-    // ترکیب تصاویر اصلی و تصاویر استخراج‌شده
     const imageLinks: string[] = [mainImage, ...rawImages, ...extractedImages]
       .filter(isRealUrl)
       .filter((v, i, a) => a.indexOf(v) === i)
@@ -123,8 +121,14 @@ async function getProducts(page: number, limit: number) {
       spec:          specs,
       description:   rawDescription,
       shop_name:     "آکسون کور",
+      
+      // ✅ رفع خطای ترب: اضافه شدن فیلد الزامی page_url
+      page_url:      `${baseUrl}/products/${productId}`,
+      
+      // برای حفظ سازگاری با نسخه‌های مختلف ترب
       shop_link:     `${baseUrl}/products/${productId}`,
       product_link:  `${baseUrl}/products/${productId}`,
+      
       date_added:    toIranDateTime(row.created_at),
       date_updated:  toIranDateTime(row.updated_at),
     };

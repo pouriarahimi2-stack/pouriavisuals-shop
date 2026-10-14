@@ -50,3 +50,5 @@ repomix-output.xml
 
 PROJECT_AUDIT_REPORT.pdf
 PROJECT_AUDIT_REPORT.md
+project_code_export-*.txt
+pack_project.py

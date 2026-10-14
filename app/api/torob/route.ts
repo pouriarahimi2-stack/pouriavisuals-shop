@@ -1,33 +1,27 @@
-// File Path: app/api/torob/route.ts
-// ترب با POST + هدر X-Torob-Token (JWT/EdDSA) درخواست می‌زنه
-// مستندات: https://panel.torob.com/api-documentation
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import * as jose from "jose";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 const TOROB_API_VERSION = "torob_api_v3";
-const DEFAULT_LIMIT     = 20;
-const MAX_LIMIT         = 100;
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 100;
 
-// کلید عمومی ترب برای verify کردن JWT — از مستندات رسمی ترب
-// الگوریتم: EdDSA (Ed25519)
 const TOROB_PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAt6Mu4T0pBORY11W+QeM35UsmLO3vsf+6yKpFDEImFk0=
 -----END PUBLIC KEY-----`;
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 function isRealUrl(s: unknown): boolean {
   if (typeof s !== "string") return false;
-  if (s.startsWith("data:"))  return false;
-  if (!s.startsWith("http"))  return false;
-  if (s.length > 2000)        return false;
+  if (s.startsWith("data:")) return false;
+  if (!s.startsWith("http")) return false;
+  if (s.length > 2000) return false;
   return true;
 }
 
@@ -39,10 +33,8 @@ function toIranDateTime(dateStr: unknown): string {
 
 async function verifyTorobToken(token: string): Promise<boolean> {
   try {
-    const publicKey = await jose.importSPKI(TOROB_PUBLIC_KEY_PEM, "EdDSA");
-    await jose.jwtVerify(token, publicKey, {
-      algorithms: ["EdDSA"],
-    });
+    const publickey = await jose.importSPKI(TOROB_PUBLIC_KEY_PEM, "EdDSA");
+    await jose.jwtVerify(token, publickey, { algorithms: ["EdDSA"] });
     return true;
   } catch {
     return false;
@@ -51,15 +43,15 @@ async function verifyTorobToken(token: string): Promise<boolean> {
 
 async function getProducts(page: number, limit: number) {
   const offset = (page - 1) * limit;
-
+  
   const { count: totalCount, error: countErr } = await supabaseAdmin
     .from("products")
     .select("id", { count: "exact", head: true })
     .eq("is_available", true);
 
   if (countErr) throw new Error("خطا در شمارش محصولات");
-
-  const total   = totalCount ?? 0;
+  
+  const total = totalCount ?? 0;
   const maxPage = Math.max(1, Math.ceil(total / limit));
 
   const { data, error } = await supabaseAdmin
@@ -78,9 +70,29 @@ async function getProducts(page: number, limit: number) {
   const pageUrl = (p: number) => `${baseUrl}/api/torob?page=${p}&limit=${limit}`;
 
   const products = rows.map((row) => {
+    let rawDescription = String(row.description ?? "");
+    let extractedImages: string[] = [];
+
+    // استخراج هوشمند تصاویر از متادیتای داخل توضیحات
+    const metaMatch = rawDescription.match(/<!--MEDIA_METADATA:(.*?)-->/);
+    if (metaMatch && metaMatch[1]) {
+      try {
+        const metaData = JSON.parse(metaMatch[1]);
+        if (Array.isArray(metaData.images)) {
+          extractedImages = metaData.images;
+        }
+      } catch (e) {
+        // نادیده گرفتن خطای پارس JSON
+      }
+      // پاک کردن کدهای اضافی متادیتا از متن توضیحات
+      rawDescription = rawDescription.replace(/<!--MEDIA_METADATA:.*?-->/g, "").trim();
+    }
+
     const rawImages = Array.isArray(row.images) ? row.images : [];
     const mainImage = typeof row.image === "string" ? row.image : "";
-    const imageLinks: string[] = [mainImage, ...rawImages]
+    
+    // ترکیب تصاویر اصلی و تصاویر استخراج‌شده
+    const imageLinks: string[] = [mainImage, ...rawImages, ...extractedImages]
       .filter(isRealUrl)
       .filter((v, i, a) => a.indexOf(v) === i)
       .slice(0, 5);
@@ -109,8 +121,8 @@ async function getProducts(page: number, limit: number) {
       availability:  Boolean(row.is_available),
       image_links:   imageLinks,
       spec:          specs,
-      description:   String(row.description ?? ""),
-      shop_name:     "اکسون کور",
+      description:   rawDescription,
+      shop_name:     "آکسون کور",
       shop_link:     `${baseUrl}/products/${productId}`,
       product_link:  `${baseUrl}/products/${productId}`,
       date_added:    toIranDateTime(row.created_at),
@@ -120,19 +132,16 @@ async function getProducts(page: number, limit: number) {
 
   return {
     api_version: TOROB_API_VERSION,
-    count:       total,
-    max_page:    maxPage,
-    next:        page < maxPage ? pageUrl(page + 1) : null,
-    previous:    page > 1      ? pageUrl(page - 1) : null,
+    count: total,
+    max_page: maxPage,
+    next: page < maxPage ? pageUrl(page + 1) : null,
+    previous: page > 1 ? pageUrl(page - 1) : null,
     products,
   };
 }
 
-// ── POST — ترب همیشه POST می‌زنه ─────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  // بررسی JWT token از هدر X-Torob-Token
   const token = req.headers.get("X-Torob-Token") ?? req.headers.get("x-torob-token");
-
   if (!token) {
     return NextResponse.json({ error: "توکن ترب ارسال نشده" }, { status: 401 });
   }
@@ -142,15 +151,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "توکن نامعتبر" }, { status: 403 });
   }
 
-  // body می‌تونه شامل page و limit باشه
   let body: Record<string, unknown> = {};
   try {
     body = await req.json();
-  } catch {
-    // body خالی — مشکلی نیست
-  }
+  } catch {}
 
-  const page  = Math.max(1, parseInt(String(body.page  ?? "1"),  10) || 1);
+  const page = Math.max(1, parseInt(String(body.page ?? "1"), 10) || 1);
   const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(String(body.limit ?? String(DEFAULT_LIMIT)), 10) || DEFAULT_LIMIT));
 
   try {
@@ -162,11 +168,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ── GET — برای تست دستی (بدون token) ────────────────────────────────────
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
-  const page  = Math.max(1, parseInt(searchParams.get("page")  ?? "1",  10) || 1);
-  const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(searchParams.get("limit") ?? String(DEFAULT_LIMIT), 10) || DEFAULT_LIMIT));
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
+  const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(searchParams.get("limit") ?? String(DEFAULT_LIMIT)), 10) || DEFAULT_LIMIT);
 
   try {
     const result = await getProducts(page, limit);

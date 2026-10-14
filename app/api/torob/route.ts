@@ -41,39 +41,57 @@ async function verifyTorobToken(token: string): Promise<boolean> {
   }
 }
 
-async function getProducts(page: number, limit: number) {
-  const offset = (page - 1) * limit;
-  
-  const { count: totalCount, error: countErr } = await supabaseAdmin
+async function getProducts(page: number, limit: number, pageUnique?: string, pageUrl?: string) {
+  let countQuery = supabaseAdmin
     .from("products")
     .select("id", { count: "exact", head: true })
     .eq("is_available", true);
 
+  let dataQuery = supabaseAdmin
+    .from("products")
+    .select(
+      "id, title, name, brand, category, price, discount_price, is_available, image, images, description, specs, created_at, updated_at, sku"
+    )
+    .eq("is_available", true);
+
+  // اضافه شدن منطق فیلتر تک‌محصول (درخواست پشتیبانی ترب)
+  if (pageUnique) {
+    countQuery = countQuery.eq("id", pageUnique);
+    dataQuery = dataQuery.eq("id", pageUnique);
+  } else if (pageUrl) {
+    // استخراج آیدی از انتهای لینک
+    const extractedId = pageUrl.split("/").filter(Boolean).pop()?.split("?")[0];
+    if (extractedId) {
+      countQuery = countQuery.eq("id", extractedId);
+      dataQuery = dataQuery.eq("id", extractedId);
+    }
+  }
+
+  const { count: totalCount, error: countErr } = await countQuery;
   if (countErr) throw new Error("خطا در شمارش محصولات");
   
   const total = totalCount ?? 0;
   const maxPage = Math.max(1, Math.ceil(total / limit));
 
-  const { data, error } = await supabaseAdmin
-    .from("products")
-    .select(
-      "id, title, name, brand, category, price, discount_price, is_available, image, images, description, specs, created_at, updated_at, sku"
-    )
-    .eq("is_available", true)
-    .range(offset, offset + limit - 1)
-    .order("updated_at", { ascending: false });
+  // اگر درخواست کلی بود، صفحه‌بندی اعمال شود
+  if (!pageUnique && !pageUrl) {
+    const offset = (page - 1) * limit;
+    dataQuery = dataQuery
+      .range(offset, offset + limit - 1)
+      .order("updated_at", { ascending: false });
+  }
 
+  const { data, error } = await dataQuery;
   if (error) throw new Error("خطا در دریافت محصولات");
 
   const rows = (data ?? []) as unknown as Record<string, unknown>[];
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://axoncore.ir";
-  const pageUrl = (p: number) => `${baseUrl}/api/torob?page=${p}&limit=${limit}`;
+  const pageUrlGen = (p: number) => `${baseUrl}/api/torob?page=${p}&limit=${limit}`;
 
   const products = rows.map((row) => {
     let rawDescription = String(row.description ?? "");
     let extractedImages: string[] = [];
 
-    // استخراج هوشمند تصاویر از متادیتای داخل توضیحات
     const metaMatch = rawDescription.match(/<!--MEDIA_METADATA:(.*?)-->/);
     if (metaMatch && metaMatch[1]) {
       try {
@@ -81,9 +99,7 @@ async function getProducts(page: number, limit: number) {
         if (Array.isArray(metaData.images)) {
           extractedImages = metaData.images;
         }
-      } catch (e) {
-        // نادیده گرفتن خطای پارس JSON
-      }
+      } catch (e) {}
       rawDescription = rawDescription.replace(/<!--MEDIA_METADATA:.*?-->/g, "").trim();
     }
 
@@ -121,14 +137,9 @@ async function getProducts(page: number, limit: number) {
       spec:          specs,
       description:   rawDescription,
       shop_name:     "آکسون کور",
-      
-      // ✅ رفع خطای ترب: اضافه شدن فیلد الزامی page_url
       page_url:      `${baseUrl}/products/${productId}`,
-      
-      // برای حفظ سازگاری با نسخه‌های مختلف ترب
       shop_link:     `${baseUrl}/products/${productId}`,
       product_link:  `${baseUrl}/products/${productId}`,
-      
       date_added:    toIranDateTime(row.created_at),
       date_updated:  toIranDateTime(row.updated_at),
     };
@@ -138,8 +149,8 @@ async function getProducts(page: number, limit: number) {
     api_version: TOROB_API_VERSION,
     count: total,
     max_page: maxPage,
-    next: page < maxPage ? pageUrl(page + 1) : null,
-    previous: page > 1 ? pageUrl(page - 1) : null,
+    next: (!pageUnique && !pageUrl && page < maxPage) ? pageUrlGen(page + 1) : null,
+    previous: (!pageUnique && !pageUrl && page > 1) ? pageUrlGen(page - 1) : null,
     products,
   };
 }
@@ -155,16 +166,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "توکن نامعتبر" }, { status: 403 });
   }
 
-  let body: Record<string, unknown> = {};
+  let body: Record<string, any> = {};
   try {
     body = await req.json();
   } catch {}
 
   const page = Math.max(1, parseInt(String(body.page ?? "1"), 10) || 1);
   const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(String(body.limit ?? String(DEFAULT_LIMIT)), 10) || DEFAULT_LIMIT));
+  
+  // خواندن مقادیر درخواست تک‌محصول
+  const pageUnique = body.page_unique ? String(body.page_unique) : undefined;
+  const pageUrl = body.page_url ? String(body.page_url) : undefined;
 
   try {
-    const result = await getProducts(page, limit);
+    const result = await getProducts(page, limit, pageUnique, pageUrl);
     return NextResponse.json(result);
   } catch (err) {
     console.error("[torob] error:", err);
@@ -176,9 +191,12 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
   const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(searchParams.get("limit") ?? String(DEFAULT_LIMIT)), 10) || DEFAULT_LIMIT);
+  
+  const pageUnique = searchParams.get("page_unique") || undefined;
+  const pageUrl = searchParams.get("page_url") || undefined;
 
   try {
-    const result = await getProducts(page, limit);
+    const result = await getProducts(page, limit, pageUnique, pageUrl);
     return NextResponse.json(result);
   } catch (err) {
     console.error("[torob] error:", err);

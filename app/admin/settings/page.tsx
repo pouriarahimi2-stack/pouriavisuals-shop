@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
@@ -15,6 +14,7 @@ interface SystemSettingsState {
   maintenanceMode: boolean;
   maintenanceMessage: string;
   noIndex: boolean;
+  smartSliderEnabled: boolean;
 }
 
 export default function AdminGlobalSettingsPage() {
@@ -29,6 +29,7 @@ export default function AdminGlobalSettingsPage() {
     maintenanceMode: false,
     maintenanceMessage: "فروشگاه در حال بروزرسانی زیرساخت‌های فنی است.",
     noIndex: false,
+    smartSliderEnabled: false,
   });
 
   const [loading, setLoading] = useState(true);
@@ -51,7 +52,8 @@ export default function AdminGlobalSettingsPage() {
         autoSendOrderSms: Boolean(s.autoSendOrderSms ?? true),
         maintenanceMode: Boolean(s.maintenanceMode ?? false),
         maintenanceMessage: String(s.maintenanceMessage ?? "فروشگاه در حال بروزرسانی زیرساخت‌های فنی است."),
-        noIndex: Boolean(s.noIndex ?? s.disallowRobots ?? false),
+        noIndex: Boolean(s.noIndex ?? false),
+        smartSliderEnabled: Boolean(s.smartSliderEnabled ?? false),
       });
     } catch {
       setFeedback({ type: "err", text: "خطا در بارگذاری تنظیمات از سرور." });
@@ -77,22 +79,18 @@ export default function AdminGlobalSettingsPage() {
         maintenanceMode: nextState.maintenanceMode,
         maintenanceMessage: nextState.maintenanceMessage,
         noIndex: nextState.noIndex,
-        disallowRobots: nextState.noIndex,
+        smartSliderEnabled: nextState.smartSliderEnabled,
       };
 
       const res = await fetch("/api/admin/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settings: payload }),
       });
       const json = await res.json();
-
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        setFeedback({ type: "ok", text: "✓ تنظیمات هزینه‌های ارسال ذخیره شد." });
+        setFeedback({ type: "ok", text: "✓ تنظیمات سایت با موفقیت ذخیره شد." });
         setTimeout(() => setFeedback(null), 4500);
-      } else {
-        throw new Error(json.message || "خطا در ذخیره تنظیمات");
       }
     } catch (err: any) {
       setFeedback({ type: "err", text: err.message || "خطا در ارتباط با سرور" });
@@ -111,41 +109,39 @@ export default function AdminGlobalSettingsPage() {
     <form onSubmit={handleSaveSubmit} className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>⚙️</span> تنظیمات کلان سیستم و هزینه‌های ارسال
-          </h1>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            مدیریت بلادرنگ پارامترهای مالی (پست/تیپاکس)
-          </p>
+          <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)]">⚙️ تنظیمات کلان سیستم و اتوماسیون</h1>
         </div>
         <button type="submit" disabled={saving || loading} className="w-full lg:w-auto px-5 py-2.5 rounded-2xl bg-blue-600 text-white text-xs font-black shadow-lg cursor-pointer">
           {saving ? "در حال ذخیره..." : "ذخیره تنظیمات 💾"}
         </button>
       </div>
 
-      {feedback && (
-        <div className={"p-4 rounded-2xl text-xs font-bold border animate-fadeIn " + (feedback.type === "ok" ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400" : "bg-rose-500/15 border-rose-500/30 text-rose-400")}>
-          {feedback.text}
-        </div>
-      )}
+      {feedback && <div className={"p-4 rounded-2xl text-xs font-bold " + (feedback.type === "ok" ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400")}>{feedback.text}</div>}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-6 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
-          <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
-            <span>🚚</span> تنظیمات هزینه‌های ارسال
-          </h2>
+        <div className="lg:col-span-6 p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
+          <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">🚚 تنظیمات هزینه‌های ارسال</h2>
           <div className="space-y-4">
             <div>
-              <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">هزینه ارسال با پست (تومان):</label>
-              <input type="text" value={form.postShippingCost} onChange={(e) => setForm({ ...form, postShippingCost: e.target.value })}
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black outline-none focus:border-[var(--accent-blue)]" />
+              <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">هزینه ارسال پست (تومان):</label>
+              <input type="text" value={form.postShippingCost} onChange={(e) => setForm({ ...form, postShippingCost: e.target.value })} className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black outline-none focus:border-[var(--accent-blue)]" />
             </div>
             <div>
-              <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">هزینه ارسال با تیپاکس (تومان):</label>
-              <input type="text" value={form.tipaxShippingCost} onChange={(e) => setForm({ ...form, tipaxShippingCost: e.target.value })}
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black outline-none focus:border-[var(--accent-blue)]" />
+              <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">هزینه ارسال تیپاکس (تومان):</label>
+              <input type="text" value={form.tipaxShippingCost} onChange={(e) => setForm({ ...form, tipaxShippingCost: e.target.value })} className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black outline-none focus:border-[var(--accent-blue)]" />
             </div>
           </div>
+        </div>
+
+        <div className="lg:col-span-6 p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
+          <h2 className="font-black text-sm text-indigo-500 border-b border-[var(--card-border)] pb-3">🤖 هوشمندسازی ظاهری سایت</h2>
+          <label className="flex items-center justify-between gap-4 p-4 rounded-2xl border bg-[var(--input-bg)] border-[var(--card-border)] cursor-pointer hover:border-indigo-500 transition">
+            <div className="space-y-1">
+              <span className="font-black text-xs text-indigo-500">اسلایدر هوشمند روزانه (Smart Slider)</span>
+              <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed">با فعال‌سازی این گزینه، سایت هر روز به صورت اتوماتیک ۵ محصول از دسته‌بندی‌های مختلف را انتخاب کرده و در اسلایدر اصلی سایت نمایش می‌دهد.</p>
+            </div>
+            <input type="checkbox" checked={form.smartSliderEnabled} onChange={(e) => setForm({ ...form, smartSliderEnabled: e.target.checked })} className="w-5 h-5 accent-indigo-500 shrink-0" />
+          </label>
         </div>
       </div>
     </form>

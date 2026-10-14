@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "آکسون کور | فروشگاه مدرن محصولات تکنولوژی و گجت‌های هوشمند",
-  description: "عرضه تخصصی جدیدترین محصولات تکنولوژی، گجت‌های دیجیتال و ابزارهای هوشمند با گارانتی اصالت طلایی و ارسال سریع به سراسر کشور.",
+  description: "عرضه تخصصی محصولات با گارانتی اصالت.",
   alternates: { canonical: "https://axoncore.ir" },
 };
 
@@ -33,43 +33,38 @@ export default async function HomePage() {
       if (bannerRes.data) banners = bannerRes.data;
       if (siteInfoRes.data) siteSettings = siteInfoRes.data;
 
-      // ── منطق اسلایدر هوشمند روزانه ──
-      const sysSettings = siteSettings?.homepage_layout_config?.system_settings || siteSettings?.settings || {};
-      if (sysSettings.smartSliderEnabled) {
-        const { data: sliderProds } = await supabaseAdmin
-          .from("products")
-          .select("id, title, image, images, category")
-          .eq("is_available", true)
-          .limit(100);
+      // ── منطق اسلایدر هوشمند: اولویت با لیست پرفروش‌های تایید شده مدیر ──
+      const layoutConfig = siteSettings?.homepage_layout_config || {};
+      const sysSettings = layoutConfig?.system_settings || siteSettings?.settings || {};
 
+      if (layoutConfig.approvedSliderBanners && layoutConfig.approvedSliderBanners.length > 0) {
+        banners = layoutConfig.approvedSliderBanners; // جایگزینی اسلایدر با محصولات پرفروش تایید شده
+      } 
+      else if (sysSettings.smartSliderEnabled || layoutConfig.smartSliderEnabled) {
+        // Fallback: اگر ادمین چیزی تایید نکرده بود ولی تیک اسلایدر هوشمند روشن بود، رندوم روزانه بیار
+        const { data: sliderProds } = await supabaseAdmin.from("products").select("id, title, image, images, category").eq("is_available", true).limit(50);
         if (sliderProds && sliderProds.length > 0) {
           const cats = Array.from(new Set(sliderProds.map((p: any) => p.category))).filter(Boolean).slice(0, 5);
           const smartBanners = [];
-          const daySeed = Math.floor(Date.now() / 86400000); // عدد روزانه منحصر به فرد
-
+          const daySeed = Math.floor(Date.now() / 86400000);
           for (const c of cats) {
             const catProds = sliderProds.filter((p: any) => p.category === c);
             if (catProds.length > 0) {
-              const prod = catProds[daySeed % catProds.length]; // انتخاب چرخشی روزانه
-              const imgUrl = prod.image || (prod.images && prod.images[0]) || "/placeholder.png";
+              const prod = catProds[daySeed % catProds.length];
               smartBanners.push({
                 id: "smart-" + prod.id,
                 title: prod.title,
-                image_url: imgUrl,
+                image_url: prod.image || (prod.images && prod.images[0]) || "/placeholder.png",
                 link_url: `/products/${prod.id}`,
                 is_active: true
               });
             }
           }
-          if (smartBanners.length > 0) {
-            banners = smartBanners; // جایگزینی اسلایدر هوشمند با اسلایدر ثابت
-          }
+          if (smartBanners.length > 0) banners = smartBanners;
         }
       }
     }
-  } catch (err) {
-    console.warn("Home page fetch warning:", err);
-  }
+  } catch (err) {}
 
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://axoncore.ir";
   const storeName = siteSettings?.storeName || siteSettings?.site_name || "آکسون کور | Axon Core";
@@ -82,9 +77,7 @@ export default async function HomePage() {
     url: baseUrl,
     logo: siteSettings?.logo_url || `${baseUrl}/favicon.ico`,
     description: siteSettings?.description || "فروشگاه آنلاین محصولات جدید",
-    ...(phone && {
-      contactPoint: { "@type": "ContactPoint", telephone: phone, contactType: "customer service", areaServed: "IR", availableLanguage: ["Persian", "English"] },
-    }),
+    ...(phone && { contactPoint: { "@type": "ContactPoint", telephone: phone, contactType: "customer service", areaServed: "IR", availableLanguage: ["Persian", "English"] } }),
   };
 
   return (

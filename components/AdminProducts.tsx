@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
+import * as XLSX from "xlsx"; // اضافه شدن پکیج اکسل
 
 export interface FullCatalogProduct {
   id: string;
@@ -48,6 +49,7 @@ export function AdminProducts(_props: any = {}) {
   const [discountFilter, setDiscountFilter] = useState<"all"|"discounted">("all");
   const [sortBy, setSortBy]             = useState<"newest"|"price_asc"|"price_desc"|"stock_asc">("newest");
 
+  // State های مربوط به اضافه کردن/ویرایش تکی (حفظ قابلیت‌های قبلی)
   const [isModalOpen, setIsModalOpen]   = useState(false);
   const [editingProd, setEditingProd]   = useState<FullCatalogProduct | null>(null);
   const [activeTab, setActiveTab]       = useState<"basic"|"images"|"specs"|"seo">("basic");
@@ -56,6 +58,16 @@ export function AdminProducts(_props: any = {}) {
   const [galleryUrlInput, setGalleryUrlInput] = useState("");
   const fileInputRef  = useRef<HTMLInputElement>(null);
   const multiFileRef  = useRef<HTMLInputElement>(null);
+
+  // --- STATE های مربوط به سیستم هوشمند ایمپورت اکسل ---
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importStep, setImportStep] = useState<1 | 2 | 3>(1);
+  const [importRows, setImportRows] = useState<any[]>([]);
+  const [importImages, setImportImages] = useState<File[]>([]);
+  const [importLogs, setImportLogs] = useState<string[]>([]);
+  const [importing, setImporting] = useState(false);
+  const excelInputRef = useRef<HTMLInputElement>(null);
+  const bulkImagesRef = useRef<HTMLInputElement>(null);
 
   const notify = (text: string, type: "success"|"error" = "success") => {
     setFeedback({ type, text });
@@ -110,7 +122,7 @@ export function AdminProducts(_props: any = {}) {
     return () => { supabase.removeChannel(ch); };
   }, []);
 
-  /** آپلود یک یا چند فایل */
+  // ─── توابع سیستم افزودن/ویرایش تکی (بدون تغییر) ───────────────────────────────────
   const uploadFiles = async (files: FileList | File[], productId?: string) => {
     setUploading(true);
     const urls: string[] = [];
@@ -129,7 +141,6 @@ export function AdminProducts(_props: any = {}) {
           if (!prev) return prev;
           const existing = (prev.images || []).filter(isRealUrl);
           const merged   = Array.from(new Set([...urls, ...existing]));
-          // اولین آپلود = تصویر شاخص (اگر تصویری نداشت)
           const mainImg  = isRealUrl(prev.image || "") ? prev.image! : merged[0];
           return { ...prev, image: mainImg, images: merged };
         });
@@ -138,7 +149,6 @@ export function AdminProducts(_props: any = {}) {
     } finally { setUploading(false); }
   };
 
-  /** تنظیم تصویر شاخص از گالری */
   const setAsMain = (url: string) => {
     setEditingProd((prev) => {
       if (!prev) return prev;
@@ -233,6 +243,169 @@ export function AdminProducts(_props: any = {}) {
     if (res.ok) { soundEngine.playSuccess(); notify("محصول حذف شد."); fetchCatalog(); window.dispatchEvent(new CustomEvent("products_updated")); }
   };
 
+  // ─── سیستم فوق‌پیشرفته ایمپورت گروهی محصولات ────────────────────────────────────
+
+  // فشرده‌سازی هوشمند سمت مرورگر
+  const compressImageLocal = (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 1000; // سایز استاندارد فروشگاه
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          canvas.toBlob((blob) => {
+            if (blob) {
+              resolve(new File([blob], file.name, { type: "image/webp" }));
+            } else {
+              resolve(file);
+            }
+          }, "image/webp", 0.85); // فشرده‌سازی WebP
+        };
+      };
+    });
+  };
+
+  // خواندن فایل اکسل
+  const handleExcelUploadForImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json(worksheet);
+
+      const parsed = json.map((row: any) => ({
+        title: row["عنوان"] || row["Title"] || row["title"] || row["نام"] || "بدون عنوان",
+        price: Number(row["قیمت"] || row["Price"] || row["price"]) || 0,
+        category: row["دسته بندی"] || row["Category"] || row["category"] || "کالای دیجیتال",
+        photo: row["Photo Filename"] || row["photo"] || row["Photo"] || null,
+        description: row["Telegram_Description"] || row["توضیحات"] || row["Description"] || "",
+        stock: Number(row["موجودی"] || row["Stock"] || row["stock"]) || 10,
+        brand: row["برند"] || row["Brand"] || row["brand"] || "Axon",
+      }));
+
+      setImportRows(parsed);
+      setImportLogs([`✅ فایل اکسل با موفقیت خوانده شد. (${parsed.length} محصول یافت شد)`]);
+      setImportStep(2); // رفتن به مرحله دوم (عکس‌ها)
+    } catch (err) {
+      alert("خطا در پردازش فایل اکسل. مطمئن شوید فرمت فایل صحیح است.");
+    }
+    e.target.value = "";
+  };
+
+  // فیلتر هوشمند و انتخاب عکس‌ها
+  const handleBulkImagesForImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    
+    // فقط عکس‌هایی که اسمشان در فایل اکسل هست را نگه می‌داریم
+    const allowedNames = new Set(importRows.map((r) => r.photo).filter(Boolean));
+    const filtered = files.filter((f) => allowedNames.has(f.name));
+
+    setImportImages(filtered);
+    setImportLogs((prev) => [
+      `📸 از ${files.length} تصویر انتخابی، ${filtered.length} تصویر دقیقاً با لیست اکسل تطبیق یافت و برای فشرده‌سازی تأیید شد.`,
+      ...prev,
+    ]);
+    e.target.value = "";
+  };
+
+  // اجرای عملیات آپلود و ذخیره
+  const executeBulkImport = async () => {
+    soundEngine.playClick();
+    setImporting(true);
+    setImportStep(3);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < importRows.length; i++) {
+      const row = importRows[i];
+      try {
+        setImportLogs((prev) => [`⏳ در حال پردازش: ${row.title}...`, ...prev]);
+
+        let imageUrl = "/placeholder.png";
+        let uploadedImages: string[] = [];
+
+        // اگر محصول عکسی در اکسل داشت، پیداش کن، فشرده کن و آپلود کن
+        if (row.photo) {
+          const matchedFile = importImages.find((f) => f.name === row.photo);
+          if (matchedFile) {
+            setImportLogs((prev) => [`   > در حال فشرده‌سازی و آپلود عکس...`, ...prev]);
+            const compressed = await compressImageLocal(matchedFile);
+            
+            const fd = new FormData();
+            fd.append("file", compressed);
+            const upRes = await fetch("/api/admin/upload-image", { method: "POST", body: fd });
+            const upJson = await upRes.json();
+            
+            if (upJson.success && upJson.url) {
+              imageUrl = upJson.url;
+              uploadedImages = [upJson.url];
+            }
+          }
+        }
+
+        const payload = {
+          title: row.title,
+          name: row.title,
+          category: row.category,
+          price: row.price,
+          stock: row.stock,
+          is_available: true,
+          image: imageUrl,
+          image_url: imageUrl,
+          images: uploadedImages,
+          description: row.description,
+          warranty: "۱۸ ماه گارانتی اصالت طلایی",
+          meta_title: row.title,
+          brand: row.brand,
+          sku: "IMP-" + Math.floor(100000 + Math.random() * 900000),
+        };
+
+        const res = await fetch("/api/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+
+        if (res.ok && json.success) {
+          successCount++;
+          setImportLogs((prev) => [`✅ ثبت شد: ${row.title}`, ...prev]);
+        } else {
+          failCount++;
+          setImportLogs((prev) => [`❌ خطا در ثبت دیتابیس: ${row.title}`, ...prev]);
+        }
+      } catch (err) {
+        failCount++;
+        setImportLogs((prev) => [`❌ خطای سیستمی در پردازش: ${row.title}`, ...prev]);
+      }
+    }
+
+    soundEngine.playSuccess();
+    setImportLogs((prev) => [`🎉 پایان عملیات. ${successCount} موفق، ${failCount} ناموفق.`, ...prev]);
+    setImporting(false);
+    fetchCatalog();
+    window.dispatchEvent(new CustomEvent("products_updated"));
+  };
+
+
   const filtered = products
     .filter((p) => {
       const q = searchQuery.toLowerCase();
@@ -260,10 +433,18 @@ export function AdminProducts(_props: any = {}) {
             {products.length} محصول · {products.filter(p => p.is_available && p.stock > 0).length} موجود · {products.filter(p => p.discount_price && p.discount_price < p.price).length} تخفیف‌دار
           </p>
         </div>
-        <button type="button" onClick={openNew}
-          className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-lg hover:opacity-90 transition cursor-pointer">
-          ➕ افزودن محصول جدید
-        </button>
+        
+        {/* اضافه شدن دکمه ایمپورت گروهی در کنار دکمه قبلی */}
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <button type="button" onClick={() => setIsImportOpen(true)}
+            className="w-full sm:w-auto px-5 py-3.5 rounded-2xl bg-emerald-600 text-white font-black text-xs shadow-lg hover:bg-emerald-500 transition cursor-pointer flex items-center justify-center gap-2">
+            <span>📥</span> ایمپورت گروهی (Excel)
+          </button>
+          <button type="button" onClick={openNew}
+            className="w-full sm:w-auto px-5 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-lg hover:opacity-90 transition cursor-pointer flex items-center justify-center gap-2">
+            <span>➕</span> افزودن محصول تکی
+          </button>
+        </div>
       </div>
 
       {feedback && (
@@ -356,7 +537,7 @@ export function AdminProducts(_props: any = {}) {
         )}
       </div>
 
-      {/* ━━━ مودال ویرایش/افزودن ━━━ */}
+      {/* ━━━ مودال ویرایش/افزودن تکی (دست‌نخورده) ━━━ */}
       {isModalOpen && editingProd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 sm:p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setIsModalOpen(false); }}>
@@ -697,6 +878,72 @@ export function AdminProducts(_props: any = {}) {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ━━━ مودال جدید سیستم ایمپورت هوشمند ━━━ */}
+      {isImportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 sm:p-4 animate-fadeIn"
+          onClick={(e) => { if (e.target === e.currentTarget && !importing) setIsImportOpen(false); }}>
+          <div className="w-full max-w-3xl max-h-[96vh] overflow-y-auto bg-[var(--modal-bg)] rounded-3xl shadow-2xl border border-[var(--card-border)] flex flex-col" dir="rtl">
+            <div className="flex items-center justify-between p-5 border-b border-[var(--card-border)] sticky top-0 bg-[var(--modal-bg)] z-10 rounded-t-3xl">
+              <h2 className="font-black text-sm text-emerald-500 flex items-center gap-2">
+                <span>📥</span> سیستم هوشمند ایمپورت گروهی و تطبیق تصاویر
+              </h2>
+              {!importing && (
+                <button type="button" onClick={() => setIsImportOpen(false)}
+                  className="p-2 rounded-xl hover:bg-rose-500/15 text-rose-400 font-black cursor-pointer text-lg leading-none">✕</button>
+              )}
+            </div>
+
+            <div className="p-6 space-y-6 text-xs flex-1">
+              {/* گام اول: آپلود فایل اکسل */}
+              <div className={"p-5 rounded-3xl border transition " + (importStep === 1 ? "bg-[var(--accent-blue)]/5 border-[var(--accent-blue)]" : "bg-[var(--input-bg)] border-[var(--card-border)] opacity-60")}>
+                <h3 className="font-black text-sm mb-3">گام اول: آپلود فایل دیتابیس (Excel / CSV)</h3>
+                <p className="text-[var(--text-secondary)] mb-4 leading-relaxed">
+                  فایل اکسل خود را آپلود کنید. ستون‌های الزامی: <code className="font-mono bg-[var(--modal-bg)] px-2 py-0.5 rounded text-[var(--accent-blue)]">Photo Filename</code> و <code className="font-mono bg-[var(--modal-bg)] px-2 py-0.5 rounded text-[var(--accent-blue)]">Telegram_Description</code>.
+                </p>
+                <div className="flex items-center gap-4">
+                  <button type="button" onClick={() => excelInputRef.current?.click()} disabled={importStep !== 1}
+                    className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black cursor-pointer shadow-lg disabled:opacity-50">
+                    📁 انتخاب فایل اکسل
+                  </button>
+                  <input ref={excelInputRef} type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleExcelUploadForImport} />
+                </div>
+              </div>
+
+              {/* گام دوم: انتخاب و تطبیق عکس‌ها */}
+              <div className={"p-5 rounded-3xl border transition " + (importStep === 2 ? "bg-emerald-500/5 border-emerald-500" : "bg-[var(--input-bg)] border-[var(--card-border)] opacity-60")}>
+                <h3 className="font-black text-sm mb-3">گام دوم: انتخاب تصاویر خام و فیلتر هوشمند</h3>
+                <p className="text-[var(--text-secondary)] mb-4 leading-relaxed">
+                  تمامی عکس‌های پوشه محصولات را انتخاب کنید. هوش مصنوعی فقط عکس‌هایی که نام آن‌ها در اکسل وجود دارد را آپلود می‌کند و بقیه را دور می‌ریزد.
+                </p>
+                <div className="flex items-center gap-4">
+                  <button type="button" onClick={() => bulkImagesRef.current?.click()} disabled={importStep !== 2}
+                    className="px-6 py-3 rounded-2xl bg-emerald-600 text-white font-black cursor-pointer shadow-lg disabled:opacity-50">
+                    🖼️ انتخاب دسته‌جمعی تصاویر
+                  </button>
+                  <input ref={bulkImagesRef} type="file" accept="image/*" multiple className="hidden" onChange={handleBulkImagesForImport} />
+                </div>
+              </div>
+
+              {/* گزارشات و لاگ‌های زنده */}
+              {importLogs.length > 0 && (
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] max-h-48 overflow-y-auto space-y-1.5 font-mono">
+                  {importLogs.map((log, i) => (
+                    <div key={i} className="text-[10px]">{log}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 p-5 border-t border-[var(--card-border)] sticky bottom-0 bg-[var(--modal-bg)] rounded-b-3xl">
+              <button type="button" disabled={importStep < 2 || importing} onClick={executeBulkImport}
+                className="flex-1 py-4 rounded-2xl bg-emerald-600 text-white font-black cursor-pointer disabled:opacity-50 text-sm shadow-xl flex items-center justify-center gap-2 transition hover:bg-emerald-500">
+                {importing ? <span className="animate-pulse">⏳ در حال پردازش و آپلود زنده...</span> : <span>🚀 شروع آپلود و ثبت محصولات در سایت</span>}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

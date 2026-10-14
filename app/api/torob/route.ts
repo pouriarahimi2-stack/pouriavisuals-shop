@@ -54,17 +54,41 @@ async function getProducts(page: number, limit: number, pageUnique?: string, pag
     )
     .eq("is_available", true);
 
-  // اضافه شدن منطق فیلتر تک‌محصول (درخواست پشتیبانی ترب)
+  // ── رفع باگ: شناسایی و اعتبارسنجی دقیق درخواست تک‌محصول ──
+  let targetId: string | undefined = undefined;
+
   if (pageUnique) {
-    countQuery = countQuery.eq("id", pageUnique);
-    dataQuery = dataQuery.eq("id", pageUnique);
+    targetId = pageUnique;
   } else if (pageUrl) {
-    // استخراج آیدی از انتهای لینک
-    const extractedId = pageUrl.split("/").filter(Boolean).pop()?.split("?")[0];
-    if (extractedId) {
-      countQuery = countQuery.eq("id", extractedId);
-      dataQuery = dataQuery.eq("id", extractedId);
+    const parts = pageUrl.split("?")[0].split("/").filter(Boolean);
+    const possibleId = parts[parts.length - 1];
+    if (possibleId) targetId = possibleId;
+  }
+
+  // اعتبارسنجی فرمت آیدی (UUID) برای جلوگیری از ارور 500 در دیتابیس (وقتی ترب دیتای فیک می‌فرستد)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  
+  if (targetId) {
+    if (!uuidRegex.test(targetId)) {
+      // اگر آیدی ارسالی ترب نامعتبر بود، بدون ارور دادن یک لیست خالی برمی‌گردانیم
+      return {
+        api_version: TOROB_API_VERSION,
+        count: 0,
+        max_page: 1,
+        next: null,
+        previous: null,
+        products: [],
+      };
     }
+    // اعمال فیلتر برای فقط یک محصول خاص
+    countQuery = countQuery.eq("id", targetId);
+    dataQuery = dataQuery.eq("id", targetId);
+  } else {
+    // اگر درخواست کلی بود، صفحه‌بندی عادی اعمال شود
+    const offset = (page - 1) * limit;
+    dataQuery = dataQuery
+      .range(offset, offset + limit - 1)
+      .order("updated_at", { ascending: false });
   }
 
   const { count: totalCount, error: countErr } = await countQuery;
@@ -72,14 +96,6 @@ async function getProducts(page: number, limit: number, pageUnique?: string, pag
   
   const total = totalCount ?? 0;
   const maxPage = Math.max(1, Math.ceil(total / limit));
-
-  // اگر درخواست کلی بود، صفحه‌بندی اعمال شود
-  if (!pageUnique && !pageUrl) {
-    const offset = (page - 1) * limit;
-    dataQuery = dataQuery
-      .range(offset, offset + limit - 1)
-      .order("updated_at", { ascending: false });
-  }
 
   const { data, error } = await dataQuery;
   if (error) throw new Error("خطا در دریافت محصولات");
@@ -89,6 +105,7 @@ async function getProducts(page: number, limit: number, pageUnique?: string, pag
   const pageUrlGen = (p: number) => `${baseUrl}/api/torob?page=${p}&limit=${limit}`;
 
   const products = rows.map((row) => {
+    // ── بخش بدون تغییر: استخراج عکس‌ها و پاکسازی توضیحات (که عالی کار می‌کرد) ──
     let rawDescription = String(row.description ?? "");
     let extractedImages: string[] = [];
 
@@ -149,8 +166,8 @@ async function getProducts(page: number, limit: number, pageUnique?: string, pag
     api_version: TOROB_API_VERSION,
     count: total,
     max_page: maxPage,
-    next: (!pageUnique && !pageUrl && page < maxPage) ? pageUrlGen(page + 1) : null,
-    previous: (!pageUnique && !pageUrl && page > 1) ? pageUrlGen(page - 1) : null,
+    next: (!targetId && page < maxPage) ? pageUrlGen(page + 1) : null,
+    previous: (!targetId && page > 1) ? pageUrlGen(page - 1) : null,
     products,
   };
 }
@@ -166,17 +183,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "توکن نامعتبر" }, { status: 403 });
   }
 
+  // ── رفع باگ: پشتیبانی از حالت ترکیبی (Query Params در درخواست POST) ──
+  const searchParams = req.nextUrl.searchParams;
   let body: Record<string, any> = {};
   try {
     body = await req.json();
   } catch {}
 
-  const page = Math.max(1, parseInt(String(body.page ?? "1"), 10) || 1);
-  const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(String(body.limit ?? String(DEFAULT_LIMIT)), 10) || DEFAULT_LIMIT));
+  const page = Math.max(1, parseInt(String(searchParams.get("page") ?? body.page ?? "1"), 10) || 1);
+  const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(String(searchParams.get("limit") ?? body.limit ?? String(DEFAULT_LIMIT)), 10) || DEFAULT_LIMIT));
   
-  // خواندن مقادیر درخواست تک‌محصول
-  const pageUnique = body.page_unique ? String(body.page_unique) : undefined;
-  const pageUrl = body.page_url ? String(body.page_url) : undefined;
+  // بررسی هم‌زمان Query و Body برای پیدا کردن آیدی تک‌محصول
+  const pageUnique = searchParams.get("page_unique") || (body.page_unique ? String(body.page_unique) : undefined);
+  const pageUrl = searchParams.get("page_url") || (body.page_url ? String(body.page_url) : undefined);
 
   try {
     const result = await getProducts(page, limit, pageUnique, pageUrl);

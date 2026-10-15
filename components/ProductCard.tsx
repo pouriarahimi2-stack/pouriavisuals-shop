@@ -12,22 +12,17 @@ export default function ProductCard({ product }: ProductCardProps) {
   const finalPrice = product.discount_price || product.price || 0;
   const isAvailable = product.stock > 0 && product.is_available !== false;
   
-  // انتخاب عکس اصلی
   const imgUrl = product.image || (product.images && product.images[0]) || "/placeholder.png";
 
   return (
     <div className="group flex flex-col bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[1.5rem] overflow-hidden transition-all duration-300 hover:shadow-xl w-full h-full relative">
       
-      {/* 
-        بخش عکس: 
-        padding اضافی حذف شد تا عکس کل قاب خودش را پر کند. 
-        استفاده از object-contain با پس‌زمینه سفید برای بهترین نمایش.
-      */}
+      {/* بخش عکس: پس‌زمینه سفید، پر کردن کامل قاب بدون حاشیه مزاحم */}
       <Link href={`/products/${pId}`} className="relative w-full aspect-square bg-white block overflow-hidden">
         <img 
           src={imgUrl} 
           alt={title} 
-          className="w-full h-full object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-105" 
+          className="w-full h-full object-contain p-2 mix-blend-multiply transition-transform duration-500 group-hover:scale-105" 
           loading="lazy" 
         />
         {!isAvailable && (
@@ -37,10 +32,9 @@ export default function ProductCard({ product }: ProductCardProps) {
         )}
       </Link>
 
-      {/* اطلاعات محصول */}
       <div className="p-3 sm:p-4 flex flex-col flex-1 gap-1.5 sm:gap-2 border-t border-[var(--card-border)] bg-[var(--input-bg)]/30">
         <div className="text-[9px] sm:text-[10px] font-black text-[var(--accent-blue)] truncate">
-          {product.category || "لوازم جانبی"}
+          {product.category || "لوازم عمومی"}
         </div>
         
         <Link href={`/products/${pId}`}>

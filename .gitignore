@@ -52,3 +52,5 @@ PROJECT_AUDIT_REPORT.pdf
 PROJECT_AUDIT_REPORT.md
 project_code_export-*.txt
 pack_project.py
+# Ignore code exports
+project_code_export.txt

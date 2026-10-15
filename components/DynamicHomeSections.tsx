@@ -1,13 +1,22 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import ProductCard, { getValidImageUrl } from "./ProductCard";
 
 export default function DynamicHomeSections({ initialProducts, initialBanners }: any) {
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return <div className="min-h-screen animate-pulse bg-[var(--modal-bg)] opacity-30"></div>;
+  }
+
   const products = Array.isArray(initialProducts) ? initialProducts : [];
   let displayBanners = Array.isArray(initialBanners) ? initialBanners : [];
 
-  // بررسی هوشمندانه محصولات برای ساخت اسلایدر خودکار
   if (displayBanners.length === 0 && products.length > 0) {
     const validProds = products.filter(p => {
       const img = getValidImageUrl(p);
@@ -31,8 +40,7 @@ export default function DynamicHomeSections({ initialProducts, initialBanners }:
   });
 
   return (
-    <div className="space-y-10 sm:space-y-16">
-      {/* ── اسلایدر ── */}
+    <div className="space-y-10 sm:space-y-16 animate-fadeIn">
       {displayBanners.length > 0 && (
         <section className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 pt-4">
           <div className="relative w-full aspect-[16/9] md:aspect-[21/9] lg:aspect-[24/9] rounded-3xl overflow-hidden shadow-xl bg-[var(--modal-bg)] border border-[var(--card-border)] group/slider">
@@ -57,7 +65,6 @@ export default function DynamicHomeSections({ initialProducts, initialBanners }:
                 );
               })}
             </div>
-            {/* نشانگرهای شیشه‌ای روی عکس */}
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10 bg-black/30 backdrop-blur-sm px-3 py-1.5 rounded-full pointer-events-none">
               {displayBanners.map((_, i) => (
                 <div key={i} className="w-1.5 h-1.5 rounded-full bg-white/70 shadow-sm" />
@@ -67,7 +74,6 @@ export default function DynamicHomeSections({ initialProducts, initialBanners }:
         </section>
       )}
 
-      {/* ── قفسه‌های محصولات ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-12 pb-10">
         {Object.entries(categoryMap).map(([category, catProducts]) => (
           <section key={category} className="space-y-4 sm:space-y-5">

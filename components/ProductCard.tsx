@@ -2,27 +2,30 @@
 import React from "react";
 import Link from "next/link";
 
-// تابع ضدگلوله برای استخراج عکس سالم از هر فرمت دیتابیس
-export function getValidImageUrl(p: any) {
-  if (!p) return "/placeholder.png";
-  let img = p.image;
+// تابع ۱۰۰٪ امن استخراج عکس بدون استفاده از Regex که باعث ارور بیلد شده بود
+export function getValidImageUrl(product: any) {
+  if (!product) return "/placeholder.png";
   
-  if (typeof img === "string" && img.startsWith("[")) {
+  let img = product.image;
+  
+  if (typeof img === "string" && img.includes("[")) {
     try { const arr = JSON.parse(img); if (arr[0]) img = arr[0]; } catch(e) {}
   }
   
-  if (!img || typeof img !== "string" || img.length < 5) {
-    if (Array.isArray(p.images) && p.images.length > 0) {
-      img = p.images[0];
-    } else if (typeof p.images === "string" && p.images.startsWith("[")) {
-      try { const arr = JSON.parse(p.images); if (arr[0]) img = arr[0]; } catch(e) {}
+  if (!img || img === "/placeholder.png" || (typeof img === "string" && img.length < 5)) {
+    if (Array.isArray(product.images) && product.images.length > 0) {
+      img = product.images[0];
+    } else if (typeof product.images === "string" && product.images.includes("[")) {
+      try { const arr = JSON.parse(product.images); if (arr[0]) img = arr[0]; } catch(e) {}
     }
   }
   
   if (typeof img === "string" && img.length > 5) {
-     img = img.replace(/^\["?/, '').replace(/"?\]$/, '').replace(/^"/, '').replace(/"$/, '');
+     // پاکسازی هرگونه کروشه یا کوتیشن اضافه بدون Regex
+     img = img.split('"').join('').split('[').join('').split(']').join('').trim();
      if (img.startsWith("http") || img.startsWith("/")) return img;
   }
+  
   return "/placeholder.png";
 }
 

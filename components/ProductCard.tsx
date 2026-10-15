@@ -2,6 +2,27 @@
 import React from "react";
 import Link from "next/link";
 
+// تابع ضدگلوله برای استخراج عکس سالم از هر فرمت دیتابیس
+export function getValidImageUrl(p: any) {
+  if (!p) return "/placeholder.png";
+  const extract = (val: any) => {
+    if (!val) return null;
+    if (Array.isArray(val) && val.length > 0) return val[0];
+    if (typeof val === "string") {
+      if (val.trim().startsWith("[")) {
+        try { const arr = JSON.parse(val); if (arr[0]) return arr[0]; } catch(e) {}
+      }
+      return val.trim();
+    }
+    return null;
+  };
+  let finalImg = extract(p.image) || extract(p.images) || "/placeholder.png";
+  if (typeof finalImg === "string") {
+     finalImg = finalImg.replace(/^\["?|"?\]$/g, '').replace(/\"/g, '');
+  }
+  return finalImg;
+}
+
 interface ProductCardProps {
   product: any;
 }
@@ -12,12 +33,10 @@ export default function ProductCard({ product }: ProductCardProps) {
   const finalPrice = product.discount_price || product.price || 0;
   const isAvailable = product.stock > 0 && product.is_available !== false;
   
-  const imgUrl = product.image || (product.images && product.images[0]) || "/placeholder.png";
+  const imgUrl = getValidImageUrl(product);
 
   return (
     <div className="group flex flex-col bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[1.5rem] overflow-hidden transition-all duration-300 hover:shadow-xl w-full h-full relative">
-      
-      {/* بخش عکس: پس‌زمینه سفید، پر کردن کامل قاب بدون حاشیه مزاحم */}
       <Link href={`/products/${pId}`} className="relative w-full aspect-square bg-white block overflow-hidden">
         <img 
           src={imgUrl} 
@@ -36,13 +55,11 @@ export default function ProductCard({ product }: ProductCardProps) {
         <div className="text-[9px] sm:text-[10px] font-black text-[var(--accent-blue)] truncate">
           {product.category || "لوازم عمومی"}
         </div>
-        
         <Link href={`/products/${pId}`}>
           <h3 className="font-bold text-[11px] sm:text-xs text-[var(--text-primary)] line-clamp-2 leading-relaxed min-h-[2rem] sm:min-h-[2.5rem] group-hover:text-[var(--accent-blue)] transition-colors">
             {title}
           </h3>
         </Link>
-
         <div className="mt-auto pt-2 flex items-end justify-between">
           <div className="flex flex-col">
             {product.discount_price && product.discount_price < product.price && (

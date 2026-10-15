@@ -151,6 +151,7 @@ export default function AdminProducts(_props: any = {}) {
       const payload = { 
         ...editingProd, 
         image: (editingProd.images && editingProd.images.length > 0) ? editingProd.images[0] : editingProd.image,
+        image_url: (editingProd.images && editingProd.images.length > 0) ? editingProd.images[0] : editingProd.image,
         is_available: editingProd.stock > 0 
       };
       const res = await fetch("/api/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });

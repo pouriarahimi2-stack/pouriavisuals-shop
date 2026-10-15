@@ -2,28 +2,29 @@
 import React from "react";
 import Link from "next/link";
 
-// تابع ۱۰۰٪ امن استخراج عکس بدون استفاده از Regex که باعث ارور بیلد شده بود
+// الگوریتم امن استخراج عکس (پشتیبانی همزمان از image و image_url)
 export function getValidImageUrl(product: any) {
   if (!product) return "/placeholder.png";
   
-  let img = product.image;
+  const checkStr = (val: any) => {
+     if (!val || typeof val !== "string") return null;
+     let cleaned = val.replace(/["'\[\]]/g, "").trim();
+     if (cleaned.startsWith("http") || cleaned.startsWith("/")) return cleaned.split(",")[0].trim();
+     return null;
+  };
   
-  if (typeof img === "string" && img.includes("[")) {
-    try { const arr = JSON.parse(img); if (arr[0]) img = arr[0]; } catch(e) {}
+  // ابتدا فیلد image_url (که صفحه اصلی به آن نیاز دارد) را چک می‌کنیم
+  let url = checkStr(product.image_url) || checkStr(product.image);
+  if (url) return url;
+  
+  if (Array.isArray(product.images) && product.images.length > 0) {
+     url = checkStr(product.images[0]);
+     if (url) return url;
   }
   
-  if (!img || img === "/placeholder.png" || (typeof img === "string" && img.length < 5)) {
-    if (Array.isArray(product.images) && product.images.length > 0) {
-      img = product.images[0];
-    } else if (typeof product.images === "string" && product.images.includes("[")) {
-      try { const arr = JSON.parse(product.images); if (arr[0]) img = arr[0]; } catch(e) {}
-    }
-  }
-  
-  if (typeof img === "string" && img.length > 5) {
-     // پاکسازی هرگونه کروشه یا کوتیشن اضافه بدون Regex
-     img = img.split('"').join('').split('[').join('').split(']').join('').trim();
-     if (img.startsWith("http") || img.startsWith("/")) return img;
+  if (typeof product.images === "string") {
+     url = checkStr(product.images);
+     if (url) return url;
   }
   
   return "/placeholder.png";

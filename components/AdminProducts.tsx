@@ -16,30 +16,29 @@ export default function AdminProducts(_props: any = {}) {
   const [loading, setLoading]     = useState(true);
   const [feedback, setFeedback]   = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // ── سرچ و فیلتر ──
   const [searchQuery, setSearchQuery]   = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
-  // ── ویرایش و افزودن تکی ──
+  // ── States ویرایش و افزودن (گالری چند عکسی) ──
   const [isModalOpen, setIsModalOpen]   = useState(false);
   const [editingProd, setEditingProd]   = useState<FullCatalogProduct | null>(null);
   const [saving, setSaving]             = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const singleImageInputRef = useRef<HTMLInputElement>(null);
+  const multiImageInputRef = useRef<HTMLInputElement>(null);
   
-  // ── استودیوی پاکسازی پیشرفته ──
+  // ── States استودیوی پاکسازی ──
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [bulkActionType, setBulkActionType] = useState<"hide" | "delete">("delete");
   const [bulkTargetCategory, setBulkTargetCategory] = useState("all");
   const [bulkProcessing, setBulkProcessing] = useState(false);
 
-  // ── ویرایش نام دسته ──
+  // ── States ویرایش دسته‌بندی ──
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
   const [renameOld, setRenameOld] = useState("");
   const [renameNew, setRenameNew] = useState("");
   const [renaming, setRenaming] = useState(false);
 
-  // ── ایمپورت اکسل و متغیرهای دیفالت ──
+  // ── States ایمپورت هوشمند ──
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importStep, setImportStep] = useState<1 | 2 | 3>(1);
   const [importRows, setImportRows] = useState<any[]>([]);
@@ -48,8 +47,6 @@ export default function AdminProducts(_props: any = {}) {
   const [importing, setImporting] = useState(false);
   const docInputRef = useRef<HTMLInputElement>(null);
   const bulkImagesRef = useRef<HTMLInputElement>(null);
-  
-  // متغیرهای حیاتی برای فرم ایمپورت که باعث ارور شده بودند
   const [globalStock, setGlobalStock] = useState<number>(10);
   const [globalCategory, setGlobalCategory] = useState<string>("");
 
@@ -102,8 +99,18 @@ export default function AdminProducts(_props: any = {}) {
   // ── منطق ویرایش و حذف تکی ──
   const handleOpenEdit = (p?: FullCatalogProduct) => {
     soundEngine.playClick();
-    if (p) setEditingProd({ ...p });
-    else setEditingProd({ id: "", title: "", sku: "", brand: "", category: "", price: 0, purchase_price: 0, stock: 10, is_available: true, description: "", image: "" } as any);
+    if (p) {
+      let parsedImgs: string[] = [];
+      const pImgs = p.images as any;
+      if (Array.isArray(pImgs)) parsedImgs = [...pImgs];
+      else if (typeof pImgs === 'string' && pImgs.length > 5) {
+        try { parsedImgs = JSON.parse(pImgs); } catch(e){}
+      }
+      if (p.image && !parsedImgs.includes(p.image)) parsedImgs.unshift(p.image);
+      setEditingProd({ ...p, images: parsedImgs });
+    } else {
+      setEditingProd({ id: "", title: "", sku: "", brand: "", category: "", price: 0, purchase_price: 0, stock: 10, is_available: true, description: "", image: "", images: [] } as any);
+    }
     setIsModalOpen(true);
   };
 
@@ -117,30 +124,42 @@ export default function AdminProducts(_props: any = {}) {
     } catch { notify("خطا در حذف محصول", "error"); }
   };
 
-  const handleSingleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file || !editingProd) return;
+  // ── منطق آپلود گالری چند عکسی ──
+  const handleMultiImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []); 
+    if (files.length === 0 || !editingProd) return;
     setUploadingImage(true);
     try {
-      const fd = new FormData(); fd.append("file", file);
-      const res = await fetch("/api/admin/upload-image", { method: "POST", body: fd });
-      const json = await res.json();
-      if (json.url) { setEditingProd({ ...editingProd, image: json.url }); notify("✓ عکس آپلود شد.", "success"); } 
-      else throw new Error();
-    } catch (err) { notify("❌ خطا در آپلود عکس", "error"); } finally { setUploadingImage(false); e.target.value = ""; }
+      const newUrls: string[] = [];
+      for (const file of files) {
+        const fd = new FormData(); fd.append("file", file);
+        const res = await fetch("/api/admin/upload-image", { method: "POST", body: fd });
+        const json = await res.json();
+        if (json.url) newUrls.push(json.url);
+      }
+      const updatedImages = [...(editingProd.images || []), ...newUrls];
+      setEditingProd({ ...editingProd, images: updatedImages, image: updatedImages.length > 0 ? updatedImages[0] : editingProd.image });
+      notify(`✓ ${newUrls.length} عکس به گالری اضافه شد.`, "success");
+    } catch (err) { notify("❌ خطا در آپلود عکس‌ها", "error"); } 
+    finally { setUploadingImage(false); e.target.value = ""; }
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault(); if (!editingProd) return;
     setSaving(true);
     try {
-      const payload = { ...editingProd, is_available: editingProd.stock > 0 };
+      const payload = { 
+        ...editingProd, 
+        image: (editingProd.images && editingProd.images.length > 0) ? editingProd.images[0] : editingProd.image,
+        is_available: editingProd.stock > 0 
+      };
       const res = await fetch("/api/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (res.ok) { soundEngine.playSuccess(); notify("محصول با موفقیت ذخیره شد.", "success"); setIsModalOpen(false); fetchCatalog(); } 
       else throw new Error();
     } catch { notify("خطا در ذخیره سازی", "error"); } finally { setSaving(false); }
   };
 
-  // ── منطق ایمپورت (همراه با دسته بندی دیفالت) ──
+  // ── منطق ایمپورت ──
   const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     try {
@@ -162,8 +181,7 @@ export default function AdminProducts(_props: any = {}) {
 
         return {
           title: row["نام محصول"] || row["عنوان"] || "بدون عنوان", sku: row["کد محصول"] || row["SKU"] || "",
-          purchase_price: dropPrice, price: finalPrice, 
-          category: row["دسته بندی"] || globalCategory || "کالای عمومی",
+          purchase_price: dropPrice, price: finalPrice, category: row["دسته بندی"] || globalCategory || "کالای عمومی",
           photo: row["Photo_Filename"] || null, description: row["Telegram_Description"] || "",
           stock: stockVal, brand: row["برند"] || "متفرقه",
         };
@@ -228,7 +246,6 @@ export default function AdminProducts(_props: any = {}) {
     } catch { alert("خطای سرور."); } finally { setRenaming(false); }
   };
 
-  // ── سرچ هوشمند و فیلتر ──
   const filtered = products.filter((p) => {
     const matchCat = categoryFilter === "all" || p.category === categoryFilter;
     const matchSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -257,16 +274,14 @@ export default function AdminProducts(_props: any = {}) {
 
       {feedback && <div className={"p-4 rounded-2xl text-xs font-bold " + (feedback.type === "success" ? "bg-emerald-500/15 text-emerald-500" : "bg-rose-500/15 text-rose-500")}>{feedback.text}</div>}
 
-      {/* ── فیلتر و جستجو ── */}
       <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="🔍 جستجو بر اساس نام یا کد کالا..." className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold" />
-        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold">
+        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="🔍 جستجو بر اساس نام یا کد کالا..." className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold focus:border-[var(--accent-blue)]" />
+        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold cursor-pointer">
           <option value="all">📁 همه دسته‌ها</option>
           {categories.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 
-      {/* ── گرید محصولات ── */}
       <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl text-xs">
         {loading ? <div className="py-16 text-center text-slate-400 font-bold">⏳ در حال بارگذاری...</div> : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -291,13 +306,13 @@ export default function AdminProducts(_props: any = {}) {
         )}
       </div>
 
-      {/* ── مودال استودیوی پاکسازی پیشرفته ── */}
+      {/* ── مودال استودیوی پاکسازی ── */}
       {isBulkDeleteOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 animate-fadeIn">
           <div className="w-full max-w-md bg-[var(--modal-bg)] rounded-3xl shadow-2xl border border-[var(--card-border)] overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-[var(--card-border)] bg-rose-50 dark:bg-rose-950/20 flex justify-between items-center">
               <h3 className="font-black text-rose-500 text-sm">🧹 استودیوی پاکسازی پیشرفته</h3>
-              <button onClick={() => setIsBulkDeleteOpen(false)} className="text-rose-500 font-black p-1 hover:bg-rose-100 rounded-lg">✕</button>
+              <button onClick={() => setIsBulkDeleteOpen(false)} className="text-rose-500 font-black p-1 hover:bg-rose-100 rounded-lg cursor-pointer">✕</button>
             </div>
             <div className="p-6 space-y-5 text-xs">
               <div>
@@ -316,7 +331,7 @@ export default function AdminProducts(_props: any = {}) {
               </div>
               {bulkActionType === "delete" && (
                 <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 leading-relaxed font-bold">
-                  ⚠️ هشدار: با اجرای این دستور، علاوه بر پاک شدن اطلاعات محصولات از دیتابیس، سیستم به صورت هوشمند **تمامی عکس‌های متصل به آن‌ها را نیز از فضای هاست ابری (Supabase Storage) پاک می‌کند** تا فضای سرور شما آزاد شود. این عملیات غیرقابل بازگشت است.
+                  ⚠️ هشدار: با اجرای این دستور، علاوه بر پاک شدن اطلاعات محصولات از دیتابیس، سیستم به صورت هوشمند **تمامی عکس‌های متصل به آن‌ها را نیز از فضای هاست ابری (Supabase Storage) پاک می‌کند** تا فضای سرور شما آزاد شود.
                 </div>
               )}
             </div>
@@ -330,7 +345,7 @@ export default function AdminProducts(_props: any = {}) {
         </div>
       )}
 
-      {/* ── فرم کامل و حرفه‌ای ویرایش/افزودن محصول ── */}
+      {/* ── فرم گالری دار ویرایش/افزودن محصول ── */}
       {isModalOpen && editingProd && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 animate-fadeIn">
           <div className="w-full max-w-4xl max-h-[96vh] overflow-hidden bg-[var(--modal-bg)] rounded-3xl shadow-2xl border border-[var(--card-border)] flex flex-col" onClick={e => e.stopPropagation()}>
@@ -340,17 +355,59 @@ export default function AdminProducts(_props: any = {}) {
             </div>
             <div className="flex-1 overflow-y-auto p-6">
               <div className="flex flex-col md:flex-row gap-8">
+                
+                {/* بخش گالری تصاویر */}
                 <div className="w-full md:w-1/3 space-y-4">
-                  <div className="aspect-square rounded-2xl border-2 border-dashed border-[var(--card-border)] flex flex-col items-center justify-center p-4 bg-[var(--input-bg)] relative overflow-hidden group">
-                    {editingProd.image ? ( <img src={editingProd.image} alt="پیش‌نمایش" className="w-full h-full object-contain mix-blend-multiply bg-white rounded-xl" /> ) : ( <div className="text-4xl opacity-50">🖼️</div> )}
-                    <div className={"absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity " + (editingProd.image ? "opacity-0 group-hover:opacity-100" : "opacity-100")}>
-                      <button type="button" disabled={uploadingImage} onClick={() => singleImageInputRef.current?.click()} className="px-4 py-2 bg-white text-black font-black text-xs rounded-xl shadow-lg cursor-pointer disabled:opacity-50 hover:bg-blue-500 hover:text-white transition">{uploadingImage ? "⏳ در حال آپلود..." : "انتخاب از کامپیوتر 📤"}</button>
+                  <div className="bg-[var(--input-bg)] rounded-2xl border border-[var(--card-border)] p-4 space-y-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-bold text-xs text-[var(--text-secondary)]">گالری تصاویر</span>
+                      <button type="button" onClick={() => multiImageInputRef.current?.click()} disabled={uploadingImage} className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-500 transition shadow-md cursor-pointer">
+                        {uploadingImage ? "⏳..." : "➕ انتخاب عکس"}
+                      </button>
                     </div>
+                    
+                    <div className="aspect-square rounded-xl border-2 border-dashed border-[var(--card-border)] flex items-center justify-center bg-white overflow-hidden relative">
+                      {(editingProd.images && editingProd.images.length > 0) ? (
+                        <img src={editingProd.images[0]} className="w-full h-full object-contain p-2 mix-blend-multiply" />
+                      ) : editingProd.image ? (
+                        <img src={editingProd.image} className="w-full h-full object-contain p-2 mix-blend-multiply" />
+                      ) : (
+                        <div className="text-4xl opacity-30">🖼️</div>
+                      )}
+                    </div>
+
+                    {(editingProd.images && editingProd.images.length > 0) && (
+                      <div className="flex gap-2 overflow-x-auto scrollbar-none snap-x py-1">
+                        {editingProd.images.map((img: string, idx: number) => (
+                          <div key={idx} className="relative w-16 h-16 rounded-lg border border-[var(--card-border)] shrink-0 bg-white group/thumb snap-start shadow-sm">
+                            <img src={img} className="w-full h-full object-contain rounded-lg p-1 mix-blend-multiply" />
+                            <button type="button" onClick={() => {
+                              const newImages = [...editingProd.images!];
+                              newImages.splice(idx, 1);
+                              setEditingProd({ ...editingProd, images: newImages, image: newImages.length > 0 ? newImages[0] : "" });
+                            }} className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full w-5 h-5 text-[10px] flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity shadow-md cursor-pointer">✕</button>
+                            {idx === 0 && <span className="absolute bottom-0 inset-x-0 bg-blue-600/90 text-white text-[8px] text-center py-0.5 rounded-b-lg font-black backdrop-blur-sm">اصلی</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <input ref={singleImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleSingleImageUpload} />
+                  
+                  <input ref={multiImageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleMultiImageUpload} />
+                  
                   <div>
-                    <label className="text-[10px] font-bold text-[var(--text-secondary)]">یا لینک مستقیم بدهید (URL):</label>
-                    <input value={editingProd.image || ""} onChange={e=>setEditingProd({...editingProd, image: e.target.value})} dir="ltr" placeholder="https://..." className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-[10px] text-slate-500 focus:border-[var(--accent-blue)] mt-1" />
+                    <label className="text-[10px] font-bold text-[var(--text-secondary)]">لینک مستقیم عکس (URL):</label>
+                    <div className="flex gap-2 mt-1">
+                      <input id="directUrlInput" dir="ltr" placeholder="https://..." className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-[10px] text-slate-500 focus:border-[var(--accent-blue)]" />
+                      <button type="button" onClick={() => {
+                         const input = document.getElementById("directUrlInput") as HTMLInputElement;
+                         if (input && input.value) {
+                             const newImgs = [...(editingProd.images || []), input.value];
+                             setEditingProd({ ...editingProd, images: newImgs, image: newImgs[0] });
+                             input.value = "";
+                         }
+                      }} className="px-3 bg-slate-200 dark:bg-slate-800 rounded-xl text-[10px] font-bold hover:bg-slate-300 dark:hover:bg-slate-700 transition cursor-pointer text-slate-700 dark:text-slate-200">افزودن</button>
+                    </div>
                   </div>
                 </div>
 
@@ -378,9 +435,9 @@ export default function AdminProducts(_props: any = {}) {
         </div>
       )}
 
-      {/* ── مودال ایمپورت ── */}
+      {/* ── مودال ایمپورت اکسل ── */}
       {isImportOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 sm:p-4 animate-fadeIn" onClick={(e) => { if (e.target === e.currentTarget && !importing) setIsImportOpen(false); }}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-3 sm:p-4 animate-fadeIn" onClick={(e) => { if (e.target === e.currentTarget && !importing) setIsImportOpen(false); }}>
           <div className="w-full max-w-4xl max-h-[96vh] overflow-y-auto bg-[var(--modal-bg)] rounded-3xl shadow-2xl border border-[var(--card-border)] flex flex-col" dir="rtl">
             <div className="flex items-center justify-between p-5 border-b border-[var(--card-border)] sticky top-0 bg-[var(--modal-bg)] z-10 rounded-t-3xl">
               <h2 className="font-black text-sm text-emerald-500">📥 ایمپورت گروهی با اکسل</h2>
@@ -391,7 +448,6 @@ export default function AdminProducts(_props: any = {}) {
               <div className={"p-5 rounded-3xl border transition " + (importStep === 1 ? "bg-[var(--accent-blue)]/5 border-[var(--accent-blue)]" : "bg-[var(--input-bg)] border-[var(--card-border)] opacity-60")}>
                 <h3 className="font-black text-sm mb-3 text-[var(--accent-blue)]">گام اول: فایل اکسل</h3>
                 
-                {/* بازگشت فیلدهای تنظیمات دیفالت که خواسته بودید */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 p-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
                   <div>
                     <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">موجودی پیش‌فرض:</label>

@@ -7,7 +7,7 @@ export default function DynamicHomeSections({ initialProducts, initialBanners }:
   const products = Array.isArray(initialProducts) ? initialProducts : [];
   let displayBanners = Array.isArray(initialBanners) ? initialBanners : [];
 
-  // بررسی هوشمندانه محصولات برای ساخت اسلایدر
+  // بررسی هوشمندانه محصولات برای ساخت اسلایدر خودکار
   if (displayBanners.length === 0 && products.length > 0) {
     const validProds = products.filter(p => {
       const img = getValidImageUrl(p);
@@ -32,6 +32,7 @@ export default function DynamicHomeSections({ initialProducts, initialBanners }:
 
   return (
     <div className="space-y-10 sm:space-y-16">
+      {/* ── اسلایدر ── */}
       {displayBanners.length > 0 && (
         <section className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 pt-4">
           <div className="relative w-full aspect-[16/9] md:aspect-[21/9] lg:aspect-[24/9] rounded-3xl overflow-hidden shadow-xl bg-[var(--modal-bg)] border border-[var(--card-border)] group/slider">
@@ -39,7 +40,7 @@ export default function DynamicHomeSections({ initialProducts, initialBanners }:
               {displayBanners.map((b: any, i: number) => {
                 const img = b.image_url || b.image || "/placeholder.png";
                 return (
-                  <a key={i} href={b.link_url || "#"} className="min-w-full h-full snap-center relative block">
+                  <a key={i} href={b.link_url || "#"} className="min-w-full h-full snap-center relative block flex-shrink-0">
                     {b.is_smart ? (
                        <div className="w-full h-full flex items-center justify-center p-8 bg-gradient-to-tr from-blue-50/50 to-indigo-50/50 dark:from-slate-900 dark:to-slate-800">
                           <img src={img} alt={b.title} className="w-full h-full object-contain mix-blend-multiply drop-shadow-xl hover:scale-105 transition-transform duration-700" />
@@ -56,6 +57,7 @@ export default function DynamicHomeSections({ initialProducts, initialBanners }:
                 );
               })}
             </div>
+            {/* نشانگرهای شیشه‌ای روی عکس */}
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10 bg-black/30 backdrop-blur-sm px-3 py-1.5 rounded-full pointer-events-none">
               {displayBanners.map((_, i) => (
                 <div key={i} className="w-1.5 h-1.5 rounded-full bg-white/70 shadow-sm" />
@@ -65,6 +67,7 @@ export default function DynamicHomeSections({ initialProducts, initialBanners }:
         </section>
       )}
 
+      {/* ── قفسه‌های محصولات ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-12 pb-10">
         {Object.entries(categoryMap).map(([category, catProducts]) => (
           <section key={category} className="space-y-4 sm:space-y-5">

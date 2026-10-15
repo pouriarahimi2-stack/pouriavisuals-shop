@@ -5,22 +5,25 @@ import Link from "next/link";
 // تابع ضدگلوله برای استخراج عکس سالم از هر فرمت دیتابیس
 export function getValidImageUrl(p: any) {
   if (!p) return "/placeholder.png";
-  const extract = (val: any) => {
-    if (!val) return null;
-    if (Array.isArray(val) && val.length > 0) return val[0];
-    if (typeof val === "string") {
-      if (val.trim().startsWith("[")) {
-        try { const arr = JSON.parse(val); if (arr[0]) return arr[0]; } catch(e) {}
-      }
-      return val.trim();
-    }
-    return null;
-  };
-  let finalImg = extract(p.image) || extract(p.images) || "/placeholder.png";
-  if (typeof finalImg === "string") {
-     finalImg = finalImg.replace(/^\["?|"?\]$/g, '').replace(/\"/g, '');
+  let img = p.image;
+  
+  if (typeof img === "string" && img.startsWith("[")) {
+    try { const arr = JSON.parse(img); if (arr[0]) img = arr[0]; } catch(e) {}
   }
-  return finalImg;
+  
+  if (!img || typeof img !== "string" || img.length < 5) {
+    if (Array.isArray(p.images) && p.images.length > 0) {
+      img = p.images[0];
+    } else if (typeof p.images === "string" && p.images.startsWith("[")) {
+      try { const arr = JSON.parse(p.images); if (arr[0]) img = arr[0]; } catch(e) {}
+    }
+  }
+  
+  if (typeof img === "string" && img.length > 5) {
+     img = img.replace(/^\["?/, '').replace(/"?\]$/, '').replace(/^"/, '').replace(/"$/, '');
+     if (img.startsWith("http") || img.startsWith("/")) return img;
+  }
+  return "/placeholder.png";
 }
 
 interface ProductCardProps {

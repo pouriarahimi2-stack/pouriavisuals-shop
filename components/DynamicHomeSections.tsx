@@ -17,6 +17,7 @@ export default function DynamicHomeSections({ initialProducts, initialBanners }:
   const products = Array.isArray(initialProducts) ? initialProducts : [];
   let displayBanners = Array.isArray(initialBanners) ? initialBanners : [];
 
+  // مکانیزم Fallback حفظ شده، اما استایل‌ها دقیقاً به حالت بنر عریض (cover) برگردانده شدند
   if (displayBanners.length === 0 && products.length > 0) {
     const validProds = products.filter(p => {
       const img = getValidImageUrl(p);
@@ -28,7 +29,6 @@ export default function DynamicHomeSections({ initialProducts, initialBanners }:
       title: prod.title,
       image_url: getValidImageUrl(prod),
       link_url: `/products/${prod.id}`,
-      is_smart: true
     }));
   }
 
@@ -41,23 +41,21 @@ export default function DynamicHomeSections({ initialProducts, initialBanners }:
 
   return (
     <div className="space-y-10 sm:space-y-16 animate-fadeIn">
+      
+      {/* ── اسلایدر اصلی: بازگشت دقیق به ظاهر نسخه 32d0de7 ── */}
       {displayBanners.length > 0 && (
         <section className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 pt-4">
-          <div className="relative w-full aspect-[16/9] md:aspect-[21/9] lg:aspect-[24/9] rounded-3xl overflow-hidden shadow-xl bg-[var(--modal-bg)] border border-[var(--card-border)] group/slider">
+          <div className="relative w-full aspect-[16/9] md:aspect-[21/9] lg:aspect-[24/9] rounded-3xl overflow-hidden shadow-2xl bg-[var(--input-bg)]">
             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none w-full h-full scroll-smooth">
               {displayBanners.map((b: any, i: number) => {
                 const img = b.image_url || b.image || "/placeholder.png";
                 return (
-                  <a key={i} href={b.link_url || "#"} className="min-w-full h-full snap-center relative block flex-shrink-0">
-                    {b.is_smart ? (
-                       <div className="w-full h-full flex items-center justify-center p-8 bg-gradient-to-tr from-blue-50/50 to-indigo-50/50 dark:from-slate-900 dark:to-slate-800">
-                          <img src={img} alt={b.title} className="w-full h-full object-contain mix-blend-multiply drop-shadow-xl hover:scale-105 transition-transform duration-700" />
-                       </div>
-                    ) : (
-                       <img src={img} alt={b.title} className="w-full h-full object-cover" />
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent flex items-end p-6 sm:p-10 pointer-events-none">
-                      <h2 className="text-white font-black text-base sm:text-xl md:text-3xl drop-shadow-lg line-clamp-2 translate-y-2 group-hover/slider:translate-y-0 transition-transform">
+                  <a key={i} href={b.link_url || "#"} className="min-w-full h-full snap-center relative block group">
+                    {/* استفاده از object-cover برای پر کردن کامل کادر به شکل بنر گرافیکی */}
+                    <img src={img} alt={b.title || "Banner"} className="w-full h-full object-cover" />
+                    
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
+                      <h2 className="text-white font-black text-lg md:text-2xl drop-shadow-md line-clamp-2">
                         {b.title}
                       </h2>
                     </div>
@@ -65,15 +63,17 @@ export default function DynamicHomeSections({ initialProducts, initialBanners }:
                 );
               })}
             </div>
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10 bg-black/30 backdrop-blur-sm px-3 py-1.5 rounded-full pointer-events-none">
+            
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10 bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-full pointer-events-none">
               {displayBanners.map((_, i) => (
-                <div key={i} className="w-1.5 h-1.5 rounded-full bg-white/70 shadow-sm" />
+                <div key={i} className="w-1.5 h-1.5 rounded-full bg-white/50 shadow-sm" />
               ))}
             </div>
           </div>
         </section>
       )}
 
+      {/* ── قفسه‌های محصولات ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-12 pb-10">
         {Object.entries(categoryMap).map(([category, catProducts]) => (
           <section key={category} className="space-y-4 sm:space-y-5">

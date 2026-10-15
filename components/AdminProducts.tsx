@@ -16,25 +16,30 @@ export default function AdminProducts(_props: any = {}) {
   const [loading, setLoading]     = useState(true);
   const [feedback, setFeedback]   = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // ── سرچ و فیلتر ──
   const [searchQuery, setSearchQuery]   = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
+  // ── ویرایش و افزودن تکی ──
   const [isModalOpen, setIsModalOpen]   = useState(false);
   const [editingProd, setEditingProd]   = useState<FullCatalogProduct | null>(null);
   const [saving, setSaving]             = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const singleImageInputRef = useRef<HTMLInputElement>(null);
   
+  // ── استودیوی پاکسازی پیشرفته ──
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [bulkActionType, setBulkActionType] = useState<"hide" | "delete">("delete");
   const [bulkTargetCategory, setBulkTargetCategory] = useState("all");
   const [bulkProcessing, setBulkProcessing] = useState(false);
 
+  // ── ویرایش نام دسته ──
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
   const [renameOld, setRenameOld] = useState("");
   const [renameNew, setRenameNew] = useState("");
   const [renaming, setRenaming] = useState(false);
 
+  // ── ایمپورت اکسل و متغیرهای دیفالت ──
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importStep, setImportStep] = useState<1 | 2 | 3>(1);
   const [importRows, setImportRows] = useState<any[]>([]);
@@ -43,7 +48,10 @@ export default function AdminProducts(_props: any = {}) {
   const [importing, setImporting] = useState(false);
   const docInputRef = useRef<HTMLInputElement>(null);
   const bulkImagesRef = useRef<HTMLInputElement>(null);
+  
+  // متغیرهای حیاتی برای فرم ایمپورت که باعث ارور شده بودند
   const [globalStock, setGlobalStock] = useState<number>(10);
+  const [globalCategory, setGlobalCategory] = useState<string>("");
 
   const notify = (text: string, type: "success"|"error" = "success") => {
     setFeedback({ type, text }); setTimeout(() => setFeedback(null), 4500);
@@ -69,6 +77,7 @@ export default function AdminProducts(_props: any = {}) {
     return () => { supabase.removeChannel(ch); };
   }, []);
 
+  // ── منطق پاک‌سازی پیشرفته ──
   const executeBulkAction = async () => {
     const isDelete = bulkActionType === "delete";
     const msg = isDelete 
@@ -90,6 +99,7 @@ export default function AdminProducts(_props: any = {}) {
     } catch (err: any) { notify(err.message || "خطا در انجام عملیات", "error"); } finally { setBulkProcessing(false); }
   };
 
+  // ── منطق ویرایش و حذف تکی ──
   const handleOpenEdit = (p?: FullCatalogProduct) => {
     soundEngine.playClick();
     if (p) setEditingProd({ ...p });
@@ -130,6 +140,7 @@ export default function AdminProducts(_props: any = {}) {
     } catch { notify("خطا در ذخیره سازی", "error"); } finally { setSaving(false); }
   };
 
+  // ── منطق ایمپورت (همراه با دسته بندی دیفالت) ──
   const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     try {
@@ -151,7 +162,8 @@ export default function AdminProducts(_props: any = {}) {
 
         return {
           title: row["نام محصول"] || row["عنوان"] || "بدون عنوان", sku: row["کد محصول"] || row["SKU"] || "",
-          purchase_price: dropPrice, price: finalPrice, category: row["دسته بندی"] || "کالای عمومی",
+          purchase_price: dropPrice, price: finalPrice, 
+          category: row["دسته بندی"] || globalCategory || "کالای عمومی",
           photo: row["Photo_Filename"] || null, description: row["Telegram_Description"] || "",
           stock: stockVal, brand: row["برند"] || "متفرقه",
         };
@@ -216,7 +228,13 @@ export default function AdminProducts(_props: any = {}) {
     } catch { alert("خطای سرور."); } finally { setRenaming(false); }
   };
 
-  const filtered = products.filter((p) => categoryFilter === "all" || p.category === categoryFilter);
+  // ── سرچ هوشمند و فیلتر ──
+  const filtered = products.filter((p) => {
+    const matchCat = categoryFilter === "all" || p.category === categoryFilter;
+    const matchSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                        (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchCat && matchSearch;
+  });
 
   return (
     <div className="space-y-6 font-sans text-[var(--text-primary)]" dir="rtl">
@@ -240,9 +258,9 @@ export default function AdminProducts(_props: any = {}) {
       {feedback && <div className={"p-4 rounded-2xl text-xs font-bold " + (feedback.type === "success" ? "bg-emerald-500/15 text-emerald-500" : "bg-rose-500/15 text-rose-500")}>{feedback.text}</div>}
 
       {/* ── فیلتر و جستجو ── */}
-      <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] grid grid-cols-2 gap-3 text-xs">
-        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="🔍 جستجو..." className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none" />
-        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold">
+      <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="🔍 جستجو بر اساس نام یا کد کالا..." className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold" />
+        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold">
           <option value="all">📁 همه دسته‌ها</option>
           {categories.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
@@ -268,6 +286,7 @@ export default function AdminProducts(_props: any = {}) {
                 </div>
               </div>
             ))}
+            {filtered.length === 0 && <div className="col-span-full py-10 text-center text-slate-400 font-bold">هیچ محصولی با این مشخصات یافت نشد.</div>}
           </div>
         )}
       </div>
@@ -280,7 +299,6 @@ export default function AdminProducts(_props: any = {}) {
               <h3 className="font-black text-rose-500 text-sm">🧹 استودیوی پاکسازی پیشرفته</h3>
               <button onClick={() => setIsBulkDeleteOpen(false)} className="text-rose-500 font-black p-1 hover:bg-rose-100 rounded-lg">✕</button>
             </div>
-            
             <div className="p-6 space-y-5 text-xs">
               <div>
                 <label className="block font-bold mb-2">نوع عملیات:</label>
@@ -289,7 +307,6 @@ export default function AdminProducts(_props: any = {}) {
                   <option value="hide">فقط مخفی‌سازی / ناموجود کردن (قابل بازگشت) 👁️‍🗨️</option>
                 </select>
               </div>
-
               <div>
                 <label className="block font-bold mb-2">هدف عملیات (دسته‌بندی):</label>
                 <select value={bulkTargetCategory} onChange={e => setBulkTargetCategory(e.target.value)} className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer">
@@ -297,14 +314,12 @@ export default function AdminProducts(_props: any = {}) {
                   {categories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-
               {bulkActionType === "delete" && (
                 <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 leading-relaxed font-bold">
                   ⚠️ هشدار: با اجرای این دستور، علاوه بر پاک شدن اطلاعات محصولات از دیتابیس، سیستم به صورت هوشمند **تمامی عکس‌های متصل به آن‌ها را نیز از فضای هاست ابری (Supabase Storage) پاک می‌کند** تا فضای سرور شما آزاد شود. این عملیات غیرقابل بازگشت است.
                 </div>
               )}
             </div>
-
             <div className="p-5 border-t border-[var(--card-border)] bg-[var(--modal-bg)] flex gap-3">
               <button onClick={() => setIsBulkDeleteOpen(false)} className="px-6 py-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs cursor-pointer hover:bg-rose-50 hover:text-rose-500 transition">انصراف</button>
               <button onClick={executeBulkAction} disabled={bulkProcessing} className="flex-1 py-4 rounded-2xl bg-rose-600 text-white font-black shadow-lg cursor-pointer disabled:opacity-50 hover:bg-rose-500 transition">
@@ -323,10 +338,8 @@ export default function AdminProducts(_props: any = {}) {
               <h3 className="font-black text-sm sm:text-base text-[var(--accent-blue)]">{editingProd.id ? "✏️ استودیوی ویرایش محصول" : "➕ ساخت محصول جدید"}</h3>
               <button type="button" onClick={() => setIsModalOpen(false)} className="p-2 bg-[var(--input-bg)] rounded-xl font-black cursor-pointer hover:bg-rose-500 hover:text-white transition">✕</button>
             </div>
-            
             <div className="flex-1 overflow-y-auto p-6">
               <div className="flex flex-col md:flex-row gap-8">
-                {/* آپلود عکس */}
                 <div className="w-full md:w-1/3 space-y-4">
                   <div className="aspect-square rounded-2xl border-2 border-dashed border-[var(--card-border)] flex flex-col items-center justify-center p-4 bg-[var(--input-bg)] relative overflow-hidden group">
                     {editingProd.image ? ( <img src={editingProd.image} alt="پیش‌نمایش" className="w-full h-full object-contain mix-blend-multiply bg-white rounded-xl" /> ) : ( <div className="text-4xl opacity-50">🖼️</div> )}
@@ -341,7 +354,6 @@ export default function AdminProducts(_props: any = {}) {
                   </div>
                 </div>
 
-                {/* فیلدهای متنی */}
                 <div className="w-full md:w-2/3 space-y-5 text-xs">
                   <div><label className="block font-bold mb-1.5 text-[var(--text-secondary)]">نام کامل محصول *</label><input required value={editingProd.title} onChange={e=>setEditingProd({...editingProd, title: e.target.value})} className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] font-bold" /></div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -356,7 +368,6 @@ export default function AdminProducts(_props: any = {}) {
                 </div>
               </div>
             </div>
-
             <div className="p-5 border-t border-[var(--card-border)] bg-[var(--modal-bg)] shrink-0 flex gap-3">
               <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs cursor-pointer hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200 transition">انصراف</button>
               <button type="button" onClick={handleSaveProduct} disabled={saving || uploadingImage} className="flex-1 py-4 rounded-2xl bg-blue-600 text-white font-black shadow-lg cursor-pointer disabled:opacity-50 hover:bg-blue-500 transition">
@@ -376,10 +387,24 @@ export default function AdminProducts(_props: any = {}) {
               {!importing && <button type="button" onClick={() => setIsImportOpen(false)} className="p-2 bg-[var(--input-bg)] rounded-xl font-black cursor-pointer hover:bg-rose-500 hover:text-white transition">✕</button>}
             </div>
             <div className="p-6 space-y-6 text-xs flex-1">
+              
               <div className={"p-5 rounded-3xl border transition " + (importStep === 1 ? "bg-[var(--accent-blue)]/5 border-[var(--accent-blue)]" : "bg-[var(--input-bg)] border-[var(--card-border)] opacity-60")}>
                 <h3 className="font-black text-sm mb-3 text-[var(--accent-blue)]">گام اول: فایل اکسل</h3>
+                
+                {/* بازگشت فیلدهای تنظیمات دیفالت که خواسته بودید */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 p-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
+                  <div>
+                    <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">موجودی پیش‌فرض:</label>
+                    <input type="number" value={globalStock} onChange={e => setGlobalStock(Number(e.target.value))} className="w-full p-3.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono focus:border-[var(--accent-blue)]" />
+                  </div>
+                  <div>
+                    <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">دسته‌بندی پیش‌فرض:</label>
+                    <input type="text" value={globalCategory} onChange={e => setGlobalCategory(e.target.value)} placeholder="مثال: لوازم ورزشی" className="w-full p-3.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] font-bold" />
+                  </div>
+                </div>
+
                 <div className="flex gap-4">
-                  <button type="button" onClick={() => docInputRef.current?.click()} disabled={importStep !== 1} className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black cursor-pointer shadow-lg disabled:opacity-50 hover:bg-blue-600 transition">📁 انتخاب فایل اکسل</button>
+                  <button type="button" onClick={() => docInputRef.current?.click()} disabled={importStep !== 1} className="px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black cursor-pointer shadow-lg disabled:opacity-50 hover:bg-blue-600 transition">📁 انتخاب فایل اکسل</button>
                   <input ref={docInputRef} type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleDocumentUpload} />
                 </div>
               </div>
@@ -388,8 +413,8 @@ export default function AdminProducts(_props: any = {}) {
                 <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
                   <div className="flex items-center justify-between mb-3"><h3 className="font-black text-sm text-[var(--accent-blue)]">پیش‌نمایش محصولات</h3><span className="px-3 py-1 bg-emerald-500/15 text-emerald-500 rounded-lg font-bold">{importRows.length} کالا</span></div>
                   <div className="overflow-x-auto max-h-48 border border-[var(--card-border)] rounded-2xl">
-                    <table className="w-full text-right"><thead className="bg-[var(--input-bg)] sticky top-0"><tr><th className="p-3">عنوان</th><th className="p-3">موجودی</th><th className="p-3">قیمت (+25٪)</th></tr></thead>
-                      <tbody className="divide-y divide-[var(--card-border)] font-bold">{importRows.map((r, idx) => (<tr key={idx}><td className="p-3 truncate max-w-[200px]">{r.title}</td><td className="p-3 text-indigo-500">{r.stock}</td><td className="p-3 font-mono text-emerald-500">{r.price.toLocaleString("fa-IR")}</td></tr>))}</tbody>
+                    <table className="w-full text-right"><thead className="bg-[var(--input-bg)] sticky top-0"><tr><th className="p-3">عنوان</th><th className="p-3">دسته‌بندی</th><th className="p-3">موجودی</th><th className="p-3">قیمت (+25٪)</th></tr></thead>
+                      <tbody className="divide-y divide-[var(--card-border)] font-bold">{importRows.map((r, idx) => (<tr key={idx}><td className="p-3 truncate max-w-[200px]">{r.title}</td><td className="p-3 text-[var(--text-secondary)] font-normal">{r.category}</td><td className="p-3 text-indigo-500">{r.stock}</td><td className="p-3 font-mono text-emerald-500">{r.price.toLocaleString("fa-IR")}</td></tr>))}</tbody>
                     </table>
                   </div>
                 </div>
@@ -397,7 +422,7 @@ export default function AdminProducts(_props: any = {}) {
 
               <div className={"p-5 rounded-3xl border transition " + (importStep === 2 ? "bg-emerald-500/5 border-emerald-500" : "bg-[var(--input-bg)] border-[var(--card-border)] opacity-60")}>
                 <h3 className="font-black text-sm mb-3 text-emerald-500">گام دوم: تصاویر</h3>
-                <div className="flex gap-4"><button type="button" onClick={() => bulkImagesRef.current?.click()} disabled={importStep !== 2} className="px-6 py-3 rounded-2xl bg-emerald-600 text-white font-black cursor-pointer shadow-lg disabled:opacity-50 hover:bg-emerald-500 transition">🖼️ انتخاب تصاویر متناظر</button><input ref={bulkImagesRef} type="file" accept="image/*" multiple className="hidden" onChange={handleSmartImageSelection} /></div>
+                <div className="flex gap-4"><button type="button" onClick={() => bulkImagesRef.current?.click()} disabled={importStep !== 2} className="px-6 py-3.5 rounded-2xl bg-emerald-600 text-white font-black cursor-pointer shadow-lg disabled:opacity-50 hover:bg-emerald-500 transition">🖼️ انتخاب تصاویر متناظر</button><input ref={bulkImagesRef} type="file" accept="image/*" multiple className="hidden" onChange={handleSmartImageSelection} /></div>
               </div>
 
               {importLogs.length > 0 && (<div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] max-h-48 overflow-y-auto space-y-1.5 font-mono">{importLogs.map((log, i) => (<div key={i} className={"text-[10px] " + (log.includes("❌") ? "text-rose-500" : "text-emerald-500")}>{log}</div>))}</div>)}
@@ -423,7 +448,6 @@ export default function AdminProducts(_props: any = {}) {
           </div>
         </div>
       )}
-
     </div>
   );
 }

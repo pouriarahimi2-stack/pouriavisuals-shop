@@ -148,6 +148,7 @@ export function AdminProducts(_props: any = {}) {
   const [globalStock, setGlobalStock]     = useState<number>(10);
   const [globalCategory, setGlobalCategory] = useState<string>("");
   const [profitMargin, setProfitMargin]   = useState<number>(25);
+  const [importOnlyAvailable, setImportOnlyAvailable] = useState<boolean>(true);
   const docInputRef    = useRef<HTMLInputElement>(null);
   const bulkImagesRef  = useRef<HTMLInputElement>(null);
 
@@ -370,8 +371,10 @@ export function AdminProducts(_props: any = {}) {
           warranty:       String(fuzzyGet(row,"warranty")||"").trim(),
         };
       }).filter((r:any) => r.title && r.title !== "بدون عنوان");
-      setImportRows(parsed);
-      setImportLogs([`✅ فایل خوانده شد. (${parsed.length} محصول)`]);
+      const filtered = importOnlyAvailable ? parsed.filter((r:any) => r.stock > 0) : parsed;
+      const skipped = parsed.length - filtered.length;
+      setImportRows(filtered);
+      setImportLogs(["✅ فایل خوانده شد. "+filtered.length+" محصول"+(skipped>0?" (⏭️ "+skipped+" ناموجود حذف شد)":"")]);
       setImportStep(2);
     } catch { notify("❌ خطا در پردازش فایل.", "error"); }
     e.target.value = "";
@@ -904,6 +907,13 @@ export function AdminProducts(_props: any = {}) {
                       className="w-full p-3 rounded-xl bg-[var(--input-bg)] border outline-none font-bold" />
                   </div>
                 </div>
+                <label className="flex items-center gap-3 cursor-pointer select-none mb-2">
+                  <div onClick={()=>setImportOnlyAvailable(v=>!v)}
+                    className={`w-11 h-6 rounded-full transition-colors flex-shrink-0 flex items-center px-1 ${importOnlyAvailable?"bg-emerald-500":"bg-[var(--card-border)]"}`}>
+                    <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${importOnlyAvailable?"translate-x-5":"translate-x-0"}`}/>
+                  </div>
+                  <span className="font-bold text-xs">فقط محصولات موجود را وارد کن <span className="text-[var(--text-secondary)] font-normal">(ناموجودها skip می‌شن)</span></span>
+                </label>
                 <button type="button" onClick={()=>docInputRef.current?.click()} disabled={importStep!==1}
                   className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black cursor-pointer shadow-lg disabled:opacity-50">
                   📁 انتخاب فایل (Excel/CSV)

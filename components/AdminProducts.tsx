@@ -9,22 +9,23 @@ export interface FullCatalogProduct {
   price: number; discount_price?: number | null; purchase_price?: number; stock: number;
   is_available: boolean; image?: string; images?: string[]; description?: string;
   warranty?: string; meta_title?: string; meta_description?: string; specs?: Record<string, any>;
+  shipping_type?: "post" | "tipax" | "both";
 }
 
 function isRealUrl(s: string) { return !!(s && !s.startsWith("data:") && s.length < 2000); }
 
-// ── فازی‌کای ستون‌ها ────────────────────────────────
 const COL_MAP: Record<string, string[]> = {
-  title:          ["نام محصول","عنوان","title","product name","product_name","اسم محصول","نام"],
-  sku:            ["کد محصول","sku","code","product code","product_code","کد","شناسه"],
-  drop_price:     ["قیمت دراپ","drop price","drop_price","قیمت","price","قیمت خرید","buying price"],
-  stock:          ["موجودی","stock","quantity","تعداد","qty"],
-  category:       ["دسته بندی","دسته‌بندی","category","cat","دسته","گروه"],
-  brand:          ["برند","brand","manufacturer","سازنده"],
-  photo:          ["photo_filename","photo filename","photo","تصویر","عکس","image","img","filename"],
-  description:    ["telegram_description","telegram description","توضیحات","description","desc","متن"],
-  discount_price: ["قیمت تخفیف","قیمت فروش","discount","sale price","discount_price","قیمت ویژه"],
-  warranty:       ["گارانتی","warranty","ضمانت"],
+  title:         ["نام محصول","عنوان","title","product name","product_name","اسم محصول","نام"],
+  sku:           ["کد محصول","sku","code","product code","product_code","کد","شناسه"],
+  drop_price:    ["قیمت دراپ","drop price","drop_price","قیمت","price","قیمت خرید","buying price"],
+  stock:         ["موجودی","stock","quantity","تعداد","qty"],
+  category:      ["دسته بندی","دسته‌بندی","category","cat","دسته","گروه"],
+  brand:         ["برند","brand","manufacturer","سازنده"],
+  photo:         ["photo_filename","photo filename","photo","تصویر","عکس","image","img","filename"],
+  description:   ["telegram_description","telegram description","توضیحات","description","desc","متن"],
+  discount_price:["قیمت تخفیف","قیمت فروش","discount","sale price","discount_price","قیمت ویژه"],
+  warranty:      ["گارانتی","warranty","ضمانت"],
+  shipping_type: ["نوع ارسال","shipping_type","shipping","ارسال","روش ارسال","delivery","نحوه ارسال"],
 };
 
 function fuzzyGet(row: Record<string,any>, col: string): any {
@@ -40,21 +41,15 @@ function fuzzyGet(row: Record<string,any>, col: string): any {
   return undefined;
 }
 
-// ── تطبیق هوشمند تصاویر ─────────────────────────────
-// برمی‌گردونه آرایه‌ای از فایل‌های تصویری که به این محصول تعلق دارن
 function fuzzyMatchImages(allFiles: File[], photoField: string | null, sku: string): File[] {
   const result: File[] = [];
   const seen = new Set<string>();
-
   const addFile = (f: File) => { if (!seen.has(f.name)) { seen.add(f.name); result.push(f); } };
-
-  // ۱. اگه Photo_Filename داشت (شاید comma-separated)
   if (photoField) {
     const names = photoField.split(/[,،;]/).map((s: string) => s.trim()).filter(Boolean);
     for (const name of names) {
       const nl = name.toLowerCase();
       const noExt = nl.replace(/\.[^.]+$/, "");
-      // exact → case-insensitive → بدون پسوند
       const found =
         allFiles.find(f => f.name === name) ||
         allFiles.find(f => f.name.toLowerCase() === nl) ||
@@ -62,8 +57,6 @@ function fuzzyMatchImages(allFiles: File[], photoField: string | null, sku: stri
       if (found) addFile(found);
     }
   }
-
-  // ۲. SKU-based: فایل‌هایی که اسمشون با SKU شروع می‌شه
   if (sku) {
     const skuL = sku.toLowerCase().replace(/[^a-z0-9]/g, "");
     if (skuL.length >= 3) {
@@ -73,7 +66,6 @@ function fuzzyMatchImages(allFiles: File[], photoField: string | null, sku: stri
       });
     }
   }
-
   return result;
 }
 
@@ -92,10 +84,19 @@ function parseStock(val: any, fallback: number): number {
   return n > 0 ? n : fallback;
 }
 
+function parseShippingType(val: any): "post" | "tipax" | "both" {
+  if (!val) return "both";
+  const s = String(val).trim().toLowerCase();
+  if (s.includes("پست") || s === "post") return "post";
+  if (s.includes("تیپاکس") || s.includes("tipax") || s.includes("پیک")) return "tipax";
+  return "both";
+}
+
 const EMPTY_FORM = (): Partial<FullCatalogProduct> => ({
   title:"", sku:"", brand:"", category:"", warranty:"",
   price:0, discount_price:null, purchase_price:0, stock:10,
   is_available:true, image:"", images:[], description:"",
+  shipping_type:"both",
 });
 
 export function AdminProducts(_props: any = {}) {
@@ -106,49 +107,45 @@ export function AdminProducts(_props: any = {}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
-  // ── مودال افزودن/ویرایش محصول ──────────────────────
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProd, setEditingProd] = useState<FullCatalogProduct|null>(null); // null = جدید
+  const [editingProd, setEditingProd] = useState<FullCatalogProduct|null>(null);
   const [editForm, setEditForm]       = useState<Partial<FullCatalogProduct>>(EMPTY_FORM());
   const [editSaving, setEditSaving]   = useState(false);
   const [activeTab, setActiveTab]     = useState<"basic"|"images">("basic");
+  // درصد سود برای محاسبه قیمت از روی قیمت خرید
+  const [profitPctLocal, setProfitPctLocal] = useState<number>(25);
 
-  // آپلود چند تصویر
   const [uploadingImages, setUploadingImages] = useState(false);
   const [imageDragOver, setImageDragOver]     = useState(false);
   const multiImgRef = useRef<HTMLInputElement>(null);
 
-  // ── مودال حذف تکی ─────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<FullCatalogProduct|null>(null);
   const [deleting, setDeleting]         = useState(false);
 
-  // ── حذف دسته‌جمعی ─────────────────────────────────
   const [bulkMode, setBulkMode]             = useState(false);
   const [selectedIds, setSelectedIds]       = useState<Set<string>>(new Set());
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting]     = useState(false);
   const [bulkDeleteProgress, setBulkDeleteProgress] = useState(0);
-  const [bulkDeleteCat, setBulkDeleteCat]   = useState<string>("all"); // فیلتر دسته برای حذف
 
-  // ── تغییر نام دسته‌بندی ────────────────────────────
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
   const [renameOld, setRenameOld] = useState("");
   const [renameNew, setRenameNew] = useState("");
   const [renaming, setRenaming]   = useState(false);
 
-  // ── ایمپورت هوشمند ────────────────────────────────
   const [isImportOpen, setIsImportOpen]   = useState(false);
   const [importStep, setImportStep]       = useState<1|2|3>(1);
   const [importRows, setImportRows]       = useState<any[]>([]);
   const [importImages, setImportImages]   = useState<File[]>([]);
   const [importLogs, setImportLogs]       = useState<string[]>([]);
   const [importing, setImporting]         = useState(false);
-  const [importSummary, setImportSummary] = useState<{success:number;updated:number;failed:number;details:{title:string;status:"new"|"update"|"fail";reason?:string}[]}|null>(null);
+  const [importSummary, setImportSummary] = useState<{success:number;updated:number;skipped:number;failed:number;details:{title:string;status:"new"|"update"|"skip"|"fail";reason?:string}[]}|null>(null);
   const [imagePreviewMap, setImagePreviewMap] = useState<Record<string,string>>({});
   const [globalStock, setGlobalStock]     = useState<number>(10);
   const [globalCategory, setGlobalCategory] = useState<string>("");
   const [profitMargin, setProfitMargin]   = useState<number>(25);
   const [importOnlyAvailable, setImportOnlyAvailable] = useState<boolean>(true);
+  const [importSkipExisting, setImportSkipExisting]   = useState<boolean>(false);
   const docInputRef    = useRef<HTMLInputElement>(null);
   const bulkImagesRef  = useRef<HTMLInputElement>(null);
 
@@ -168,6 +165,7 @@ export function AdminProducts(_props: any = {}) {
         stock: p.stock !== undefined ? Number(p.stock) : 10,
         is_available: p.is_available !== false,
         images: Array.isArray(p.images) ? p.images.filter(isRealUrl) : [],
+        shipping_type: p.shipping_type || "both",
       }));
       setProducts(list);
       setCategories(Array.from(new Set<string>(list.map(x=>x.category).filter(Boolean))));
@@ -196,11 +194,37 @@ export function AdminProducts(_props: any = {}) {
     );
   });
 
-  // ── باز کردن فرم (جدید یا ویرایش) ─────────────────
-  const openAdd  = () => { setEditingProd(null); setEditForm(EMPTY_FORM()); setActiveTab("basic"); setIsModalOpen(true); };
-  const openEdit = (p: FullCatalogProduct) => { setEditingProd(p); setEditForm({...p, images:[...(p.images||[])]}); setActiveTab("basic"); setIsModalOpen(true); };
+  const openAdd  = () => { setEditingProd(null); setEditForm(EMPTY_FORM()); setActiveTab("basic"); setProfitPctLocal(25); setIsModalOpen(true); };
+  const openEdit = (p: FullCatalogProduct) => {
+    setEditingProd(p);
+    setEditForm({...p, images:[...(p.images||[])]});
+    setActiveTab("basic");
+    // محاسبه درصد سود از روی قیمت موجود
+    if (p.purchase_price && p.purchase_price > 0 && p.price > 0) {
+      setProfitPctLocal(Math.round(((p.price / p.purchase_price) - 1) * 100));
+    } else {
+      setProfitPctLocal(25);
+    }
+    setIsModalOpen(true);
+  };
 
-  // ── آپلود چند تصویر ────────────────────────────────
+  // آپدیت قیمت وقتی درصد سود عوض میشه
+  const handleProfitPctChange = (pct: number) => {
+    setProfitPctLocal(pct);
+    const pp = Number(editForm.purchase_price || 0);
+    if (pp > 0) {
+      setEditForm(f => ({ ...f, price: Math.round(pp * (1 + pct / 100)) }));
+    }
+  };
+
+  // آپدیت قیمت وقتی قیمت خرید عوض میشه
+  const handlePurchasePriceChange = (pp: number) => {
+    setEditForm(f => ({ ...f, purchase_price: pp }));
+    if (pp > 0 && profitPctLocal > 0) {
+      setEditForm(f => ({ ...f, purchase_price: pp, price: Math.round(pp * (1 + profitPctLocal / 100)) }));
+    }
+  };
+
   const uploadImageFiles = async (files: FileList | File[]) => {
     const arr = Array.from(files).filter(f => f.type.startsWith("image/"));
     if (!arr.length) return;
@@ -242,11 +266,8 @@ export function AdminProducts(_props: any = {}) {
     });
   };
 
-  const setMainImage = (url: string) => {
-    setEditForm(prev => ({ ...prev, image: url }));
-  };
+  const setMainImage = (url: string) => setEditForm(prev => ({ ...prev, image: url }));
 
-  // ── ذخیره محصول ────────────────────────────────────
   const saveProduct = async () => {
     if (!editForm.title?.trim()) { notify("❌ عنوان محصول الزامی است.", "error"); return; }
     soundEngine.playClick(); setEditSaving(true);
@@ -261,6 +282,7 @@ export function AdminProducts(_props: any = {}) {
         is_available: Number(editForm.stock||0) > 0,
         images: (editForm.images||[]).filter(isRealUrl),
         image: editForm.image && isRealUrl(editForm.image) ? editForm.image : ((editForm.images||[]).filter(isRealUrl)[0]||"/placeholder.png"),
+        shipping_type: editForm.shipping_type || "both",
       };
       const res = await fetch("/api/products", {
         method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload)
@@ -277,15 +299,9 @@ export function AdminProducts(_props: any = {}) {
     finally { setEditSaving(false); }
   };
 
-  // ── توابع حذف دسته‌جمعی ───────────────────────────
   const toggleSelect = (id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+    setSelectedIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   };
-
   const selectAll = () => setSelectedIds(new Set(filtered.map(p=>p.id)));
   const selectByCategory = (cat: string) => setSelectedIds(new Set(products.filter(p=>p.category===cat).map(p=>p.id)));
   const clearSelection = () => setSelectedIds(new Set());
@@ -297,9 +313,7 @@ export function AdminProducts(_props: any = {}) {
     setBulkDeleting(true); setBulkDeleteProgress(0);
     let done = 0;
     for (const id of ids) {
-      try {
-        await fetch(`/api/products?id=${id}`, { method: "DELETE" });
-      } catch {}
+      try { await fetch(`/api/products?id=${id}`, { method: "DELETE" }); } catch {}
       done++;
       setBulkDeleteProgress(Math.round((done/ids.length)*100));
     }
@@ -310,7 +324,6 @@ export function AdminProducts(_props: any = {}) {
     setSelectedIds(new Set()); fetchCatalog();
   };
 
-  // ── حذف تکی ────────────────────────────────────────
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     soundEngine.playClick(); setDeleting(true);
@@ -328,7 +341,6 @@ export function AdminProducts(_props: any = {}) {
     finally { setDeleting(false); }
   };
 
-  // ── تغییر نام دسته‌بندی ────────────────────────────
   const handleRenameCategory = async () => {
     if (!renameOld || !renameNew.trim()) return;
     soundEngine.playClick(); setRenaming(true);
@@ -346,7 +358,6 @@ export function AdminProducts(_props: any = {}) {
     finally { setRenaming(false); }
   };
 
-  // ── ایمپورت هوشمند ────────────────────────────────
   const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     try {
@@ -359,22 +370,23 @@ export function AdminProducts(_props: any = {}) {
         const drop = parsePrice(fuzzyGet(row,"drop_price"));
         const disc = parsePrice(fuzzyGet(row,"discount_price"));
         return {
-          title:          String(fuzzyGet(row,"title")||"بدون عنوان").trim(),
-          sku:            String(fuzzyGet(row,"sku")||"").trim(),
-          purchase_price: drop,
-          price:          disc > 0 ? disc : Math.round(drop * mult),
-          category:       String(fuzzyGet(row,"category")||globalCategory||"عمومی").trim(),
-          photo:          String(fuzzyGet(row,"photo")||"").trim()||null,
-          description:    String(fuzzyGet(row,"description")||"").trim(),
-          stock:          parseStock(fuzzyGet(row,"stock"), globalStock),
-          brand:          String(fuzzyGet(row,"brand")||"متفرقه").trim(),
-          warranty:       String(fuzzyGet(row,"warranty")||"").trim(),
+          title:         String(fuzzyGet(row,"title")||"بدون عنوان").trim(),
+          sku:           String(fuzzyGet(row,"sku")||"").trim(),
+          purchase_price:drop,
+          price:         disc > 0 ? disc : Math.round(drop * mult),
+          category:      String(fuzzyGet(row,"category")||globalCategory||"عمومی").trim(),
+          photo:         String(fuzzyGet(row,"photo")||"").trim()||null,
+          description:   String(fuzzyGet(row,"description")||"").trim(),
+          stock:         parseStock(fuzzyGet(row,"stock"), globalStock),
+          brand:         String(fuzzyGet(row,"brand")||"متفرقه").trim(),
+          warranty:      String(fuzzyGet(row,"warranty")||"").trim(),
+          shipping_type: parseShippingType(fuzzyGet(row,"shipping_type")),
         };
       }).filter((r:any) => r.title && r.title !== "بدون عنوان");
-      const filtered = importOnlyAvailable ? parsed.filter((r:any) => r.stock > 0) : parsed;
-      const skipped = parsed.length - filtered.length;
-      setImportRows(filtered);
-      setImportLogs(["✅ فایل خوانده شد. "+filtered.length+" محصول"+(skipped>0?" (⏭️ "+skipped+" ناموجود حذف شد)":"")]);
+      const afterAvail = importOnlyAvailable ? parsed.filter((r:any) => r.stock > 0) : parsed;
+      const skippedAvail = parsed.length - afterAvail.length;
+      setImportRows(afterAvail);
+      setImportLogs(["✅ فایل خوانده شد. "+afterAvail.length+" محصول"+(skippedAvail>0?" (⏭️ "+skippedAvail+" ناموجود حذف شد)":"")]);
       setImportStep(2);
     } catch { notify("❌ خطا در پردازش فایل.", "error"); }
     e.target.value = "";
@@ -382,33 +394,30 @@ export function AdminProducts(_props: any = {}) {
 
   const handleSmartImageSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files||[]);
-    // همه فایل‌ها رو نگه می‌داریم — fuzzyMatch موقع ایمپورت تشخیص می‌ده
     setImportImages(files);
-    // پیش‌نمایش برای فایل‌هایی که در Photo_Filename هستن
     const prev: Record<string,string> = {};
     files.forEach(f => { prev[f.name] = URL.createObjectURL(f); });
     setImagePreviewMap(prev);
-    // آمار: چند تا از این عکسا match میشن؟
     let matchCount = 0;
-    importRows.forEach(r => {
-      const m = fuzzyMatchImages(files, r.photo, r.sku||"");
-      if (m.length > 0) matchCount++;
-    });
-    setImportLogs(p => [
-      `📸 ${files.length} فایل انتخاب شد — ${matchCount} از ${importRows.length} محصول تصویر پیدا کرد.`,
-      ...p
-    ]);
+    importRows.forEach(r => { const m = fuzzyMatchImages(files, r.photo, r.sku||""); if (m.length > 0) matchCount++; });
+    setImportLogs(p => [`📸 ${files.length} فایل انتخاب شد — ${matchCount} از ${importRows.length} محصول تصویر پیدا کرد.`, ...p]);
   };
 
   const executeBulkImport = async () => {
     soundEngine.playClick(); setImporting(true); setImportStep(3);
-    let sc=0, uc=0, fc=0;
-    const details: {title:string;status:"new"|"update"|"fail";reason?:string}[] = [];
+    let sc=0, uc=0, skc=0, fc=0;
+    const details: {title:string;status:"new"|"update"|"skip"|"fail";reason?:string}[] = [];
     for (let i=0; i<importRows.length; i++) {
       const row = importRows[i];
       try {
         const ex = products.find(p=>(row.sku && p.sku===row.sku)||p.title.trim().toLowerCase()===row.title.trim().toLowerCase());
-        // تطبیق هوشمند تصاویر (چندگانه)
+        // اگر skip-existing فعاله و محصول وجود داشت، رد کن
+        if (importSkipExisting && ex) {
+          skc++;
+          details.push({title:row.title, status:"skip"});
+          setImportLogs(p => [`⏭️ [${i+1}/${importRows.length}] skip: ${row.title}`, ...p.slice(0,29)]);
+          continue;
+        }
         const matchedFiles = fuzzyMatchImages(importImages, row.photo, row.sku||"");
         const imgCount = matchedFiles.length;
         setImportLogs(p => [`⏳ [${i+1}/${importRows.length}] ${row.title} ${imgCount>0?"(📸 "+imgCount+" عکس)":"(بدون عکس)"}`, ...p.slice(0,29)]);
@@ -421,9 +430,7 @@ export function AdminProducts(_props: any = {}) {
           } catch {}
         }
         let imgUrl = uploadedUrls[0] || ex?.image || "/placeholder.png";
-        const allImages = uploadedUrls.length > 0
-          ? uploadedUrls
-          : (ex?.images?.filter(isRealUrl) || [imgUrl]);
+        const allImages = uploadedUrls.length > 0 ? uploadedUrls : (ex?.images?.filter(isRealUrl) || [imgUrl]);
         const payload:any = {
           id:ex?.id, title:row.title, category:row.category||ex?.category||"عمومی",
           price:row.price, purchase_price:row.purchase_price, stock:row.stock,
@@ -434,19 +441,19 @@ export function AdminProducts(_props: any = {}) {
           brand:row.brand||ex?.brand||"متفرقه",
           sku:row.sku||ex?.sku||"",
           warranty:row.warranty||ex?.warranty||"",
+          shipping_type:row.shipping_type||ex?.shipping_type||"both",
         };
         const res=await fetch("/api/products",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
         if (res.ok) { ex?(uc++,details.push({title:row.title,status:"update"})):(sc++,details.push({title:row.title,status:"new"})); }
         else { const j=await res.json().catch(()=>({})); fc++; details.push({title:row.title,status:"fail",reason:j.message||`HTTP ${res.status}`}); }
-      } catch(e:any) { fc++; details.push({title:row.title,status:"fail",reason:e?.message||"خطای ناشناخته"}); }
+      } catch(e) { const err = e as any; fc++; details.push({title:row.title,status:"fail",reason:err?.message||"خطای ناشناخته"}); }
     }
     soundEngine.playSuccess();
-    setImportSummary({success:sc,updated:uc,failed:fc,details});
-    setImportLogs(p=>[`🎉 پایان: ${sc} جدید، ${uc} آپدیت، ${fc} خطا`,...p]);
+    setImportSummary({success:sc,updated:uc,skipped:skc,failed:fc,details});
+    setImportLogs(p=>[`🎉 پایان: ${sc} جدید، ${uc} آپدیت، ${skc} skip، ${fc} خطا`,...p]);
     setImporting(false); fetchCatalog();
   };
 
-  // ────────────────────────────────────────────────────
   return (
     <div className="space-y-6 font-sans text-[var(--text-primary)]" dir="rtl">
 
@@ -494,13 +501,11 @@ export function AdminProducts(_props: any = {}) {
         </select>
       </div>
 
-      {/* ── نوار حذف گروهی ── */}
       {bulkMode && (
         <div className="p-4 rounded-3xl bg-rose-500/10 border border-rose-500/30 flex flex-col sm:flex-row items-start sm:items-center gap-3 text-xs" dir="rtl">
           <span className="font-black text-rose-500">🗑️ حالت حذف گروهی فعال — {selectedIds.size} محصول انتخاب شده</span>
           <div className="flex flex-wrap gap-2 sm:mr-auto">
-            <button type="button" onClick={selectAll}
-              className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 font-bold hover:bg-rose-500/25 transition-colors">
+            <button type="button" onClick={selectAll} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 font-bold hover:bg-rose-500/25 transition-colors">
               انتخاب همه ({filtered.length})
             </button>
             {categories.map(cat=>(
@@ -509,8 +514,7 @@ export function AdminProducts(_props: any = {}) {
                 {cat} ({products.filter(p=>p.category===cat).length})
               </button>
             ))}
-            <button type="button" onClick={clearSelection}
-              className="px-3 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold hover:border-rose-500/40 transition-colors">
+            <button type="button" onClick={clearSelection} className="px-3 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold hover:border-rose-500/40 transition-colors">
               لغو انتخاب
             </button>
           </div>
@@ -532,8 +536,7 @@ export function AdminProducts(_props: any = {}) {
             <div className="text-4xl">{searchQuery?"🔍":"📭"}</div>
             <p className="text-slate-400 font-bold">{searchQuery?"نتیجه‌ای یافت نشد.":"هنوز محصولی ثبت نشده."}</p>
             {!searchQuery && (
-              <button type="button" onClick={openAdd}
-                className="mx-auto flex items-center gap-2 px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-lg">
+              <button type="button" onClick={openAdd} className="mx-auto flex items-center gap-2 px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-lg">
                 ➕ اولین محصول را اضافه کنید
               </button>
             )}
@@ -545,12 +548,9 @@ export function AdminProducts(_props: any = {}) {
                 onClick={()=>bulkMode&&toggleSelect(p.id)}
                 className={`p-4 rounded-2xl bg-[var(--input-bg)] border flex flex-col gap-3 transition-colors ${
                   bulkMode
-                    ? selectedIds.has(p.id)
-                      ? "border-rose-500 bg-rose-500/5 cursor-pointer"
-                      : "border-[var(--card-border)] hover:border-rose-400/40 cursor-pointer"
+                    ? selectedIds.has(p.id) ? "border-rose-500 bg-rose-500/5 cursor-pointer" : "border-[var(--card-border)] hover:border-rose-400/40 cursor-pointer"
                     : "border-[var(--card-border)] hover:border-[var(--accent-blue)]/40"
                 }`}>
-                {/* چک‌باکس در حالت bulk */}
                 {bulkMode && (
                   <div className="flex items-center gap-2 pb-1 border-b border-[var(--card-border)]">
                     <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${selectedIds.has(p.id)?"bg-rose-500 border-rose-500":"border-[var(--card-border)]"}`}>
@@ -560,7 +560,6 @@ export function AdminProducts(_props: any = {}) {
                   </div>
                 )}
                 <div className="flex gap-3">
-                  {/* گالری کوچک */}
                   <div className="flex-shrink-0">
                     <img src={p.image||"/placeholder.png"} className="w-16 h-16 rounded-2xl object-contain border bg-white p-1" alt={p.title} />
                     {(p.images||[]).filter(isRealUrl).length > 1 && (
@@ -579,6 +578,11 @@ export function AdminProducts(_props: any = {}) {
                     <h3 className="font-black text-xs line-clamp-2">{p.title}</h3>
                     {p.brand && p.brand!=="متفرقه" && <span className="text-[10px] text-[var(--text-secondary)]">{p.brand}</span>}
                     <div className="font-mono text-emerald-500 font-bold">{p.price.toLocaleString("fa-IR")} تومان</div>
+                    {p.shipping_type && p.shipping_type !== "both" && (
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${p.shipping_type==="post"?"bg-blue-500/15 text-blue-500":"bg-amber-500/15 text-amber-500"}`}>
+                        {p.shipping_type==="post"?"📮 پست":"🚚 تیپاکس"}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center justify-between pt-1 border-t border-[var(--card-border)]">
@@ -614,17 +618,12 @@ export function AdminProducts(_props: any = {}) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 sm:p-4 animate-fadeIn"
           onClick={e=>{if(e.target===e.currentTarget&&!editSaving)setIsModalOpen(false);}}>
           <div className="w-full max-w-2xl max-h-[94vh] overflow-y-auto bg-[var(--modal-bg)] rounded-3xl shadow-2xl border border-[var(--card-border)] flex flex-col" dir="rtl">
-
             <div className="flex items-center justify-between p-5 border-b border-[var(--card-border)] sticky top-0 bg-[var(--modal-bg)] z-10 rounded-t-3xl">
               <h2 className="font-black text-sm text-[var(--accent-blue)]">
                 {editingProd?"✏️ ویرایش محصول":"➕ افزودن محصول جدید"}
               </h2>
-              {!editSaving&&(
-                <button type="button" onClick={()=>setIsModalOpen(false)} className="p-2 rounded-xl bg-[var(--input-bg)] font-black">✕</button>
-              )}
+              {!editSaving&&<button type="button" onClick={()=>setIsModalOpen(false)} className="p-2 rounded-xl bg-[var(--input-bg)] font-black">✕</button>}
             </div>
-
-            {/* تب‌ها */}
             <div className="flex border-b border-[var(--card-border)] px-5 sticky top-[61px] bg-[var(--modal-bg)] z-10">
               {(["basic","images"] as const).map(tab=>(
                 <button key={tab} type="button" onClick={()=>setActiveTab(tab)}
@@ -633,9 +632,7 @@ export function AdminProducts(_props: any = {}) {
                 </button>
               ))}
             </div>
-
             <div className="p-5 space-y-4 flex-1 text-xs">
-
               {activeTab==="basic"&&(
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
@@ -664,21 +661,46 @@ export function AdminProducts(_props: any = {}) {
                     <input type="text" value={editForm.warranty||""} onChange={e=>setEditForm(f=>({...f,warranty:e.target.value}))}
                       className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none" />
                   </div>
+                  {/* نوع ارسال */}
+                  <div>
+                    <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">نوع ارسال</label>
+                    <select value={editForm.shipping_type||"both"} onChange={e=>setEditForm(f=>({...f,shipping_type:e.target.value as any}))}
+                      className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold cursor-pointer">
+                      <option value="both">📦 هر دو (پست و تیپاکس)</option>
+                      <option value="post">📮 فقط پست پیشتاز</option>
+                      <option value="tipax">🚚 فقط تیپاکس</option>
+                    </select>
+                  </div>
+                  {/* قیمت خرید */}
+                  <div>
+                    <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">قیمت خرید (تومان)</label>
+                    <input type="number" value={editForm.purchase_price||0}
+                      onChange={e=>handlePurchasePriceChange(Number(e.target.value))}
+                      className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono" />
+                  </div>
+                  {/* درصد سود */}
+                  <div>
+                    <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">درصد سود (٪) — قیمت فروش را محاسبه می‌کند</label>
+                    <div className="relative">
+                      <input type="number" min={0} max={500} value={profitPctLocal}
+                        onChange={e=>handleProfitPctChange(Number(e.target.value))}
+                        className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono pl-8" />
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]">٪</span>
+                    </div>
+                  </div>
+                  {/* قیمت فروش */}
                   <div>
                     <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">قیمت فروش (تومان) *</label>
                     <input type="number" value={editForm.price||0} onChange={e=>setEditForm(f=>({...f,price:Number(e.target.value)}))}
                       className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono" />
                   </div>
+                  {/* قیمت تخفیف */}
                   <div>
                     <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">قیمت تخفیف‌خورده (اختیاری)</label>
                     <input type="number" value={editForm.discount_price||""} onChange={e=>setEditForm(f=>({...f,discount_price:e.target.value?Number(e.target.value):null}))}
                       className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono" />
                   </div>
-                  <div>
-                    <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">قیمت خرید</label>
-                    <input type="number" value={editForm.purchase_price||0} onChange={e=>setEditForm(f=>({...f,purchase_price:Number(e.target.value)}))}
-                      className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono" />
-                  </div>
+                  {/* موجودی */}
                   <div>
                     <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">موجودی</label>
                     <input type="number" min={0} value={editForm.stock||0} onChange={e=>setEditForm(f=>({...f,stock:Number(e.target.value),is_available:Number(e.target.value)>0}))}
@@ -691,56 +713,37 @@ export function AdminProducts(_props: any = {}) {
                   </div>
                 </div>
               )}
-
               {activeTab==="images"&&(
                 <div className="space-y-5">
-                  {/* ناحیه Drag & Drop */}
-                  <div
-                    onDragOver={e=>{e.preventDefault();setImageDragOver(true);}}
+                  <div onDragOver={e=>{e.preventDefault();setImageDragOver(true);}}
                     onDragLeave={()=>setImageDragOver(false)}
                     onDrop={handleImgDrop}
                     onClick={()=>multiImgRef.current?.click()}
                     className={`relative border-2 border-dashed rounded-3xl p-8 text-center cursor-pointer transition-colors ${imageDragOver?"border-[var(--accent-blue)] bg-[var(--accent-blue)]/5":"border-[var(--card-border)] hover:border-[var(--accent-blue)]/50"}`}>
                     <input ref={multiImgRef} type="file" accept="image/*" multiple className="hidden" onChange={handleMultiImgInput} />
                     {uploadingImages?(
-                      <div className="space-y-2">
-                        <div className="text-2xl animate-spin">⏳</div>
-                        <p className="font-bold text-[var(--text-secondary)]">در حال آپلود...</p>
-                      </div>
+                      <div className="space-y-2"><div className="text-2xl animate-spin">⏳</div><p className="font-bold text-[var(--text-secondary)]">در حال آپلود...</p></div>
                     ):(
-                      <div className="space-y-2">
-                        <div className="text-3xl">🖼️</div>
-                        <p className="font-bold text-[var(--text-secondary)]">کلیک کنید یا تصاویر را اینجا بکشید</p>
-                        <p className="text-[10px] text-[var(--text-secondary)]">JPG، PNG، WEBP — چند فایل همزمان قبول می‌شه</p>
-                      </div>
+                      <div className="space-y-2"><div className="text-3xl">🖼️</div><p className="font-bold text-[var(--text-secondary)]">کلیک کنید یا تصاویر را اینجا بکشید</p></div>
                     )}
                   </div>
-
-                  {/* گالری تصاویر آپلود شده */}
                   {(editForm.images||[]).filter(isRealUrl).length > 0 && (
                     <div className="space-y-2">
-                      <p className="font-bold text-[var(--text-secondary)]">
-                        تصاویر ({(editForm.images||[]).filter(isRealUrl).length} عدد) — تصویر اصلی را انتخاب کنید:
-                      </p>
+                      <p className="font-bold text-[var(--text-secondary)]">تصاویر ({(editForm.images||[]).filter(isRealUrl).length} عدد) — تصویر اصلی را انتخاب کنید:</p>
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                         {(editForm.images||[]).filter(isRealUrl).map((url,i)=>(
                           <div key={i} className="relative group">
-                            <img src={url} className={`w-full aspect-square object-contain rounded-2xl border-2 bg-white p-1 cursor-pointer transition-all ${editForm.image===url?"border-[var(--accent-blue)] shadow-lg scale-[1.02]":"border-[var(--card-border)] hover:border-[var(--accent-blue)]/50"}`}
+                            <img src={url}
+                              className={`w-full aspect-square object-contain rounded-2xl border-2 bg-white p-1 cursor-pointer transition-all ${editForm.image===url?"border-[var(--accent-blue)] shadow-lg scale-[1.02]":"border-[var(--card-border)] hover:border-[var(--accent-blue)]/50"}`}
                               onClick={()=>setMainImage(url)} alt={`img-${i}`} />
-                            {editForm.image===url&&(
-                              <span className="absolute top-1 right-1 bg-[var(--accent-blue)] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">اصلی</span>
-                            )}
+                            {editForm.image===url&&<span className="absolute top-1 right-1 bg-[var(--accent-blue)] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">اصلی</span>}
                             <button type="button" onClick={()=>removeImage(url)}
-                              className="absolute top-1 left-1 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] font-black opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              ✕
-                            </button>
+                              className="absolute top-1 left-1 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] font-black opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">✕</button>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
-
-                  {/* URL دستی */}
                   <div>
                     <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">یا URL تصویر را وارد کنید:</label>
                     <div className="flex gap-2">
@@ -761,12 +764,9 @@ export function AdminProducts(_props: any = {}) {
                 </div>
               )}
             </div>
-
             <div className="flex gap-3 p-5 border-t border-[var(--card-border)] sticky bottom-0 bg-[var(--modal-bg)] rounded-b-3xl">
               <button type="button" onClick={()=>setIsModalOpen(false)} disabled={editSaving}
-                className="flex-1 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs disabled:opacity-50">
-                انصراف
-              </button>
+                className="flex-1 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs disabled:opacity-50">انصراف</button>
               <button type="button" onClick={saveProduct} disabled={editSaving||uploadingImages}
                 className="flex-1 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-lg disabled:opacity-50">
                 {editSaving?"⏳ در حال ذخیره...":editingProd?"💾 ذخیره تغییرات":"✅ افزودن محصول"}
@@ -776,7 +776,7 @@ export function AdminProducts(_props: any = {}) {
         </div>
       )}
 
-      {/* ══════ مودال تأیید حذف دسته‌جمعی ══════ */}
+      {/* حذف گروهی */}
       {isBulkDeleteOpen&&(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 animate-fadeIn"
           onClick={e=>{if(e.target===e.currentTarget&&!bulkDeleting)setIsBulkDeleteOpen(false);}}>
@@ -784,7 +784,6 @@ export function AdminProducts(_props: any = {}) {
             <div className="text-center">
               <div className="text-5xl mb-3">⚠️</div>
               <h3 className="font-black text-sm text-rose-500">حذف دسته‌جمعی</h3>
-              <p className="text-xs text-[var(--text-secondary)] mt-2 leading-relaxed">این عمل قابل بازگشت نیست!</p>
             </div>
             <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-center space-y-2">
               <div className="text-3xl font-black text-rose-500">{selectedIds.size}</div>
@@ -792,9 +791,7 @@ export function AdminProducts(_props: any = {}) {
             </div>
             {bulkDeleting && (
               <div className="space-y-2">
-                <div className="flex justify-between text-[10px] font-bold text-[var(--text-secondary)]">
-                  <span>در حال حذف...</span><span>{bulkDeleteProgress}٪</span>
-                </div>
+                <div className="flex justify-between text-[10px] font-bold text-[var(--text-secondary)]"><span>در حال حذف...</span><span>{bulkDeleteProgress}٪</span></div>
                 <div className="w-full bg-[var(--input-bg)] rounded-full h-2 overflow-hidden">
                   <div className="bg-rose-500 h-2 rounded-full transition-all" style={{width:`${bulkDeleteProgress}%`}}/>
                 </div>
@@ -802,36 +799,26 @@ export function AdminProducts(_props: any = {}) {
             )}
             {!bulkDeleting && (
               <div className="flex gap-3">
-                <button type="button" onClick={()=>setIsBulkDeleteOpen(false)}
-                  className="flex-1 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs">انصراف</button>
-                <button type="button" onClick={executeBulkDelete}
-                  className="flex-1 py-3 rounded-2xl bg-rose-600 text-white font-black text-xs shadow-lg">
-                  ✅ بله، همه حذف شوند
-                </button>
+                <button type="button" onClick={()=>setIsBulkDeleteOpen(false)} className="flex-1 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs">انصراف</button>
+                <button type="button" onClick={executeBulkDelete} className="flex-1 py-3 rounded-2xl bg-rose-600 text-white font-black text-xs shadow-lg">✅ بله، همه حذف شوند</button>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* ══════ مودال تأیید حذف تکی ══════ */}
+      {/* حذف تکی */}
       {deleteTarget&&(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 animate-fadeIn"
           onClick={e=>{if(e.target===e.currentTarget&&!deleting)setDeleteTarget(null);}}>
           <div className="w-full max-w-sm bg-[var(--modal-bg)] rounded-3xl p-6 shadow-2xl border border-rose-500/30 space-y-5" dir="rtl">
-            <div className="text-center">
-              <div className="text-5xl mb-3">🗑️</div>
-              <h3 className="font-black text-sm text-rose-500">حذف محصول</h3>
-              <p className="text-xs text-[var(--text-secondary)] mt-2 leading-relaxed">این عمل قابل بازگشت نیست.</p>
-            </div>
+            <div className="text-center"><div className="text-5xl mb-3">🗑️</div><h3 className="font-black text-sm text-rose-500">حذف محصول</h3></div>
             <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-center">
               <span className="font-black text-xs text-rose-500">{deleteTarget.title}</span>
             </div>
             <div className="flex gap-3">
-              <button type="button" onClick={()=>setDeleteTarget(null)} disabled={deleting}
-                className="flex-1 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs">انصراف</button>
-              <button type="button" onClick={confirmDelete} disabled={deleting}
-                className="flex-1 py-3 rounded-2xl bg-rose-600 text-white font-black text-xs shadow-lg disabled:opacity-50">
+              <button type="button" onClick={()=>setDeleteTarget(null)} disabled={deleting} className="flex-1 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs">انصراف</button>
+              <button type="button" onClick={confirmDelete} disabled={deleting} className="flex-1 py-3 rounded-2xl bg-rose-600 text-white font-black text-xs shadow-lg disabled:opacity-50">
                 {deleting?"⏳ حذف...":"✅ بله، حذف شود"}
               </button>
             </div>
@@ -839,32 +826,25 @@ export function AdminProducts(_props: any = {}) {
         </div>
       )}
 
-      {/* ══════ مودال تغییر نام دسته‌بندی ══════ */}
+      {/* تغییر نام دسته‌بندی */}
       {isCatModalOpen&&(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 animate-fadeIn"
-          onClick={()=>setIsCatModalOpen(false)}>
-          <div className="w-full max-w-md bg-[var(--modal-bg)] rounded-3xl p-6 shadow-2xl space-y-5 border border-[var(--card-border)]"
-            onClick={e=>e.stopPropagation()} dir="rtl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 animate-fadeIn" onClick={()=>setIsCatModalOpen(false)}>
+          <div className="w-full max-w-md bg-[var(--modal-bg)] rounded-3xl p-6 shadow-2xl space-y-5 border border-[var(--card-border)]" onClick={e=>e.stopPropagation()} dir="rtl">
             <h3 className="font-black text-sm text-[var(--accent-blue)]">✏️ ویرایش دسته‌بندی‌ها</h3>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">با تغییر نام دسته، تمام محصولات داخل آن به نام جدید منتقل می‌شوند.</p>
             <div>
               <label className="block text-xs font-bold mb-1.5">دسته فعلی:</label>
-              <select value={renameOld} onChange={e=>setRenameOld(e.target.value)}
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold">
+              <select value={renameOld} onChange={e=>setRenameOld(e.target.value)} className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold">
                 <option value="">انتخاب...</option>
                 {categories.map(c=><option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-xs font-bold mb-1.5">نام جدید:</label>
-              <input type="text" value={renameNew} onChange={e=>setRenameNew(e.target.value)}
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold" />
+              <input type="text" value={renameNew} onChange={e=>setRenameNew(e.target.value)} className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold" />
             </div>
             <div className="flex gap-2 pt-2">
-              <button type="button" onClick={()=>setIsCatModalOpen(false)}
-                className="flex-1 px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs">انصراف</button>
-              <button type="button" disabled={renaming||!renameOld||!renameNew} onClick={handleRenameCategory}
-                className="flex-1 px-4 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-lg disabled:opacity-50">
+              <button type="button" onClick={()=>setIsCatModalOpen(false)} className="flex-1 px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs">انصراف</button>
+              <button type="button" disabled={renaming||!renameOld||!renameNew} onClick={handleRenameCategory} className="flex-1 px-4 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-lg disabled:opacity-50">
                 {renaming?"در حال انتقال...":"تغییر نام"}
               </button>
             </div>
@@ -902,24 +882,35 @@ export function AdminProducts(_props: any = {}) {
                   </div>
                   <div>
                     <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">دسته‌بندی کلی (اختیاری):</label>
-                    <input type="text" value={globalCategory} onChange={e=>setGlobalCategory(e.target.value)}
-                      placeholder="مثال: لوازم جانبی"
+                    <input type="text" value={globalCategory} onChange={e=>setGlobalCategory(e.target.value)} placeholder="مثال: لوازم جانبی"
                       className="w-full p-3 rounded-xl bg-[var(--input-bg)] border outline-none font-bold" />
                   </div>
                 </div>
-                <label className="flex items-center gap-3 cursor-pointer select-none mb-2">
+
+                {/* toggle فقط موجود */}
+                <label className="flex items-center gap-3 cursor-pointer select-none mb-3">
                   <div onClick={()=>setImportOnlyAvailable(v=>!v)}
                     className={`w-11 h-6 rounded-full transition-colors flex-shrink-0 flex items-center px-1 ${importOnlyAvailable?"bg-emerald-500":"bg-[var(--card-border)]"}`}>
                     <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${importOnlyAvailable?"translate-x-5":"translate-x-0"}`}/>
                   </div>
                   <span className="font-bold text-xs">فقط محصولات موجود را وارد کن <span className="text-[var(--text-secondary)] font-normal">(ناموجودها skip می‌شن)</span></span>
                 </label>
+
+                {/* toggle skip تکراری */}
+                <label className="flex items-center gap-3 cursor-pointer select-none mb-5">
+                  <div onClick={()=>setImportSkipExisting(v=>!v)}
+                    className={`w-11 h-6 rounded-full transition-colors flex-shrink-0 flex items-center px-1 ${importSkipExisting?"bg-amber-500":"bg-[var(--card-border)]"}`}>
+                    <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${importSkipExisting?"translate-x-5":"translate-x-0"}`}/>
+                  </div>
+                  <span className="font-bold text-xs">اگر محصول از قبل در سایت هست، skip کن <span className="text-[var(--text-secondary)] font-normal">(محصولات تکراری آپدیت نمی‌شن)</span></span>
+                </label>
+
                 <button type="button" onClick={()=>docInputRef.current?.click()} disabled={importStep!==1}
                   className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black cursor-pointer shadow-lg disabled:opacity-50">
                   📁 انتخاب فایل (Excel/CSV)
                 </button>
                 <input ref={docInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleDocumentUpload} />
-                <p className="mt-3 text-[10px] text-[var(--text-secondary)]">ستون‌های پشتیبانی‌شده: نام محصول · قیمت دراپ · دسته بندی · برند · کد محصول · Photo_Filename · Telegram_Description · موجودی</p>
+                <p className="mt-3 text-[10px] text-[var(--text-secondary)]">ستون‌های پشتیبانی‌شده: نام محصول · قیمت دراپ · دسته بندی · برند · کد محصول · Photo_Filename · Telegram_Description · موجودی · نوع ارسال</p>
               </div>
 
               {/* Dry-Run */}
@@ -938,14 +929,16 @@ export function AdminProducts(_props: any = {}) {
                           <th className="p-2">دسته</th>
                           <th className="p-2">موجودی</th>
                           <th className="p-2">قیمت نهایی</th>
+                          <th className="p-2">ارسال</th>
                           <th className="p-2">وضعیت</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--card-border)] font-bold text-[10px]">
                         {importRows.map((r,idx)=>{
                           const ex=products.find(p=>(r.sku&&p.sku===r.sku)||p.title.trim().toLowerCase()===r.title.trim().toLowerCase());
+                          const willSkip = importSkipExisting && ex;
                           return (
-                            <tr key={idx} className={ex?"bg-amber-500/5":""}>
+                            <tr key={idx} className={willSkip?"opacity-40":ex?"bg-amber-500/5":""}>
                               <td className="p-2">
                                 {imagePreviewMap[r.photo]
                                   ?<img src={imagePreviewMap[r.photo]} className="w-10 h-10 rounded-lg object-contain border bg-white" alt=""/>
@@ -955,9 +948,10 @@ export function AdminProducts(_props: any = {}) {
                               <td className="p-2 text-[var(--text-secondary)]">{r.category}</td>
                               <td className="p-2 text-indigo-500">{r.stock}</td>
                               <td className="p-2 font-mono text-emerald-500">{r.price.toLocaleString("fa-IR")}</td>
+                              <td className="p-2 text-[var(--text-secondary)]">{r.shipping_type==="post"?"📮 پست":r.shipping_type==="tipax"?"🚚 تیپاکس":"📦 هر دو"}</td>
                               <td className="p-2">
-                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${ex?"bg-amber-500/15 text-amber-500":"bg-emerald-500/15 text-emerald-500"}`}>
-                                  {ex?"📝 آپدیت":"🆕 جدید"}
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${willSkip?"bg-slate-500/15 text-slate-500":ex?"bg-amber-500/15 text-amber-500":"bg-emerald-500/15 text-emerald-500"}`}>
+                                  {willSkip?"⏭️ skip":ex?"📝 آپدیت":"🆕 جدید"}
                                 </span>
                               </td>
                             </tr>
@@ -994,7 +988,7 @@ export function AdminProducts(_props: any = {}) {
               {importLogs.length>0&&(
                 <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-sky-500/30 max-h-48 overflow-y-auto space-y-1.5 font-mono">
                   {importLogs.map((log,i)=>(
-                    <div key={i} className={`text-[10px] ${log.includes("❌")||log.includes("خطا")?"text-rose-500":log.includes("آپدیت")?"text-amber-400":"text-emerald-500"}`}>{log}</div>
+                    <div key={i} className={`text-[10px] ${log.includes("❌")||log.includes("خطا")?"text-rose-500":log.includes("آپدیت")?"text-amber-400":log.includes("skip")?"text-slate-400":"text-emerald-500"}`}>{log}</div>
                   ))}
                 </div>
               )}
@@ -1003,7 +997,7 @@ export function AdminProducts(_props: any = {}) {
               {importSummary&&(
                 <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-emerald-500/30 space-y-4">
                   <h3 className="font-black text-sm text-emerald-500">📊 گزارش کامل ایمپورت</h3>
-                  <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="grid grid-cols-4 gap-3 text-center">
                     <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
                       <div className="text-2xl font-black text-emerald-500">{importSummary.success}</div>
                       <div className="text-[10px] text-[var(--text-secondary)] mt-1">🆕 جدید</div>
@@ -1011,6 +1005,10 @@ export function AdminProducts(_props: any = {}) {
                     <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20">
                       <div className="text-2xl font-black text-amber-500">{importSummary.updated}</div>
                       <div className="text-[10px] text-[var(--text-secondary)] mt-1">📝 آپدیت</div>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-slate-500/10 border border-slate-500/20">
+                      <div className="text-2xl font-black text-slate-400">{importSummary.skipped}</div>
+                      <div className="text-[10px] text-[var(--text-secondary)] mt-1">⏭️ skip</div>
                     </div>
                     <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
                       <div className="text-2xl font-black text-rose-500">{importSummary.failed}</div>
@@ -1028,7 +1026,6 @@ export function AdminProducts(_props: any = {}) {
                 </div>
               )}
             </div>
-
             <div className="flex gap-3 p-5 border-t border-[var(--card-border)] sticky bottom-0 bg-[var(--modal-bg)] rounded-b-3xl">
               <button type="button" disabled={importStep<2||importing} onClick={executeBulkImport}
                 className="flex-1 py-4 rounded-2xl bg-emerald-600 text-white font-black cursor-pointer disabled:opacity-50 text-sm shadow-xl flex justify-center gap-2">

@@ -23,6 +23,16 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
 
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // پیشروی خودکار هر ۴ ثانیه
+  useEffect(() => {
+    if (products.length <= 1) return;
+    const timer = setInterval(() => {
+      if (!isDragging) setCurrentIndex((p) => (p + 1) % products.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [products.length, isDragging]);
 
   useEffect(() => {
     fetch("/api/theme-builder", { cache: "no-store" })
@@ -79,7 +89,7 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
 
       {/* کانتینر اصلی با ارتفاع کاملاً ثابت برای جلوگیری از هرگونه پرش (Layout Shift) */}
       <div 
-        className="relative w-full h-[520px] md:h-[450px] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] overflow-hidden shadow-2xl touch-pan-y select-none"
+        className="relative w-full h-[400px] sm:h-[460px] md:h-[440px] rounded-[2rem] sm:rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] overflow-hidden shadow-2xl touch-pan-y select-none"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -150,12 +160,15 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
           })}
         </div>
 
-        {/* نقطه‌های ناوبری ساده و ایمن در پایین صفحه */}
-        <div className="absolute bottom-5 left-0 right-0 z-30 flex items-center justify-center gap-2 pointer-events-none">
+        {/* نقطه‌های ناوبری — کلیکپذیر */}
+        <div className="absolute bottom-4 left-0 right-0 z-30 flex items-center justify-center gap-2">
           {products.map((_, idx) => (
-            <span
+            <button
               key={idx}
-              className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentIndex ? "w-6 bg-[var(--accent-blue)] shadow-md shadow-blue-500/50" : "w-1.5 bg-gray-400/40"}`}
+              type="button"
+              aria-label={`اسلاید ${idx + 1}`}
+              onClick={() => setCurrentIndex(idx)}
+              className={`h-1.5 rounded-full transition-all duration-300 focus:outline-none ${idx === currentIndex ? "w-6 bg-[var(--accent-blue)] shadow-md shadow-blue-500/50" : "w-1.5 bg-gray-400/40 hover:bg-gray-400/70"}`}
             />
           ))}
         </div>

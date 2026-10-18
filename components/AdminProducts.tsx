@@ -181,6 +181,7 @@ export function AdminProducts(_props: any = {}) {
   const [profitMargin, setProfitMargin]   = useState<number>(25);
   const [importOnlyAvailable, setImportOnlyAvailable] = useState<boolean>(true);
   const [importSkipExisting, setImportSkipExisting]   = useState<boolean>(false);
+  const [importShippingOverride, setImportShippingOverride] = useState<"auto"|"post"|"tipax"|"both">("auto");
   const docInputRef    = useRef<HTMLInputElement>(null);
   const bulkImagesRef  = useRef<HTMLInputElement>(null);
 
@@ -397,9 +398,24 @@ export function AdminProducts(_props: any = {}) {
     const file = e.target.files?.[0]; if (!file) return;
     try {
       setImportLogs(["⏳ در حال خواندن فایل..."]); setImportSummary(null);
-      const data = await file.arrayBuffer();
-      const wb = XLSX.read(data, { type:"array" });
-      const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+      const name = file.name.toLowerCase();
+      let json: any[] = [];
+
+      if (name.endsWith(".pdf") || name.endsWith(".docx") || name.endsWith(".doc")) {
+        // ارسال به API سرور‌ساید برای پارس PDF / Word
+        const fd = new FormData(); fd.append("file", file);
+        const res = await fetch("/api/admin/parse-document", { method: "POST", body: fd });
+        const result = await res.json();
+        if (!res.ok) { notify("❌ " + (result.error || "خطا در پارس فایل"), "error"); e.target.value = ""; return; }
+        if (result.warning) { setImportLogs([result.warning]); }
+        json = result.rows || [];
+      } else {
+        // XLSX / CSV — پارس کلاینت‌ساید
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(data, { type:"array" });
+        json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+      }
+
       const mult = 1 + profitMargin/100;
       const parsed = (json as any[]).map(row => {
         const drop = parsePrice(fuzzyGet(row,"drop_price"));
@@ -418,7 +434,11 @@ export function AdminProducts(_props: any = {}) {
           shipping_type: parseShippingType(fuzzyGet(row,"shipping_type")),
         };
       }).filter((r:any) => r.title && r.title !== "بدون عنوان");
-      const afterAvail = importOnlyAvailable ? parsed.filter((r:any) => r.stock > 0) : parsed;
+      // اعمال override نوع ارسال اگر ادمین انتخاب کرده باشه
+      const withShipping = importShippingOverride !== "auto"
+        ? parsed.map((r:any) => ({ ...r, shipping_type: importShippingOverride }))
+        : parsed;
+      const afterAvail = importOnlyAvailable ? withShipping.filter((r:any) => r.stock > 0) : withShipping;
       const skippedAvail = parsed.length - afterAvail.length;
       setImportRows(afterAvail);
       setImportLogs(["✅ فایل خوانده شد. "+afterAvail.length+" محصول"+(skippedAvail>0?" (⏭️ "+skippedAvail+" ناموجود حذف شد)":"")]);
@@ -922,6 +942,26 @@ export function AdminProducts(_props: any = {}) {
                   </div>
                 </div>
 
+                {/* ══ انتخاب نوع ارسال برای همه محصولات ══ */}
+                <div className="mb-5 p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+                  <label className="block font-black text-xs mb-2 text-[var(--text-secondary)]">🚚 نوع ارسال (برای همه محصولات این فایل):</label>
+                  <select
+                    value={importShippingOverride}
+                    onChange={e => setImportShippingOverride(e.target.value as any)}
+                    className="w-full p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold text-xs cursor-pointer"
+                  >
+                    <option value="auto">📋 خودکار — از ستون نوع ارسال فایل بخوان</option>
+                    <option value="post">📮 پست — همه محصولات فقط پست</option>
+                    <option value="tipax">🚚 تیپاکس (پس‌کرایه) — همه محصولات فقط تیپاکس</option>
+                    <option value="both">📦 هر دو روش — مشتری انتخاب کند</option>
+                  </select>
+                  {importShippingOverride !== "auto" && (
+                    <p className="mt-1.5 text-[10px] text-amber-500 font-bold">
+                      ⚠️ این انتخاب، ستون نوع ارسال فایل را نادیده می‌گیرد و برای همه محصولات اعمال می‌شود.
+                    </p>
+                  )}
+                </div>
+
                 {/* toggle فقط موجود — کل ردیف کلیکپذیره */}
                 <div role="button" tabIndex={0}
                   onClick={()=>setImportOnlyAvailable(v=>!v)}
@@ -952,10 +992,10 @@ export function AdminProducts(_props: any = {}) {
 
                 <button type="button" onClick={()=>docInputRef.current?.click()} disabled={importStep!==1}
                   className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black cursor-pointer shadow-lg disabled:opacity-50">
-                  📁 انتخاب فایل (Excel/CSV)
+                  📁 انتخاب فایل (Excel/CSV/PDF/Word)
                 </button>
-                <input ref={docInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleDocumentUpload} />
-                <p className="mt-3 text-[10px] text-[var(--text-secondary)]">ستون‌های پشتیبانی‌شده: نام محصول · قیمت دراپ · دسته بندی · برند · کد محصول · Photo_Filename · Telegram_Description · موجودی · نوع ارسال</p>
+                <input ref={docInputRef} type="file" accept=".xlsx,.xls,.csv,.pdf,.doc,.docx" className="hidden" onChange={handleDocumentUpload} />
+                <p className="mt-3 text-[10px] text-[var(--text-secondary)]">فرمت‌های پشتیبانی‌شده: Excel ، CSV ، PDF ، Word (docx) — ستون‌ها: نام محصول · قیمت دراپ · دسته بندی · برند · کد محصول · Photo_Filename · Telegram_Description · موجودی · نوع ارسال</p>
               </div>
 
               {/* Dry-Run */}

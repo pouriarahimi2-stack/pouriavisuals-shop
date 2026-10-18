@@ -42,25 +42,46 @@ function fuzzyGet(row: Record<string,any>, col: string): any {
 }
 
 function fuzzyMatchImages(allFiles: File[], photoField: string | null, sku: string): File[] {
+  // فیلتر: فایل‌های thumb را حذف کن (photo_60@...thumb.jpg)
+  const mainFiles = allFiles.filter(f =>
+    !f.name.toLowerCase().includes(".thumb.") &&
+    !f.name.toLowerCase().endsWith(".thumb")
+  );
   const result: File[] = [];
   const seen = new Set<string>();
   const addFile = (f: File) => { if (!seen.has(f.name)) { seen.add(f.name); result.push(f); } };
+
   if (photoField) {
     const names = photoField.split(/[,،;]/).map((s: string) => s.trim()).filter(Boolean);
     for (const name of names) {
       const nl = name.toLowerCase();
       const noExt = nl.replace(/\.[^.]+$/, "");
+      // استخراج شماره photo از الگوی photo_60@تاریخ
+      const photoNumMatch = noExt.match(/^(photo_)(\d+)/);
+      const photoNum = photoNumMatch ? photoNumMatch[2] : null;
+
       const found =
-        allFiles.find(f => f.name === name) ||
-        allFiles.find(f => f.name.toLowerCase() === nl) ||
-        allFiles.find(f => f.name.toLowerCase().replace(/\.[^.]+$/, "") === noExt);
+        // ۱. تطابق دقیق
+        mainFiles.find(f => f.name === name) ||
+        // ۲. تطابق بدون حساسیت به کوچک/بزرگ
+        mainFiles.find(f => f.name.toLowerCase() === nl) ||
+        // ۳. تطابق بدون پسوند
+        mainFiles.find(f => f.name.toLowerCase().replace(/\.[^.]+$/, "") === noExt) ||
+        // ۴. تطابق بر اساس شماره photo (photo_60@هر تاریخی)
+        (photoNum ? mainFiles.find(f => {
+          const fn = f.name.toLowerCase().replace(/\.[^.]+$/, "");
+          const m = fn.match(/^photo_(\d+)/);
+          return m && m[1] === photoNum;
+        }) : undefined);
+
       if (found) addFile(found);
     }
   }
+
   if (sku) {
     const skuL = sku.toLowerCase().replace(/[^a-z0-9]/g, "");
     if (skuL.length >= 3) {
-      allFiles.forEach(f => {
+      mainFiles.forEach(f => {
         const fnl = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");
         if (fnl.startsWith(skuL)) addFile(f);
       });
@@ -71,7 +92,21 @@ function fuzzyMatchImages(allFiles: File[], photoField: string | null, sku: stri
 
 function parsePrice(val: any): number {
   if (!val) return 0;
-  const s = String(val).replace(/[,،٬\s]/g,"").replace(/[۰-۹]/g, d => String(d.charCodeAt(0)-1632));
+  let s = String(val).trim()
+    // ارقام فارسی/عربی به انگلیسی
+    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 1632))
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 1632))
+    // حذف کاما و فاصله
+    .replace(/[,،٬\s]/g, "");
+  // نقطه به عنوان جداکننده هزارگان فارسی (مثل 2.800.000)
+  const dotCount = (s.match(/\./g) || []).length;
+  if (dotCount > 1) {
+    // چند نقطه → همه جداکننده هزارگان هستن
+    s = s.replace(/\./g, "");
+  } else if (dotCount === 1 && /\.\d{3}$/.test(s)) {
+    // یه نقطه + دقیقاً ۳ رقم بعدش → جداکننده هزارگان (مثل 2.800)
+    s = s.replace(".", "");
+  }
   return Number(s) || 0;
 }
 

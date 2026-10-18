@@ -922,23 +922,33 @@ export function AdminProducts(_props: any = {}) {
                   </div>
                 </div>
 
-                {/* toggle فقط موجود */}
-                <label className="flex items-center gap-3 cursor-pointer select-none mb-3">
-                  <div onClick={()=>setImportOnlyAvailable(v=>!v)}
-                    className={`w-11 h-6 rounded-full transition-colors flex-shrink-0 flex items-center px-1 ${importOnlyAvailable?"bg-emerald-500":"bg-[var(--card-border)]"}`}>
-                    <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${importOnlyAvailable?"translate-x-5":"translate-x-0"}`}/>
+                {/* toggle فقط موجود — کل ردیف کلیکپذیره */}
+                <div role="button" tabIndex={0}
+                  onClick={()=>setImportOnlyAvailable(v=>!v)}
+                  onKeyDown={e=>(e.key===" "||e.key==="Enter")&&setImportOnlyAvailable(v=>!v)}
+                  className="flex items-center gap-3 cursor-pointer select-none mb-3 group">
+                  <div className={`relative w-11 h-6 rounded-full flex-shrink-0 transition-colors duration-200 ${importOnlyAvailable?"bg-emerald-500":"bg-slate-300 dark:bg-slate-600"}`}>
+                    <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-md transition-transform duration-200 ${importOnlyAvailable?"translate-x-5":"translate-x-0"}`}/>
                   </div>
-                  <span className="font-bold text-xs">فقط محصولات موجود را وارد کن <span className="text-[var(--text-secondary)] font-normal">(ناموجودها skip می‌شن)</span></span>
-                </label>
+                  <span className="font-bold text-xs group-hover:text-[var(--accent-blue)] transition-colors">
+                    فقط محصولات موجود را وارد کن
+                    <span className="text-[var(--text-secondary)] font-normal"> (ناموجودها skip می‌شن)</span>
+                  </span>
+                </div>
 
-                {/* toggle skip تکراری */}
-                <label className="flex items-center gap-3 cursor-pointer select-none mb-5">
-                  <div onClick={()=>setImportSkipExisting(v=>!v)}
-                    className={`w-11 h-6 rounded-full transition-colors flex-shrink-0 flex items-center px-1 ${importSkipExisting?"bg-amber-500":"bg-[var(--card-border)]"}`}>
-                    <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${importSkipExisting?"translate-x-5":"translate-x-0"}`}/>
+                {/* toggle skip تکراری — کل ردیف کلیکپذیره */}
+                <div role="button" tabIndex={0}
+                  onClick={()=>setImportSkipExisting(v=>!v)}
+                  onKeyDown={e=>(e.key===" "||e.key==="Enter")&&setImportSkipExisting(v=>!v)}
+                  className="flex items-center gap-3 cursor-pointer select-none mb-5 group">
+                  <div className={`relative w-11 h-6 rounded-full flex-shrink-0 transition-colors duration-200 ${importSkipExisting?"bg-amber-500":"bg-slate-300 dark:bg-slate-600"}`}>
+                    <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-md transition-transform duration-200 ${importSkipExisting?"translate-x-5":"translate-x-0"}`}/>
                   </div>
-                  <span className="font-bold text-xs">اگر محصول از قبل در سایت هست، skip کن <span className="text-[var(--text-secondary)] font-normal">(محصولات تکراری آپدیت نمی‌شن)</span></span>
-                </label>
+                  <span className="font-bold text-xs group-hover:text-[var(--accent-blue)] transition-colors">
+                    اگر محصول از قبل در سایت هست، skip کن
+                    <span className="text-[var(--text-secondary)] font-normal"> (محصولات تکراری آپدیت نمی‌شن)</span>
+                  </span>
+                </div>
 
                 <button type="button" onClick={()=>docInputRef.current?.click()} disabled={importStep!==1}
                   className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black cursor-pointer shadow-lg disabled:opacity-50">
@@ -984,6 +994,19 @@ export function AdminProducts(_props: any = {}) {
                               <td className="p-2 text-indigo-500">{r.stock}</td>
                               <td className="p-2 font-mono text-emerald-500">{r.price.toLocaleString("fa-IR")}</td>
                               <td className="p-2 text-[var(--text-secondary)]">{r.shipping_type==="post"?"📮 پست":r.shipping_type==="tipax"?"🚚 تیپاکس":"📦 هر دو"}</td>
+                              <td className="p-2">
+                                {/* هشدار: توضیحات با عنوان تناقض داره */}
+                                {(()=>{
+                                  if (!r.description || !r.title) return null;
+                                  const titleWords = r.title.split(/\s+/).filter((w:string)=>w.length>2).slice(0,3);
+                                  const descLower = r.description.toLowerCase();
+                                  const titleLower = r.title.toLowerCase();
+                                  const hasMatch = titleWords.some((w:string)=>descLower.includes(w.toLowerCase()));
+                                  if (!hasMatch && r.description.length > 30)
+                                    return <span title="توضیحات با عنوان محصول مطابقت ندارد — احتمالاً خطای داده در فایل اکسل" className="text-orange-500 text-[11px] cursor-help">⚠️</span>;
+                                  return null;
+                                })()}
+                              </td>
                               <td className="p-2">
                                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${willSkip?"bg-slate-500/15 text-slate-500":ex?"bg-amber-500/15 text-amber-500":"bg-emerald-500/15 text-emerald-500"}`}>
                                   {willSkip?"⏭️ skip":ex?"📝 آپدیت":"🆕 جدید"}

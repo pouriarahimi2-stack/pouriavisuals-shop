@@ -100,9 +100,9 @@ export async function POST(req: NextRequest) {
     const mediaMeta: Record<string, unknown> = {
       images: imagesList,
       specs: typeof body.specs === "object" && body.specs ? body.specs : {},
-      warranty: String(body.warranty || "۱۸ ماه گارانتی اصالت طلایی").trim(),
+      warranty: String(body.warranty ?? "").trim(),
       sku: String(body.sku || "SKU-" + productId.slice(-6).toUpperCase()).trim(),
-      brand: String(body.brand || "Axon").trim(),
+      brand: String(body.brand ?? "").trim(),
       purchase_price: purchasePrice,
       discount_price: discountPrice,
       meta_title: String(body.meta_title || cleanTitle).trim(),
@@ -124,6 +124,11 @@ export async function POST(req: NextRequest) {
       image_url: primaryImage,
       description: packagedDescription,
       updated_at: new Date().toISOString(),
+      // ← ستون‌های جدید — مستقیم به DB نوشته میشن
+      purchase_price: purchasePrice,
+      shipping_type: (["post","tipax","both"] as const).includes(body.shipping_type as any)
+        ? (body.shipping_type as "post"|"tipax"|"both")
+        : "both",
     };
 
     // بررسی وجود محصول

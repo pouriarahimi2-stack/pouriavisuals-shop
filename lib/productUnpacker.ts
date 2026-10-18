@@ -46,7 +46,7 @@ export function unpackProductRow(p: any) {
     title: p.title || p.name || "کالای دیجیتال",
     name: p.name || p.title || "کالای دیجیتال",
     sku: p.sku || meta.sku || "SKU-" + String(p.id).slice(-6).toUpperCase(),
-    brand: p.brand || meta.brand || "Axon",
+    brand: p.brand || meta.brand || "",
     category: p.category || "کالای دیجیتال",
     price: basePrice,
     discount_price: discountPrice,
@@ -60,10 +60,12 @@ export function unpackProductRow(p: any) {
     images: imagesArr,
     description: rawDesc,
     short_description: p.short_description || meta.short_description || rawDesc.slice(0, 140),
-    warranty: p.warranty || meta.warranty || "۱۸ ماه گارانتی اصالت طلایی",
+    warranty: p.warranty || meta.warranty || "",
     meta_title: p.meta_title || meta.meta_title || p.title || p.name || "",
     meta_description: p.meta_description || meta.meta_description || rawDesc.slice(0, 155),
     specs: (typeof p.specs === "object" && p.specs) || meta.specs || {},
+    // روش ارسال — از ستون DB
+    shipping_type: (p.shipping_type as "post"|"tipax"|"both"|undefined) || "both",
   };
 }
 

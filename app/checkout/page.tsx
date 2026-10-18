@@ -122,10 +122,28 @@ export default function CheckoutPage() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchLiveStoreRules]);
 
+  // ── فیلتر هوشمند روش ارسال بر اساس نوع محصولات سبد ─────────
+  const cartShipTypes = cartItems.map((i: any) => (i.shipping_type || "both") as string);
+  const allowPost  = cartShipTypes.every(t => t === "post"  || t === "both");
+  const allowTipax = cartShipTypes.every(t => t === "tipax" || t === "both");
+  // اگر همه محصولات یه نوع خاص دارن، auto-select کن
+  const forcedShipping: "post"|"tipax"|null =
+    (allowPost && !allowTipax) ? "post" :
+    (!allowPost && allowTipax) ? "tipax" : null;
+
+  // اگر نوع ارسال محدود شده و انتخاب کنونی اشتباهه، ریست کن
+  React.useEffect(() => {
+    if (forcedShipping && shippingMethod !== forcedShipping) {
+      setShippingMethod(forcedShipping);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forcedShipping]);
+
+  // تیپاکس = پس‌کرایه: هزینه ارسال هنگام تحویل گرفته میشه
   let shippingCost = 0;
   if (finalPayable > 0) {
     if (shippingMethod === "post") shippingCost = financialRules.postShippingCost;
-    else if (shippingMethod === "tipax") shippingCost = financialRules.tipaxShippingCost;
+    else if (shippingMethod === "tipax") shippingCost = 0; // پس‌کرایه
   }
 
   const vatAmount = finalPayable > 0 && financialRules.vatPercent > 0 ? Math.round((finalPayable * financialRules.vatPercent) / 100) : 0;
@@ -364,21 +382,34 @@ export default function CheckoutPage() {
           <div className="p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
             <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">۲. انتخاب روش ارسال کالا (اجباری)</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-              <label className={"p-4 rounded-2xl border-2 cursor-pointer transition flex flex-col gap-2 " + (shippingMethod === "post" ? "border-emerald-500 bg-emerald-500/10" : "border-[var(--card-border)] bg-[var(--input-bg)]")}>
-                <div className="flex items-center gap-3">
-                  <input type="radio" name="shippingMethod" value="post" checked={shippingMethod === "post"} onChange={() => { setShippingMethod("post"); soundEngine.playClick(); }} className="w-4 h-4 accent-emerald-500" />
-                  <span className="font-black text-sm">پست پیشتاز</span>
-                </div>
-                <div className="pr-7 font-mono font-black text-emerald-600">{formatPrice(financialRules.postShippingCost)} تومان</div>
-              </label>
+              {/* پست پیشتاز — فقط وقتی مجاز باشه */}
+              {(allowPost || (!allowPost && !allowTipax)) && (
+                <label className={"p-4 rounded-2xl border-2 transition flex flex-col gap-2 " + (!allowPost ? "opacity-40 cursor-not-allowed" : "cursor-pointer") + " " + (shippingMethod === "post" ? "border-emerald-500 bg-emerald-500/10" : "border-[var(--card-border)] bg-[var(--input-bg)]")}>
+                  <div className="flex items-center gap-3">
+                    <input type="radio" name="shippingMethod" value="post" checked={shippingMethod === "post"} disabled={!allowPost}
+                      onChange={() => { if (allowPost) { setShippingMethod("post"); soundEngine.playClick(); } }}
+                      className="w-4 h-4 accent-emerald-500" />
+                    <span className="font-black text-sm">📮 پست پیشتاز</span>
+                  </div>
+                  <div className="pr-7 font-mono font-black text-emerald-600">{formatPrice(financialRules.postShippingCost)} تومان</div>
+                </label>
+              )}
 
-              <label className={"p-4 rounded-2xl border-2 cursor-pointer transition flex flex-col gap-2 " + (shippingMethod === "tipax" ? "border-amber-500 bg-amber-500/10" : "border-[var(--card-border)] bg-[var(--input-bg)]")}>
-                <div className="flex items-center gap-3">
-                  <input type="radio" name="shippingMethod" value="tipax" checked={shippingMethod === "tipax"} onChange={() => { setShippingMethod("tipax"); soundEngine.playClick(); }} className="w-4 h-4 accent-amber-500" />
-                  <span className="font-black text-sm">ارسال با تیپاکس</span>
-                </div>
-                <div className="pr-7 font-mono font-black text-amber-600">{formatPrice(financialRules.tipaxShippingCost)} تومان</div>
-              </label>
+              {/* تیپاکس — فقط وقتی مجاز باشه */}
+              {(allowTipax || (!allowPost && !allowTipax)) && (
+                <label className={"p-4 rounded-2xl border-2 transition flex flex-col gap-2 " + (!allowTipax ? "opacity-40 cursor-not-allowed" : "cursor-pointer") + " " + (shippingMethod === "tipax" ? "border-amber-500 bg-amber-500/10" : "border-[var(--card-border)] bg-[var(--input-bg)]")}>
+                  <div className="flex items-center gap-3">
+                    <input type="radio" name="shippingMethod" value="tipax" checked={shippingMethod === "tipax"} disabled={!allowTipax}
+                      onChange={() => { if (allowTipax) { setShippingMethod("tipax"); soundEngine.playClick(); } }}
+                      className="w-4 h-4 accent-amber-500" />
+                    <span className="font-black text-sm">🚚 ارسال با تیپاکس</span>
+                  </div>
+                  <div className="pr-7">
+                    <span className="font-mono font-black text-amber-600">پس‌کرایه</span>
+                    <span className="text-[10px] text-[var(--text-secondary)] mr-2">(هنگام تحویل دریافت میشه)</span>
+                  </div>
+                </label>
+              )}
             </div>
           </div>
         </div>
@@ -386,6 +417,28 @@ export default function CheckoutPage() {
         {/* ستون راست: صورتحساب */}
         <div className="lg:col-span-5 p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs h-fit">
           <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">۳. صورتحساب و تایید نهایی</h2>
+          {/* خلاصه محصولات سبد */}
+          {cartItems.length > 0 && (
+            <div className="space-y-2 text-[11px]">
+              {cartItems.map((item: any, idx: number) => (
+                <div key={item.id || idx} className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+                  {(item.image || item.image_url) && (
+                    <img src={item.image || item.image_url} alt={item.title||""} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" onError={(e)=>{(e.target as HTMLImageElement).style.display="none"}} />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-[12px] truncate">{item.title || item.name}</div>
+                    <div className="flex items-center gap-2 mt-0.5 text-[var(--text-secondary)]">
+                      <span>تعداد: <span className="font-mono font-bold">{item.quantity || 1}</span></span>
+                      {item.selectedColor && <span>رنگ: <span className="font-bold">{item.selectedColor}</span></span>}
+                    </div>
+                  </div>
+                  <div className="font-mono font-black text-[var(--accent-blue)] whitespace-nowrap text-[11px]">
+                    {typeof formatPrice === "function" ? formatPrice((item.discount_price||item.price||0)*(item.quantity||1)) : ((item.discount_price||item.price||0)*(item.quantity||1)).toLocaleString("fa-IR")} ت
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
             <div className="flex justify-between">
               <span>مجموع اقلام:</span>
@@ -405,7 +458,9 @@ export default function CheckoutPage() {
             )}
             <div className="flex justify-between">
               <span>هزینه ارسال ({shippingMethod === "post" ? "پست" : shippingMethod === "tipax" ? "تیپاکس" : "انتخاب نشده"}):</span>
-              <span className="font-mono text-emerald-500">{!shippingMethod ? "---" : formatPrice(shippingCost) + " تومان"}</span>
+              <span className={`font-mono ${shippingMethod==="tipax"?"text-amber-500":"text-emerald-500"}`}>
+                {!shippingMethod ? "---" : shippingMethod === "tipax" ? "پس‌کرایه 🚚" : formatPrice(shippingCost) + " تومان"}
+              </span>
             </div>
             <div className="pt-2.5 border-t border-[var(--card-border)] flex justify-between items-center text-sm">
               <span className="font-black">مبلغ قابل پرداخت:</span>

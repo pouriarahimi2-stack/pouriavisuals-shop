@@ -17,20 +17,26 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
 
     if (sys.noIndex) {
       return {
-        rules: {
-          userAgent: "*",
-          disallow: "/",
-        },
+        rules: { userAgent: "*", disallow: "/" },
       };
     }
   } catch {}
 
   return {
-    rules: {
-      userAgent: "*",
-      allow: "/",
-      disallow: ["/admin/", "/api/"],
-    },
+    rules: [
+      {
+        userAgent: "*",
+        allow: ["/", "/products/", "/blog/", "/news/", "/about", "/contact"],
+        disallow: ["/admin/", "/api/", "/_next/", "/checkout/", "/profile/"],
+      },
+      {
+        // اجازه دسترسی Google Extended Indexing
+        userAgent: "Googlebot",
+        allow: ["/", "/products/", "/blog/", "/news/", "/about", "/contact"],
+        disallow: ["/admin/", "/api/", "/checkout/", "/profile/"],
+      },
+    ],
     sitemap: "https://axoncore.ir/sitemap.xml",
+    host:    "https://axoncore.ir",
   };
 }

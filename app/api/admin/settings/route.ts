@@ -26,12 +26,14 @@ export async function GET() {
         success: true,
         settings,
         system_settings: settings,
-      },
-      {
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        seo_identity: {
+          site_name:        row?.site_name        || "",
+          tagline:          row?.tagline          || "",
+          description:      row?.description      || "",
+          meta_description: row?.meta_description || row?.description || "",
         },
-      }
+      },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
     );
   } catch (err: any) {
     return NextResponse.json(
@@ -46,7 +48,7 @@ export async function POST(req: NextRequest) {
   if (!auth.ok) return auth.res;
 
   try {
-    const body = await req.json();
+    const body  = await req.json();
     const input = body.settings && typeof body.settings === "object" ? body.settings : body;
 
     const { data: existingRow } = await supabaseAdmin
@@ -122,45 +124,51 @@ export async function POST(req: NextRequest) {
     const nextLayoutConfig = {
       ...currentLayout,
       system_settings: updatedSettings,
-      store_settings: updatedSettings,
-      defaultShippingCost: updatedSettings.defaultShippingCost,
+      store_settings:  updatedSettings,
+      defaultShippingCost:   updatedSettings.defaultShippingCost,
       freeShippingThreshold: updatedSettings.freeShippingThreshold,
-      vatPercent: updatedSettings.vatPercent,
-      allowGuestCheckout: updatedSettings.allowGuestCheckout,
-      autoSendOrderSms: updatedSettings.autoSendOrderSms,
-      maintenanceMode: updatedSettings.maintenanceMode,
-      maintenanceMessage: updatedSettings.maintenanceMessage,
-      noIndex: updatedSettings.noIndex,
-      disallowRobots: updatedSettings.disallowRobots,
+      vatPercent:            updatedSettings.vatPercent,
+      allowGuestCheckout:    updatedSettings.allowGuestCheckout,
+      autoSendOrderSms:      updatedSettings.autoSendOrderSms,
+      maintenanceMode:       updatedSettings.maintenanceMode,
+      maintenanceMessage:    updatedSettings.maintenanceMessage,
+      noIndex:               updatedSettings.noIndex,
+      disallowRobots:        updatedSettings.disallowRobots,
     };
+
+    // ─── SEO Identity fields ───
+    const seoUpdate: Record<string, string> = {};
+    if (input.site_name        !== undefined) seoUpdate.site_name        = String(input.site_name).trim();
+    if (input.tagline          !== undefined) seoUpdate.tagline          = String(input.tagline).trim();
+    if (input.description      !== undefined) seoUpdate.description      = String(input.description).trim();
+    if (input.meta_description !== undefined) seoUpdate.meta_description = String(input.meta_description).trim();
 
     if (existingRow?.id) {
       const { error: fullErr } = await supabaseAdmin
         .from("site_info")
         .update({
           homepage_layout_config: nextLayoutConfig,
-          allow_google_index: !updatedSettings.noIndex,
-          maintenance_mode: updatedSettings.maintenanceMode ? "indefinite" : "none",
+          allow_google_index:      !updatedSettings.noIndex,
+          maintenance_mode:        updatedSettings.maintenanceMode ? "indefinite" : "none",
           free_shipping_threshold: updatedSettings.freeShippingThreshold,
-          updated_at: new Date().toISOString(),
+          updated_at:              new Date().toISOString(),
+          ...seoUpdate,
         })
         .eq("id", existingRow.id);
 
       if (fullErr) {
         await supabaseAdmin
           .from("site_info")
-          .update({
-            homepage_layout_config: nextLayoutConfig,
-            updated_at: new Date().toISOString(),
-          })
+          .update({ homepage_layout_config: nextLayoutConfig, updated_at: new Date().toISOString(), ...seoUpdate })
           .eq("id", existingRow.id);
       }
     } else {
       await supabaseAdmin.from("site_info").insert([
         {
-          site_name: "آکسون کور | AXON CORE",
+          site_name:              seoUpdate.site_name || "آکسون کور | AXON CORE",
           homepage_layout_config: nextLayoutConfig,
-          updated_at: new Date().toISOString(),
+          updated_at:             new Date().toISOString(),
+          ...seoUpdate,
         },
       ]);
     }
@@ -168,14 +176,11 @@ export async function POST(req: NextRequest) {
     try {
       await supabaseAdmin.from("admin_audit_logs").insert([
         {
-          action: "UPDATE_SYSTEM_SETTINGS",
-          user_id: auth.session?.username || "admin",
-          details: {
-            resource: "site_info:system_settings",
-            updatedSettings,
-          },
+          action:     "UPDATE_SYSTEM_SETTINGS",
+          user_id:    auth.session?.username || "admin",
+          details:    { resource: "site_info:system_settings", updatedSettings, seoUpdate },
           ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
-          severity: "info",
+          severity:   "info",
           created_at: new Date().toISOString(),
         },
       ]);
@@ -188,11 +193,7 @@ export async function POST(req: NextRequest) {
         system_settings: updatedSettings,
         message: "✓ تنظیمات کلان سیستم ذخیره شد و بلافاصله در سراسر سایت اعمال گردید.",
       },
-      {
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-        },
-      }
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
     );
   } catch (err: any) {
     return NextResponse.json(
@@ -200,12 +201,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-export async function PUT(req: NextRequest) {
-  return POST(req);
-}
-
-export async function PATCH(req: NextRequest) {
-  return POST(req);
 }

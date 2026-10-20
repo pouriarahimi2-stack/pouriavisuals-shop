@@ -182,6 +182,9 @@ export function AdminProducts(_props: any = {}) {
   const [importOnlyAvailable, setImportOnlyAvailable] = useState<boolean>(true);
   const [importSkipExisting, setImportSkipExisting]   = useState<boolean>(false);
   const [importShippingOverride, setImportShippingOverride] = useState<"auto"|"post"|"tipax"|"both">("auto");
+  const [localColors, setLocalColors] = useState<{ name: string; hex: string }[]>([]);
+  const [newColorHex, setNewColorHex] = useState<string>("#000000");
+  const [newColorName, setNewColorName] = useState<string>("");
   const docInputRef    = useRef<HTMLInputElement>(null);
   const bulkImagesRef  = useRef<HTMLInputElement>(null);
 
@@ -761,6 +764,69 @@ export function AdminProducts(_props: any = {}) {
                     <input type="number" min={0} value={editForm.stock||0} onChange={e=>setEditForm(f=>({...f,stock:Number(e.target.value),is_available:Number(e.target.value)>0}))}
                       className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono" />
                   </div>
+
+              {/* ══ color_options_admin_section ══ */}
+              <div className="md:col-span-2 space-y-3">
+                <label className="block text-xs font-black text-[var(--text-secondary)]">🎨 رنگ‌های موجود محصول</label>
+
+                {/* نمایش رنگ‌های اضافه‌شده */}
+                {Array.isArray(localColors) && localColors.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {localColors.map((c, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[var(--card-border)] bg-[var(--input-bg)] text-xs font-bold">
+                        <span className="w-3.5 h-3.5 rounded-full border border-black/10 flex-shrink-0" style={{ backgroundColor: c.hex }} />
+                        <span>{c.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = localColors.filter((_, i) => i !== idx);
+                            setLocalColors(updated);
+                          }}
+                          className="text-rose-400 hover:text-rose-600 font-black ml-0.5 leading-none text-sm"
+                        >×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* افزودن رنگ جدید */}
+                <div className="flex gap-2 items-center flex-wrap">
+                  <input
+                    type="color"
+                    value={newColorHex}
+                    onChange={e => setNewColorHex(e.target.value)}
+                    className="w-10 h-9 rounded-xl border border-[var(--card-border)] cursor-pointer p-0.5 bg-[var(--input-bg)] flex-shrink-0"
+                  />
+                  <input
+                    type="text"
+                    value={newColorName}
+                    onChange={e => setNewColorName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (newColorName.trim()) {
+                          setLocalColors(prev => [...prev, { hex: newColorHex, name: newColorName.trim() }]);
+                          setNewColorName("");
+                        }
+                      }
+                    }}
+                    placeholder="نام رنگ (مثلاً: مشکی)"
+                    className="flex-1 min-w-[120px] px-3 py-2 rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newColorName.trim()) return;
+                      setLocalColors(prev => [...prev, { hex: newColorHex, name: newColorName.trim() }]);
+                      setNewColorName("");
+                    }}
+                    className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 flex-shrink-0"
+                  >+ افزودن رنگ</button>
+                </div>
+                <p className="text-[10px] text-[var(--text-secondary)]">
+                  ایمپورت Excel: ستون <code className="bg-black/10 px-1 rounded">Color_Options</code> — فرمت: <code className="bg-black/10 px-1 rounded">#HEX:نام,#HEX:نام</code> — مثال: <code className="bg-black/10 px-1 rounded">#000000:مشکی,#FFFFFF:سفید</code>
+                </p>
+              </div>
                   <div className="sm:col-span-2">
                     <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">توضیحات</label>
                     <textarea rows={4} value={editForm.description||""} onChange={e=>setEditForm(f=>({...f,description:e.target.value}))}

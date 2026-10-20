@@ -9,6 +9,9 @@ import { CartProvider } from "@/context/CartContext";
 import { SiteInfoProvider } from "@/context/SiteInfoContext";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 
 export const viewport: Viewport = {
   width: "device-width",

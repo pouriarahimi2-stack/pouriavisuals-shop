@@ -129,6 +129,9 @@ export async function POST(req: NextRequest) {
       shipping_type: (["post","tipax","both"] as const).includes(body.shipping_type as any)
         ? (body.shipping_type as "post"|"tipax"|"both")
         : "both",
+      color_options: Array.isArray(body.color_options)
+        ? body.color_options.filter((c: any) => c && typeof c.name === "string" && typeof c.hex === "string")
+        : [],
     };
 
     // بررسی وجود محصول

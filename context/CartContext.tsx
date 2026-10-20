@@ -14,6 +14,7 @@ export interface CartItem {
   quantity: number;
   stock?: number;
   category?: string;
+  selectedColor?: string;
 }
 
 export interface AppliedCoupon {
@@ -133,6 +134,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             quantity: Math.min(itemStock, addQuantity),
             stock: itemStock,
             category: item.category || "عمومی",
+            selectedColor: item.selectedColor || undefined,
           },
         ];
       }

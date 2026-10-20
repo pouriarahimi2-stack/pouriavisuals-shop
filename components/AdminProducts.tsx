@@ -995,7 +995,7 @@ export function AdminProducts(_props: any = {}) {
                   📁 انتخاب فایل (Excel/CSV/PDF/Word)
                 </button>
                 <input ref={docInputRef} type="file" accept=".xlsx,.xls,.csv,.pdf,.doc,.docx" className="hidden" onChange={handleDocumentUpload} />
-                <p className="mt-3 text-[10px] text-[var(--text-secondary)]">فرمت‌های پشتیبانی‌شده: Excel ، CSV ، PDF ، Word (docx) — ستون‌ها: نام محصول · قیمت دراپ · دسته بندی · برند · کد محصول · Photo_Filename · Telegram_Description · موجودی · نوع ارسال</p>
+                <p className="mt-3 text-[10px] text-[var(--text-secondary)]">فرمت‌های پشتیبانی‌شده: Excel ، CSV ، PDF ، Word — ستون‌ها: نام محصول · قیمت دراپ · دسته بندی · برند · Photo_Filename · Telegram_Description · موجودی · نوع ارسال · Color_Options</p>
               </div>
 
               {/* Dry-Run */}

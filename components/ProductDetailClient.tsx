@@ -90,6 +90,7 @@ export default function ProductDetailClient({
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [selectedColor, setSelectedColor] = useState<string>("");
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -180,6 +181,7 @@ export default function ProductDetailClient({
         stock: stockCount,
         category: product.category || "عمومی",
         quantity: 1,
+        selectedColor: selectedColor || undefined,
       },
       false
     );
@@ -317,6 +319,39 @@ export default function ProductDetailClient({
             <div className="flex items-center gap-2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-blue-500 w-fit">
               <ShieldCheck size={18} />
               <span>گارانتی: {product.parsedWarranty}</span>
+            </div>
+          )}
+
+
+          {/* ══ انتخاب رنگ محصول ══ */}
+          {Array.isArray(product.color_options) && product.color_options.length > 0 && (
+            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+              <p className="text-xs font-black text-[var(--text-secondary)] mb-3">رنگ محصول:</p>
+              <div className="flex flex-wrap gap-2">
+                {product.color_options.map((c: { name: string; hex: string }) => (
+                  <button
+                    key={c.hex}
+                    type="button"
+                    title={c.name}
+                    onClick={() => setSelectedColor(selectedColor === c.name ? "" : c.name)}
+                    className={
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 text-xs font-bold transition-all " +
+                      (selectedColor === c.name
+                        ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]"
+                        : "border-[var(--card-border)] text-[var(--text-primary)] hover:border-[var(--accent-blue)]/50")
+                    }
+                  >
+                    <span
+                      className="w-4 h-4 rounded-full border border-black/10 flex-shrink-0"
+                      style={{ backgroundColor: c.hex }}
+                    />
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+              {selectedColor && (
+                <p className="mt-2 text-[10px] text-emerald-500 font-bold">✓ رنگ انتخاب‌شده: {selectedColor}</p>
+              )}
             </div>
           )}
 

@@ -15,6 +15,7 @@ export interface CartItem {
   stock?: number;
   category?: string;
   selectedColor?: string;
+  shipping_type?: string;
 }
 
 export interface AppliedCoupon {

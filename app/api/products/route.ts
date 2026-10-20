@@ -123,15 +123,15 @@ export async function POST(req: NextRequest) {
       is_available: body.is_available !== undefined ? Boolean(body.is_available) : numericStock > 0,
       image_url: primaryImage,
       description: packagedDescription,
+      color_options: Array.isArray(body.color_options)
+        ? body.color_options.filter((co: any) => co && typeof co.name === "string" && typeof co.hex === "string")
+        : [],
       updated_at: new Date().toISOString(),
       // ← ستون‌های جدید — مستقیم به DB نوشته میشن
       purchase_price: purchasePrice,
       shipping_type: (["post","tipax","both"] as const).includes(body.shipping_type as any)
         ? (body.shipping_type as "post"|"tipax"|"both")
         : "both",
-      color_options: Array.isArray(body.color_options)
-        ? body.color_options.filter((c: any) => c && typeof c.name === "string" && typeof c.hex === "string")
-        : [],
     };
 
     // بررسی وجود محصول

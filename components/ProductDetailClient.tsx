@@ -180,8 +180,9 @@ export default function ProductDetailClient({
         images: [itemImage],
         stock: stockCount,
         category: product.category || "عمومی",
-        quantity: 1,
+        shipping_type: product.shipping_type || undefined,
         selectedColor: selectedColor || undefined,
+        quantity: 1,
       },
       false
     );
@@ -366,6 +367,31 @@ export default function ProductDetailClient({
                     {formatPrice(basePrice)} تومان
                   </div>
                 )}
+          {/* color_options_user_section */}
+          {Array.isArray(product.color_options) && product.color_options.length > 0 && (
+            <div className="flex flex-col gap-2 mb-4">
+              <span className="text-xs font-bold text-[var(--text-secondary)]">🎨 رنگ موجود — انتخاب کنید:</span>
+              <div className="flex flex-wrap gap-2">
+                {(product.color_options as Array<{hex: string; name: string}>).map((c) => (
+                  <button
+                    key={c.hex}
+                    onClick={() => setSelectedColor(c.name)}
+                    title={c.name}
+                    aria-label={"رنگ " + c.name}
+                    className={`w-9 h-9 rounded-full border-2 transition-all shadow-sm ${
+                      selectedColor === c.name
+                        ? "border-[var(--accent-blue)] ring-2 ring-[var(--accent-blue)]/40 scale-110"
+                        : "border-[var(--card-border)] hover:scale-105"
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                  />
+                ))}
+              </div>
+              {selectedColor && (
+                <span className="text-[11px] font-bold text-[var(--accent-blue)]">رنگ انتخابی: {selectedColor}</span>
+              )}
+            </div>
+          )}
                 <div className="text-2xl text-emerald-500" suppressHydrationWarning>
                   {formatPrice(finalPrice)} تومان
                 </div>

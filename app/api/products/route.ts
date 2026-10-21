@@ -129,9 +129,15 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
       // ← ستون‌های جدید — مستقیم به DB نوشته میشن
       purchase_price: purchasePrice,
-      shipping_type: (["post","tipax","both"] as const).includes(body.shipping_type as any)
-        ? (body.shipping_type as "post"|"tipax"|"both")
-        : "both",
+      shipping_type: (() => {
+        const stMap: Record<string, "post"|"tipax"|"both"> = {
+          "post": "post", "tipax": "tipax", "both": "both",
+          "فقط پست": "post",    "پست": "post",
+          "فقط تیپاکس": "tipax", "تیپاکس": "tipax",
+          "پست و تیپاکس": "both", "هر دو": "both",
+        };
+        return stMap[String(body.shipping_type || "").trim()] || "both";
+      })(),
     };
 
     // بررسی وجود محصول

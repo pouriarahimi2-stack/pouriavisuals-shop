@@ -72,6 +72,34 @@ export default function CheckoutPage() {
   const [notes, setNotes] = useState("");
   const [shippingMethod, setShippingMethod] = useState<"post" | "tipax" | null>(null);
 
+  // ─────────────────────────────────────────────────────────────────
+  // allowedShipping: بر اساس shipping_type آیتم‌های سبد خرید
+  // اگر محصول "tipax" باشه → فقط تیپاکس / اگر "post" باشه → فقط پست
+  // ─────────────────────────────────────────────────────────────────
+  const allowedShipping = React.useMemo(() => {
+    const items = (cartItems || []) as any[];
+    const hasTipaxOnly = items.some((item: any) => {
+      const st = String(item.shipping_type || "").toLowerCase();
+      return st === "tipax";
+    });
+    const hasPostOnly = items.some((item: any) => {
+      const st = String(item.shipping_type || "").toLowerCase();
+      return st === "post";
+    });
+    if (hasTipaxOnly && !hasPostOnly) return "tipax_only" as const;
+    if (hasPostOnly && !hasTipaxOnly) return "post_only" as const;
+    return "both" as const;
+  }, [cartItems]);
+
+  // اعمال خودکار روش ارسال اجباری
+  React.useEffect(() => {
+    if (allowedShipping === "tipax_only" && shippingMethod !== "tipax") {
+      setShippingMethod("tipax");
+    } else if (allowedShipping === "post_only" && shippingMethod !== "post") {
+      setShippingMethod("post");
+    }
+  }, [allowedShipping]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [couponInput, setCouponInput] = useState("");
   const [couponMsg, setCouponMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
@@ -379,34 +407,52 @@ export default function CheckoutPage() {
           </div>
 
           {/* بخش ۲: روش ارسال */}
+          {/* smart_shipping_section */}
           <div className="p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
-            <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">۲. انتخاب روش ارسال کالا (اجباری)</h2>
+            <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
+              ۲. انتخاب روش ارسال کالا (اجباری)
+            </h2>
+            {allowedShipping !== "both" && (
+              <div className="text-[11px] px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 font-bold">
+                ⚠️ {allowedShipping === "tipax_only"
+                  ? "این سفارش فقط از طریق تیپاکس (پس‌کرایه) ارسال می‌شود."
+                  : "این سفارش فقط از طریق پست پیشتاز ارسال می‌شود."}
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-              {/* پست پیشتاز — فقط وقتی مجاز باشه */}
-              {(allowPost || (!allowPost && !allowTipax)) && (
-                <label className={"p-4 rounded-2xl border-2 transition flex flex-col gap-2 " + (!allowPost ? "opacity-40 cursor-not-allowed" : "cursor-pointer") + " " + (shippingMethod === "post" ? "border-emerald-500 bg-emerald-500/10" : "border-[var(--card-border)] bg-[var(--input-bg)]")}>
+              {allowedShipping !== "tipax_only" && (
+                <label className={"p-4 rounded-2xl border-2 cursor-pointer transition flex flex-col gap-2 " + (shippingMethod === "post" ? "border-emerald-500 bg-emerald-500/10" : "border-[var(--card-border)] bg-[var(--input-bg)]")}>
                   <div className="flex items-center gap-3">
-                    <input type="radio" name="shippingMethod" value="post" checked={shippingMethod === "post"} disabled={!allowPost}
-                      onChange={() => { if (allowPost) { setShippingMethod("post"); soundEngine.playClick(); } }}
-                      className="w-4 h-4 accent-emerald-500" />
-                    <span className="font-black text-sm">📮 پست پیشتاز</span>
+                    <input
+                      type="radio"
+                      name="shippingMethod"
+                      value="post"
+                      checked={shippingMethod === "post"}
+                      onChange={() => setShippingMethod("post")}
+                      className="w-4 h-4 accent-emerald-500"
+                    />
+                    <span className="font-black text-sm">📦 پست پیشتاز</span>
                   </div>
-                  <div className="pr-7 font-mono font-black text-emerald-600">{formatPrice(financialRules.postShippingCost)} تومان</div>
+                  <div className="pr-7 font-bold text-emerald-600 text-xs">
+                    هزینه ثابت + تحویل درب منزل
+                  </div>
                 </label>
               )}
-
-              {/* تیپاکس — فقط وقتی مجاز باشه */}
-              {(allowTipax || (!allowPost && !allowTipax)) && (
-                <label className={"p-4 rounded-2xl border-2 transition flex flex-col gap-2 " + (!allowTipax ? "opacity-40 cursor-not-allowed" : "cursor-pointer") + " " + (shippingMethod === "tipax" ? "border-amber-500 bg-amber-500/10" : "border-[var(--card-border)] bg-[var(--input-bg)]")}>
+              {allowedShipping !== "post_only" && (
+                <label className={"p-4 rounded-2xl border-2 cursor-pointer transition flex flex-col gap-2 " + (shippingMethod === "tipax" ? "border-amber-500 bg-amber-500/10" : "border-[var(--card-border)] bg-[var(--input-bg)]")}>
                   <div className="flex items-center gap-3">
-                    <input type="radio" name="shippingMethod" value="tipax" checked={shippingMethod === "tipax"} disabled={!allowTipax}
-                      onChange={() => { if (allowTipax) { setShippingMethod("tipax"); soundEngine.playClick(); } }}
-                      className="w-4 h-4 accent-amber-500" />
-                    <span className="font-black text-sm">🚚 ارسال با تیپاکس</span>
+                    <input
+                      type="radio"
+                      name="shippingMethod"
+                      value="tipax"
+                      checked={shippingMethod === "tipax"}
+                      onChange={() => setShippingMethod("tipax")}
+                      className="w-4 h-4 accent-amber-500"
+                    />
+                    <span className="font-black text-sm">🚀 ارسال با تیپاکس</span>
                   </div>
-                  <div className="pr-7">
-                    <span className="font-mono font-black text-amber-600">پس‌کرایه</span>
-                    <span className="text-[10px] text-[var(--text-secondary)] mr-2">(هنگام تحویل دریافت میشه)</span>
+                  <div className="pr-7 font-bold text-amber-600 text-xs">
+                    پس‌کرایه — بدون افزایش مبلغ فاکتور
                   </div>
                 </label>
               )}

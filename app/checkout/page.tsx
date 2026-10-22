@@ -78,16 +78,19 @@ export default function CheckoutPage() {
   // ─────────────────────────────────────────────────────────────────
   const allowedShipping = React.useMemo(() => {
     const items = (cartItems || []) as any[];
-    const hasTipaxOnly = items.some((item: any) => {
-      const st = String(item.shipping_type || "").toLowerCase();
-      return st === "tipax";
-    });
-    const hasPostOnly = items.some((item: any) => {
-      const st = String(item.shipping_type || "").toLowerCase();
-      return st === "post";
-    });
+    // shipping_type ممکنه مستقیم یا nested باشه
+    const getShippingType = (item: any): string => {
+      return String(
+        item.shipping_type ||
+        item.product?.shipping_type ||
+        item.shippingType ||
+        ""
+      ).toLowerCase().trim();
+    };
+    const hasTipaxOnly = items.some((item: any) => getShippingType(item) === "tipax");
+    const hasPostOnly  = items.some((item: any) => getShippingType(item) === "post");
     if (hasTipaxOnly && !hasPostOnly) return "tipax_only" as const;
-    if (hasPostOnly && !hasTipaxOnly) return "post_only" as const;
+    if (hasPostOnly  && !hasTipaxOnly) return "post_only"  as const;
     return "both" as const;
   }, [cartItems]);
 

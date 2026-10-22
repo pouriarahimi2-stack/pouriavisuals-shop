@@ -10,6 +10,7 @@ export interface FullCatalogProduct {
   is_available: boolean; image?: string; images?: string[]; description?: string;
   warranty?: string; meta_title?: string; meta_description?: string; specs?: Record<string, any>;
   shipping_type?: "post" | "tipax" | "both";
+  color_options?: { name: string; hex: string }[];
 }
 
 function isRealUrl(s: string) { return !!(s && !s.startsWith("data:") && s.length < 2000); }
@@ -233,11 +234,12 @@ export function AdminProducts(_props: any = {}) {
     );
   });
 
-  const openAdd  = () => { setEditingProd(null); setEditForm(EMPTY_FORM()); setActiveTab("basic"); setProfitPctLocal(25); setIsModalOpen(true); };
+  const openAdd  = () => { setEditingProd(null); setEditForm(EMPTY_FORM()); setActiveTab("basic"); setProfitPctLocal(25); setLocalColors([]); setIsModalOpen(true); };
   const openEdit = (p: FullCatalogProduct) => {
     setEditingProd(p);
     setEditForm({...p, images:[...(p.images||[])]});
     setActiveTab("basic");
+    setLocalColors(Array.isArray(p.color_options) ? p.color_options : []);
     // محاسبه درصد سود از روی قیمت موجود
     if (p.purchase_price && p.purchase_price > 0 && p.price > 0) {
       setProfitPctLocal(Math.round(((p.price / p.purchase_price) - 1) * 100));
@@ -322,6 +324,7 @@ export function AdminProducts(_props: any = {}) {
         images: (editForm.images||[]).filter(isRealUrl),
         image: editForm.image && isRealUrl(editForm.image) ? editForm.image : ((editForm.images||[]).filter(isRealUrl)[0]||"/placeholder.png"),
         shipping_type: editForm.shipping_type || "both",
+        color_options: localColors,
       };
       const res = await fetch("/api/products", {
         method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload)

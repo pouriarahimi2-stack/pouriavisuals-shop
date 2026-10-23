@@ -109,6 +109,8 @@ export async function POST(req: NextRequest) {
         quantity: requestedQty,
         total_price: lineTotal,
         image: it.image || it.image_url || null,
+        selectedColor: it.selectedColor || it.selected_color || null,
+        shipping_type: it.shipping_type || null,
       });
     }
 
@@ -193,10 +195,44 @@ export async function POST(req: NextRequest) {
         .eq("id", couponRecordToUpdate.id);
     }
 
-    smsService.sendSMS(
-      cleanPhone,
-      "مشتری گرامی، سفارش شما در آکسون ثبت شد. سپاس از اعتماد شما."
-    ).catch(() => {});
+    // ── پیام SMS کامل سفارش ──
+    (() => {
+      try {
+        const persianDate = new Date(createdOrder.created_at).toLocaleDateString("fa-IR", {
+          year: "numeric", month: "long", day: "numeric",
+          hour: "2-digit", minute: "2-digit",
+        });
+        const itemLines = verifiedItems.map((vi: any) => {
+          const colorPart = vi.selectedColor ? ` (رنگ: ${vi.selectedColor})` : "";
+          return `🔸 ${vi.title}${colorPart} × ${vi.quantity} — ${Number(vi.price).toLocaleString("fa-IR")} ت`;
+        }).join("\n");
+
+        const smsText = [
+          `✅ سفارش شما در آکسون ثبت شد`,
+          `━━━━━━━━━━━━━━━━━`,
+          itemLines,
+          `━━━━━━━━━━━━━━━━━`,
+          `🔸 تاریخ: ${persianDate}`,
+          `🔸 مبلغ کل: ${Number(calculatedRawTotal).toLocaleString("fa-IR")} تومان`,
+          ...(finalDiscount > 0 ? [`🔸 تخفیف: ${Number(finalDiscount).toLocaleString("fa-IR")} ت`] : []),
+          `🔸 مبلغ قابل پرداخت: ${Number(payableAmount).toLocaleString("fa-IR")} تومان`,
+          `━━━━━━━━━━━━━━━━━`,
+          `📍 اطلاعات تحویل:`,
+          `🔸 گیرنده: ${orderPayload.customer_name}`,
+          `🔸 موبایل: ${cleanPhone}`,
+          `🔸 ${orderPayload.province} - ${orderPayload.city}`,
+          `🔸 ${finalAddress}`,
+          ...(postal_code ? [`🔸 کد پستی: ${postal_code}`] : []),
+          `━━━━━━━━━━━━━━━━━`,
+          `کد پیگیری: ${orderNumber}`,
+          `سپاس از اعتماد شما 🙏`,
+        ].join("\n");
+
+        smsService.sendSMS(cleanPhone, smsText).catch(() => {});
+      } catch (smsErr) {
+        console.warn("SMS error:", smsErr);
+      }
+    })();
 
     return NextResponse.json({
       success: true,

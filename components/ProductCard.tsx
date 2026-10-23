@@ -19,6 +19,8 @@ interface ProductCardProps {
     category?:       string;
     stock?:          number;
     warranty?:       string;
+    color_options?:  { name: string; hex: string }[];
+    shipping_type?:  string;
   };
 }
 
@@ -101,7 +103,10 @@ export default function ProductCard({ product }: ProductCardProps) {
             </span>
           )}
         </div>
-        <AddToCartButton product={{ ...product, image: imgSrc }} showCounter={false} />
+        <AddToCartButton
+          product={{ ...product, image: imgSrc, color_options: product.color_options, shipping_type: product.shipping_type }}
+          showCounter={false}
+        />
       </div>
     </div>
   );

@@ -10,10 +10,13 @@ interface AddToCartButtonProps {
     title?: string;
     name?: string;
     price: number;
+    discount_price?: number | null;
     image?: string | null;
     images?: string[];
     stock?: number;
     category?: string;
+    color_options?: { name: string; hex: string }[];
+    shipping_type?: string;
   };
   className?: string;
   showCounter?: boolean;
@@ -28,6 +31,8 @@ export default function AddToCartButton({
   const [animState, setAnimState] = useState<"idle" | "adding">("idle");
   const [bumpCounter, setBumpCounter] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const hasColors = Array.isArray(product.color_options) && product.color_options.length > 0;
 
   useEffect(() => {
     setMounted(true);
@@ -44,47 +49,87 @@ export default function AddToCartButton({
     product.image ||
     "/placeholder.png";
 
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!isAvailable || isMaxReached || animState !== "idle") return;
-
+  const doAddToCart = (colorName?: string) => {
     soundEngine.playAddToCart();
     setAnimState("adding");
-
-    // افزودن کالا بدون باز کردن زودهنگام کشو
     addToCart(
       {
         id: product.id,
         title: product.title || product.name,
         name: product.title || product.name,
         price: product.price,
+        discount_price: product.discount_price,
         image: guaranteedImage,
         images: [guaranteedImage],
         stock: stockLimit,
         category: product.category || "تکنولوژی",
         quantity: 1,
+        selectedColor: colorName || undefined,
+        shipping_type: product.shipping_type || undefined,
       },
       false
     );
+    setTimeout(() => { setBumpCounter(true); setTimeout(() => setBumpCounter(false), 500); }, 550);
+    setTimeout(() => { setAnimState("idle"); openCart(); }, 1250);
+  };
 
-    setTimeout(() => {
-      setBumpCounter(true);
-      setTimeout(() => setBumpCounter(false), 500);
-    }, 550);
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isAvailable || isMaxReached || animState !== "idle") return;
+    // اگه محصول رنگ داره، اول color picker نشون بده
+    if (hasColors) {
+      setShowColorPicker((prev) => !prev);
+      return;
+    }
+    doAddToCart();
+  };
 
-    // کشوی سبد خرید دقیقاً با اتمام کامل ۱.۲۵ ثانیه انیمیشن چرخ‌دستی باز می‌شود
-    setTimeout(() => {
-      setAnimState("idle");
-      openCart();
-    }, 1250);
+  const handleColorSelect = (e: React.MouseEvent, colorName: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowColorPicker(false);
+    doAddToCart(colorName);
   };
 
   const isAnimating = animState === "adding";
 
   return (
-    <div className={`flex flex-col items-center gap-1.5 w-full select-text ${className}`} dir="rtl" suppressHydrationWarning>
+    <div className={`flex flex-col items-center gap-1.5 w-full select-text relative ${className}`} dir="rtl" suppressHydrationWarning>
+      {/* ── Color Picker Popup ── */}
+      {showColorPicker && hasColors && (
+        <div
+          className="absolute bottom-full mb-2 right-0 left-0 z-50 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-2xl shadow-2xl p-3"
+          dir="rtl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="font-black text-[11px] text-[var(--text-primary)]">انتخاب رنگ</span>
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowColorPicker(false); }}
+              className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-red-500/10 text-[var(--text-secondary)] hover:text-red-500 transition text-base leading-none"
+            >×</button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {product.color_options!.map((c) => (
+              <button
+                key={c.hex + c.name}
+                type="button"
+                onClick={(e) => handleColorSelect(e, c.name)}
+                className="flex flex-col items-center gap-1 p-1.5 rounded-xl hover:bg-[var(--input-bg)] transition group border border-transparent hover:border-[var(--card-border)]"
+                title={c.name}
+              >
+                <span
+                  className="w-7 h-7 rounded-full border-2 border-white/20 shadow-md block ring-2 ring-transparent group-hover:ring-[var(--accent-blue)] transition"
+                  style={{ backgroundColor: c.hex }}
+                />
+                <span className="text-[9px] font-bold text-[var(--text-secondary)] max-w-[52px] truncate">{c.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <button
         type="button"
         disabled={!isAvailable || isMaxReached}

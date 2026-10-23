@@ -136,6 +136,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             stock: itemStock,
             category: item.category || "عمومی",
             selectedColor: item.selectedColor || undefined,
+            shipping_type: item.shipping_type || undefined,
           },
         ];
       }

@@ -270,6 +270,9 @@ export async function PUT(req: NextRequest) {
       is_available: isAvailable !== undefined ? Boolean(isAvailable) : numericStock > 0,
       description: packagedDesc,
       updated_at: new Date().toISOString(),
+      sku: sku ? String(sku).trim() : unpackedExisting.sku,
+      brand: brand ? String(brand).trim() : unpackedExisting.brand,
+      warranty: warranty ? String(warranty).trim() : unpackedExisting.warranty,
     };
 
     const { data: updated, error } = await supabaseAdmin

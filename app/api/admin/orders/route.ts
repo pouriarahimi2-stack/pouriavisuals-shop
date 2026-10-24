@@ -71,7 +71,7 @@ export async function PATCH(req: NextRequest) {
 
     const { data: existingOrder } = await supabaseAdmin
       .from("orders")
-      .select("id, status, payment_status, items")
+      .select("id, status, payment_status, items, phone, final_amount, total_amount")
       .eq("id", id)
       .maybeSingle();
 
@@ -95,7 +95,41 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    // اگر سفارش برای اولین بار به وضعیت «لغو شده» تغییر یابد، موجودی کالاهای آن به انبار بازگردانده شود
+    
+    // [WALLET_INTEGRATION] عودت وجه به کیف پول در صورت لغو سفارش پرداخت‌شده
+    if (resolvedStatus === "cancelled" && existingOrder && existingOrder.payment_status === "paid") {
+      try {
+        const { data: wallet } = await supabaseAdmin
+          .from("customer_wallets")
+          .select("balance")
+          .eq("customer_phone", existingOrder.phone)
+          .maybeSingle();
+
+        const refundAmount = Number(existingOrder.final_amount || existingOrder.total_amount || 0);
+
+        if (wallet) {
+          await supabaseAdmin
+            .from("customer_wallets")
+            .update({ balance: Number(wallet.balance) + refundAmount, updated_at: new Date().toISOString() })
+            .eq("customer_phone", existingOrder.phone);
+        } else {
+          await supabaseAdmin
+            .from("customer_wallets")
+            .insert([{ 
+              customer_phone: existingOrder.phone, 
+              balance: refundAmount,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }]);
+        }
+        console.log("وجه با موفقیت به کیف پول مشتری عودت داده شد.");
+      } catch (walletErr) {
+        console.error("خطا در عودت وجه به کیف پول:", walletErr);
+      }
+    }
+    
+    // اگر سفارش برای اولین بار به وضعیت «لغو شده» تغییر یابد
+// موجودی کالاهای آن به انبار بازگردانده شود
     if (
       resolvedStatus === "cancelled" &&
       existingOrder &&
@@ -159,7 +193,7 @@ export async function DELETE(req: NextRequest) {
 
     const { data: ord } = await supabaseAdmin
       .from("orders")
-      .select("id, status, payment_status, items")
+      .select("id, status, payment_status, items, phone, final_amount, total_amount")
       .eq("id", id)
       .maybeSingle();
 

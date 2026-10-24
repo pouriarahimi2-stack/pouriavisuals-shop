@@ -6,7 +6,7 @@ import { postViaNetafrazRelay } from "@/lib/netafrazRelay";
 export const dynamic = "force-dynamic";
 
 const ZARINPAL_MERCHANT_ID =
-  process.env.ZARINPAL_MERCHANT_ID || "459a9ff5-fed1-4a6c-b9c3-309f93c6bf73";
+  process.env.ZARINPAL_MERCHANT_ID ;
 
 export async function POST(req: NextRequest) {
   try {

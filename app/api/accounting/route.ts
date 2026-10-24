@@ -30,16 +30,16 @@ export async function GET(req: NextRequest) {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const monthlyOrders = orders.filter((o: any) => {
+    const monthlyOrders = orders.filter((o: { created_at?: string; status?: string; payment_status?: string; items?: Array<{ productId?: string; product_id?: string; id?: string; quantity?: number; discount_price?: number; price?: number }> }) => {
       const orderDate = new Date(o.created_at || Date.now());
       return orderDate >= thirtyDaysAgo && o.status !== "cancelled" && o.payment_status !== "failed";
     });
 
-    const productFinancials = products.map((p: any) => {
+    const productFinancials = products.map((p: { id: string; title?: string; sku?: string; brand?: string; category?: string; warranty?: string; stock?: number; is_available?: boolean; price?: number; discount_price?: number; purchase_price?: number }) => {
       let unitsSoldMonthly = 0;
       let totalRevenueMonthly = 0;
 
-      monthlyOrders.forEach((o: any) => {
+      monthlyOrders.forEach((o: { created_at?: string; status?: string; payment_status?: string; items?: Array<{ productId?: string; product_id?: string; id?: string; quantity?: number; discount_price?: number; price?: number }> }) => {
         const items = Array.isArray(o.items) ? o.items : [];
         items.forEach((item: any) => {
           if (String(item.productId || item.product_id || item.id) === String(p.id)) {

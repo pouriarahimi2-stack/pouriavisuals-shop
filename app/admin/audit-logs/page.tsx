@@ -168,7 +168,7 @@ export default function AdminAuditLogsPage() {
           <div className="p-8 text-center text-xs text-slate-400 font-bold">هیچ رخدادی هنوز ثبت نشده است.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs min-w-[680px]">
+            <table className="w-full text-right text-xs w-full min-w-full md:min-w-[680px]">
               <thead>
                 <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)]">
                   <th className="pb-3 px-3">نوع عملیات</th>

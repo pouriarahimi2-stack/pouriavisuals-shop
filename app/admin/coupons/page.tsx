@@ -419,7 +419,7 @@ export default function AdminCouponsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs min-w-[920px]">
+            <table className="w-full text-right text-xs w-full min-w-full lg:min-w-[920px]">
               <thead>
                 <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)]">
                   <th className="pb-3 px-3">کد تخفیف (کپی سریع)</th>

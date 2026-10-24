@@ -448,6 +448,12 @@ function AccountDashboardContent() {
         isUnpaid: false,
       };
     }
+    if (st === "picking" || st === "packing") {
+      return { text: "در حال پردازش انبار 🏭", cls: "bg-blue-500/15 text-blue-500 border-blue-500/30", step: 2, isUnpaid: false };
+    }
+    if (st === "ready") {
+      return { text: "آماده ارسال 📦", cls: "bg-orange-500/15 text-orange-500 border-orange-500/30", step: 2, isUnpaid: false };
+    }
     if (st === "paid" || paySt === "paid" || st === "processing") {
       return {
         text: "پرداخت شده • در حال بسته‌بندی 📦",

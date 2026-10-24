@@ -20,11 +20,8 @@ export async function GET(req: NextRequest) {
       msg2Res,
     ] = await Promise.allSettled([
       supabaseAdmin.from("products").select("id, price, discount_price, purchase_price, stock"),
-      supabaseAdmin
-        .from("orders")
-        .select("id, order_number, status, payment_status, final_amount, total_amount, created_at, phone, customer_phone, customer_name")
-        .order("created_at", { ascending: false })
-        .limit(250),
+      supabaseAdmin.from("orders").select("id, order_number, status, payment_status, final_amount, total_amount, created_at, phone, customer_phone, customer_name").order("created_at", { ascending: false }).limit(250),
+      supabaseAdmin.from("admin_financial_stats").select("*").maybeSingle(),
       supabaseAdmin.from("coupons").select("id", { count: "exact", head: true }).eq("is_active", true),
       supabaseAdmin.from("posts").select("id", { count: "exact", head: true }),
       supabaseAdmin.from("tech_news").select("id", { count: "exact", head: true }),
@@ -51,23 +48,15 @@ export async function GET(req: NextRequest) {
       inventoryValuation += stk * unitCost;
     }
 
-    let totalSales = 0;
-    let pendingOrders = 0;
+    const { data: dbStats } = await supabaseAdmin.from("admin_financial_stats").select("*").maybeSingle();
+    let totalSales = dbStats?.total_revenue || 0;
+    let pendingOrders = dbStats?.pending_orders || 0;
+    
     const phoneCounts: Record<string, number> = {};
-
     for (const o of allOrders) {
-      const st = String(o.status || o.payment_status || "pending");
-      if (st === "pending" || st === "pending_manual_review" || st === "processing") {
-        pendingOrders++;
-      }
-      if (st !== "cancelled" && st !== "failed") {
-        const amt = Number(o.final_amount || o.total_amount || 0);
-        if (Number.isFinite(amt)) totalSales += amt;
-      }
       const ph = String(o.phone || o.customer_phone || "").trim();
       if (ph) phoneCounts[ph] = (phoneCounts[ph] || 0) + 1;
     }
-
     const totalCustomers = Object.keys(phoneCounts).length;
     const vipCustomersCount = Object.values(phoneCounts).filter((c) => c >= 2).length;
 

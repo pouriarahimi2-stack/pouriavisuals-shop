@@ -83,6 +83,8 @@ export async function PATCH(req: NextRequest) {
     if (resolvedStatus) {
       updatePayload.status = resolvedStatus;
       if (resolvedStatus === "paid") updatePayload.payment_status = "paid";
+      // Enterprise Logistics Statuses
+      if (["picking", "packing", "ready"].includes(resolvedStatus)) updatePayload.status = resolvedStatus;
       if (resolvedStatus === "cancelled") updatePayload.payment_status = "failed";
     }
 

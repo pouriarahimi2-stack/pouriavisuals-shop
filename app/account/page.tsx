@@ -165,7 +165,7 @@ function AccountDashboardContent() {
   const [savingProfile, setSavingProfile] = useState(false);
 
   const syncUserDisplayName = useCallback(
-    (orderList: CustomerOrder[], currentUserObj: any) => {
+    (orderList: CustomerOrder[], currentUserObj: { phone?: string; name?: string; full_name?: string; username?: string; province?: string; city?: string; address?: string; postalCode?: string }) => {
       if (!currentUserObj) return;
       const latestNamedOrder = orderList.find(
         (o) =>
@@ -904,7 +904,7 @@ function AccountDashboardContent() {
                   </h4>
                   <div className="space-y-2">
                     {(Array.isArray(selectedOrder.items) ? selectedOrder.items : []).map(
-                      (item: any, idx: number) => (
+                      (item: { title?: string; name?: string; discount_price?: number; discountPrice?: number; price?: number; quantity?: number }, idx: number) => (
                         <div
                           key={idx}
                           className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3"

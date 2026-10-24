@@ -390,7 +390,7 @@ export default function AdminCouponsPage() {
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-lg sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🏷️</span> استودیوی پیشرفته کوپن‌های زمان‌دار، هدفمند و کمپین‌های پیامکی CRM
+            <span>🏷️</span> مدیریت پیشرفته کوپن‌های زمان‌دار، هدفمند و کمپین‌های پیامکی CRM
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
             تولید کد تخفیف روی کل سبد، دسته‌بندی یا کالای خاص + اتصال ۱-کلیکی به هدر سایت و ارسال پیامک به مشتریان CRM

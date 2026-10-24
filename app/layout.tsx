@@ -9,6 +9,7 @@ import { CartProvider } from "@/context/CartContext";
 import { SiteInfoProvider } from "@/context/SiteInfoContext";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import RealtimeGlobalListener from "@/components/RealtimeGlobalListener";
+import MobileBottomNav from "@/components/layout/MobileBottomNav";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -144,6 +145,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <LiveStoreSyncGuard />
           </SiteInfoProvider>
         </CartProvider>
+        <MobileBottomNav />
       </body>
     </html>
   );

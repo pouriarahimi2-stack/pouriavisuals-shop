@@ -553,3 +553,64 @@ html, body, div, span, p, h1, h2, h3, h4, h5, h6, pre, code, td, th, input, text
     height: 4px;
   }
 }
+
+
+/* =========================================
+   Enterprise Mobile UI Overrides (AXON CORE)
+   ========================================= */
+@media (max-width: 768px) {
+  /* 1. جلوگیری از تداخل هدر با محتوای سایت */
+  main {
+    padding-top: 90px !important; /* فاصله از هدر */
+    padding-bottom: 90px !important; /* فاصله از منوی پایین */
+  }
+
+  /* 2. کوچک کردن کارت‌های محصول و نمایش به صورت گرید ۲ ستونه */
+  /* این کد به صورت هوشمند کلاس‌های گرید یک‌ستونه را به دوستونه تغییر می‌دهد */
+  .grid-cols-1, .grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+    padding: 8px !important;
+  }
+
+  /* 3. اصلاح سایز فونت‌ها و دکمه‌ها در کارت محصول */
+  .grid-cols-1 > div, .grid-cols-2 > div {
+    border-radius: 12px !important;
+    padding: 8px !important;
+  }
+  
+  /* کوچک کردن عنوان محصول */
+  .grid-cols-1 h2, .grid-cols-1 h3, .grid-cols-2 h2, .grid-cols-2 h3 {
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+    margin-bottom: 4px !important;
+    white-space: normal !important;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  /* کوچک کردن قیمت */
+  .grid-cols-1 .text-green-600, .grid-cols-2 .text-green-600 {
+    font-size: 14px !important;
+  }
+
+  /* اصلاح دکمه خرید */
+  .grid-cols-1 button, .grid-cols-2 button {
+    padding: 6px 8px !important;
+    font-size: 11px !important;
+    border-radius: 8px !important;
+  }
+
+  /* 4. جابجایی دکمه شناور چت/پشتیبانی برای جلوگیری از تداخل */
+  .fixed.bottom-4.left-4, .fixed.bottom-5.left-5 {
+    bottom: 85px !important; /* بالاتر از منوی موبایل */
+    z-index: 90 !important;
+  }
+}
+
+/* پشتیبانی از Safe Area در گوشی‌های آیفون */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}

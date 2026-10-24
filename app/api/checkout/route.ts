@@ -236,6 +236,34 @@ export async function POST(req: NextRequest) {
       address +
       (notes ? " (" + notes + ")" : "");
 
+    
+    // [IDEMPOTENCY_GUARD] جلوگیری از ثبت سفارش تکراری در اثر دوبار کلیک
+    const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const { data: recentDuplicate } = await supabaseAdmin
+      .from("orders")
+      .select("id, final_amount, tracking_code, order_number")
+      .eq("phone", cleanPhone)
+      .eq("status", "pending")
+      .gte("created_at", twoMinsAgo)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // اگر سفارشی با مبلغ یکسان در 2 دقیقه گذشته ثبت شده باشد، همان را برمی‌گردانیم
+    if (recentDuplicate) {
+      // بررسی تطابق مبلغ برای اطمینان از اینکه همان سبد خرید است
+      // محاسبه مبلغ فعلی به صورت حدودی برای مقایسه سریع
+      let estimatedCurrentTotal = items.reduce((acc: number, it: any) => acc + Number(it.price || 0) * Number(it.quantity || 1), 0);
+      if (Math.abs(Number(recentDuplicate.final_amount) - estimatedCurrentTotal) < 500000) {
+         return NextResponse.json({
+          success: true,
+          order: recentDuplicate,
+          message: "✓ سفارش شما پیش از این ثبت شده و در حال انتقال به درگاه است.",
+        });
+      }
+    }
+    // پایان گارد
+    
     const generatedUuid = randomUUID();
     const orderPayload: Record<string, any> = {
       id: generatedUuid,

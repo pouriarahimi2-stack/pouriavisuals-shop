@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
       const mTitle = p.meta_title || pTitle;
       const mDesc = p.meta_description || p.description || "";
       const hasImg = Boolean(p.image && p.image !== "/placeholder.png");
+      const hasMissingAltTags = Array.isArray(p.media_gallery) && p.media_gallery.some((m: any) => !m.alt || m.alt.length < 5);
 
       if (!mDesc || mDesc.length < 30) {
         issues.push({
@@ -50,6 +51,16 @@ export async function GET(req: NextRequest) {
           title: pTitle,
           severity: "high",
           message: "توضیحات متا (Meta Description) محصول کوتاه یا ثبت نشده است.",
+          meta_title: mTitle,
+          meta_description: mDesc,
+        });
+      } else if (hasMissingAltTags) {
+        issues.push({
+          id: String(p.id),
+          type: "product",
+          title: pTitle,
+          severity: "low",
+          message: "برخی از تصاویر این محصول فاقد تگ جایگزین (Alt) اختصاصی برای موتورهای جستجو هستند.",
           meta_title: mTitle,
           meta_description: mDesc,
         });

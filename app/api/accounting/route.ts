@@ -173,6 +173,11 @@ export async function POST(req: NextRequest) {
         is_available: newStock > 0,
         description: packagedDesc,
         updated_at: new Date().toISOString(),
+      /* Enterprise Infrastructure Inject */
+      discount_start_date: (typeof body !== 'undefined' && body.discount_start_date) ? new Date(body.discount_start_date).toISOString() : undefined,
+      discount_end_date: (typeof body !== 'undefined' && body.discount_end_date) ? new Date(body.discount_end_date).toISOString() : undefined,
+      media_gallery: (typeof body !== 'undefined' && Array.isArray(body.media_gallery)) ? body.media_gallery : undefined,
+      specs_jsonb: (typeof body !== 'undefined' && typeof body.specs === 'object') ? body.specs : undefined,
       })
       .eq("id", productId);
 
@@ -270,6 +275,11 @@ export async function PUT(req: NextRequest) {
       is_available: isAvailable !== undefined ? Boolean(isAvailable) : numericStock > 0,
       description: packagedDesc,
       updated_at: new Date().toISOString(),
+      /* Enterprise Infrastructure Inject */
+      discount_start_date: (typeof body !== 'undefined' && body.discount_start_date) ? new Date(body.discount_start_date).toISOString() : undefined,
+      discount_end_date: (typeof body !== 'undefined' && body.discount_end_date) ? new Date(body.discount_end_date).toISOString() : undefined,
+      media_gallery: (typeof body !== 'undefined' && Array.isArray(body.media_gallery)) ? body.media_gallery : undefined,
+      specs_jsonb: (typeof body !== 'undefined' && typeof body.specs === 'object') ? body.specs : undefined,
       sku: sku ? String(sku).trim() : unpackedExisting.sku,
       brand: brand ? String(brand).trim() : unpackedExisting.brand,
       warranty: warranty ? String(warranty).trim() : unpackedExisting.warranty,

@@ -127,6 +127,11 @@ export async function POST(req: NextRequest) {
         ? body.color_options.filter((co: any) => co && typeof co.name === "string" && typeof co.hex === "string")
         : [],
       updated_at: new Date().toISOString(),
+      /* Enterprise Infrastructure Inject */
+      discount_start_date: (typeof body !== 'undefined' && body.discount_start_date) ? new Date(body.discount_start_date).toISOString() : undefined,
+      discount_end_date: (typeof body !== 'undefined' && body.discount_end_date) ? new Date(body.discount_end_date).toISOString() : undefined,
+      media_gallery: (typeof body !== 'undefined' && Array.isArray(body.media_gallery)) ? body.media_gallery : undefined,
+      specs_jsonb: (typeof body !== 'undefined' && typeof body.specs === 'object') ? body.specs : undefined,
       // ← ستون‌های جدید — مستقیم به DB نوشته میشن
       purchase_price: purchasePrice,
       shipping_type: (() => {

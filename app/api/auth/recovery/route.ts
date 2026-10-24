@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
             })
             .eq("id", siteRow.id);
 
-          const adminPhone = String(siteRow.support_phone || "09376110200").replace(/\D/g, "");
+          const adminPhone = String(siteRow.support_phone || "").replace(/\D/g, "");
           if (adminPhone.length === 11) {
             try {
               await smsService.sendSMS(

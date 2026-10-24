@@ -70,11 +70,7 @@ async function handleVerify(params: {
               .eq("id", pId)
               .maybeSingle();
             if (pRow) {
-              const restored = Number(pRow.stock || 0) + qty;
-              await supabaseAdmin
-                .from("products")
-                .update({ stock: restored, is_available: restored > 0 })
-                .eq("id", pRow.id);
+              await supabaseAdmin.rpc("increment_product_stock", { p_id: pRow.id, qty: qty });
             }
           } catch {}
         }

@@ -202,7 +202,7 @@ export default function ProPageDesignStudio() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
         <div>
           <h2 className="font-black text-sm sm:text-base text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🎨</span> استودیوی پیشرفته طراحی صفحات سایت و ویرایشگر صفحات فعلی (Live Modular Studio)
+            <span>🎨</span> مدیریت پیشرفته طراحی صفحات سایت و ویرایشگر صفحات فعلی (Live Modular Studio)
           </h2>
           <p className="text-[11px] text-[var(--text-secondary)] mt-1">
             ویرایش مستقیم صفحات فعلی سایت (صفحه اصلی، کاتالوگ، درباره ما، تماس با ما) یا افزودن بلوک‌های Liquid Glass با جزئیات کامل

@@ -20,12 +20,12 @@ export async function GET(req: NextRequest) {
         .gte("created_at", startDate).lt("created_at", endDate)
         .order("created_at", { ascending: true });
       const all       = orders || [];
-      const paid      = all.filter((o: any) => ["paid","delivered","shipped"].includes(o.payment_status || o.status || ""));
-      const cancelled = all.filter((o: any) => (o.payment_status || o.status) === "cancelled");
+      const paid      = all.filter((o: { created_at: string; status?: string; payment_status?: string; final_amount?: number; total_amount?: number; total_price?: number; customer_phone?: string; customer_name?: string; items?: any[] }) => ["paid","delivered","shipped"].includes(o.payment_status || o.status || ""));
+      const cancelled = all.filter((o: { created_at: string; status?: string; payment_status?: string; final_amount?: number; total_amount?: number; total_price?: number; customer_phone?: string; customer_name?: string; items?: any[] }) => (o.payment_status || o.status) === "cancelled");
       const totalRevenue = paid.reduce((s: number, o: any) => s + Number(o.final_amount || o.total_amount || o.total_price || 0), 0);
       const avgOrder     = paid.length > 0 ? Math.round(totalRevenue / paid.length) : 0;
       const dailyMap: Record<string, number> = {};
-      paid.forEach((o: any) => {
+      paid.forEach((o: { created_at: string; status?: string; payment_status?: string; final_amount?: number; total_amount?: number; total_price?: number; customer_phone?: string; customer_name?: string; items?: any[] }) => {
         const day = o.created_at.slice(0, 10);
         dailyMap[day] = (dailyMap[day] || 0) + Number(o.final_amount || o.total_amount || o.total_price || 0);
       });
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
         .map(([date, revenue]) => ({ date, revenue }))
         .sort((a, b) => a.date.localeCompare(b.date));
       const productSales: Record<string, { title: string; qty: number; revenue: number }> = {};
-      paid.forEach((o: any) => {
+      paid.forEach((o: { created_at: string; status?: string; payment_status?: string; final_amount?: number; total_amount?: number; total_price?: number; customer_phone?: string; customer_name?: string; items?: any[] }) => {
         (o.items || []).forEach((item: any) => {
           const key = item.id || item.title;
           if (!productSales[key]) productSales[key] = { title: item.title || "—", qty: 0, revenue: 0 };
@@ -57,9 +57,9 @@ export async function GET(req: NextRequest) {
       const totalValue = all.reduce((s: number, p: any) => s + Number(p.price || 0) * Number(p.stock || 0), 0);
       return NextResponse.json({ success: true, products: all,
         stats: { totalProducts: all.length,
-          inStock: all.filter((p: any) => Number(p.stock) > 0).length,
-          outOfStock: all.filter((p: any) => Number(p.stock) === 0).length,
-          lowStock: all.filter((p: any) => Number(p.stock) > 0 && Number(p.stock) <= 3).length,
+          inStock: all.filter((p: { stock?: number; price?: number }) => Number(p.stock) > 0).length,
+          outOfStock: all.filter((p: { stock?: number; price?: number }) => Number(p.stock) === 0).length,
+          lowStock: all.filter((p: { stock?: number; price?: number }) => Number(p.stock) > 0 && Number(p.stock) <= 3).length,
           totalInventoryValue: totalValue } });
     }
     if (type === "customers") {
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
         .select("customer_name,customer_phone,total_price,total_amount,final_amount,payment_status,status,created_at,order_number")
         .order("created_at", { ascending: false });
       const customerMap: Record<string, any> = {};
-      (orders || []).forEach((o: any) => {
+      (orders || []).forEach((o: { created_at: string; status?: string; payment_status?: string; final_amount?: number; total_amount?: number; total_price?: number; customer_phone?: string; customer_name?: string; items?: any[] }) => {
         const phone = o.customer_phone || "unknown";
         if (!customerMap[phone]) customerMap[phone] = {
           phone, name: o.customer_name || "نامشخص",
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
         if (o.created_at < c.firstOrderAt) c.firstOrderAt = o.created_at;
       });
       const customers = Object.values(customerMap)
-        .map((c: any) => ({ ...c, isVip: c.totalSpent >= 5_000_000 }))
+        .map((c: { totalSpent: number; totalOrders: number; paidOrders: number }) => ({ ...c, isVip: c.totalSpent >= 5_000_000 }))
         .sort((a: any, b: any) => b.totalSpent - a.totalSpent);
       return NextResponse.json({ success: true, customers });
     }

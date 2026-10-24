@@ -92,7 +92,7 @@ export default function BulkPriceStockStudio() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--card-border)] pb-3">
         <div>
           <h2 className="font-black text-sm sm:text-base text-[var(--accent-blue)] flex items-center gap-2">
-            <span>⚡</span> استودیوی تغییر دسته‌جمعی قیمت‌ها و موجودی انبار (Bulk Price & Stock Studio)
+            <span>⚡</span> بخش مدیریتی تغییر دسته‌جمعی قیمت‌ها و موجودی انبار (Bulk Price & Stock Studio)
           </h2>
           <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
             افزایش یا کاهش درصدی/ریالی قیمت کل محصولات یا یک دسته‌بندی خاص با رند شدن خودکار به هزار تومان

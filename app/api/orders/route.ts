@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { calculateOrderDiscount } from "@/lib/couponValidator";
 import { smsService } from "@/services/smsService";
-import { checkRateLimit } from "@/lib/rateLimiter";
+import { rateLimiter } from "@/lib/rateLimiter";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "127.0.0.1";
-    const rateCheck = await checkRateLimit(clientIp, "create_order", 10, 15);
+    const rateCheck = await rateLimiter.checkLimit(clientIp, "create_order", 10, 15);
     if (!rateCheck.allowed) {
       return NextResponse.json({ success: false, message: "تعداد ثبت سفارشات از این IP بیش از حد مجاز است." }, { status: 429 });
     }

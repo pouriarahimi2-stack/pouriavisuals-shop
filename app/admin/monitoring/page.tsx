@@ -294,7 +294,7 @@ export default function AdminMonitoringPage() {
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       {/* هدر مرکز نظارت زنده مدیر ارشد */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2 md:gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
@@ -368,7 +368,7 @@ export default function AdminMonitoringPage() {
       )}
 
       {/* کارت‌های خلاصه وضعیت کلی */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 text-xs">
         <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
           <span className="text-[var(--text-secondary)] font-bold">افراد آنلاین در همین لحظه:</span>
           <span className="text-xl font-black font-mono text-emerald-400 block">
@@ -421,7 +421,7 @@ export default function AdminMonitoringPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:grid-cols-2 gap-2 md:gap-4">
           {users.map((u) => {
             const isSelected = selectedUserFilter.toLowerCase() === u.username.toLowerCase();
             return (

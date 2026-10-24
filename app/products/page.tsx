@@ -106,9 +106,9 @@ export default function ProductsCatalogPage() {
 
       <div className="max-w-7xl mx-auto space-y-6">
         {/* هدر تمیز و بدون متن اضافه */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[var(--card-border)]">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 pb-4 border-b border-[var(--card-border)]">
           <div>
-            <h1 className="text-xl sm:text-2xl font-black">کاتالوگ کالاها و تجهیزات هوشمند</h1>
+            <h1 className="text-sm md:text-xl sm:text-2xl font-black">کاتالوگ کالاها و تجهیزات هوشمند</h1>
             <span className="text-xs text-[var(--text-secondary)] font-bold mt-1 block">
               نمایش {filteredProducts.length} محصول از مجموع {products.length} کالا
             </span>
@@ -158,7 +158,7 @@ export default function ProductsCatalogPage() {
           </div>
 
           {/* فیلترهای تکمیلی و بازه قیمت */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-[var(--card-border)] items-center">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:grid-cols-3 gap-2 md:gap-4 pt-3 border-t border-[var(--card-border)] items-center">
             
             {/* چک‌باکس‌های وضعیت موجودی و تخفیف */}
             <div className="flex flex-wrap items-center gap-2">
@@ -246,7 +246,7 @@ export default function ProductsCatalogPage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
               {filteredProducts.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}

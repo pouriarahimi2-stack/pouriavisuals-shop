@@ -79,7 +79,7 @@ export default function ColorGamutSimulator({ productTitle }: { productTitle: st
       className="p-4 sm:p-6 md:p-8 rounded-3xl sm:rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6 font-sans select-text text-[var(--text-primary)]"
       dir="rtl"
     >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 md:gap-4 border-b border-[var(--card-border)] pb-5">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center text-xl sm:text-2xl shadow-lg shadow-blue-500/25 shrink-0">
             🎨
@@ -127,7 +127,7 @@ export default function ColorGamutSimulator({ productTitle }: { productTitle: st
       </div>
 
       {/* بوم نمایش و تست فریم ریت */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6 items-center">
         <div className="lg:col-span-8 relative h-64 sm:h-80 md:h-96 rounded-3xl overflow-hidden bg-black border border-[var(--card-border)] shadow-inner flex items-center justify-center group">
           <img
             src={testImages[testPattern]}

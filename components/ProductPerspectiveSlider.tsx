@@ -82,7 +82,7 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 my-8 space-y-4">
       {(customTitle || customSubtitle) && (
         <div className="text-center space-y-1.5 mb-2">
-          {customTitle && <h2 className="text-xl sm:text-2xl font-black text-[var(--text-primary)]">{customTitle}</h2>}
+          {customTitle && <h2 className="text-sm md:text-xl sm:text-2xl font-black text-[var(--text-primary)]">{customTitle}</h2>}
           {customSubtitle && <p className="text-xs text-[var(--text-secondary)]">{customSubtitle}</p>}
         </div>
       )}
@@ -135,7 +135,7 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
                   <div className="px-3 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-[11px] font-black">
                     {prod.category || "پیشنهاد ویژه"}
                   </div>
-                  <h2 className="text-xl sm:text-3xl font-black text-[var(--text-primary)] leading-tight line-clamp-2">
+                  <h2 className="text-sm md:text-xl sm:text-3xl font-black text-[var(--text-primary)] leading-tight line-clamp-2">
                     {prod.title}
                   </h2>
                   <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-2">
@@ -143,7 +143,7 @@ export default function ProductPerspectiveSlider({ products: propProducts, custo
                   </p>
                   
                   <div className="w-full pt-4 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
-                    <div className="text-lg sm:text-xl font-black text-emerald-500 font-mono">
+                    <div className="text-lg sm:text-sm md:text-xl font-black text-emerald-500 font-mono">
                       {finalPrice.toLocaleString("fa-IR")} <span className="text-xs font-sans">تومان</span>
                     </div>
                     <Link

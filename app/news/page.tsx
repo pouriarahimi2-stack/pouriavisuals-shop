@@ -55,7 +55,7 @@ export default function TechNewsHubPage() {
     <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto font-sans select-text text-[var(--text-primary)] space-y-6" dir="rtl">
       
       {/* سربرگ بدون متن پایش دو ساعت و بدون منوی دسته‌بندی */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-4">
         <div className="space-y-1">
           <h1 className="text-xl sm:text-2xl font-black tracking-tight">
             رادار جدیدترین رویدادها و اخبار فناوری
@@ -83,7 +83,7 @@ export default function TechNewsHubPage() {
           خبری در این بخش ثبت نشده است.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-4">
           {filteredNews.map((item) => (
             <Link
               key={item.id}

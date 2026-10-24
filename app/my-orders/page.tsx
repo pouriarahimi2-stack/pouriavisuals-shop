@@ -98,7 +98,7 @@ export default function MyOrdersPage() {
         <div>
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <h1 className="text-xl sm:text-2xl font-black">حساب کاربری و سوابق سفارش‌های من</h1>
+            <h1 className="text-sm md:text-xl sm:text-2xl font-black">حساب کاربری و سوابق سفارش‌های من</h1>
           </div>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
             {phone ? `سفارش‌های ثبت شده با شماره ${phone} (به‌روزرسانی بلادرنگ)` : "برای مشاهده سوابق فاکتورها وارد حساب کاربری خود شوید."}

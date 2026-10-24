@@ -121,7 +121,7 @@ export default function AdminLiveChatAndMessagesPage() {
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)]">
@@ -137,7 +137,7 @@ export default function AdminLiveChatAndMessagesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6 text-xs">
         {/* لیست مخاطبان تاییدشده گفتگوی زنده */}
         <div className="lg:col-span-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3 h-fit">
           <input

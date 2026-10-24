@@ -88,7 +88,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4 text-xs">
         <div>
           <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
             نام و نام خانوادگی تحویل‌گیرنده *
@@ -217,7 +217,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
       <div className="space-y-3 pt-4 border-t border-[var(--card-border)]">
         <label className="block font-black text-xs text-[var(--text-secondary)]">روش ارسال مرسوله:</label>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3">
           <div
             onClick={() => handleMethodChange("regular")}
             className={

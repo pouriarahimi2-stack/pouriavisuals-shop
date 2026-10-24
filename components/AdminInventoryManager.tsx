@@ -251,9 +251,9 @@ export function AdminInventoryManager({
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       {/* هدر یکپارچه ادغام ۳ بخش: حسابداری و انبار + سفارشات و بارنامه + گزارش‌های مالی */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2 md:gap-4">
         <div>
-          <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
+          <h1 className="text-base sm:text-sm md:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🏛️</span> مرکز یکپارچه حسابداری، انبار، سفارشات و گردش مالی ماهانه
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
@@ -324,31 +324,31 @@ export function AdminInventoryManager({
       )}
 
       {/* کارت‌های خلاصه ترازنامه مالی و انبار */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 text-xs">
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1 shadow-sm">
           <span className="text-[var(--text-secondary)] font-bold">ارزش دارایی موجودی انبار:</span>
-          <span className="text-lg sm:text-xl font-black font-mono text-[var(--accent-blue)] block">
+          <span className="text-lg sm:text-sm md:text-xl font-black font-mono text-[var(--accent-blue)] block">
             {summary.totalInventoryAssets.toLocaleString("fa-IR")} ت
           </span>
           <span className="text-[10px] text-slate-400">بر مبنای قیمت خرید واحد</span>
         </div>
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1 shadow-sm">
           <span className="text-[var(--text-secondary)] font-bold">فروش ناخالص ۳۰ روز اخیر:</span>
-          <span className="text-lg sm:text-xl font-black font-mono text-emerald-500 block">
+          <span className="text-lg sm:text-sm md:text-xl font-black font-mono text-emerald-500 block">
             {summary.totalMonthlySalesGross.toLocaleString("fa-IR")} ت
           </span>
           <span className="text-[10px] text-slate-400">{summary.totalUnitsSold} قلم کالای فروخته‌شده</span>
         </div>
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1 shadow-sm">
           <span className="text-[var(--text-secondary)] font-bold">مالیات بر ارزش افزوده (۱۰٪):</span>
-          <span className="text-lg sm:text-xl font-black font-mono text-amber-500 block">
+          <span className="text-lg sm:text-sm md:text-xl font-black font-mono text-amber-500 block">
             {summary.totalMonthlyVAT.toLocaleString("fa-IR")} ت
           </span>
           <span className="text-[10px] text-slate-400">ذخیره قانونی مالیاتی</span>
         </div>
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1 shadow-sm">
           <span className="text-[var(--text-secondary)] font-bold">سود خالص قطعی ماهانه:</span>
-          <span className="text-lg sm:text-xl font-black font-mono text-indigo-400 block">
+          <span className="text-lg sm:text-sm md:text-xl font-black font-mono text-indigo-400 block">
             {summary.totalMonthlyNetProfit.toLocaleString("fa-IR")} ت
           </span>
           <span className="text-[10px] text-slate-400">پس از کسر بهای خرید و مالیات</span>
@@ -370,7 +370,7 @@ export function AdminInventoryManager({
               ➕ ثبت سند ورود جدید به انبار / اصلاح موجودی و بهای خرید
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <div className="lg:col-span-2">
                 <label className="block mb-1 font-bold text-[var(--text-secondary)]">انتخاب کالا:</label>
                 <select
@@ -587,7 +587,7 @@ export function AdminInventoryManager({
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-4 font-mono text-[11px] shrink-0">
+                    <div className="flex items-center gap-2 md:gap-4 font-mono text-[11px] shrink-0">
                       <span className="font-black text-[var(--accent-blue)]">تعداد: {log.quantity}</span>
                       <span className="text-slate-400">
                         {log.created_at ? new Date(log.created_at).toLocaleString("fa-IR") : ""}
@@ -660,7 +660,7 @@ export function AdminInventoryManager({
             </div>
 
             <form onSubmit={handleSaveFullProductEdit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3.5">
                 <div className="sm:col-span-2">
                   <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان کامل کالا *</label>
                   <input

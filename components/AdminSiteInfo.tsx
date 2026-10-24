@@ -107,7 +107,7 @@ export default function AdminSiteInfo() {
       <input type="file" ref={logoInputRef} onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], setLogoUrl)} accept="image/*" className="hidden" />
       <input type="file" ref={footerLogoInputRef} onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], setFooterLogoUrl)} accept="image/*" className="hidden" />
 
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 md:gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>⚙️</span> تنظیمات هویت بصری و لوگوهای ۳ گانه
@@ -142,7 +142,7 @@ export default function AdminSiteInfo() {
             <span>🖼️</span> مدیریت ۳ لوگوی سایت
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:grid-cols-3 gap-3 md:gap-6">
             
             {/* ۱. لوگوی بالای سایت */}
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
@@ -232,7 +232,7 @@ export default function AdminSiteInfo() {
         </div>
 
         {/* مشخصات برند و اطلاعات تماس */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
           <div>
             <label className="block font-bold text-[var(--text-secondary)] mb-1.5">نام رسمی فروشگاه (Brand Name):</label>
             <input

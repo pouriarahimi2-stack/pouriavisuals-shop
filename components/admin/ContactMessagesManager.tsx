@@ -195,7 +195,7 @@ export default function ContactMessagesManager() {
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="bg-[var(--modal-bg)] p-4 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="bg-[var(--modal-bg)] p-4 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 md:gap-4">
         <div>
           <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>📩</span> مرکز مدیریت تیکت‌های مشاوره و پیام‌های بلادرنگ
@@ -237,7 +237,7 @@ export default function ContactMessagesManager() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6">
         <div className="lg:col-span-4 bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-3 min-h-[360px] lg:h-[640px] flex flex-col justify-between shadow-xl">
           <div className="space-y-3 flex-1 flex flex-col overflow-hidden">
             <div className="border-b border-[var(--card-border)] pb-2">

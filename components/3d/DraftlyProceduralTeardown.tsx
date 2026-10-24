@@ -331,7 +331,7 @@ export default function DraftlyProceduralTeardown({
           </button>
         </header>
 
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-hidden">
+        <div className="flex-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 overflow-hidden">
           <div
             ref={containerRef}
             style={{ touchAction: "none" }}

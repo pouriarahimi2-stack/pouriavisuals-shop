@@ -283,7 +283,7 @@ export default function AdminCustomers() {
         </div>
       )}
 
-      <div className="bg-[var(--modal-bg)] p-4 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-[var(--modal-bg)] p-4 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-4">
         <div>
           <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>👥</span> سامانه هوشمند مدیریت ارتباط با مشتریان (Enterprise CRM)
@@ -311,7 +311,7 @@ export default function AdminCustomers() {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2 md:gap-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
         <div className="flex gap-2 overflow-x-auto w-full lg:w-auto pb-1 text-xs scrollbar-none">
           {[
             { id: "all", label: "همه مخاطبان", count: customers.length },
@@ -456,7 +456,7 @@ export default function AdminCustomers() {
             </div>
 
             <form onSubmit={handleSaveCustomer} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
                 <div>
                   <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام و نام خانوادگی *</label>
                   <input

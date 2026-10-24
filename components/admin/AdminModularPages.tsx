@@ -438,9 +438,9 @@ export default function AdminModularPages() {
       className="w-full flex flex-col font-sans select-text min-h-screen space-y-4 text-[var(--text-primary)]"
       dir="rtl"
     >
-      <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
+      <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-2 md:gap-4">
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="w-10 h-10 rounded-2xl bg-sky-500 text-white flex items-center justify-center text-xl shadow-md font-bold">
+          <div className="w-10 h-10 rounded-2xl bg-sky-500 text-white flex items-center justify-center text-sm md:text-xl shadow-md font-bold">
             ⚡
           </div>
           <div className="flex items-center gap-2">
@@ -579,7 +579,7 @@ export default function AdminModularPages() {
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-emerald-500"
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block mb-1 font-bold text-[var(--text-secondary)]">
                     ۳. آدرس اختصاصی لندینگ‌پیج (Slug) *:

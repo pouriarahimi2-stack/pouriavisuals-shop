@@ -133,7 +133,7 @@ export default function ProductDetailClient({
 
   if (!product) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center dir-rtl gap-4 font-sans select-text">
+      <div className="min-h-screen flex flex-col items-center justify-center dir-rtl gap-2 md:gap-4 font-sans select-text">
         <p className="text-sm font-bold text-[var(--text-primary)]">کالای مورد نظر یافت نشد.</p>
         <Link
           href="/products"
@@ -228,7 +228,7 @@ export default function ProductDetailClient({
         <span className="text-[var(--text-primary)]">{product.title || product.name}</span>
       </div>
 
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
+      <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
         {/* گالری تصاویر محصول */}
         <div className="flex flex-col items-center bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 relative shadow-md">
           <div className="w-full h-64 sm:h-80 md:h-96 relative flex items-center justify-center overflow-hidden rounded-2xl bg-black/5 dark:bg-white/5">
@@ -311,7 +311,7 @@ export default function ProductDetailClient({
                 </span>
               )}
             </div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black mt-3 leading-snug">
+            <h1 className="text-sm md:text-xl sm:text-2xl lg:text-3xl font-black mt-3 leading-snug">
               {product.title || product.name}
             </h1>
           </div>
@@ -423,7 +423,7 @@ export default function ProductDetailClient({
           {product.parsedSpecs && Object.keys(product.parsedSpecs).length > 0 && (
             <div>
               <h2 className="text-sm font-black mb-3">مشخصات فنی دستگاه</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3">
                 {Object.entries(product.parsedSpecs)
                   .filter(([k]) => k !== "teardown_data")
                   .map(([k, v]: any) => (

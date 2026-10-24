@@ -209,7 +209,7 @@ export function PageBuilder() {
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 md:gap-4 bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl">
         <div>
           <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🏗️</span> صفحه‌ساز ماژولار و مدیریت چیدمان ریسپانسیو (دسکتاپ، موبایل و تبلت)
@@ -241,7 +241,7 @@ export function PageBuilder() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6 text-xs">
         <div className="lg:col-span-3 bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-xl h-fit">
           <h3 className="text-xs font-black border-b border-[var(--card-border)] pb-3">
             📑 صفحات ثبت‌شده ({pages.length})
@@ -330,7 +330,7 @@ export function PageBuilder() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-2 md:gap-4">
             <div>
               <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان صفحه *</label>
               <input
@@ -432,7 +432,7 @@ export function PageBuilder() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3">
                     <input
                       type="text"
                       value={block.data.title || block.data.heading || ""}
@@ -449,7 +449,7 @@ export function PageBuilder() {
                     />
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-4 pt-1 text-[11px] font-bold text-[var(--text-secondary)]">
+                  <div className="flex flex-wrap items-center gap-2 md:gap-4 pt-1 text-[11px] font-bold text-[var(--text-secondary)]">
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
                         type="checkbox"

@@ -167,9 +167,9 @@ export default function AdminGlobalSettingsPage() {
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       {/* header */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2 md:gap-4">
         <div>
-          <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)]">⚙️ تنظیمات کلان سیستم و اتوماسیون</h1>
+          <h1 className="text-base sm:text-sm md:text-xl font-black text-[var(--accent-blue)]">⚙️ تنظیمات کلان سیستم و اتوماسیون</h1>
         </div>
         <button type="button" onClick={handleSaveSubmit} disabled={saving || loading}
           className="w-full lg:w-auto px-5 py-2.5 rounded-2xl bg-blue-600 text-white text-xs font-black shadow-lg cursor-pointer disabled:opacity-50 transition">
@@ -192,7 +192,7 @@ export default function AdminGlobalSettingsPage() {
           متن نام سایت و تگ‌لاین در تب مرورگر و نتایج گوگل نمایش داده می‌شوند.
           فرمت نهایی: <span className="font-mono bg-[var(--input-bg)] px-1.5 py-0.5 rounded">نام سایت | تگ‌لاین</span>
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
           <div>
             <label className={labelCls}>نام سایت (site_name):</label>
             <input className={inputCls} value={form.site_name}
@@ -240,7 +240,7 @@ export default function AdminGlobalSettingsPage() {
       </div>
 
       {/* ─── Shipping + Smart Slider ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6">
         <div className="lg:col-span-6 p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
           <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">🚚 تنظیمات هزینه‌های ارسال</h2>
           <div className="space-y-4">

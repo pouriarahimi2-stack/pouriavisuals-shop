@@ -189,7 +189,7 @@ export default function AdminAccountsManager() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
               <div>
                 <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">پین امنیتی ورود ادمین (PIN):</label>
                 <input
@@ -286,7 +286,7 @@ export default function AdminAccountsManager() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
               <div>
                 <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">تعداد ارقام کد تایید OTP:</label>
                 <select
@@ -352,7 +352,7 @@ export default function AdminAccountsManager() {
       ) : (
         /* بخش مدیریت ادمین‌ها */
         <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
-          <form onSubmit={handleCreateAdmin} className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <form onSubmit={handleCreateAdmin} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-3 text-xs">
             <input
               type="text"
               required

@@ -168,7 +168,7 @@ function PaymentGatewayContent() {
               ✓
             </div>
             <div className="space-y-1">
-              <h1 className="text-xl font-black text-emerald-400">پرداخت با موفقیت انجام شد!</h1>
+              <h1 className="text-sm md:text-xl font-black text-emerald-400">پرداخت با موفقیت انجام شد!</h1>
               <p className="text-xs text-[var(--text-secondary)]">{message}</p>
             </div>
 

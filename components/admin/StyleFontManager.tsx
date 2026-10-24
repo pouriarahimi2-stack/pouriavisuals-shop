@@ -195,7 +195,7 @@ export default function StyleFontManager() {
         className="hidden"
       />
 
-      <div className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 md:gap-4">
         <div>
           <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>✨</span> استودیوی هویت بصری، فونت‌ها و استایل‌ساز پیشرفته CSS
@@ -246,7 +246,7 @@ export default function StyleFontManager() {
           <span className="font-black text-[var(--accent-blue)] block">
             🎨 پیش‌فرض‌های آماده طراحی (با یک کلیک اعمال کنید):
           </span>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-2.5">
             <button
               type="button"
               onClick={() => applyVisualPreset("apple_glass")}
@@ -271,7 +271,7 @@ export default function StyleFontManager() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:grid-cols-2 lg:grid-cols-3 gap-5">
           <div className="space-y-2">
             <label className="block font-bold text-[var(--text-secondary)]">
               تایپوگرافی و قلم اصلی کل سایت:
@@ -390,7 +390,7 @@ export default function StyleFontManager() {
             🎛️ کنترلرهای بصری استایل‌ساز پیشرفته CSS (تولید خودکار کدهای استایل)
           </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-2 md:gap-4">
             <div className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
               <div className="flex justify-between">
                 <span className="font-bold">شدت ماتی شیشه‌ای (Backdrop Blur):</span>

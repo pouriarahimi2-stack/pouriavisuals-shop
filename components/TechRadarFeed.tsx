@@ -49,7 +49,7 @@ export default function TechRadarFeed() {
             جدیدترین اخبار تکنولوژی
           </span>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 w-full overflow-hidden">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-2 flex-1 w-full overflow-hidden">
           {visibleNews.map((item, idx) => (
             <Link
               key={(item.id || item.slug) + "-" + idx}

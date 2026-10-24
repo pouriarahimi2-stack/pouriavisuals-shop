@@ -106,7 +106,7 @@ export default function AdminAiSeoAutopilot() {
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 md:gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xl">🤖</span>
@@ -134,7 +134,7 @@ export default function AdminAiSeoAutopilot() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-3 gap-3 md:gap-6">
         <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4 shadow-xl text-xs">
           <h3 className="font-black text-xs text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
             ⚙️ تنظیم هدف‌گذاری هوشمند سئو

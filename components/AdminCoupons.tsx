@@ -149,7 +149,7 @@ export default function AdminCoupons() {
         </div>
       )}
 
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4">
         <div>
           <h3 className="font-black text-base flex items-center gap-2 text-[var(--accent-blue)]">
             <span>🏷️</span> سیستم هوشمند کدهای تخفیف، جشنواره‌ها و کمپین‌ها
@@ -180,7 +180,7 @@ export default function AdminCoupons() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
           <div>
             <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
               کد تخفیف (لاتین) *

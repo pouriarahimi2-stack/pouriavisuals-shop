@@ -61,7 +61,7 @@ export default function TrackOrderPage() {
           <div className="w-16 h-16 mx-auto bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mb-4">
             <Package size={32} />
           </div>
-          <h1 className="text-xl font-black text-white">استعلام و رهگیری سفارشات</h1>
+          <h1 className="text-sm md:text-xl font-black text-white">استعلام و رهگیری سفارشات</h1>
           <p className="text-xs text-zinc-400 mt-2">
             شماره موبایلی که هنگام خرید ثبت کرده‌اید یا شماره سفارش خود را وارد کنید:
           </p>

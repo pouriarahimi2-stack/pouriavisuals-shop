@@ -260,7 +260,7 @@ export default function ProPageDesignStudio() {
         <div className="font-black text-[var(--accent-blue)]">
           ➕ افزودن بلوک جدید به صفحه انتخاب‌شده ({selectedRoute}):
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {(Object.keys(BLOCK_TEMPLATES) as Array<CustomPageSection["type"]>).map(
             (typeKey) => (
               <button
@@ -277,7 +277,7 @@ export default function ProPageDesignStudio() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-5">
         <div className="lg:col-span-5 space-y-2.5">
           <div className="font-black text-[var(--text-secondary)]">
             🧱 بلوک‌های فعال در مسیر «{selectedRoute}» ({routeSections.length} بلوک):
@@ -361,7 +361,7 @@ export default function ProPageDesignStudio() {
                 </label>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block mb-1 font-bold">عنوان اصلی بلوک:</label>
                   <input
@@ -399,7 +399,7 @@ export default function ProPageDesignStudio() {
               </div>
 
               {activeBlock.type === "product_showcase" && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3 p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
                   <div>
                     <label className="block mb-1 font-bold">فیلتر دسته‌بندی محصولات:</label>
                     <input
@@ -514,7 +514,7 @@ export default function ProPageDesignStudio() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block mb-1 font-bold">متن دکمه (CTA):</label>
                   <input

@@ -111,7 +111,7 @@ export function ProductReviews(props: ProductReviewsProps) {
       dir="rtl"
     >
       {/* هدر آمار رضایت خریداران و تعداد کل دیدگاه‌ها */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-5">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-4 border-b border-[var(--card-border)] pb-5">
         <div>
           <h3 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>💬</span> دیدگاه‌ها، تجربیات خرید و میزان رضایت از {resolvedTitle}
@@ -158,7 +158,7 @@ export function ProductReviews(props: ProductReviewsProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6 text-xs">
         {/* فرم ثبت دیدگاه جدید */}
         <form
           onSubmit={handleSubmitReview}

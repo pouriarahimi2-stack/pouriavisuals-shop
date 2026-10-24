@@ -481,7 +481,7 @@ export default function StorefrontLayoutStudio({
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2 md:gap-4">
         <div>
           <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🎨</span> مرکز فرماندهی یکپارچه ظاهر، ابعاد لوگوها، هدر، فوتر و صفحه‌ساز
@@ -501,7 +501,7 @@ export default function StorefrontLayoutStudio({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-3 text-xs">
         <div className="p-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-between">
           <div>
             <span className="font-black text-sky-400 block">📱 سهم کاربران موبایل</span>
@@ -568,7 +568,7 @@ export default function StorefrontLayoutStudio({
       {activeTab === "page_builder" && <AdminModularPages />}
 
       {(activeTab === "header" || activeTab === "footer" || activeTab === "sections") && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6 text-xs">
           <form
             onSubmit={handleSaveAll}
             className="lg:col-span-7 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5"
@@ -579,7 +579,7 @@ export default function StorefrontLayoutStudio({
                   تنظیمات کامل هدر، ابعاد لوگوی هدر، سایز فونت منو، فاوآیکون و نوار اعلان
                 </h2>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
                   <div>
                     <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
                       نام برند در هدر (در صورت خالی گذاشتن، فقط لوگو نمایش داده می‌شود):
@@ -687,7 +687,7 @@ export default function StorefrontLayoutStudio({
                   <span className="font-black text-[var(--accent-blue)] block">
                     📐 تنظیم دقیق سایز لوگوی هدر، ارتفاع هدر و سایز فونت منو:
                   </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
                       <div className="flex justify-between font-bold text-[11px]">
                         <span>عرض لوگوی هدر:</span>
@@ -819,7 +819,7 @@ export default function StorefrontLayoutStudio({
                     </span>
                   </label>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-2.5">
                     <input
                       type="text"
                       value={activeOfferObj.badge}
@@ -865,7 +865,7 @@ export default function StorefrontLayoutStudio({
                     )}
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <div className="flex flex-col sm:flex-row items-center gap-2 md:gap-4">
                     <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center min-w-[140px] min-h-[70px]">
                       {footerLogoUrl ? (
                         <img
@@ -901,7 +901,7 @@ export default function StorefrontLayoutStudio({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[var(--card-border)]">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-3 pt-2 border-t border-[var(--card-border)]">
                     <div className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
                       <div className="flex justify-between font-bold text-[11px]">
                         <span>عرض لوگوی فوتر:</span>
@@ -947,7 +947,7 @@ export default function StorefrontLayoutStudio({
                 </div>
 
                 {/* ۲. متون فوتر (در صورت خالی گذاشتن هر فیلد، در فوتر نمایش داده نمی‌شود) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
                   <div>
                     <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
                       عنوان برند در فوتر (خالی = عدم نمایش عنوان متنی):
@@ -1178,7 +1178,7 @@ export default function StorefrontLayoutStudio({
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-3.5">
                     <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5">
                       <div className="flex justify-between font-bold">
                         <span>📱 ارتفاع بنر موبایل:</span>
@@ -1279,7 +1279,7 @@ export default function StorefrontLayoutStudio({
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2.5">
                           <input
                             type="text"
                             value={sec.title}

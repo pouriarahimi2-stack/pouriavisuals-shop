@@ -25,7 +25,7 @@ export default function LiveMarketArbitrage({
 
   return (
     <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 md:gap-4 border-b border-[var(--card-border)] pb-5">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 flex items-center justify-center text-2xl shadow-lg">
             ⚖️
@@ -47,7 +47,7 @@ export default function LiveMarketArbitrage({
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
         {/* فاکتور فروشگاه ما */}
         <div className="p-4 rounded-2xl bg-blue-500/10 border-2 border-blue-500/40 space-y-2 relative shadow-md">
           <div className="flex justify-between items-center">

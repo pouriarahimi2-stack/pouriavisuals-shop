@@ -159,7 +159,7 @@ export function AdminStyleSettings() {
         </div>
       </div>
 
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4">
         <div>
           <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>✨</span> مدیریت هویت بصری، تایپوگرافی و استایل‌ساز پیشرفته CSS
@@ -188,12 +188,12 @@ export function AdminStyleSettings() {
       {loading ? (
         <div className="p-12 text-center text-xs text-slate-400 font-bold">در حال بارگذاری موتور استایل...</div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6 text-xs">
           <form
             onSubmit={handleSaveStyles}
             className="lg:col-span-7 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
               <div>
                 <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
                   رنگ اصلی برند (Primary Accent):

@@ -103,7 +103,7 @@ export default function AdminAuditLogsPage() {
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4">
         <div>
           <h1 className="text-lg sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🛡️</span> دفتر کل وقایع و اسکنر هوشمند امنیت (Audit Logs & Auto-Fix)
@@ -134,7 +134,7 @@ export default function AdminAuditLogsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-2 md:gap-4 text-xs">
         <div className="p-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-between">
           <span className="font-bold text-[var(--text-secondary)]">ضریب امنیت جاری سیستم:</span>
           <span className="font-mono font-black text-lg text-emerald-500">{securityScore}% ✓</span>

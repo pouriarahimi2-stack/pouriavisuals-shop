@@ -66,7 +66,7 @@ export default function AdminMenuSettings() {
         <span>🔗</span> مدیریت منوهای هدر سایت
       </h3>
 
-      <form onSubmit={handleAddMenu} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <form onSubmit={handleAddMenu} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:grid-cols-3 gap-3">
         <input
           type="text"
           placeholder="عنوان منو (مثلا: اخبار)"

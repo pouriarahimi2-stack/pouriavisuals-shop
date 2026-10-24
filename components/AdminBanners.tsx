@@ -303,7 +303,7 @@ export default function AdminBanners() {
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4">
         <div>
           <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🖼️</span> مدیریت هوشمند بنرها، اسلایدرها و لینک‌دهی کاتالوگ محصولات
@@ -361,7 +361,7 @@ export default function AdminBanners() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
           <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5">
             <div className="flex justify-between font-bold">
               <span>📱 ارتفاع بنر در موبایل:</span>
@@ -428,7 +428,7 @@ export default function AdminBanners() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6">
         <form
           onSubmit={handleSaveBanner}
           className="lg:col-span-5 bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-xl text-xs h-fit"
@@ -679,7 +679,7 @@ export default function AdminBanners() {
                 return (
                   <div
                     key={b.id}
-                    className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-[var(--accent-blue)] transition"
+                    className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4 hover:border-[var(--accent-blue)] transition"
                   >
                     <div className="flex items-center gap-3 overflow-hidden">
                       <img

@@ -60,7 +60,7 @@ export default function ProductList({
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-pulse">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 animate-pulse">
           {Array.from({ length: 4 }).map((_, idx) => (
             <div
               key={idx}
@@ -78,7 +78,7 @@ export default function ProductList({
           <p>محصولی در پایگاه داده ثبت نشده است. از پیشخوان ادمین محصول جدید اضافه نمایید.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
           {products.map((prod) => (
             <ProductCard key={prod.id} product={prod} />
           ))}

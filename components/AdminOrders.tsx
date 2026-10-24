@@ -283,7 +283,7 @@ export default function AdminOrders() {
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[var(--modal-bg)] border border-[var(--card-border)] p-5 sm:p-6 rounded-3xl shadow-xl">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 md:gap-4 bg-[var(--modal-bg)] border border-[var(--card-border)] p-5 sm:p-6 rounded-3xl shadow-xl">
         <div>
           <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>📑</span> مدیریت سفارش‌ها، صدور فاکتور و رهگیری پستی (Realtime)
@@ -499,7 +499,7 @@ export default function AdminOrders() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4 text-xs">
               <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                 <h4 className="font-black text-[var(--accent-blue)]">👤 مشخصات خریدار:</h4>
                 <p>

@@ -200,7 +200,7 @@ export default function AdminNewsManager() {
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 md:gap-4">
         <div>
           <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>📡</span> ربات هوشمند رادار اخبار تکنولوژی و تقویت سئو
@@ -251,7 +251,7 @@ export default function AdminNewsManager() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6">
         <div className="lg:col-span-4 bg-[var(--modal-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--card-border)] space-y-3 h-fit shadow-xl">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
             <h3 className="text-xs font-black">📰 اخبار فعال ({news.length})</h3>
@@ -335,7 +335,7 @@ export default function AdminNewsManager() {
             onSubmit={handleSave}
             className="bg-[var(--modal-bg)] p-5 sm:p-8 rounded-3xl border border-[var(--card-border)] space-y-5 shadow-xl text-xs"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
               <div className="sm:col-span-2">
                 <label className="block font-bold text-[var(--text-secondary)] mb-1">تیتر خبر *</label>
                 <input

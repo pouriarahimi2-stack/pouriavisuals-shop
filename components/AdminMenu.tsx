@@ -368,7 +368,7 @@ export function AdminMenu() {
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4">
         <div>
           <h2 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🧭</span> مهندسی درخت منو، زیرمنوهای ۳ سطحی هوشمند و دسته‌بندی‌ها
@@ -413,7 +413,7 @@ export function AdminMenu() {
       )}
 
       {activeTab === "menus" && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6 text-xs">
           <div className="lg:col-span-4 space-y-4">
             <form
               onSubmit={handleAddMenuItem}
@@ -498,7 +498,7 @@ export function AdminMenu() {
                 >
                   {/* سطح ۱ */}
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1 w-full">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 flex-1 w-full">
                       <input
                         type="text"
                         value={item.title}
@@ -552,7 +552,7 @@ export function AdminMenu() {
                           className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2"
                         >
                           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1 w-full">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 flex-1 w-full">
                               <input
                                 type="text"
                                 value={sub2.title}
@@ -670,7 +670,7 @@ export function AdminMenu() {
       )}
 
       {activeTab === "categories" && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6 text-xs">
           <form
             onSubmit={handleSaveCategory}
             className="lg:col-span-4 p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 h-fit"
@@ -703,7 +703,7 @@ export function AdminMenu() {
             </button>
           </form>
 
-          <div className="lg:col-span-8 p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl grid grid-cols-1 sm:grid-cols-2 gap-3 h-fit">
+          <div className="lg:col-span-8 p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3 h-fit">
             {categories.map((cat) => (
               <div
                 key={cat.id}

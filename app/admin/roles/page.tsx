@@ -231,7 +231,7 @@ export default function AdminRolesPage() {
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4">
         <div>
           <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🛡️</span> مدیریت نقش‌ها، زیرمجموعه‌ها، سطح دسترسی و تم پنل (RBAC)
@@ -264,7 +264,7 @@ export default function AdminRolesPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6 text-xs">
         <form
           onSubmit={handleSaveAdmin}
           className="lg:col-span-6 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4"
@@ -273,7 +273,7 @@ export default function AdminRolesPage() {
             {editingId ? "✏️ ویرایش زیرمجموعه، دسترسی‌ها و تم پنل" : "➕ افزودن زیرمجموعه مدیریتی جدید"}
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
             <div>
               <label className="block mb-1 font-bold text-[var(--text-secondary)]">
                 نام کاربری (لاتین) *
@@ -410,7 +410,7 @@ export default function AdminRolesPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto p-1">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto p-1">
               {ALL_PERMISSIONS.map((perm) => {
                 const isChecked = selectedPerms.includes(perm.id);
                 const canWriteThisModule = canRoleWriteModule(role, perm.id);

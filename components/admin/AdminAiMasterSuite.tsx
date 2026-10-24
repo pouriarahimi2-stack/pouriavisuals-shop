@@ -299,7 +299,7 @@ export default function AdminAiMasterSuite() {
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       {/* سربرگ هوش مصنوعی */}
-      <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-blue-500/25">
             🤖
@@ -603,7 +603,7 @@ export default function AdminAiMasterSuite() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-2 md:gap-4 text-xs">
             <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
               <span className="text-[var(--text-secondary)] font-bold">کلیک‌های ارگانیک ماهانه:</span>
               <span className="text-xl font-black font-mono text-[var(--accent-blue)] block">{seoData?.totalOrganicClicks || "---"}</span>
@@ -659,7 +659,7 @@ export default function AdminAiMasterSuite() {
       {/* تب ۳: کالبدشکافی ۳D و متالورژی قطعات (کاملاً بازگردانی‌شده) */}
       {activeTab === "teardown" && (
         <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-[var(--card-border)] pb-4">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 md:gap-4 border-b border-[var(--card-border)] pb-4">
             <div>
               <h3 className="font-black text-sm text-[var(--accent-blue)]">کالبدشکافی سه بعدی و متالورژی قطعات</h3>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">تفکیک خودکار لایه‌ها از عکس محصول و ذخیره در دیتابیس</p>
@@ -692,13 +692,13 @@ export default function AdminAiMasterSuite() {
               <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
                 <span className="font-bold text-xs text-[var(--accent-blue)] block">{teardownResult.architectureName}</span>
                 <p className="text-xs text-[var(--text-secondary)] font-medium leading-relaxed">{teardownResult.summary}</p>
-                <div className="flex gap-4 pt-2 font-mono text-[11px] font-bold text-slate-400">
+                <div className="flex gap-2 md:gap-4 pt-2 font-mono text-[11px] font-bold text-slate-400">
                   <span>تعداد لایه‌ها: {teardownResult.totalLayers}</span>
                   <span>امتیاز تعمیرپذیری: {teardownResult.repairabilityScore}/10</span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {teardownResult.components?.map((c: any) => (
                   <div key={c.id} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                     <div className="flex justify-between items-center">

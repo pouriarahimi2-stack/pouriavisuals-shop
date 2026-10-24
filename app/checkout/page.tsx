@@ -343,21 +343,21 @@ export default function CheckoutPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 font-sans select-text text-[var(--text-primary)] space-y-6" dir="rtl">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4 border-b border-[var(--card-border)] pb-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-[var(--accent-blue)]">🛡️ تکمیل مشخصات گیرنده و پرداخت امن</h1>
+          <h1 className="text-sm md:text-xl sm:text-2xl font-black text-[var(--accent-blue)]">🛡️ تکمیل مشخصات گیرنده و پرداخت امن</h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">مجهز به حافظه هوشمند فرم (اطلاعات شما پاک نمی‌شود)</p>
         </div>
       </div>
 
       {errorMsg && <div className="p-4 rounded-2xl bg-rose-500/15 text-rose-500 text-xs font-bold animate-fadeIn">⚠️ {errorMsg}</div>}
 
-      <form onSubmit={handlePrimaryCheckoutClick} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <form onSubmit={handlePrimaryCheckoutClick} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6">
         <div className="lg:col-span-7 space-y-5">
           {/* بخش ۱: مشخصات گیرنده */}
           <div className="p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
             <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">۱. مشخصات خریدار و نشانی دقیق تحویل مرسوله</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
               {/* نام */}
               <div>
                 <label className="block mb-1.5 font-bold">نام گیرنده *</label>
@@ -422,7 +422,7 @@ export default function CheckoutPage() {
                   : "این سفارش فقط از طریق پست پیشتاز ارسال می‌شود."}
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4 pt-1">
               {allowedShipping !== "tipax_only" && (
                 <label className={"p-4 rounded-2xl border-2 cursor-pointer transition flex flex-col gap-2 " + (shippingMethod === "post" ? "border-emerald-500 bg-emerald-500/10" : "border-[var(--card-border)] bg-[var(--input-bg)]")}>
                   <div className="flex items-center gap-3">

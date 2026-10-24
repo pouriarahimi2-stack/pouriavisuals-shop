@@ -68,7 +68,7 @@ export default function TrackOrderPage() {
         onSubmit={handleTrack}
         className="p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4"
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-[var(--text-secondary)]">شماره یا شناسه فاکتور:</label>
             <input

@@ -137,7 +137,7 @@ export default function DiscountManager() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-3 gap-3 md:gap-6 text-xs">
         <form
           onSubmit={handleCreateCoupon}
           className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] space-y-3.5 shadow-xl h-fit"

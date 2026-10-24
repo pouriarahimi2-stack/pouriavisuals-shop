@@ -204,7 +204,7 @@ export default async function NewsDetailPage({ params }: Props) {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 text-xs">
             {relatedProducts.map((p: any) => {
               const finalP = Number(p.discount_price || p.price || 0);
               return (
@@ -244,7 +244,7 @@ export default async function NewsDetailPage({ params }: Props) {
           <h3 className="font-black text-sm text-[var(--text-secondary)]">
             📰 سایر گزارش‌های اخیر رادار فناوری:
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-2 md:gap-4 text-xs">
             {recentNews.map((rn: any) => (
               <Link
                 key={rn.id}
@@ -258,7 +258,7 @@ export default async function NewsDetailPage({ params }: Props) {
         </section>
       )}
 
-      <div className="pt-4 border-t border-[var(--card-border)] flex flex-wrap items-center justify-between gap-4">
+      <div className="pt-4 border-t border-[var(--card-border)] flex flex-wrap items-center justify-between gap-2 md:gap-4">
         <div className="flex flex-wrap gap-2">
           {(article.tags || []).map((tag: string, i: number) => (
             <span

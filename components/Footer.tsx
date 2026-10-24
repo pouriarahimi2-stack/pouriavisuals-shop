@@ -152,7 +152,7 @@ export default function Footer() {
     if (colKey === "brand") {
       return (
         <div key="col_brand" className="lg:col-span-4 space-y-4">
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2 md:gap-4">
             {footerLogoUrl && !logoImgFailed ? (
               <div
                 className={
@@ -325,12 +325,12 @@ export default function Footer() {
       dir="rtl"
     >
       <div className={"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 " + pyClass}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:grid-cols-2 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-8 items-start">
           {columnOrder.map((colKey) => renderColumn(colKey))}
         </div>
 
         {copyrightText && (
-          <div className="pt-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)] font-bold">
+          <div className="pt-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-2 md:gap-4 text-xs text-[var(--text-secondary)] font-bold">
             <p>{copyrightText}</p>
             <span className="font-mono text-[11px] text-[var(--accent-blue)]">
               AXON CORE SECURE E-COMMERCE

@@ -507,13 +507,13 @@ function AccountDashboardContent() {
       dir="rtl"
     >
       {/* هدر حساب کاربری */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xl font-black shadow-lg shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-sm md:text-xl font-black shadow-lg shrink-0">
             👤
           </div>
           <div>
-            <h1 className="text-base sm:text-xl font-black">
+            <h1 className="text-base sm:text-sm md:text-xl font-black">
               حساب کاربری و پیگیری سفارشات — {displayName}
             </h1>
             <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
@@ -595,7 +595,7 @@ function AccountDashboardContent() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
             <div>
               <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
                 نام و نام خانوادگی *
@@ -696,7 +696,7 @@ function AccountDashboardContent() {
           </button>
         </form>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6 text-xs">
           {/* ستون راست: لیست سفارشات ثبت‌شده با دکمه‌های مستقیم پرداخت/حذف روی هر کارت ناتمام */}
           <div className="lg:col-span-5 p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3 h-fit">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">

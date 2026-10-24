@@ -67,7 +67,7 @@ export default function ContactPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-3 gap-3 md:gap-6">
 
           {/* ستون اطلاعات تماس */}
           <div className="space-y-4">
@@ -127,7 +127,7 @@ export default function ContactPage() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
                   <div>
                     <label className="block text-[var(--text-secondary)] mb-1.5 font-bold">نام و نام خانوادگی *</label>
                     <input

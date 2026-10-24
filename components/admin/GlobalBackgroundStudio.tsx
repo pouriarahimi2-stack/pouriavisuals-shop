@@ -85,7 +85,7 @@ export default function GlobalBackgroundStudio() {
         <h3 className="font-black text-sm text-indigo-400 border-b border-[var(--card-border)] pb-2">
           🖼️ تنظیمات پس‌زمینه اسلایدر پرچمداران
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:grid-cols-2 gap-2 md:gap-4">
           <div className="space-y-1.5">
             <label className="font-bold block">لینک عکس پس‌زمینه ثابت (اختیاری):</label>
             <input
@@ -116,7 +116,7 @@ export default function GlobalBackgroundStudio() {
         <h3 className="font-black text-sm text-sky-400 border-b border-[var(--card-border)] pb-2">
           💬 تنظیمات دکمه گفتگوی زنده (Live Chat)
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-2 md:gap-4">
           <div className="space-y-1.5">
             <div className="flex justify-between font-bold">
               <span>سایز در موبایل:</span>
@@ -155,7 +155,7 @@ export default function GlobalBackgroundStudio() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:grid-cols-2 gap-2 md:gap-4 pt-2">
           <div className="space-y-1.5">
             <label className="font-bold block">موقعیت دکمه در صفحه:</label>
             <select

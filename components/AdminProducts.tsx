@@ -519,9 +519,9 @@ export function AdminProducts(_props: any = {}) {
     <div className="space-y-6 font-sans text-[var(--text-primary)]" dir="rtl">
 
       {/* هدر */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4">
         <div>
-          <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)]">🛍️ مدیریت کاتالوگ محصولات</h1>
+          <h1 className="text-base sm:text-sm md:text-xl font-black text-[var(--accent-blue)]">🛍️ مدیریت کاتالوگ محصولات</h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1">{products.length} محصول ثبت شده</p>
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
@@ -603,7 +603,7 @@ export function AdminProducts(_props: any = {}) {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:grid-cols-2 xl:grid-cols-3 gap-2 md:gap-4">
             {filtered.slice(0,60).map(p=>(
               <div key={p.id}
                 onClick={()=>bulkMode&&toggleSelect(p.id)}
@@ -695,7 +695,7 @@ export function AdminProducts(_props: any = {}) {
             </div>
             <div className="p-5 space-y-4 flex-1 text-xs">
               {activeTab==="basic"&&(
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
                   <div className="sm:col-span-2">
                     <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">عنوان محصول *</label>
                     <input type="text" value={editForm.title||""} onChange={e=>setEditForm(f=>({...f,title:e.target.value}))}
@@ -990,7 +990,7 @@ export function AdminProducts(_props: any = {}) {
               {/* گام ۱ */}
               <div className={`p-5 rounded-3xl border transition ${importStep===1?"bg-[var(--accent-blue)]/5 border-[var(--accent-blue)]":"bg-[var(--input-bg)] border-[var(--card-border)] opacity-60"}`}>
                 <h3 className="font-black text-sm mb-4">گام اول: تنظیمات و آپلود فایل</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-2 md:gap-4 mb-5">
                   <div>
                     <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">موجودی پیش‌فرض:</label>
                     <input type="number" min={0} value={globalStock} onChange={e=>setGlobalStock(Number(e.target.value))}
@@ -1133,7 +1133,7 @@ export function AdminProducts(_props: any = {}) {
               {/* گام ۲ */}
               <div className={`p-5 rounded-3xl border transition ${importStep===2?"bg-emerald-500/5 border-emerald-500":"bg-[var(--input-bg)] border-[var(--card-border)] opacity-60"}`}>
                 <h3 className="font-black text-sm mb-3">گام دوم: انتخاب تصاویر</h3>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 md:gap-4">
                   <button type="button" onClick={()=>bulkImagesRef.current?.click()} disabled={importStep!==2}
                     className="px-6 py-3 rounded-2xl bg-emerald-600 text-white font-black cursor-pointer shadow-lg disabled:opacity-50">
                     🖼️ انتخاب تصاویر محصولات

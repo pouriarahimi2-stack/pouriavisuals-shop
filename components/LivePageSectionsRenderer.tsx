@@ -129,14 +129,14 @@ export default function LivePageSectionsRenderer({
             className={"rounded-3xl px-5 sm:px-8 transition-all " + cardSurfaceClass}
           >
             {sec.type === "hero_banner" && (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6 items-center">
                 <div className="lg:col-span-7 space-y-4 text-right">
                   {sec.badgeText && (
                     <span className="inline-block px-3.5 py-1 rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-400 text-xs font-black">
                       {sec.badgeText}
                     </span>
                   )}
-                  <h2 className="text-xl sm:text-3xl font-black text-[var(--text-primary)] leading-tight">
+                  <h2 className="text-sm md:text-xl sm:text-3xl font-black text-[var(--text-primary)] leading-tight">
                     {sec.title}
                   </h2>
                   {sec.subtitle && (
@@ -183,7 +183,7 @@ export default function LivePageSectionsRenderer({
                     <p className="text-xs text-[var(--text-secondary)]">{sec.subtitle}</p>
                   )}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
                   {(sec.items || []).map((item, i) => (
                     <div
                       key={i}
@@ -218,7 +218,7 @@ export default function LivePageSectionsRenderer({
                         {sec.badgeText}
                       </span>
                     )}
-                    <h2 className="text-base sm:text-xl font-black text-[var(--text-primary)] mt-1">
+                    <h2 className="text-base sm:text-sm md:text-xl font-black text-[var(--text-primary)] mt-1">
                       {sec.title}
                     </h2>
                     {sec.subtitle && (
@@ -233,7 +233,7 @@ export default function LivePageSectionsRenderer({
                   </Link>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
                   {filteredProducts.map((prod: any) => {
                     const finalPrice = Number(prod.discount_price || prod.price || 0);
                     return (
@@ -272,7 +272,7 @@ export default function LivePageSectionsRenderer({
             {sec.type === "comparison_table" && (
               <div className="space-y-4">
                 <div className="space-y-1">
-                  <h2 className="text-base sm:text-xl font-black text-[var(--text-primary)]">
+                  <h2 className="text-base sm:text-sm md:text-xl font-black text-[var(--text-primary)]">
                     {sec.title}
                   </h2>
                   {sec.subtitle && (
@@ -311,7 +311,7 @@ export default function LivePageSectionsRenderer({
             {sec.type === "faq_accordion" && (
               <div className="space-y-4">
                 <div className="text-center space-y-1">
-                  <h2 className="text-base sm:text-xl font-black text-[var(--text-primary)]">
+                  <h2 className="text-base sm:text-sm md:text-xl font-black text-[var(--text-primary)]">
                     {sec.title}
                   </h2>
                   {sec.subtitle && (
@@ -354,7 +354,7 @@ export default function LivePageSectionsRenderer({
             {sec.type === "custom_html" && (
               <div className="space-y-3">
                 {sec.title && (
-                  <h2 className="text-base sm:text-xl font-black text-[var(--text-primary)]">
+                  <h2 className="text-base sm:text-sm md:text-xl font-black text-[var(--text-primary)]">
                     {sec.title}
                   </h2>
                 )}
@@ -372,14 +372,14 @@ export default function LivePageSectionsRenderer({
             {(sec.type === "countdown_offer" ||
               sec.type === "trust_badges" ||
               sec.type === "glass_callout") && (
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-2 md:gap-4">
                 <div className="space-y-1.5 text-center md:text-right">
                   {sec.badgeText && (
                     <span className="inline-block px-3 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[11px] font-black">
                       {sec.badgeText}
                     </span>
                   )}
-                  <h3 className="text-base sm:text-xl font-black text-[var(--text-primary)]">
+                  <h3 className="text-base sm:text-sm md:text-xl font-black text-[var(--text-primary)]">
                     {sec.title}
                   </h3>
                   {sec.subtitle && (

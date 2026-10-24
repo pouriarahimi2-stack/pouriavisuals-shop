@@ -546,7 +546,7 @@ export default function UserLoginPage() {
                         className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-center outline-none focus:border-[var(--accent-blue)]"
                       />
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2">
                       <div>
                         <label className="block mb-1 font-bold text-[var(--text-secondary)]">کلمه عبور *</label>
                         <input

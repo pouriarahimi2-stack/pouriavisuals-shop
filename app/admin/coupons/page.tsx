@@ -387,9 +387,9 @@ export default function AdminCouponsPage() {
 
   return (
     <div className="space-y-6 font-sans text-[var(--text-primary)] select-text" dir="rtl">
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4">
         <div>
-          <h1 className="text-lg sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
+          <h1 className="text-lg sm:text-sm md:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🏷️</span> مدیریت پیشرفته کوپن‌های زمان‌دار، هدفمند و کمپین‌های پیامکی CRM
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
@@ -559,7 +559,7 @@ export default function AdminCouponsPage() {
             </div>
 
             <form onSubmit={handleFormSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3.5">
                 <div className="sm:col-span-2">
                   <label className="block font-bold text-[var(--text-secondary)] mb-1">
                     کد تخفیف (لاتین) *:
@@ -802,7 +802,7 @@ export default function AdminCouponsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-bold text-[var(--text-secondary)] mb-1">
                       🕒 تاریخ و ساعت شروع:

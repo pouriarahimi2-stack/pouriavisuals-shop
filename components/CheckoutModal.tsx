@@ -323,7 +323,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         </button>
 
         <div className="flex items-center gap-2 mb-5 border-b border-[var(--card-border)] pb-4 text-right">
-          <span className="text-xl">🛡️</span>
+          <span className="text-sm md:text-xl">🛡️</span>
           <div>
             <h2 className="text-sm sm:text-base font-black text-[var(--text-primary)]">
               تکمیل مشخصات تحویل و انتقال به درگاه پرداخت
@@ -415,7 +415,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs text-right">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3">
             <div>
               <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام گیرنده *</label>
               <input
@@ -440,7 +440,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3">
             <div>
               <label className="block mb-1 font-bold text-[var(--text-secondary)]">انتخاب استان *</label>
               <select
@@ -475,7 +475,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3">
             <div>
               <label className="block mb-1 font-bold text-[var(--text-secondary)]">
                 شماره تلفن همراه (۱۱ رقم) *

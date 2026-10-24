@@ -48,7 +48,7 @@ export default function ProductArchiveClient({
   return (
     <div className="space-y-8">
       {/* فیلترها و مرتب‌سازی با دکمه‌های تاچ ارگونومیک */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-2 md:gap-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <button
             onClick={() => {
@@ -109,7 +109,7 @@ export default function ProductArchiveClient({
           کالایی با این مشخصات یافت نشد.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
           {filtered.map((product) => (
             <ProductCard key={product.id} product={product as any} />
           ))}

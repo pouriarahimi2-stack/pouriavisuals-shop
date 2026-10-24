@@ -37,7 +37,7 @@ export default function ProductComparisonModal({
         
         <header className="p-5 border-b border-[var(--card-border)] flex flex-wrap items-center justify-between gap-3 bg-[var(--input-bg)]">
           <div className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-2xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] flex items-center justify-center text-xl font-black shadow-sm">
+            <span className="w-10 h-10 rounded-2xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] flex items-center justify-center text-sm md:text-xl font-black shadow-sm">
               ⚖️
             </span>
             <div>

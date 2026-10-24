@@ -87,7 +87,7 @@ export default function AdminDashboardStats() {
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       {/* سربرگ */}
-      <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-blue-500/25">📊</div>
           <div>
@@ -104,13 +104,13 @@ export default function AdminDashboardStats() {
       </div>
 
       {/* ۱. شاخص‌های اصلی */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 text-xs">
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm hover:border-emerald-500 transition">
           <div className="flex items-center justify-between text-[var(--text-secondary)] font-bold">
             <span>گردش مالی و فروش کل</span>
             <span className="p-2 rounded-2xl bg-emerald-500/10 text-emerald-500 text-sm">💳</span>
           </div>
-          <div className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
+          <div className="text-sm md:text-xl font-black font-mono text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
             {loading ? "..." : formatPrice(stats.totalSales)} <span className="text-xs font-normal">تومان</span>
           </div>
           <span className="text-[10px] text-slate-400 font-medium block">تراکنش‌های تاییدشده در دیتابیس</span>

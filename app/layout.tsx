@@ -8,6 +8,7 @@ import MotionInit from "@/components/MotionInit";
 import { CartProvider } from "@/context/CartContext";
 import { SiteInfoProvider } from "@/context/SiteInfoContext";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import RealtimeGlobalListener from "@/components/RealtimeGlobalListener";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -132,6 +133,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <style id="axon-live-custom-css" dangerouslySetInnerHTML={{ __html: inlineStyle }} />
       </head>
       <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased selection:bg-[var(--accent-blue)] selection:text-white">
+        <RealtimeGlobalListener />
         <MotionInit />
         <CartProvider>
           <SiteInfoProvider>

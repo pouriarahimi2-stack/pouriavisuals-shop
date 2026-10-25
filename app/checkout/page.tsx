@@ -9,6 +9,7 @@ import { soundEngine } from "@/lib/soundEngine";
 import { IRAN_PROVINCES_CITIES } from "@/lib/iranProvinces";
 import { formatPrice } from "@/lib/formatters";
 import { supabase } from "@/lib/supabase";
+import { PricingEngine } from "@/lib/pricingEngine";
 
 const CHECKOUT_DRAFT_KEY = "axon_checkout_form_draft_v2027";
 
@@ -177,8 +178,11 @@ export default function CheckoutPage() {
     else if (shippingMethod === "tipax") shippingCost = 0; // پس‌کرایه
   }
 
-  const vatAmount = finalPayable > 0 && financialRules.vatPercent > 0 ? Math.round((finalPayable * financialRules.vatPercent) / 100) : 0;
-  const grandTotal = Math.max(0, finalPayable + vatAmount + shippingCost);
+  // استفاده از موتور مالی قانونی برای تفکیک مالیات بدون افزایش مبلغ پرداختی مشتری
+  const invoice = PricingEngine.calculateInvoiceBreakdown(cartItems);
+  const vatAmount = invoice.totalVatAmount;
+  // مبلغ کالاها شامل مالیات است، فقط هزینه ارسال اضافه می‌شود
+  const grandTotal = Math.max(0, finalPayable + shippingCost);
 
   // لیست شهرهای استان انتخاب‌شده
   const provinceList = Object.keys(IRAN_PROVINCES_CITIES).sort();
@@ -500,9 +504,9 @@ export default function CheckoutPage() {
               </div>
             )}
             {vatAmount > 0 && (
-              <div className="flex justify-between text-orange-500">
-                <span>مالیات بر ارزش افزوده ({financialRules.vatPercent}٪):</span>
-                <span className="font-mono">+ {formatPrice(vatAmount)} تومان</span>
+              <div className="flex justify-between text-slate-500 text-[10px]">
+                <span>شامل مالیات بر ارزش افزوده ({financialRules.vatPercent}٪):</span>
+                <span className="font-mono">{formatPrice(vatAmount)} تومان</span>
               </div>
             )}
             <div className="flex justify-between">

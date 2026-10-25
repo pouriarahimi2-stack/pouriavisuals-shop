@@ -579,3 +579,18 @@ iframe[id^="crisp"],
     padding-top: 20px;
   }
 }
+
+
+/* رفع باگ لکه سیاه اسلایدر در موبایل */
+.swiper-button-next, .swiper-button-prev, .swiper-scrollbar, .slick-arrow, .slick-prev, .slick-next {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+/* اجبار قطعی به گرید ۲ ستونه در موبایل */
+@media (max-width: 768px) {
+  .grid-cols-1, .grid-cols-2, .sm\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}

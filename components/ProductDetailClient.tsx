@@ -1,4 +1,6 @@
 "use client";
+
+import ClientVariantSelector from "@/components/ClientVariantSelector";
 // File Path: components/ProductDetailClient.tsx
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -88,6 +90,7 @@ export default function ProductDetailClient({
 
   const [product, setProduct] = useState<any>(() => cleanAndExtractProduct(initialProduct));
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [currentVariant, setCurrentVariant] = useState<any>(null);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [selectedColor, setSelectedColor] = useState<string>("");
@@ -378,7 +381,9 @@ export default function ProductDetailClient({
           </div>
 
           {isAvailable ? (
-            <button
+            <>
+<ClientVariantSelector variants={product.variants || []} basePrice={product.price} onVariantSelect={setCurrentVariant} />
+<button
               type="button"
               onClick={handleAddToCartAndCheckout}
               className={
@@ -400,6 +405,7 @@ export default function ProductDetailClient({
                 </>
               )}
             </button>
+</>
           ) : (
             <button
               type="button"

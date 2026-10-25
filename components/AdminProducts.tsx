@@ -139,6 +139,7 @@ export function AdminProducts(_props: any = {}) {
   const [products, setProducts]   = useState<FullCatalogProduct[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [isTelegramImportOpen, setIsTelegramImportOpen] = useState(false);
   const [feedback, setFeedback]   = useState<{type:"success"|"error";text:string}|null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -533,6 +534,9 @@ export function AdminProducts(_props: any = {}) {
             className="px-4 py-3 rounded-2xl bg-emerald-600 text-white font-black text-xs shadow-lg flex gap-2">
             <span>📥</span> ایمپورت اکسل
           </button>
+            <button type="button" onClick={() => setIsTelegramImportOpen(true)} className="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-black shadow-md transition flex items-center gap-2">🤖 ایمپورت تلگرامی</button>
+          <button type="button" onClick={() => setIsTelegramImportOpen(true)} className="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-black shadow-md transition flex items-center gap-2">🤖 ایمپورت تلگرامی</button>
+          <button type="button" onClick={() => setIsTelegramImportOpen(true)} className="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-black shadow-md transition flex items-center gap-2">🤖 ایمپورت تلگرامی</button>
           <button type="button" onClick={openAdd}
             className="px-4 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-lg flex gap-2">
             <span>➕</span> افزودن محصول

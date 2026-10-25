@@ -1,9 +1,9 @@
 "use client";
 
-
 import React, { useState } from "react";
 import ProductCard from "@/components/ProductCard";
 import { soundEngine } from "@/lib/soundEngine";
+import FacetedFilterSidebar from "@/components/FacetedFilterSidebar";
 
 interface ProductItem {
   id: string | number;
@@ -17,6 +17,8 @@ interface ProductItem {
   category?: string;
   stock?: number;
   is_available?: boolean;
+  brand?: string;
+  specs_jsonb?: any;
 }
 
 export default function ProductArchiveClient({
@@ -29,14 +31,30 @@ export default function ProductArchiveClient({
   const [selectedCat, setSelectedCat] = useState("all");
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"default" | "price_asc" | "price_desc">("default");
+  
+  // استیت فیلترهای سایدبار پیشرفته
+  const [advancedFilters, setAdvancedFilters] = useState<any>({ categories: [], brands: [], minPrice: 0, maxPrice: 100000000 });
+
+  // محاسبه خودکار فیلترها از لیست کالاها
+  const computedCategories = Array.from(new Set(initialProducts.map(p => p.category).filter(Boolean))) as string[];
+  const computedBrands = Array.from(new Set(initialProducts.map(p => p.brand || (p.specs_jsonb && p.specs_jsonb.brand)).filter(Boolean))) as string[];
+  const computedMaxPrice = initialProducts.length > 0 ? Math.max(...initialProducts.map(p => p.price || 0)) : 100000000;
 
   const filtered = initialProducts
     .filter((p) => {
+      // فیلترهای پایه (بالای صفحه)
       const matchCat = selectedCat === "all" || p.category === selectedCat;
       const matchSearch =
         (p.title || p.name || "").toLowerCase().includes(search.toLowerCase()) ||
         (p.category || "").toLowerCase().includes(search.toLowerCase());
-      return matchCat && matchSearch;
+        
+      // فیلترهای پیشرفته (سایدبار)
+      const matchAdvCat = advancedFilters.categories.length === 0 || (p.category && advancedFilters.categories.includes(p.category));
+      const pBrand = p.brand || (p.specs_jsonb && p.specs_jsonb.brand);
+      const matchAdvBrand = advancedFilters.brands.length === 0 || (pBrand && advancedFilters.brands.includes(pBrand));
+      const matchPrice = (p.price || 0) <= (advancedFilters.maxPrice || 100000000);
+      
+      return matchCat && matchSearch && matchAdvCat && matchAdvBrand && matchPrice;
     })
     .sort((a, b) => {
       const priceA = a.discount_price || a.discountPrice || a.price;
@@ -48,7 +66,7 @@ export default function ProductArchiveClient({
 
   return (
     <div className="space-y-8">
-      {/* فیلترها و مرتب‌سازی با دکمه‌های تاچ ارگونومیک */}
+      {/* هدر جستجو و فیلترهای سریع */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-2 md:gap-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <button
@@ -104,18 +122,35 @@ export default function ProductArchiveClient({
           </select>
         </div>
       </div>
+      
+      {/* گرید اصلی و سایدبار فیلترها */}
+      <div className="flex flex-col md:flex-row gap-6 items-start">
+        
+        {/* سایدبار (دسکتاپ) */}
+        <aside className="w-full md:w-64 shrink-0 hidden md:block">
+          <FacetedFilterSidebar 
+            categories={computedCategories} 
+            brands={computedBrands} 
+            maxPrice={computedMaxPrice} 
+            onFilterChange={setAdvancedFilters} 
+          />
+        </aside>
 
-      {filtered.length === 0 ? (
-        <div className="p-12 text-center bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl text-xs font-bold text-[var(--text-secondary)]">
-          کالایی با این مشخصات یافت نشد.
+        {/* لیست کالاها */}
+        <div className="flex-1 w-full">
+          {filtered.length === 0 ? (
+            <div className="p-12 text-center bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl text-xs font-bold text-[var(--text-secondary)]">
+              کالایی با این مشخصات یافت نشد.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6">
+              {filtered.map((product) => (
+                <ProductCard key={product.id} product={product as any} />
+              ))}
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
-          {filtered.map((product) => (
-            <ProductCard key={product.id} product={product as any} />
-          ))}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

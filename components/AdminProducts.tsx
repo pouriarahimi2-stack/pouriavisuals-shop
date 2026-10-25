@@ -1,4 +1,5 @@
 "use client";
+import TelegramImporterModal from "@/components/admin/TelegramImporterModal";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
@@ -137,6 +138,7 @@ const EMPTY_FORM = (): Partial<FullCatalogProduct> => ({
 
 export function AdminProducts(_props: any = {}) {
   const [isTelegramImportOpen, setIsTelegramImportOpen] = useState(false);
+
 
   const [products, setProducts]   = useState<FullCatalogProduct[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -535,7 +537,7 @@ export function AdminProducts(_props: any = {}) {
             className="px-4 py-3 rounded-2xl bg-emerald-600 text-white font-black text-xs shadow-lg flex gap-2">
             <span>📥</span> ایمپورت اکسل
           </button>
-          <button type="button" onClick={() => setIsTelegramImportOpen(true)} className="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-black shadow-md transition flex items-center gap-2">🤖 ایمپورت تلگرامی</button>
+            <button type="button" onClick={() => setIsTelegramImportOpen(true)} className="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-black shadow-md transition flex items-center gap-2">🤖 ایمپورت تلگرامی</button>
           <button type="button" onClick={openAdd}
             className="px-4 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-lg flex gap-2">
             <span>➕</span> افزودن محصول
@@ -1205,7 +1207,9 @@ export function AdminProducts(_props: any = {}) {
           </div>
         </div>
       )}
-    </div>
+    
+      {isTelegramImportOpen && <TelegramImporterModal onClose={() => setIsTelegramImportOpen(false)} onImportComplete={() => { setIsTelegramImportOpen(false); window.location.reload(); }} />}
+</div>
   );
 }
 

@@ -1,76 +1,342 @@
 "use client";
-import React from "react";
+// File Path: components/Footer.tsx
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { MapPin, Clock, ShieldCheck, Truck } from "lucide-react";
+import { useSiteInfo } from "@/context/SiteInfoContext";
+import EnamadBadge from "@/components/EnamadBadge";
+
+function resolveSafeUrl(val: any): string {
+  if (typeof val !== "string") return "";
+  const clean = val.trim();
+  if (!clean) return "";
+  if (clean.includes(".supabase.co/storage/")) {
+    return "/api/media-proxy?url=" + encodeURIComponent(clean);
+  }
+  return clean;
+}
 
 export default function Footer() {
-  return (
-    <footer className="w-full bg-[#f4f7fb] dark:bg-[#0b0f17] border-t border-[var(--card-border)] pt-12 pb-24 sm:pb-6 text-[var(--text-primary)] font-sans select-text mt-auto relative z-10" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 text-right">
-          
-          <div className="space-y-6 lg:col-span-1 flex flex-col items-center lg:items-start text-center lg:text-right">
-            <Link href="/" className="flex items-center gap-3">
-              <img src="/favicon.ico" alt="AXON CORE" className="w-12 h-12 object-contain rounded-xl bg-black p-1" />
-              <h2 className="text-xl font-black text-[var(--text-primary)] tracking-tight font-mono">AXON CORE</h2>
-            </Link>
-            <p className="text-[11px] text-[var(--text-secondary)] font-medium leading-loose">
-              مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال
+  const { siteInfo } = useSiteInfo();
+  const [logoImgFailed, setLogoImgFailed] = useState(false);
+
+  const info = siteInfo || {};
+  const layoutCfg = info?.homepage_layout_config || {};
+  const persisted = layoutCfg?._persisted_identity || {};
+  const tbFooter =
+    info?.theme_builder_config?.globalFooter ||
+    layoutCfg?.theme_builder_config?.globalFooter ||
+    {};
+  const footerCfg = layoutCfg?.footer || {};
+
+  // خواندن منحصراً لوگوی فوتر از دیتابیس (بدون جایگزینی با لوگوی هدر یا لوگوی مثلثی هاردکد)
+  const rawFooterLogo =
+    tbFooter.footerLogoUrl !== undefined
+      ? String(tbFooter.footerLogoUrl)
+      : persisted.footer_logo_url !== undefined
+      ? String(persisted.footer_logo_url)
+      : String(info.footer_logo_url || info.footerLogoUrl || "");
+
+  const footerLogoUrl = resolveSafeUrl(rawFooterLogo);
+
+  useEffect(() => {
+    setLogoImgFailed(false);
+  }, [footerLogoUrl]);
+
+  if (footerCfg.show === false) return null;
+
+  const brandTitle =
+    tbFooter.brandTitle !== undefined
+      ? String(tbFooter.brandTitle).trim()
+      : String(footerCfg.brandTitle ?? "").trim();
+
+  const brandSubtitle =
+    tbFooter.brandSubtitle !== undefined
+      ? String(tbFooter.brandSubtitle).trim()
+      : String(footerCfg.brandSubtitle ?? info.tagline ?? "").trim();
+
+  const brandDescription =
+    tbFooter.brandDescription !== undefined
+      ? String(tbFooter.brandDescription).trim()
+      : String(footerCfg.description ?? info.description ?? "").trim();
+
+  const footerLogoWidth = Number(tbFooter.footerLogoWidth || footerCfg.footerLogoWidth || 140);
+  const footerLogoHeight = Number(tbFooter.footerLogoHeight || footerCfg.footerLogoHeight || 56);
+  const footerLogoRadius = tbFooter.footerLogoRadius || "12px";
+  const showFooterLogoBox = Boolean(tbFooter.showFooterLogoBox);
+
+  const showTrustBadges =
+    tbFooter.showTrustBadges !== undefined ? Boolean(tbFooter.showTrustBadges) : true;
+  const badge1Text =
+    tbFooter.badge1Text !== undefined ? String(tbFooter.badge1Text).trim() : "ضمانت اصالت کالا";
+  const badge2Text =
+    tbFooter.badge2Text !== undefined ? String(tbFooter.badge2Text).trim() : "ارسال سریع سراسری";
+
+  const quickLinksTitle =
+    tbFooter.quickLinksTitle !== undefined ? String(tbFooter.quickLinksTitle).trim() : "دسترسی سریع";
+  const supportTitle =
+    tbFooter.supportTitle !== undefined
+      ? String(tbFooter.supportTitle).trim()
+      : "مرکز ارتباط و پشتیبانی";
+
+  const supportPhone =
+    tbFooter.supportPhone !== undefined
+      ? String(tbFooter.supportPhone).trim()
+      : String(footerCfg.supportPhone ?? info.phone ?? "").trim();
+  const supportEmail =
+    tbFooter.supportEmail !== undefined
+      ? String(tbFooter.supportEmail).trim()
+      : String(footerCfg.supportEmail ?? info.email ?? "").trim();
+  const warehouseAddress =
+    tbFooter.warehouseAddress !== undefined
+      ? String(tbFooter.warehouseAddress).trim()
+      : String(footerCfg.warehouseAddress ?? info.address ?? "").trim();
+  const workingHours =
+    tbFooter.workingHours !== undefined
+      ? String(tbFooter.workingHours).trim()
+      : String(footerCfg.workingHours ?? info.working_hours ?? "").trim();
+
+  const copyrightText =
+    tbFooter.copyright !== undefined
+      ? String(tbFooter.copyright).trim()
+      : String(footerCfg?.bottomBar?.copyrightText ?? info.footer_text ?? "").trim();
+
+  const enamadEnabled =
+    tbFooter.enamadEnabled !== undefined
+      ? Boolean(tbFooter.enamadEnabled)
+      : footerCfg.enamadEnabled !== undefined
+      ? Boolean(footerCfg.enamadEnabled)
+      : true;
+
+  const enamadCode = tbFooter.enamadCode || footerCfg.enamadCode || "7434404";
+  const enamadLink = tbFooter.enamadLink || footerCfg.enamadLink || undefined;
+
+  const scaleMode = tbFooter.scaleMode || footerCfg.scaleMode || "normal";
+  const paddingMode = tbFooter.paddingMode || footerCfg.paddingMode || "normal";
+
+  const quickLinks: Array<{ id?: string; title: string; url: string; show?: boolean }> =
+    Array.isArray(tbFooter.quickLinks)
+      ? tbFooter.quickLinks.filter((l: any) => l.show !== false && String(l.title || "").trim() !== "")
+      : [];
+
+  const externalLinks: Array<{ id?: string; title: string; url: string; show?: boolean }> =
+    Array.isArray(tbFooter.externalLinks)
+      ? tbFooter.externalLinks.filter(
+          (l: any) =>
+            l.show !== false &&
+            l.url !== "/api/torob" &&
+            l.url !== "/sitemap.xml" &&
+            String(l.title || "").trim() !== ""
+        )
+      : [];
+
+  const columnOrder: string[] =
+    Array.isArray(tbFooter.columnOrder) && tbFooter.columnOrder.length === 4
+      ? tbFooter.columnOrder
+      : ["brand", "quick_links", "support", "enamad"];
+
+  const pyClass =
+    paddingMode === "compact"
+      ? "py-6 sm:py-8"
+      : paddingMode === "relaxed"
+      ? "py-14 sm:py-16"
+      : "py-10 sm:py-12";
+
+  const textScaleClass =
+    scaleMode === "compact" ? "text-[11px]" : scaleMode === "large" ? "text-sm" : "text-xs";
+
+  const footerImgKey = footerLogoUrl
+    ? footerLogoUrl.slice(-32) + "_" + footerLogoUrl.length
+    : "no_footer_logo";
+
+  const renderColumn = (colKey: string) => {
+    if (colKey === "brand") {
+      return (
+        <div key="col_brand" className="lg:col-span-4 space-y-4">
+          <div className="flex flex-wrap items-center gap-2 md:gap-4">
+            {footerLogoUrl && !logoImgFailed ? (
+              <div
+                className={
+                  showFooterLogoBox
+                    ? "p-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-md"
+                    : "flex items-center justify-center shrink-0"
+                }
+              >
+                <img
+                  key={footerImgKey}
+                  src={footerLogoUrl}
+                  alt={brandTitle || ""}
+                  onError={() => setLogoImgFailed(true)}
+                  style={{
+                    width: footerLogoWidth + "px",
+                    height: footerLogoHeight + "px",
+                    borderRadius: String(footerLogoRadius),
+                    objectFit: "contain",
+                  }}
+                  className="transition-all duration-300"
+                />
+              </div>
+            ) : null}
+
+            {(brandTitle || brandSubtitle) && (
+              <div className="min-w-[180px] flex-1">
+                {brandTitle && (
+                  <h3 className="text-base sm:text-lg font-black text-[var(--text-primary)]">
+                    {brandTitle}
+                  </h3>
+                )}
+                {brandSubtitle && (
+                  <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5 leading-relaxed">
+                    {brandSubtitle}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {brandDescription && (
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed text-justify font-medium">
+              {brandDescription}
             </p>
-            <div className="flex flex-col sm:flex-row gap-2 justify-center lg:justify-start w-full">
-              <div className="flex items-center justify-center gap-2 bg-white dark:bg-[#161d2b] px-4 py-2.5 rounded-full border border-gray-100 dark:border-gray-800 shadow-sm w-full sm:w-auto">
-                <ShieldCheck size={16} className="text-blue-500" />
-                <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">ضمانت اصالت کالا</span>
-              </div>
-              <div className="flex items-center justify-center gap-2 bg-white dark:bg-[#161d2b] px-4 py-2.5 rounded-full border border-gray-100 dark:border-gray-800 shadow-sm w-full sm:w-auto">
-                <Truck size={16} className="text-rose-500" />
-                <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">ارسال سریع سراسری</span>
-              </div>
-            </div>
-          </div>
+          )}
 
-          <div className="space-y-5 text-center lg:text-right pt-2">
-            <h3 className="text-sm font-black text-blue-600">دسترسی سریع</h3>
-            <ul className="space-y-4 inline-block text-right">
-              <li><Link href="/products" className="text-xs font-bold text-[var(--text-secondary)] hover:text-blue-600 transition flex items-center gap-2"><span className="text-[10px]">🛍️</span> کاتالوگ محصولات دیجیتال</Link></li>
-              <li><Link href="/news" className="text-xs font-bold text-[var(--text-secondary)] hover:text-blue-600 transition flex items-center gap-2"><span className="text-[10px]">📡</span> رادار اخبار تکنولوژی</Link></li>
-              <li><Link href="/blog" className="text-xs font-bold text-[var(--text-secondary)] hover:text-blue-600 transition flex items-center gap-2"><span className="text-[10px]">📚</span> مجله تخصصی و راهنمای خرید</Link></li>
-              <li><Link href="/track-order" className="text-xs font-bold text-[var(--text-secondary)] hover:text-blue-600 transition flex items-center gap-2"><span className="text-[10px]">🎯</span> پیگیری لحظه‌ای سفارشات</Link></li>
-            </ul>
-          </div>
-
-          <div className="space-y-5 text-center lg:text-right pt-2">
-            <h3 className="text-sm font-black text-blue-600">مرکز ارتباط و پشتیبانی</h3>
-            <div className="space-y-3 max-w-[260px] mx-auto lg:mx-0">
-              <div className="flex items-center justify-between bg-white dark:bg-[#161d2b] p-3.5 rounded-[1rem] border border-gray-100 dark:border-gray-800 shadow-sm">
-                <span className="text-[10px] font-bold text-[var(--text-secondary)]">ایمیل رسمی:</span>
-                <span className="text-xs font-bold font-mono">Pouriarahimi@yahoo.com</span>
-              </div>
-              <div className="flex flex-col gap-2.5 bg-white dark:bg-[#161d2b] p-3.5 rounded-[1rem] border border-gray-100 dark:border-gray-800 shadow-sm text-right">
-                <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-primary)]">
-                  <MapPin size={16} className="text-rose-500" />
-                  نشانی: شیراز - ستارخان
+          {showTrustBadges && (badge1Text || badge2Text) && (
+            <div className="grid grid-cols-2 gap-2.5 pt-1 text-[11px] font-bold">
+              {badge1Text && (
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex items-center gap-2 text-[var(--text-primary)]">
+                  <span>🛡️</span>
+                  <span>{badge1Text}</span>
                 </div>
-                <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400">
-                  <Clock size={14} />
-                  ساعات کاری: شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰
+              )}
+              {badge2Text && (
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex items-center gap-2 text-[var(--text-primary)]">
+                  <span>🚀</span>
+                  <span>{badge2Text}</span>
                 </div>
-              </div>
+              )}
             </div>
-          </div>
+          )}
+        </div>
+      );
+    }
 
-          <div className="flex justify-center lg:justify-end items-start pt-2">
-            <div className="bg-white p-4 rounded-[2rem] border border-gray-100 shadow-md w-32 flex justify-center items-center hover:shadow-lg transition">
-              <img src="https://trustseal.enamad.ir/logo.aspx?id=346513&Code=R9g5Z2Z2G" alt="eNamad" className="w-full h-auto object-contain mix-blend-multiply" />
-            </div>
+    if (colKey === "quick_links") {
+      return (
+        <div key="col_quick" className={"lg:col-span-3 space-y-3 " + textScaleClass}>
+          {quickLinksTitle && (
+            <h4 className="font-black text-sm text-[var(--accent-blue)]">{quickLinksTitle}</h4>
+          )}
+          <ul className="space-y-2 font-bold text-[var(--text-secondary)]">
+            {quickLinks.map((q, idx) => (
+              <li key={q.id || idx}>
+                <Link href={q.url || "/"} className="hover:text-[var(--accent-blue)] transition">
+                  {q.title}
+                </Link>
+              </li>
+            ))}
+            {externalLinks.map((ext, i) => (
+              <li key={ext.id || "ext_" + i}>
+                <a
+                  href={ext.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-[var(--accent-blue)] transition"
+                >
+                  🔗 {ext.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
+
+    if (colKey === "support") {
+      return (
+        <div key="col_support" className={"lg:col-span-3 space-y-3 " + textScaleClass}>
+          {supportTitle && (
+            <h4 className="font-black text-sm text-[var(--accent-blue)]">{supportTitle}</h4>
+          )}
+          <div className="space-y-2.5 text-[var(--text-secondary)] font-bold">
+            {supportPhone && (
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)]">
+                <span>تلفن پشتیبانی:</span>
+                <a
+                  href={"tel:" + supportPhone}
+                  dir="ltr"
+                  className="font-mono font-black text-[var(--accent-blue)] hover:underline"
+                >
+                  {supportPhone}
+                </a>
+              </div>
+            )}
+            {supportEmail && (
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)]">
+                <span>ایمیل رسمی:</span>
+                <a
+                  href={"mailto:" + supportEmail}
+                  dir="ltr"
+                  className="font-mono text-[11px] text-[var(--text-primary)] hover:underline truncate max-w-[160px]"
+                >
+                  {supportEmail}
+                </a>
+              </div>
+            )}
+            {(warehouseAddress || workingHours) && (
+              <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)] space-y-1">
+                {warehouseAddress && (
+                  <div className="text-[var(--text-primary)]">📍 نشانی: {warehouseAddress}</div>
+                )}
+                {workingHours && (
+                  <div className="text-[11px] text-[var(--text-secondary)]">
+                    🕒 ساعات کاری: {workingHours}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          
         </div>
-        
-        <div className="mt-12 pt-6 border-t border-gray-200 dark:border-gray-800 flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] text-[var(--text-secondary)] font-bold">
-          <p>تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026</p>
-          <p className="font-mono text-blue-500 tracking-widest uppercase">AXON CORE SECURE E-COMMERCE</p>
+      );
+    }
+
+    if (colKey === "enamad") {
+      return (
+        <div
+          key="col_enamad"
+          className="lg:col-span-2 flex flex-col items-center justify-center space-y-2"
+        >
+          {enamadEnabled && (
+            <div className="p-3 rounded-3xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex flex-col items-center justify-center shadow-sm">
+              <EnamadBadge code={enamadCode} link={enamadLink} />
+              <span className="text-[10px] font-bold text-[var(--text-secondary)] mt-1">
+                نماد اعتماد الکترونیکی
+              </span>
+            </div>
+          )}
         </div>
+      );
+    }
+
+    return null;
+  };
+
+  return (
+    <footer
+      className="mt-16 border-t border-[var(--card-border)] bg-[var(--bg-secondary)] text-[var(--text-primary)] font-sans select-text pb-24 lg:pb-10 transition-colors duration-300"
+      dir="rtl"
+    >
+      <div className={"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 " + pyClass}>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:grid-cols-2 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-8 items-start">
+          {columnOrder.map((colKey) => renderColumn(colKey))}
+        </div>
+
+        {copyrightText && (
+          <div className="pt-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-2 md:gap-4 text-xs text-[var(--text-secondary)] font-bold">
+            <p>{copyrightText}</p>
+            <span className="font-mono text-[11px] text-[var(--accent-blue)]">
+              AXON CORE SECURE E-COMMERCE
+            </span>
+          </div>
+        )}
       </div>
     </footer>
   );

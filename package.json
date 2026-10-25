@@ -14,7 +14,8 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
     "@measured/puck": "^0.20.2",
-    "@supabase/supabase-js": "^2.49.1",
+    "@supabase/supabase-js": "^2.118.0",
+    "dotenv": "^18.0.9",
     "jose": "^6.2.12",
     "lucide-react": "^0.475.0",
     "mammoth": "^1.13.0",

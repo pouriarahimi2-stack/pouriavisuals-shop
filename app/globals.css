@@ -663,3 +663,29 @@ iframe[id^="crisp"],
     padding-bottom: 80px !important;
   }
 }
+
+
+/* =========================================
+   AXON CORE - AGGRESSIVE MOBILE UI FIXES
+   ========================================= */
+@media (max-width: 768px) {
+  /* شبکه دو ستونه اجباری */
+  .grid, .grid-cols-1, .grid-cols-2, .sm\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+  
+  /* مخفی کردن لکه‌های سیاه و دکمه‌های خراب اسلایدر در موبایل */
+  .swiper-button-next, .swiper-button-prev, .swiper-scrollbar, .slick-arrow { 
+    display: none !important; opacity: 0 !important; visibility: hidden !important; 
+  }
+  
+  /* حذف کامل منوی قدیمی سایت که در پایین صفحه گیر کرده بود */
+  nav.fixed.bottom-0:not(.MobileBottomNav_container), div.fixed.bottom-0.bg-black { 
+    display: none !important; 
+  }
+  
+  /* فاصله ایمن برای چت و فوتر */
+  iframe[id^="raychat"], .crisp-client, #raychat_btn, .chat-widget { bottom: 90px !important; z-index: 9999 !important; }
+  body, main { padding-bottom: 80px !important; }
+}

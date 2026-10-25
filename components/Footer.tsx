@@ -9,7 +9,6 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 text-right">
           
-          {/* ستون اول: لوگو و معرفی */}
           <div className="space-y-6 lg:col-span-1 flex flex-col items-center lg:items-start text-center lg:text-right">
             <Link href="/" className="flex items-center gap-3">
               <img src="/favicon.ico" alt="AXON CORE" className="w-12 h-12 object-contain rounded-xl bg-black p-1" />
@@ -30,7 +29,6 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* ستون دوم: دسترسی سریع */}
           <div className="space-y-5 text-center lg:text-right pt-2">
             <h3 className="text-sm font-black text-blue-600">دسترسی سریع</h3>
             <ul className="space-y-4 inline-block text-right">
@@ -41,7 +39,6 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* ستون سوم: مرکز ارتباط */}
           <div className="space-y-5 text-center lg:text-right pt-2">
             <h3 className="text-sm font-black text-blue-600">مرکز ارتباط و پشتیبانی</h3>
             <div className="space-y-3 max-w-[260px] mx-auto lg:mx-0">
@@ -62,7 +59,6 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* ستون چهارم: اینماد */}
           <div className="flex justify-center lg:justify-end items-start pt-2">
             <div className="bg-white p-4 rounded-[2rem] border border-gray-100 shadow-md w-32 flex justify-center items-center hover:shadow-lg transition">
               <img src="https://trustseal.enamad.ir/logo.aspx?id=346513&Code=R9g5Z2Z2G" alt="eNamad" className="w-full h-auto object-contain mix-blend-multiply" />
@@ -71,7 +67,6 @@ export default function Footer() {
           
         </div>
         
-        {/* نوار پایینی */}
         <div className="mt-12 pt-6 border-t border-gray-200 dark:border-gray-800 flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] text-[var(--text-secondary)] font-bold">
           <p>تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026</p>
           <p className="font-mono text-blue-500 tracking-widest uppercase">AXON CORE SECURE E-COMMERCE</p>

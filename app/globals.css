@@ -553,3 +553,29 @@ html, body, div, span, p, h1, h2, h3, h4, h5, h6, pre, code, td, th, input, text
     height: 4px;
   }
 }
+
+/* =========================================
+   Axon Core - Mobile UI & Overlaps Fixes
+   ========================================= */
+body, main, #__next {
+  /* جلوگیری از رفتن محتوا زیر منوی موبایل در تمام صفحات */
+  padding-bottom: 85px !important; 
+}
+
+/* حل تداخل دکمه پشتیبانی/چت (بالا بردن آیکون چت در موبایل) */
+iframe[id^="raychat"], 
+iframe[id^="crisp"], 
+.crisp-client, 
+.raychat_main, 
+#raychat_btn,
+.chat-widget-container {
+  bottom: 90px !important;
+  z-index: 99 !important;
+}
+
+@media (max-width: 768px) {
+  /* اطمینان از فاصله ایمن هدر */
+  main {
+    padding-top: 20px;
+  }
+}

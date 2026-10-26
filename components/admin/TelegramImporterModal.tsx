@@ -1,7 +1,6 @@
 "use client";
 import React, { useState } from "react";
 import * as XLSX from "xlsx";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function TelegramImporterModal({ onClose, onImportComplete }: any) {
@@ -33,8 +32,10 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     
     try {
        setProgress({ current: 0, step: "در حال دریافت لیست محصولات فعلی سایت..." });
-       const { data: existingProducts } = await supabase.from("products").select("title");
-       const existingTitles = new Set((existingProducts || []).map(p => p.title.trim()));
+       const resExisting = await fetch("/api/products", { cache: "no-store" });
+       const existingJson = await resExisting.json();
+       const existingProducts = existingJson.data || [];
+       const existingTitles = new Set((existingProducts || []).map((p: any) => (p.title || "").trim()));
 
        setProgress({ current: 0, step: "در حال تحلیل دیتای تلگرام..." });
        const jsonText = await jsonFile.text();
@@ -116,26 +117,26 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                    for (const photoPath of matchedTg.photos) {
                        const photoName = photoPath.split("/").pop() || photoPath.split("\\").pop();
                        const photoFile = photoMap.get(photoName);
+                       
                        if (photoFile) {
-                           // 🌟 رفع قطعی خطای 400 Bad Request با تولید نام امن
-                           const rawExt = photoName.split(".").pop() || "jpg";
-                           const cleanExt = rawExt.toLowerCase().replace(/[^a-z0-9]/g, "");
-                           const safeRandomName = "img_" + Date.now() + "_" + Math.floor(Math.random() * 100000) + "." + (cleanExt || "jpg");
-                           const cloudPath = "uploads/" + safeRandomName;
+                           const formData = new FormData();
+                           formData.append("file", photoFile);
                            
-                           // 🌟 ایجاد وقفه ۱ ثانیه‌ای برای جلوگیری از مسدود شدن IP توسط Supabase (حل ارور HTTP2)
-                           await new Promise(resolve => setTimeout(resolve, 1000));
+                           // وقفه برای جلوگیری از Block شدن درخواست‌ها
+                           await new Promise(resolve => setTimeout(resolve, 400));
                            
-                           const { error: upErr } = await supabase.storage.from("products").upload(cloudPath, photoFile, {
-                               cacheControl: "3600",
-                               upsert: false
-                           });
-                           
-                           if (!upErr) {
-                               const { data } = supabase.storage.from("products").getPublicUrl(cloudPath);
-                               uploadedUrls.push(data.publicUrl);
-                           } else {
-                               console.warn("Upload Warning:", upErr);
+                           try {
+                               // تماس مستقیم با سرور امن - هیچ ارور RLS یا 400ی از دیتابیس نخواهید گرفت
+                               const upRes = await fetch("/api/admin/upload", {
+                                   method: "POST",
+                                   body: formData
+                               });
+                               const upJson = await upRes.json();
+                               if (upRes.ok && upJson.success && (upJson.rawUrl || upJson.url)) {
+                                   uploadedUrls.push(upJson.rawUrl || upJson.url);
+                               }
+                           } catch (err) {
+                               console.warn("Upload error:", err);
                            }
                        }
                    }
@@ -145,10 +146,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                        const finalPrice = Math.ceil((priceWithProfit * 1.10) / 1000) * 1000; 
                        const finalShipping = shippingType === "auto" ? rowShipping : shippingType;
 
-                       // 🌟 وقفه کوتاه قبل از ثبت در دیتابیس
-                       await new Promise(resolve => setTimeout(resolve, 500));
-
-                       await supabase.from("products").insert([{
+                       const productPayload = {
                            title: productName,
                            category: fallbackCategory,
                            price: finalPrice,
@@ -156,13 +154,26 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                            is_available: stock > 0,
                            description: matchedTg.description,
                            shipping_type: finalShipping,
-                           image_url: uploadedUrls[0],
-                           images: uploadedUrls,
-                           created_at: new Date().toISOString(),
-                           updated_at: new Date().toISOString()
-                       }]);
-                       existingTitles.add(productName);
-                       successCount++;
+                           image: uploadedUrls[0],
+                           images: uploadedUrls
+                       };
+
+                       await new Promise(resolve => setTimeout(resolve, 300));
+
+                       try {
+                           // ثبت دیتابیس سمت سرور
+                           const pRes = await fetch("/api/admin/products", {
+                               method: "POST",
+                               headers: { "Content-Type": "application/json" },
+                               body: JSON.stringify(productPayload)
+                           });
+                           if (pRes.ok) {
+                               existingTitles.add(productName);
+                               successCount++;
+                           }
+                       } catch (err) {
+                           console.warn("Insert error:", err);
+                       }
                    }
                }
            }
@@ -184,7 +195,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 font-sans select-text dir-rtl">
       <div className="w-full max-w-4xl bg-[var(--modal-bg)] rounded-[2rem] shadow-2xl border border-[var(--card-border)] flex flex-col max-h-[96vh]">
         <div className="flex items-center justify-between p-5 border-b border-[var(--card-border)] bg-[var(--modal-bg)] z-10 rounded-t-[2rem]">
-          <h2 className="font-black text-sm text-sky-500">🤖 ایمپورت هوشمند تلگرام + اکسل</h2>
+          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت هوشمند تلگرام + اکسل (نسخه V2.0 امن)</h2>
           {!loading && <button type="button" onClick={onClose} className="p-2 rounded-xl bg-[var(--input-bg)] font-black cursor-pointer hover:bg-rose-500 hover:text-white transition">✕</button>}
         </div>
         
@@ -244,14 +255,14 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
           {loading && (
              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center space-y-2">
-                <div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                <p className="font-bold text-sky-500">{progress.step}</p>
-                <p className="font-mono text-emerald-500 font-black text-sm">آپلود شده: {progress.current} محصول</p>
+                <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <p className="font-bold text-emerald-500">{progress.step}</p>
+                <p className="font-mono text-[var(--accent-blue)] font-black text-sm">آپلود شده: {progress.current} محصول</p>
              </div>
           )}
 
-          <button onClick={handleRunImport} disabled={loading} className="w-full py-4 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-black shadow-xl transition cursor-pointer disabled:opacity-50">
-            {loading ? "در حال پردازش و آپلود ایمن..." : "🚀 شروع ایمپورت هوشمند تلگرام"}
+          <button onClick={handleRunImport} disabled={loading} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-xl transition cursor-pointer disabled:opacity-50">
+            {loading ? "در حال پردازش و ارتباط امن با سرور..." : "🚀 شروع ایمپورت هوشمند تلگرام"}
           </button>
         </div>
       </div>

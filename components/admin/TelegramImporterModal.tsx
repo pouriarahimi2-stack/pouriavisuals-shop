@@ -3,13 +3,23 @@ import React, { useState } from "react";
 import * as XLSX from "xlsx";
 import { soundEngine } from "@/lib/soundEngine";
 
-const cleanStr = (s: string) => {
-  return String(s || "")
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    .replace(/ي/g, 'ی')
-    .replace(/ك/g, 'ک')
-    .replace(/\s+/g, '')
-    .toLowerCase();
+// الگوریتم پیشرفته تمیزسازی رشته‌ها
+const cleanStr = (s: string) => String(s || "").replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').toLowerCase();
+
+// الگوریتم هوش مصنوعی (Fuzzy Match) برای پیدا کردن دقیق عکس‌ها حتی با نام‌های متفاوت
+const fuzzyMatch = (desc: string, title: string) => {
+    const cDesc = cleanStr(desc);
+    const cTitle = cleanStr(title);
+    if(cDesc.includes(cTitle)) return true;
+    
+    const titleWords = cTitle.split(/\s+/).filter(w => w.length > 2);
+    if(titleWords.length === 0) return false;
+    
+    let matchCount = 0;
+    for(const w of titleWords) {
+        if(cDesc.includes(w)) matchCount++;
+    }
+    return (matchCount / titleWords.length) >= 0.5; // اگر ۵۰٪ کلمات هم مچ باشند عکس را پیدا می‌کند
 };
 
 export default function TelegramImporterModal({ onClose, onImportComplete }: any) {
@@ -41,8 +51,6 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     
     try {
        setProgress({ current: 0, step: "در حال دریافت ایمن کاتالوگ فعلی سایت..." });
-       
-       // 🌟 Safe Fetch: جلوگیری از کرش کردن سیستم به دلیل Network Connection Closed
        let existingTitles = new Set<string>();
        try {
            const resExisting = await fetch("/api/products", { cache: "no-store", headers: { "Connection": "keep-alive" } });
@@ -52,10 +60,9 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
            }
        } catch (fetchErr) {
            console.warn("اخطار شبکه در دریافت محصولات قدیمی:", fetchErr);
-           // اگر شبکه قطع شد، متوقف نشو و ادامه بده
        }
 
-       setProgress({ current: 0, step: "در حال استخراج دیتای تلگرام..." });
+       setProgress({ current: 0, step: "در حال پردازش هوشمند دیتای تلگرام..." });
        const jsonText = await jsonFile.text();
        const tgData = JSON.parse(jsonText);
        
@@ -128,7 +135,9 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
                setProgress({ current: successCount, step: "ثبت: " + productName.slice(0,25) + "..." });
                
-               const matchedTg = productsMap.find(p => cleanStr(p.description).includes(cleanProdName));
+               // 🌟 استفاده از الگوریتم جدید فازی برای پیدا کردن قطعی عکس در تلگرام
+               const matchedTg = productsMap.find(p => fuzzyMatch(p.description, productName));
+               
                let uploadedUrls: string[] = [];
                let descriptionToUse = productName; 
 
@@ -142,7 +151,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                            if (photoFile) {
                                const formData = new FormData();
                                formData.append("file", photoFile);
-                               await new Promise(resolve => setTimeout(resolve, 600)); // 🌟 وقفه طولانی‌تر برای پایداری
+                               await new Promise(resolve => setTimeout(resolve, 300));
                                try {
                                    const upRes = await fetch("/api/admin/upload", { method: "POST", body: formData });
                                    if (upRes.ok) {
@@ -169,6 +178,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
                const productPayload = {
                    title: productName,
+                   brand: "", // 🌟 فورس کردن برند به عنوان استرینگ خالی (حذف کامل Apple)
                    category: fallbackCategory,
                    price: finalPrice,
                    stock: stock,
@@ -179,7 +189,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                    images: uploadedUrls
                };
 
-               await new Promise(resolve => setTimeout(resolve, 500)); // 🌟 استراحت به سرور
+               await new Promise(resolve => setTimeout(resolve, 300));
 
                try {
                    const pRes = await fetch("/api/admin/products", {
@@ -203,7 +213,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
        if (onImportComplete) setTimeout(() => { window.location.reload(); }, 2500);
 
     } catch (err: any) {
-       setMessage({ text: "❌ متاسفانه خطایی رخ داد: " + err.message, type: "error" });
+       setMessage({ text: "❌ خطای شبکه: " + err.message, type: "error" });
     } finally {
        setLoading(false);
     }
@@ -213,7 +223,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-sans select-text dir-rtl">
       <div className="w-full max-w-4xl bg-[var(--modal-bg)] rounded-[2rem] shadow-2xl border border-[var(--card-border)] flex flex-col max-h-[96vh]">
         <div className="flex items-center justify-between p-5 border-b border-[var(--card-border)] bg-[var(--modal-bg)] z-10 rounded-t-[2rem]">
-          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت هوشمند تلگرام + اکسل (ضد کرش و مقاوم)</h2>
+          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت هوشمند تلگرام (تطبیق عکس فازی + حذف Apple)</h2>
           {!loading && <button type="button" onClick={onClose} className="p-2 rounded-xl bg-[var(--input-bg)] font-black cursor-pointer hover:bg-rose-500 hover:text-white transition">✕</button>}
         </div>
         
@@ -247,18 +257,17 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
               </div>
               <span className="font-bold text-xs">فقط محصولات موجود را وارد کن <span className="text-gray-400">(ناموجودها skip می‌شن)</span></span>
             </label>
-
             <label className="flex items-center gap-3 cursor-pointer select-none group">
               <div className={"relative w-11 h-6 rounded-full transition-colors " + (skipExisting ? "bg-amber-500" : "bg-slate-300 dark:bg-slate-600")}>
                 <div className={"absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform " + (skipExisting ? "translate-x-5" : "translate-x-0")} />
               </div>
-              <span className="font-bold text-xs">اگر محصول از قبل در سایت هست، skip کن <span className="text-gray-400">(تکراری‌ها آپدیت نمی‌شن)</span></span>
+              <span className="font-bold text-xs">اگر محصول از قبل در سایت هست، skip کن <span className="text-gray-400">(جلوگیری هوشمند از تکرار)</span></span>
             </label>
           </div>
 
           <div className="space-y-3">
              <div className="p-4 rounded-2xl border border-sky-500/30 bg-sky-500/5">
-                <label className="block font-black mb-2 text-sky-500">۱. انتخاب فایل JSON تلگرام (result.json)</label>
+                <label className="block font-black mb-2 text-sky-500">۱. انتخاب فایل JSON تلگرام</label>
                 <input type="file" accept=".json" onChange={e => setJsonFile(e.target.files?.[0] || null)} className="w-full font-mono text-[10px]" />
              </div>
              <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/5">
@@ -266,7 +275,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                 <input type="file" multiple accept=".xlsx,.xls" onChange={e => setExcelFiles(e.target.files)} className="w-full font-mono text-[10px]" />
              </div>
              <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5">
-                <label className="block font-black mb-2 text-emerald-500">۳. انتخاب پوشه عکس‌ها (Photos)</label>
+                <label className="block font-black mb-2 text-emerald-500">۳. انتخاب پوشه عکس‌ها</label>
                 <input type="file" {...{ webkitdirectory: "", directory: "" } as any} multiple onChange={e => setPhotoFiles(e.target.files)} className="w-full font-mono text-[10px]" />
              </div>
           </div>
@@ -280,7 +289,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
           )}
 
           <button onClick={handleRunImport} disabled={loading} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-xl transition cursor-pointer disabled:opacity-50">
-            {loading ? "در حال پردازش زره‌پوش و ضد کرش..." : "🚀 شروع ایمپورت هوشمند تلگرام"}
+            {loading ? "در حال پردازش..." : "🚀 شروع ایمپورت هوشمند تلگرام"}
           </button>
         </div>
       </div>

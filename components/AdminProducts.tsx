@@ -143,6 +143,7 @@ export function AdminProducts(_props: any = {}) {
   const [products, setProducts]   = useState<FullCatalogProduct[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [visibleCount, setVisibleCount] = useState(24);
     const [feedback, setFeedback]   = useState<{type:"success"|"error";text:string}|null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");

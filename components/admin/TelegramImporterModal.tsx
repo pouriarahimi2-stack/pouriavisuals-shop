@@ -114,6 +114,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                    
                    const uploadedUrls = [];
                    for (const photoPath of matchedTg.photos) {
+                       await new Promise(r => setTimeout(r, 200)); // جلوگیری از خطای HTTP2 Protocol Error
                        const photoName = photoPath.split('/').pop() || photoPath.split('\\').pop();
                        const photoFile = photoMap.get(photoName);
                        if (photoFile) {

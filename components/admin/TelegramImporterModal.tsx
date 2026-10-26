@@ -133,6 +133,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                        const finalPrice = Math.ceil((priceWithProfit * 1.10) / 1000) * 1000; 
                        const finalShipping = shippingType === "auto" ? rowShipping : shippingType;
 
+                       await new Promise(r => setTimeout(r, 500)); // Delay to prevent HTTP2 Protocol Error & 400 Bad Request
                        await supabase.from('products').insert([{
                            title: productName,
                            category: fallbackCategory,

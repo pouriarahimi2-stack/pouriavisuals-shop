@@ -114,15 +114,17 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                    
                    const uploadedUrls = [];
                    for (const photoPath of matchedTg.photos) {
+                       await new Promise(r => setTimeout(r, 400)); // رفع خطای HTTP2 و Bad Request
+
                        await new Promise(r => setTimeout(r, 200)); // جلوگیری از خطای HTTP2 Protocol Error
                        const photoName = photoPath.split('/').pop() || photoPath.split('\\').pop();
                        const photoFile = photoMap.get(photoName);
                        if (photoFile) {
                            const ext = photoName.split('.').pop() || 'jpg';
                            const cloudPath = `uploads/bulk_${Date.now()}_${Math.random().toString(36).slice(2,7)}.${ext}`;
-                           const { error: upErr } = await supabase.storage.from('products').upload(cloudPath, photoFile);
+                           const { error: upErr } = await supabase.storage.from('product-images').upload(cloudPath, photoFile);
                            if (!upErr) {
-                               const { data } = supabase.storage.from('products').getPublicUrl(cloudPath);
+                               const { data } = supabase.storage.from('product-images').getPublicUrl(cloudPath);
                                uploadedUrls.push(data.publicUrl);
                            }
                        }

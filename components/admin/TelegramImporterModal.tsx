@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import * as XLSX from "xlsx";
-import { supabase } from "@/lib/supabase"; // 🟢 مسیر درست جایگزین شد
+import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function TelegramImporterModal({ onClose, onImportComplete }: any) {
@@ -33,7 +33,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     
     try {
        setProgress({ current: 0, step: "در حال دریافت لیست محصولات فعلی سایت..." });
-       const { data: existingProducts } = await supabase.from('products').select('title');
+       const { data: existingProducts } = await supabase.from("products").select("title");
        const existingTitles = new Set((existingProducts || []).map(p => p.title.trim()));
 
        setProgress({ current: 0, step: "در حال تحلیل دیتای تلگرام..." });
@@ -43,8 +43,8 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
        const productsMap: any[] = [];
        let currentProduct: any = null;
        for (const msg of (tgData.messages || [])) {
-           if (msg.type !== 'message') continue;
-           let textContent = Array.isArray(msg.text) ? msg.text.map((t:any) => typeof t === 'string' ? t : t.text).join('') : (msg.text || '');
+           if (msg.type !== "message") continue;
+           let textContent = Array.isArray(msg.text) ? msg.text.map((t:any) => typeof t === "string" ? t : t.text).join("") : (msg.text || "");
            if (textContent.length > 20) {
                currentProduct = { description: textContent, photos: msg.photo ? [msg.photo] : [], date: msg.date_unixtime };
                productsMap.push(currentProduct);
@@ -64,9 +64,9 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
        for (let e=0; e<excelFiles.length; e++) {
            const file = excelFiles[e];
-           const fallbackCategory = globalCategory || file.name.split('-')[0].split('_')[0].trim() || "عمومی";
+           const fallbackCategory = globalCategory || file.name.split("-")[0].split("_")[0].trim() || "عمومی";
            
-           setProgress({ current: successCount, step: `در حال خواندن فایل: ${file.name}` });
+           setProgress({ current: successCount, step: "در حال خواندن فایل: " + file.name });
            
            const buffer = await file.arrayBuffer();
            const workbook = XLSX.read(buffer, { type: "array" });
@@ -78,15 +78,15 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
            for (let i = 0; i < Math.min(100, rawData.length); i++) {
                if (!rawData[i]) continue;
-               const rowStr = rawData[i].map(String).join(' ').toLowerCase();
-               if ((rowStr.includes('نام') || rowStr.includes('کالا') || rowStr.includes('محصول')) &&
-                   (rowStr.includes('قیمت') || rowStr.includes('دراپ') || rowStr.includes('خرید'))) {
+               const rowStr = rawData[i].map(String).join(" ").toLowerCase();
+               if ((rowStr.includes("نام") || rowStr.includes("کالا") || rowStr.includes("محصول")) &&
+                   (rowStr.includes("قیمت") || rowStr.includes("دراپ") || rowStr.includes("خرید"))) {
                    headerRowIndex = i;
-                   const headers = rawData[i].map((h:any) => String(h || '').toLowerCase().trim());
-                   colMap.name = headers.findIndex((h:any) => h.includes('نام') || h.includes('کالا') || h.includes('محصول'));
-                   colMap.buyPrice = headers.findIndex((h:any) => h.includes('دراپ') || h.includes('قیمت') || h.includes('خرید'));
-                   colMap.stock = headers.findIndex((h:any) => h.includes('موجود'));
-                   colMap.shipping = headers.findIndex((h:any) => h.includes('ارسال'));
+                   const headers = rawData[i].map((h:any) => String(h || "").toLowerCase().trim());
+                   colMap.name = headers.findIndex((h:any) => h.includes("نام") || h.includes("کالا") || h.includes("محصول"));
+                   colMap.buyPrice = headers.findIndex((h:any) => h.includes("دراپ") || h.includes("قیمت") || h.includes("خرید"));
+                   colMap.stock = headers.findIndex((h:any) => h.includes("موجود"));
+                   colMap.shipping = headers.findIndex((h:any) => h.includes("ارسال"));
                    break;
                }
            }
@@ -98,9 +98,9 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                if (!row || !row[colMap.name]) continue;
 
                const productName = String(row[colMap.name]).trim();
-               const buyPrice = Number(String(row[colMap.buyPrice] || '0').replace(/\D/g, ''));
-               const stock = colMap.stock !== -1 ? Number(String(row[colMap.stock] || String(defaultStock)).replace(/\D/g, '')) : defaultStock;
-               const rowShipping = colMap.shipping !== -1 ? String(row[colMap.shipping] || 'both') : 'both';
+               const buyPrice = Number(String(row[colMap.buyPrice] || "0").replace(/\D/g, ""));
+               const stock = colMap.stock !== -1 ? Number(String(row[colMap.stock] || String(defaultStock)).replace(/\D/g, "")) : defaultStock;
+               const rowShipping = colMap.shipping !== -1 ? String(row[colMap.shipping] || "both") : "both";
 
                if (buyPrice === 0) continue;
 
@@ -110,26 +110,32 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                const matchedTg = productsMap.find(p => p.description.includes(productName));
                
                if (matchedTg && matchedTg.photos.length > 0) {
-                   setProgress({ current: successCount, step: `آپلود عکس: ${productName.slice(0,25)}...` });
+                   setProgress({ current: successCount, step: "آپلود عکس: " + productName.slice(0,25) + "..." });
                    
                    const uploadedUrls = [];
                    for (const photoPath of matchedTg.photos) {
-                       await new Promise(r => setTimeout(r, 400)); // رفع خطای HTTP2 و Bad Request
-
-                       await new Promise(r => setTimeout(r, 200)); // جلوگیری از خطای HTTP2 Protocol Error
-                       const photoName = photoPath.split('/').pop() || photoPath.split('\\').pop();
+                       const photoName = photoPath.split("/").pop() || photoPath.split("\\").pop();
                        const photoFile = photoMap.get(photoName);
                        if (photoFile) {
-                           const ext = photoName.split('.').pop() || 'jpg';
-                           // تولید یک اسم امن برای عکس جهت جلوگیری از ارور 400 سوپابیس
-                           const safeFileName = "img_" + Date.now() + "_" + Math.floor(Math.random() * 10000) + "." + ext;
-                           const cloudPath = "uploads/" + safeFileName;
+                           // 🌟 رفع قطعی خطای 400 Bad Request با تولید نام امن
+                           const rawExt = photoName.split(".").pop() || "jpg";
+                           const cleanExt = rawExt.toLowerCase().replace(/[^a-z0-9]/g, "");
+                           const safeRandomName = "img_" + Date.now() + "_" + Math.floor(Math.random() * 100000) + "." + (cleanExt || "jpg");
+                           const cloudPath = "uploads/" + safeRandomName;
                            
-                           await new Promise(resolve => setTimeout(resolve, 300)); // جلوگیری از ارور قطعی سرور (HTTP2)
-                           const { error: upErr } = await supabase.storage.from('product-images').upload(cloudPath, photoFile);
+                           // 🌟 ایجاد وقفه ۱ ثانیه‌ای برای جلوگیری از مسدود شدن IP توسط Supabase (حل ارور HTTP2)
+                           await new Promise(resolve => setTimeout(resolve, 1000));
+                           
+                           const { error: upErr } = await supabase.storage.from("products").upload(cloudPath, photoFile, {
+                               cacheControl: "3600",
+                               upsert: false
+                           });
+                           
                            if (!upErr) {
-                               const { data } = supabase.storage.from('product-images').getPublicUrl(cloudPath);
+                               const { data } = supabase.storage.from("products").getPublicUrl(cloudPath);
                                uploadedUrls.push(data.publicUrl);
+                           } else {
+                               console.warn("Upload Warning:", upErr);
                            }
                        }
                    }
@@ -139,8 +145,10 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                        const finalPrice = Math.ceil((priceWithProfit * 1.10) / 1000) * 1000; 
                        const finalShipping = shippingType === "auto" ? rowShipping : shippingType;
 
-                       await new Promise(r => setTimeout(r, 500)); // Delay to prevent HTTP2 Protocol Error & 400 Bad Request
-                       await supabase.from('products').insert([{
+                       // 🌟 وقفه کوتاه قبل از ثبت در دیتابیس
+                       await new Promise(resolve => setTimeout(resolve, 500));
+
+                       await supabase.from("products").insert([{
                            title: productName,
                            category: fallbackCategory,
                            price: finalPrice,
@@ -162,7 +170,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
        soundEngine?.playSuccess?.();
        setProgress({ current: successCount, step: "عملیات با موفقیت پایان یافت!" });
-       setMessage({ text: `🎉 عالی! ${successCount} کالا وارد شد. (${skippedCount} کالا اسکیپ شد)`, type: "success" });
+       setMessage({ text: "🎉 عالی! " + successCount + " کالا وارد شد. (" + skippedCount + " کالا اسکیپ شد)", type: "success" });
        if (onImportComplete) setTimeout(onImportComplete, 2000);
 
     } catch (err: any) {
@@ -182,7 +190,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
         
         <div className="p-6 space-y-6 text-xs overflow-y-auto flex-1">
           {message && (
-            <div className={`p-4 rounded-2xl font-bold border ${message.type === 'error' ? 'bg-rose-500/10 text-rose-500 border-rose-500/30' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'}`}>
+            <div className={"p-4 rounded-2xl font-bold border " + (message.type === "error" ? "bg-rose-500/10 text-rose-500 border-rose-500/30" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/30")}>
               {message.text}
             </div>
           )}
@@ -205,15 +213,15 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
           <div className="space-y-4 border-b border-[var(--card-border)] pb-6">
             <label className="flex items-center gap-3 cursor-pointer select-none group">
-              <div className={`relative w-11 h-6 rounded-full transition-colors ${onlyAvailable ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
-                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${onlyAvailable ? 'translate-x-5' : 'translate-x-0'}`} />
+              <div className={"relative w-11 h-6 rounded-full transition-colors " + (onlyAvailable ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600")}>
+                <div className={"absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform " + (onlyAvailable ? "translate-x-5" : "translate-x-0")} />
               </div>
               <span className="font-bold text-xs">فقط محصولات موجود را وارد کن <span className="text-gray-400">(ناموجودها skip می‌شن)</span></span>
             </label>
 
             <label className="flex items-center gap-3 cursor-pointer select-none group">
-              <div className={`relative w-11 h-6 rounded-full transition-colors ${skipExisting ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
-                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${skipExisting ? 'translate-x-5' : 'translate-x-0'}`} />
+              <div className={"relative w-11 h-6 rounded-full transition-colors " + (skipExisting ? "bg-amber-500" : "bg-slate-300 dark:bg-slate-600")}>
+                <div className={"absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform " + (skipExisting ? "translate-x-5" : "translate-x-0")} />
               </div>
               <span className="font-bold text-xs">اگر محصول از قبل در سایت هست، skip کن <span className="text-gray-400">(تکراری‌ها آپدیت نمی‌شن)</span></span>
             </label>
@@ -243,7 +251,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
           )}
 
           <button onClick={handleRunImport} disabled={loading} className="w-full py-4 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-black shadow-xl transition cursor-pointer disabled:opacity-50">
-            {loading ? "در حال پردازش و آپلود..." : "🚀 شروع ایمپورت هوشمند تلگرام"}
+            {loading ? "در حال پردازش و آپلود ایمن..." : "🚀 شروع ایمپورت هوشمند تلگرام"}
           </button>
         </div>
       </div>

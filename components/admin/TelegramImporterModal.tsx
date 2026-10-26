@@ -245,18 +245,19 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
           </div>
 
           <div className="space-y-4 border-b border-[var(--card-border)] pb-6">
-            <label className="flex items-center gap-3 cursor-pointer select-none group">
+            <div role="button" onClick={() => setOnlyAvailable(!onlyAvailable)} className="flex items-center gap-3 cursor-pointer select-none group">
               <div className={"relative w-11 h-6 rounded-full transition-colors " + (onlyAvailable ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600")}>
                 <div className={"absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform " + (onlyAvailable ? "translate-x-5" : "translate-x-0")} />
               </div>
-              <span className="font-bold text-xs">فقط محصولات موجود را وارد کن</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer select-none group opacity-70">
-              <div className="relative w-11 h-6 rounded-full bg-emerald-500 transition-colors">
-                <div className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full translate-x-5 transition-transform" />
+              <span className="font-bold text-xs">فقط محصولات موجود را وارد کن <span className="text-gray-400 font-normal">(ناموجودها skip می‌شن)</span></span>
+            </div>
+
+            <div role="button" onClick={() => setSkipExisting(!skipExisting)} className="flex items-center gap-3 cursor-pointer select-none group">
+              <div className={"relative w-11 h-6 rounded-full transition-colors " + (skipExisting ? "bg-amber-500" : "bg-slate-300 dark:bg-slate-600")}>
+                <div className={"absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform " + (skipExisting ? "translate-x-5" : "translate-x-0")} />
               </div>
-              <span className="font-bold text-xs">اگر محصول در سایت هست، skip کن (همیشه فعال برای جلوگیری از تکرار)</span>
-            </label>
+              <span className="font-bold text-xs">اگر محصول از قبل در سایت هست، skip کن <span className="text-gray-400 font-normal">(جلوگیری از ثبت تکراری)</span></span>
+            </div>
           </div>
 
           <div className="space-y-3">

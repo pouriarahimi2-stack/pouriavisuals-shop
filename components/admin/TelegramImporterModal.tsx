@@ -121,7 +121,11 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                        const photoFile = photoMap.get(photoName);
                        if (photoFile) {
                            const ext = photoName.split('.').pop() || 'jpg';
-                           const cloudPath = `uploads/bulk_${Date.now()}_${Math.random().toString(36).slice(2,7)}.${ext}`;
+                           // تولید یک اسم امن برای عکس جهت جلوگیری از ارور 400 سوپابیس
+                           const safeFileName = "img_" + Date.now() + "_" + Math.floor(Math.random() * 10000) + "." + ext;
+                           const cloudPath = "uploads/" + safeFileName;
+                           
+                           await new Promise(resolve => setTimeout(resolve, 300)); // جلوگیری از ارور قطعی سرور (HTTP2)
                            const { error: upErr } = await supabase.storage.from('product-images').upload(cloudPath, photoFile);
                            if (!upErr) {
                                const { data } = supabase.storage.from('product-images').getPublicUrl(cloudPath);

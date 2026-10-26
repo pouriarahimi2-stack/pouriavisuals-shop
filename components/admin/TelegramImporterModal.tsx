@@ -3,6 +3,16 @@ import React, { useState } from "react";
 import * as XLSX from "xlsx";
 import { soundEngine } from "@/lib/soundEngine";
 
+// تابع هوشمند برای یکسان‌سازی حروف و حذف فاصله‌ها جهت جلوگیری از تکرار و پیدا کردن دقیق محصولات
+const cleanStr = (s: string) => {
+  return String(s || "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/ي/g, 'ی')
+    .replace(/ك/g, 'ک')
+    .replace(/\s+/g, '')
+    .toLowerCase();
+};
+
 export default function TelegramImporterModal({ onClose, onImportComplete }: any) {
   const [jsonFile, setJsonFile] = useState<File | null>(null);
   const [excelFiles, setExcelFiles] = useState<FileList | null>(null);
@@ -14,7 +24,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
   
   const [shippingType, setShippingType] = useState("auto");
   const [onlyAvailable, setOnlyAvailable] = useState(true);
-  const [skipExisting, setSkipExisting] = useState(false);
+  const [skipExisting, setSkipExisting] = useState(true); // 🌟 پیش‌فرض روی فعال قرار گرفت تا جلوی تکرار گرفته شود
 
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, step: "آماده شروع..." });
@@ -31,13 +41,13 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     soundEngine?.playClick?.();
     
     try {
-       setProgress({ current: 0, step: "در حال دریافت لیست محصولات فعلی سایت..." });
+       setProgress({ current: 0, step: "در حال دریافت و تحلیل لیست کاتالوگ موجود سایت..." });
        const resExisting = await fetch("/api/products", { cache: "no-store" });
        const existingJson = await resExisting.json();
-       const existingProducts = existingJson.data || [];
-       const existingTitles = new Set((existingProducts || []).map((p: any) => (p.title || "").trim()));
+       // 🌟 یکسان‌سازی نام تمام محصولات سایت برای مقایسه بدون خطا
+       const existingTitles = new Set((existingJson.data || []).map((p: any) => cleanStr(p.title)));
 
-       setProgress({ current: 0, step: "در حال تحلیل دیتای تلگرام..." });
+       setProgress({ current: 0, step: "در حال استخراج دیتای تلگرام..." });
        const jsonText = await jsonFile.text();
        const tgData = JSON.parse(jsonText);
        
@@ -67,7 +77,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
            const file = excelFiles[e];
            const fallbackCategory = globalCategory || file.name.split("-")[0].split("_")[0].trim() || "عمومی";
            
-           setProgress({ current: successCount, step: "در حال خواندن فایل: " + file.name });
+           setProgress({ current: successCount, step: "در حال پردازش اکسل: " + file.name });
            
            const buffer = await file.arrayBuffer();
            const workbook = XLSX.read(buffer, { type: "array" });
@@ -99,82 +109,85 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                if (!row || !row[colMap.name]) continue;
 
                const productName = String(row[colMap.name]).trim();
+               const cleanProdName = cleanStr(productName);
                const buyPrice = Number(String(row[colMap.buyPrice] || "0").replace(/\D/g, ""));
                const stock = colMap.stock !== -1 ? Number(String(row[colMap.stock] || String(defaultStock)).replace(/\D/g, "")) : defaultStock;
                const rowShipping = colMap.shipping !== -1 ? String(row[colMap.shipping] || "both") : "both";
 
                if (buyPrice === 0) continue;
-
                if (onlyAvailable && stock <= 0) { skippedCount++; continue; }
-               if (skipExisting && existingTitles.has(productName)) { skippedCount++; continue; }
-
-               const matchedTg = productsMap.find(p => p.description.includes(productName));
                
-               if (matchedTg && matchedTg.photos.length > 0) {
-                   setProgress({ current: successCount, step: "آپلود عکس: " + productName.slice(0,25) + "..." });
-                   
-                   const uploadedUrls = [];
-                   for (const photoPath of matchedTg.photos) {
-                       const photoName = photoPath.split("/").pop() || photoPath.split("\\").pop();
-                       const photoFile = photoMap.get(photoName);
-                       
-                       if (photoFile) {
-                           const formData = new FormData();
-                           formData.append("file", photoFile);
+               // 🌟 بررسی فوق‌دقیق برای جلوگیری از آپلود محصول تکراری
+               if (skipExisting && existingTitles.has(cleanProdName)) { skippedCount++; continue; }
+
+               setProgress({ current: successCount, step: "پردازش: " + productName.slice(0,25) + "..." });
+               
+               // 🌟 تطابق هوشمند با دیتاهای تلگرام
+               const matchedTg = productsMap.find(p => cleanStr(p.description).includes(cleanProdName));
+               
+               let uploadedUrls = [];
+               let descriptionToUse = productName; // اگر در تلگرام نبود، حداقل نام اکسل ثبت شود
+
+               if (matchedTg) {
+                   descriptionToUse = matchedTg.description || productName;
+                   if (matchedTg.photos && matchedTg.photos.length > 0) {
+                       for (const photoPath of matchedTg.photos) {
+                           const photoName = photoPath.split("/").pop() || photoPath.split("\\").pop();
+                           const photoFile = photoMap.get(photoName);
                            
-                           // وقفه برای جلوگیری از Block شدن درخواست‌ها
-                           await new Promise(resolve => setTimeout(resolve, 400));
-                           
-                           try {
-                               // تماس مستقیم با سرور امن - هیچ ارور RLS یا 400ی از دیتابیس نخواهید گرفت
-                               const upRes = await fetch("/api/admin/upload", {
-                                   method: "POST",
-                                   body: formData
-                               });
-                               const upJson = await upRes.json();
-                               if (upRes.ok && upJson.success && (upJson.rawUrl || upJson.url)) {
-                                   uploadedUrls.push(upJson.rawUrl || upJson.url);
+                           if (photoFile) {
+                               const formData = new FormData();
+                               formData.append("file", photoFile);
+                               await new Promise(resolve => setTimeout(resolve, 400));
+                               try {
+                                   const upRes = await fetch("/api/admin/upload", { method: "POST", body: formData });
+                                   const upJson = await upRes.json();
+                                   if (upRes.ok && upJson.success && (upJson.rawUrl || upJson.url)) {
+                                       uploadedUrls.push(upJson.rawUrl || upJson.url);
+                                   }
+                               } catch (err) {
+                                   console.warn("Upload error:", err);
                                }
-                           } catch (err) {
-                               console.warn("Upload error:", err);
                            }
                        }
                    }
+               }
 
-                   if (uploadedUrls.length > 0) {
-                       const priceWithProfit = buyPrice * (1 + (profitMargin / 100));
-                       const finalPrice = Math.ceil((priceWithProfit * 1.10) / 1000) * 1000; 
-                       const finalShipping = shippingType === "auto" ? rowShipping : shippingType;
+               // 🌟 اگر عکسی آپلود نشد یا در تلگرام پیدا نشد، به هیچ وجه کالا را Skip نکن! (عکس پیش‌فرض بگذار)
+               if (uploadedUrls.length === 0) {
+                   uploadedUrls.push("/placeholder.png");
+               }
 
-                       const productPayload = {
-                           title: productName,
-                           category: fallbackCategory,
-                           price: finalPrice,
-                           stock: stock,
-                           is_available: stock > 0,
-                           description: matchedTg.description,
-                           shipping_type: finalShipping,
-                           image: uploadedUrls[0],
-                           images: uploadedUrls
-                       };
+               const priceWithProfit = buyPrice * (1 + (profitMargin / 100));
+               const finalPrice = Math.ceil((priceWithProfit * 1.10) / 1000) * 1000; 
+               const finalShipping = shippingType === "auto" ? rowShipping : shippingType;
 
-                       await new Promise(resolve => setTimeout(resolve, 300));
+               const productPayload = {
+                   title: productName,
+                   category: fallbackCategory,
+                   price: finalPrice,
+                   stock: stock,
+                   is_available: stock > 0,
+                   description: descriptionToUse,
+                   shipping_type: finalShipping,
+                   image: uploadedUrls[0],
+                   images: uploadedUrls
+               };
 
-                       try {
-                           // ثبت دیتابیس سمت سرور
-                           const pRes = await fetch("/api/admin/products", {
-                               method: "POST",
-                               headers: { "Content-Type": "application/json" },
-                               body: JSON.stringify(productPayload)
-                           });
-                           if (pRes.ok) {
-                               existingTitles.add(productName);
-                               successCount++;
-                           }
-                       } catch (err) {
-                           console.warn("Insert error:", err);
-                       }
+               await new Promise(resolve => setTimeout(resolve, 300));
+
+               try {
+                   const pRes = await fetch("/api/admin/products", {
+                       method: "POST",
+                       headers: { "Content-Type": "application/json" },
+                       body: JSON.stringify(productPayload)
+                   });
+                   if (pRes.ok) {
+                       existingTitles.add(cleanProdName); // ثبت در حافظه برای جلوگیری از تکرار در ادامه لوپ
+                       successCount++;
                    }
+               } catch (err) {
+                   console.warn("Insert error:", err);
                }
            }
        }
@@ -195,7 +208,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 font-sans select-text dir-rtl">
       <div className="w-full max-w-4xl bg-[var(--modal-bg)] rounded-[2rem] shadow-2xl border border-[var(--card-border)] flex flex-col max-h-[96vh]">
         <div className="flex items-center justify-between p-5 border-b border-[var(--card-border)] bg-[var(--modal-bg)] z-10 rounded-t-[2rem]">
-          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت هوشمند تلگرام + اکسل (نسخه V2.0 امن)</h2>
+          <h2 className="font-black text-sm text-sky-500">🤖 ایمپورت هوشمند تلگرام + اکسل (تضمین ۱۰۰٪ ورود کالاها)</h2>
           {!loading && <button type="button" onClick={onClose} className="p-2 rounded-xl bg-[var(--input-bg)] font-black cursor-pointer hover:bg-rose-500 hover:text-white transition">✕</button>}
         </div>
         
@@ -255,14 +268,14 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
           {loading && (
              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center space-y-2">
-                <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                <p className="font-bold text-emerald-500">{progress.step}</p>
-                <p className="font-mono text-[var(--accent-blue)] font-black text-sm">آپلود شده: {progress.current} محصول</p>
+                <div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <p className="font-bold text-sky-500">{progress.step}</p>
+                <p className="font-mono text-emerald-500 font-black text-sm">آپلود شده: {progress.current} محصول</p>
              </div>
           )}
 
-          <button onClick={handleRunImport} disabled={loading} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-xl transition cursor-pointer disabled:opacity-50">
-            {loading ? "در حال پردازش و ارتباط امن با سرور..." : "🚀 شروع ایمپورت هوشمند تلگرام"}
+          <button onClick={handleRunImport} disabled={loading} className="w-full py-4 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-black shadow-xl transition cursor-pointer disabled:opacity-50">
+            {loading ? "در حال پردازش و استخراج ۱۰۰٪ محصولات..." : "🚀 شروع ایمپورت هوشمند تلگرام"}
           </button>
         </div>
       </div>

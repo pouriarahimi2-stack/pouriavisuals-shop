@@ -4,14 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
+import { Home, LayoutGrid, ShoppingCart, User } from "lucide-react";
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
-  const cart     = useCart() as any;
+  const cart = useCart() as any;
   const [userPhone, setUserPhone] = useState<string | null>(null);
 
-  const cartItems: any[] = Array.isArray(cart?.cartItems) ? cart.cartItems
-    : Array.isArray(cart?.items) ? cart.items : [];
+  const cartItems: any[] = Array.isArray(cart?.cartItems) ? cart.cartItems : Array.isArray(cart?.items) ? cart.items : [];
   const cartCount = cartItems.reduce((a: number, i: any) => a + (Number(i?.quantity) || 1), 0);
 
   useEffect(() => {
@@ -20,56 +20,79 @@ export default function MobileBottomNav() {
       if (u.phone) setUserPhone(String(u.phone));
       else if (u.name) setUserPhone(u.name);
     } catch {}
-    const h = (e: any) => {
+    const handleAuth = (e: any) => {
       if (e.detail?.phone) setUserPhone(String(e.detail.phone));
       else if (e.detail?.name) setUserPhone(e.detail.name);
       else setUserPhone(null);
     };
-    window.addEventListener("user_auth_changed", h);
-    return () => window.removeEventListener("user_auth_changed", h);
+    window.addEventListener("user_auth_changed", handleAuth);
+    return () => window.removeEventListener("user_auth_changed", handleAuth);
   }, []);
 
-  // در ادمین نشون نده
+  // مخفی کردن در صفحات ادمین
   if (pathname?.startsWith("/admin")) return null;
 
+  // لینک‌های اصلاح شده برای رفع خطای ۴۰۴
   const navItems = [
-    { label: "خانه",    href: "/",           icon: "🏠" },
-    { label: "کالاها",  href: "/products",   icon: "📦" },
-    { label: "سبد",     href: "#cart",        isCart: true, icon: "🛒" },
-    { label: "پیگیری", href: "/track-order", icon: "🚚" },
-    { label: userPhone ? "حساب" : "ورود", href: userPhone ? "/my-orders" : "/login", icon: "👤" },
+    { label: "خانه", href: "/", icon: Home },
+    { label: "دسته‌بندی", href: "/products", icon: LayoutGrid },
+    { label: "سبد خرید", href: "#cart", isCart: true, icon: ShoppingCart },
+    { label: "پروفایل", href: userPhone ? "/account" : "/login", icon: User },
   ];
+
+  const handleCartClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    soundEngine.playClick();
+    if (typeof cart?.openCart === "function") cart.openCart();
+    else if (typeof cart?.toggleCart === "function") cart.toggleCart();
+  };
 
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 z-30 md:hidden bg-[var(--modal-bg)] border-t border-[var(--card-border)] font-sans select-text"
+      className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-white/75 dark:bg-[#0b0f17]/75 backdrop-blur-xl border-t border-gray-200/50 dark:border-white/10 font-sans select-none transition-all duration-300"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      dir="rtl"
     >
-      <div className="h-14 px-1 flex items-center justify-around">
+      <div className="h-[65px] px-2 flex items-center justify-between max-w-md mx-auto">
         {navItems.map((item) => {
           const isActive = !item.isCart && pathname === item.href;
+          const Icon = item.icon;
+          
           if (item.isCart) {
             return (
-              <button key={item.label}
-                onClick={() => { soundEngine.playClick(); if (typeof cart?.openCart === "function") cart.openCart(); }}
-                className="relative flex flex-col items-center justify-center gap-0.5 text-[9px] font-bold text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition min-w-[52px] py-1">
-                <span className="text-xl relative">
-                  {item.icon}
+              <button
+                key={item.label}
+                onClick={handleCartClick}
+                className="relative flex flex-col items-center justify-center gap-1 w-[25%] h-full text-[10px] font-black transition-colors duration-200 text-gray-500 dark:text-gray-400 hover:text-sky-500"
+              >
+                <div className="relative">
+                  <Icon size={24} strokeWidth={isActive ? 2.5 : 2} className="transition-all duration-300" />
                   {cartCount > 0 && (
-                    <span className="absolute -top-1.5 -right-2 w-4 h-4 rounded-full bg-[var(--accent-blue)] text-white text-[8px] font-mono flex items-center justify-center font-bold">
+                    <span className="absolute -top-1.5 -right-2 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-mono flex items-center justify-center font-bold shadow-md shadow-rose-500/30">
                       {cartCount > 9 ? "9+" : cartCount}
                     </span>
                   )}
-                </span>
+                </div>
                 <span>{item.label}</span>
               </button>
             );
           }
+
           return (
-            <Link key={item.label} href={item.href} onClick={() => soundEngine.playClick()}
-              className={"flex flex-col items-center justify-center gap-0.5 text-[9px] font-bold transition min-w-[52px] py-1 " + (isActive ? "text-[var(--accent-blue)]" : "text-[var(--text-secondary)]")}>
-              <span className={"text-xl transition-transform " + (isActive ? "scale-110" : "")}>{item.icon}</span>
-              <span>{item.label}</span>
+            <Link
+              key={item.label}
+              href={item.href}
+              onClick={() => soundEngine.playClick()}
+              className={`flex flex-col items-center justify-center gap-1 w-[25%] h-full text-[10px] font-black transition-all duration-300 ${
+                isActive ? "text-sky-500 dark:text-sky-400" : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              <Icon 
+                size={24} 
+                strokeWidth={isActive ? 2.5 : 2} 
+                className={`transition-all duration-300 ${isActive ? "scale-110 drop-shadow-md" : ""}`} 
+              />
+              <span className={isActive ? "opacity-100" : "opacity-80"}>{item.label}</span>
             </Link>
           );
         })}

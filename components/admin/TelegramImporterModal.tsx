@@ -3,7 +3,6 @@ import React, { useState } from "react";
 import * as XLSX from "xlsx";
 import { soundEngine } from "@/lib/soundEngine";
 
-// تابع هوشمند برای یکسان‌سازی حروف و حذف فاصله‌ها جهت جلوگیری از تکرار و پیدا کردن دقیق محصولات
 const cleanStr = (s: string) => {
   return String(s || "")
     .replace(/[\u200B-\u200D\uFEFF]/g, '')
@@ -24,7 +23,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
   
   const [shippingType, setShippingType] = useState("auto");
   const [onlyAvailable, setOnlyAvailable] = useState(true);
-  const [skipExisting, setSkipExisting] = useState(true); // 🌟 پیش‌فرض روی فعال قرار گرفت تا جلوی تکرار گرفته شود
+  const [skipExisting, setSkipExisting] = useState(true);
 
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, step: "آماده شروع..." });
@@ -41,11 +40,20 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     soundEngine?.playClick?.();
     
     try {
-       setProgress({ current: 0, step: "در حال دریافت و تحلیل لیست کاتالوگ موجود سایت..." });
-       const resExisting = await fetch("/api/products", { cache: "no-store" });
-       const existingJson = await resExisting.json();
-       // 🌟 یکسان‌سازی نام تمام محصولات سایت برای مقایسه بدون خطا
-       const existingTitles = new Set((existingJson.data || []).map((p: any) => cleanStr(p.title)));
+       setProgress({ current: 0, step: "در حال دریافت ایمن کاتالوگ فعلی سایت..." });
+       
+       // 🌟 Safe Fetch: جلوگیری از کرش کردن سیستم به دلیل Network Connection Closed
+       let existingTitles = new Set<string>();
+       try {
+           const resExisting = await fetch("/api/products", { cache: "no-store", headers: { "Connection": "keep-alive" } });
+           if (resExisting.ok) {
+               const existingJson = await resExisting.json();
+               existingTitles = new Set((existingJson.data || []).map((p: any) => cleanStr(p.title)));
+           }
+       } catch (fetchErr) {
+           console.warn("اخطار شبکه در دریافت محصولات قدیمی:", fetchErr);
+           // اگر شبکه قطع شد، متوقف نشو و ادامه بده
+       }
 
        setProgress({ current: 0, step: "در حال استخراج دیتای تلگرام..." });
        const jsonText = await jsonFile.text();
@@ -77,7 +85,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
            const file = excelFiles[e];
            const fallbackCategory = globalCategory || file.name.split("-")[0].split("_")[0].trim() || "عمومی";
            
-           setProgress({ current: successCount, step: "در حال پردازش اکسل: " + file.name });
+           setProgress({ current: successCount, step: "پردازش اکسل: " + file.name });
            
            const buffer = await file.arrayBuffer();
            const workbook = XLSX.read(buffer, { type: "array" });
@@ -116,17 +124,13 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
                if (buyPrice === 0) continue;
                if (onlyAvailable && stock <= 0) { skippedCount++; continue; }
-               
-               // 🌟 بررسی فوق‌دقیق برای جلوگیری از آپلود محصول تکراری
                if (skipExisting && existingTitles.has(cleanProdName)) { skippedCount++; continue; }
 
-               setProgress({ current: successCount, step: "پردازش: " + productName.slice(0,25) + "..." });
+               setProgress({ current: successCount, step: "ثبت: " + productName.slice(0,25) + "..." });
                
-               // 🌟 تطابق هوشمند با دیتاهای تلگرام
                const matchedTg = productsMap.find(p => cleanStr(p.description).includes(cleanProdName));
-               
-               let uploadedUrls = [];
-               let descriptionToUse = productName; // اگر در تلگرام نبود، حداقل نام اکسل ثبت شود
+               let uploadedUrls: string[] = [];
+               let descriptionToUse = productName; 
 
                if (matchedTg) {
                    descriptionToUse = matchedTg.description || productName;
@@ -138,22 +142,23 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                            if (photoFile) {
                                const formData = new FormData();
                                formData.append("file", photoFile);
-                               await new Promise(resolve => setTimeout(resolve, 400));
+                               await new Promise(resolve => setTimeout(resolve, 600)); // 🌟 وقفه طولانی‌تر برای پایداری
                                try {
                                    const upRes = await fetch("/api/admin/upload", { method: "POST", body: formData });
-                                   const upJson = await upRes.json();
-                                   if (upRes.ok && upJson.success && (upJson.rawUrl || upJson.url)) {
-                                       uploadedUrls.push(upJson.rawUrl || upJson.url);
+                                   if (upRes.ok) {
+                                       const upJson = await upRes.json();
+                                       if (upJson.success && (upJson.rawUrl || upJson.url)) {
+                                           uploadedUrls.push(upJson.rawUrl || upJson.url);
+                                       }
                                    }
                                } catch (err) {
-                                   console.warn("Upload error:", err);
+                                   console.warn("Network Warning Upload:", err);
                                }
                            }
                        }
                    }
                }
 
-               // 🌟 اگر عکسی آپلود نشد یا در تلگرام پیدا نشد، به هیچ وجه کالا را Skip نکن! (عکس پیش‌فرض بگذار)
                if (uploadedUrls.length === 0) {
                    uploadedUrls.push("/placeholder.png");
                }
@@ -174,7 +179,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                    images: uploadedUrls
                };
 
-               await new Promise(resolve => setTimeout(resolve, 300));
+               await new Promise(resolve => setTimeout(resolve, 500)); // 🌟 استراحت به سرور
 
                try {
                    const pRes = await fetch("/api/admin/products", {
@@ -183,11 +188,11 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                        body: JSON.stringify(productPayload)
                    });
                    if (pRes.ok) {
-                       existingTitles.add(cleanProdName); // ثبت در حافظه برای جلوگیری از تکرار در ادامه لوپ
+                       existingTitles.add(cleanProdName); 
                        successCount++;
                    }
                } catch (err) {
-                   console.warn("Insert error:", err);
+                   console.warn("Network Warning Insert:", err);
                }
            }
        }
@@ -195,20 +200,20 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
        soundEngine?.playSuccess?.();
        setProgress({ current: successCount, step: "عملیات با موفقیت پایان یافت!" });
        setMessage({ text: "🎉 عالی! " + successCount + " کالا وارد شد. (" + skippedCount + " کالا اسکیپ شد)", type: "success" });
-       if (onImportComplete) setTimeout(onImportComplete, 2000);
+       if (onImportComplete) setTimeout(() => { window.location.reload(); }, 2500);
 
     } catch (err: any) {
-       setMessage({ text: "❌ خطا در سیستم: " + err.message, type: "error" });
+       setMessage({ text: "❌ متاسفانه خطایی رخ داد: " + err.message, type: "error" });
     } finally {
        setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 font-sans select-text dir-rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-sans select-text dir-rtl">
       <div className="w-full max-w-4xl bg-[var(--modal-bg)] rounded-[2rem] shadow-2xl border border-[var(--card-border)] flex flex-col max-h-[96vh]">
         <div className="flex items-center justify-between p-5 border-b border-[var(--card-border)] bg-[var(--modal-bg)] z-10 rounded-t-[2rem]">
-          <h2 className="font-black text-sm text-sky-500">🤖 ایمپورت هوشمند تلگرام + اکسل (تضمین ۱۰۰٪ ورود کالاها)</h2>
+          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت هوشمند تلگرام + اکسل (ضد کرش و مقاوم)</h2>
           {!loading && <button type="button" onClick={onClose} className="p-2 rounded-xl bg-[var(--input-bg)] font-black cursor-pointer hover:bg-rose-500 hover:text-white transition">✕</button>}
         </div>
         
@@ -268,14 +273,14 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
           {loading && (
              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center space-y-2">
-                <div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                <p className="font-bold text-sky-500">{progress.step}</p>
-                <p className="font-mono text-emerald-500 font-black text-sm">آپلود شده: {progress.current} محصول</p>
+                <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <p className="font-bold text-emerald-500">{progress.step}</p>
+                <p className="font-mono text-slate-500 font-black text-sm">آپلود شده: <span className="text-[var(--accent-blue)]">{progress.current}</span> محصول</p>
              </div>
           )}
 
-          <button onClick={handleRunImport} disabled={loading} className="w-full py-4 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-black shadow-xl transition cursor-pointer disabled:opacity-50">
-            {loading ? "در حال پردازش و استخراج ۱۰۰٪ محصولات..." : "🚀 شروع ایمپورت هوشمند تلگرام"}
+          <button onClick={handleRunImport} disabled={loading} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-xl transition cursor-pointer disabled:opacity-50">
+            {loading ? "در حال پردازش زره‌پوش و ضد کرش..." : "🚀 شروع ایمپورت هوشمند تلگرام"}
           </button>
         </div>
       </div>

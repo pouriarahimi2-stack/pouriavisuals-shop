@@ -3,63 +3,99 @@ import React, { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { soundEngine } from "@/lib/soundEngine";
 
-const normalizeStr = (s: string) => String(s || "").replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim().toLowerCase();
+// 👑 ۱. تمیزسازی فوق‌حرفه‌ای متن (تبدیل اعداد فارسی، حذف ویرگول هزارگان و استخراج حروف)
+const cleanStr = (s: string) => {
+    if (!s) return "";
+    let s2 = String(s).toLowerCase();
+    s2 = s2.replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776));
+    s2 = s2.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632));
+    s2 = s2.replace(/(\d)[,،.](\d)/g, '$1$2'); // 80,000 -> 80000
+    s2 = s2.replace(/[^\w\s\u0600-\u06FF]/gi, ' ');
+    s2 = s2.replace(/[يى]/g, 'ی').replace(/[كڪ]/g, 'ک');
+    s2 = s2.replace(/[\u200B-\u200D\uFEFF]/g, ' ');
+    return s2.replace(/\s+/g, ' ').trim();
+};
 
-// 👑 الگوریتم قطعی انبارداری (Smart Retail Matcher)
+// 👑 ۲. الگوریتم Sørensen–Dice Coefficient (استاندارد جهانی جستجوی شباهت)
+const getBigrams = (str: string) => {
+    const bg = [];
+    for (let i = 0; i < str.length - 1; i++) bg.push(str.slice(i, i + 2));
+    return bg;
+};
+const diceCoefficient = (s1: string, s2: string) => {
+    if (!s1 || !s2) return 0;
+    if (s1 === s2) return 1;
+    const bg1 = getBigrams(s1);
+    const bg2 = getBigrams(s2);
+    if (!bg1.length || !bg2.length) return 0;
+    let intersection = 0;
+    const bg2Copy = [...bg2];
+    for (let i = 0; i < bg1.length; i++) {
+        const idx = bg2Copy.indexOf(bg1[i]);
+        if (idx !== -1) {
+            intersection++;
+            bg2Copy.splice(idx, 1);
+        }
+    }
+    return (2.0 * intersection) / (bg1.length + bg2.length);
+};
+
+// 👑 ۳. استخراج قطعی توکن‌های مدل (اعداد و حروف انگلیسی مثل w892 یا 30)
+const extractModels = (str: string) => {
+    const tokens = str.match(/[a-z0-9]+/g) || [];
+    return tokens.filter(t => /\d/.test(t) && t.length >= 2);
+};
+
+// 👑 ۴. موتور تطبیق انبارداری (Retail Matcher)
 const findBestMatch = (excelName: string, tgProducts: any[]) => {
-    const exName = normalizeStr(excelName);
-    const exWords = exName.split(/\s+/).filter(w => w.length > 2 && w !== 'مدل' && w !== 'برند' && w !== 'دستگاه');
+    const exClean = cleanStr(excelName);
+    if (!exClean) return null;
     
-    // استخراج تمام اعداد معنادار (مثل 892، 3833، 30، 200)
-    const exNumbers = (exName.match(/\d+/g) || []).filter(n => n.length > 1); 
-    // هسته اصلی کالا (معمولا کلمه اول: مثل پروژکتور، لامپ، پاور)
-    const firstNoun = exWords[0] || "";
-
+    const exModels = extractModels(exClean);
     let bestTg = null;
-    let maxScore = -1;
+    let highestScore = 0;
 
     for (const tg of tgProducts) {
-        const tgDesc = normalizeStr(tg.description);
-        let score = 0;
-        let isValid = true;
+        const tgDesc = tg.description || "";
+        const tgCleanFull = cleanStr(tgDesc);
         
-        // قانون اول: اگر نام اکسل حاوی عدد/مدل است، حتماً باید حداقل یکی از آن اعداد در تلگرام باشد
-        if (exNumbers.length > 0) {
-            const hasNumMatch = exNumbers.some(num => tgDesc.includes(num));
-            if (!hasNumMatch) {
-                isValid = false; // کالا قطعا نامربوط است (مثلا 3834 بجای 3833)
-            } else {
-                score += 500; // امتیاز ویژه برای مچ شدن مدل نامبر
+        // 🔒 قفل امنیتی: اگر نام محصول عدد/مدل دارد (مثل 3834)، تلگرام موظف است آن را داشته باشد!
+        let missingCritical = false;
+        for (const m of exModels) {
+            if (!tgCleanFull.includes(m)) {
+                missingCritical = true;
+                break;
+            }
+        }
+        // اگر حتی یک عدد/مدل مهم در تلگرام نبود، کالا ۱۰۰٪ نامربوط است و رد می‌شود.
+        if (missingCritical) continue; 
+
+        // 🎯 محاسبه شباهت واقعی جملات با الگوریتم دایس
+        let score = 0;
+        if (tgCleanFull.includes(exClean)) {
+            score = 1; // تطابق ۱۰۰ درصدی
+        } else {
+            // مقایسه خط به خط برای پیدا کردن نزدیک‌ترین جمله تلگرام به نام اکسل
+            const lines = tgDesc.split('\n');
+            for (const line of lines) {
+                const lineClean = cleanStr(line);
+                if (!lineClean) continue;
+                const sim = diceCoefficient(exClean, lineClean);
+                if (sim > score) score = sim;
             }
         }
 
-        // قانون دوم: هسته کالا (مثل پروژکتور) باید در تلگرام وجود داشته باشد
-        if (firstNoun && !tgDesc.includes(firstNoun)) {
-            // استثنا: اگر شماره مدل 3 رقمی به بالا دقیقا مچ شد (مثل w892) از نبودن کلمه پروژکتور چشم‌پوشی کن
-            if (!(exNumbers.length > 0 && exNumbers.some(num => tgDesc.includes(num) && num.length >= 3))) {
-                isValid = false; // عکس پاوربانک به پروژکتور نمی‌چسبد
-            }
-        }
-
-        if (!isValid) continue;
-
-        // محاسبه شباهت سایر کلمات برای پیدا کردن بهترین گزینه
-        let wordMatches = 0;
-        for (const w of exWords) {
-            if (tgDesc.includes(w)) wordMatches++;
-        }
-        score += (wordMatches / Math.max(exWords.length, 1)) * 100;
-
-        if (score > maxScore) {
-            maxScore = score;
+        if (score > highestScore) {
+            highestScore = score;
             bestTg = tg;
         }
     }
     
-    return bestTg;
+    // حداقل شباهت ساختاری ۳۵ درصد برای تایید نهایی
+    return highestScore >= 0.35 ? bestTg : null;
 };
 
-// تابع هوشمند برای یافتن فایل عکس حتی اگر ویندوز نام فایل را تغییر داده باشد
+// تابع هوشمند یافتن فایل تصویر
 const findPhotoFile = (photoPath: string, filesArr: File[]) => {
     if (!photoPath) return null;
     const baseName = (photoPath.split("/").pop() || photoPath.split("\\").pop() || "").toLowerCase();
@@ -119,7 +155,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     soundEngine?.playClick?.();
     
     try {
-       setProgress({ current: 0, step: "دریافت اطلاعات سایت..." });
+       setProgress({ current: 0, step: "دریافت اطلاعات دیتابیس..." });
        
        let existingProductsMap = new Map<string, string>();
        try {
@@ -127,7 +163,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
            if (resExisting.ok) {
                const existingJson = await resExisting.json();
                (existingJson.data || []).forEach((p: any) => {
-                   existingProductsMap.set(normalizeStr(p.title), String(p.id));
+                   existingProductsMap.set(cleanStr(p.title), String(p.id));
                });
            }
        } catch (err) {}
@@ -197,7 +233,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                if (!row || !row[colMap.name]) continue;
 
                const productName = String(row[colMap.name]).trim();
-               const cleanProdName = normalizeStr(productName);
+               const exactProdName = cleanStr(productName);
                const buyPrice = Number(String(row[colMap.buyPrice] || "0").replace(/\D/g, ""));
                
                let stock = defaultStock;
@@ -217,12 +253,12 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                if (buyPrice === 0) continue;
                if (onlyAvailable && stock <= 0) { skippedCount++; continue; }
                
-               const existingId = existingProductsMap.get(cleanProdName);
+               const existingId = existingProductsMap.get(exactProdName);
                if (skipExisting && existingId) { skippedCount++; continue; }
 
                setProgress({ current: successCount, step: (existingId ? "آپدیت: " : "ثبت: ") + productName.slice(0,25) + "..." });
                
-               // 🌟 اجرای الگوریتم نهایی پیدا کردن عکس تلگرام
+               // 🌟 استفاده از هوش مصنوعی قفل توکنی (Token Locking AI)
                const matchedTg = findBestMatch(productName, productsMap);
                
                let uploadedUrls: string[] = [];
@@ -271,7 +307,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
                const productPayload: any = {
                    title: productName,
-                   brand: "\u200B", // خنثی کننده قطعی اپل
+                   brand: "\u200B", // ترفند حذف Apple
                    category: fallbackCategory,
                    price: finalPrice,
                    stock: stock,
@@ -300,7 +336,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                        body: JSON.stringify(productPayload)
                    });
                    if (pRes.ok) {
-                       if(!existingId) existingProductsMap.set(cleanProdName, "saved"); 
+                       if(!existingId) existingProductsMap.set(exactProdName, "saved"); 
                        successCount++;
                    }
                } catch (err) {}
@@ -310,7 +346,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
        if (!cancelRef.current) {
            soundEngine?.playSuccess?.();
            setProgress({ current: successCount, step: "عملیات پایان یافت!" });
-           setMessage({ text: "🎉 تمام! " + successCount + " کالا ثبت یا آپدیت شد. (" + skippedCount + " رد شد)", type: "success" });
+           setMessage({ text: "🎉 عالی! " + successCount + " کالا ثبت یا آپدیت شد. (" + skippedCount + " رد شد)", type: "success" });
            if (onImportComplete) setTimeout(() => { window.location.reload(); }, 2500);
        }
 
@@ -346,7 +382,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-sans select-text dir-rtl">
       <div className="w-full max-w-4xl bg-[var(--modal-bg)] rounded-[2rem] shadow-2xl border border-[var(--card-border)] flex flex-col max-h-[96vh]">
         <div className="flex items-center justify-between p-5 border-b border-[var(--card-border)] bg-[var(--modal-bg)] z-10 rounded-t-[2rem]">
-          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت هوشمند تلگرام (تطبیق قطعی با هوش مصنوعی)</h2>
+          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت قطعی و هوشمند (استاندارد جهانی)</h2>
           <div className="flex gap-2">
             {loading && <button type="button" onClick={() => setIsMinimized(true)} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] hover:bg-slate-200 font-black cursor-pointer transition text-slate-600 flex items-center gap-1">➖ مینیمایز</button>}
             {loading && <button type="button" onClick={handleCancel} className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white font-black cursor-pointer transition flex items-center gap-1">⏹ توقف</button>}
@@ -432,7 +468,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
           )}
 
           <button onClick={handleRunImport} disabled={loading} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-xl transition cursor-pointer disabled:opacity-50">
-            {loading ? "در حال پردازش..." : "🚀 شروع ایمپورت هوشمند تلگرام"}
+            {loading ? "در حال پردازش..." : "🚀 شروع ایمپورت قطعی و هوشمند"}
           </button>
         </div>
       </div>

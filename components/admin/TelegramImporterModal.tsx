@@ -3,76 +3,8 @@ import React, { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { soundEngine } from "@/lib/soundEngine";
 
-// پاکسازی متن برای مقایسه دقیق
-const normalizeStr = (s: string) => String(s || "").replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim().toLowerCase();
-
-// الگوریتم امتیازدهی هوشمند (تشخیص هسته کلمه + تشخیص مدل انگلیسی/عددی)
-const findBestMatch = (excelName: string, tgProducts: any[]) => {
-    const exName = normalizeStr(excelName);
-    // فیلتر کردن کلمات زائد که باعث فریب خوردن سیستم می‌شوند
-    const exWords = exName.split(/\s+/).filter(w => w.length > 2 && !['مدل','دستگاه','برند','وات','قوی','فوق','العاده','شارژی','واقعی','دار','تک','دو'].includes(w));
-    
-    let bestTg = null;
-    let maxScore = -999;
-    
-    // کلمه کلیدی اصلی (اولین کلمه معنادار مثل: پروژکتور، پاوربانک، اینورتر)
-    const coreNoun = exWords[0] || "";
-
-    for (const tg of tgProducts) {
-        const tgDesc = normalizeStr(tg.description);
-        let score = 0;
-        
-        if (tgDesc.includes(exName)) score += 1000;
-        
-        let wordMatches = 0;
-        for (const w of exWords) {
-            if (tgDesc.includes(w)) {
-                wordMatches++;
-                score += 10;
-                // اگر کلمه شامل عدد یا حروف انگلیسی باشد (مثل w892 یا 128w)، ارزش بسیار بالایی برای یافتن کالا دارد
-                if (/[a-z0-9]/i.test(w)) {
-                    score += 150;
-                }
-            }
-        }
-        
-        // جریمه سنگین: اگر کلمه اصلی محصول در توضیحات تلگرام نبود، احتمالاً محصول اشتباه است
-        if (coreNoun && !tgDesc.includes(coreNoun)) {
-            score -= 100;
-        }
-
-        score += (wordMatches / Math.max(exWords.length, 1)) * 30;
-        
-        if (score > maxScore) {
-            maxScore = score;
-            bestTg = tg;
-        }
-    }
-    
-    // حداقل امتیاز قابل قبول (باید کلمه کلیدی یا مدل نامبر پیدا شده باشد)
-    return maxScore >= 10 ? bestTg : null;
-};
-
-// حل مشکل پیدا نکردن نام فایل‌ها در صورت تغییر اسم توسط سیستم عامل
-const findPhotoFile = (photoPath: string, filesArr: File[]) => {
-    if (!photoPath) return null;
-    const baseName = (photoPath.split("/").pop() || photoPath.split("\\").pop() || "").toLowerCase();
-    
-    let found = filesArr.find(f => f.name.toLowerCase() === baseName);
-    if (found) return found;
-    
-    const match = baseName.match(/(photo_\d+)/);
-    if (match) {
-        const coreId = match[1];
-        // اولویت با عکس‌های اصلی (نه تصاویر بندانگشتی)
-        found = filesArr.find(f => f.name.toLowerCase().includes(coreId) && !f.name.toLowerCase().includes("thumb"));
-        if (found) return found;
-        
-        found = filesArr.find(f => f.name.toLowerCase().includes(coreId));
-        return found;
-    }
-    return null;
-};
+// تمیز کردن فاصله و حروف برای تطبیق قطعی (Exact Match)
+const exactNormalize = (s: string) => String(s || "").replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim().toLowerCase();
 
 export default function TelegramImporterModal({ onClose, onImportComplete }: any) {
   const [jsonFile, setJsonFile] = useState<File | null>(null);
@@ -123,7 +55,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
            if (resExisting.ok) {
                const existingJson = await resExisting.json();
                (existingJson.data || []).forEach((p: any) => {
-                   existingProductsMap.set(normalizeStr(p.title), String(p.id));
+                   existingProductsMap.set(exactNormalize(p.title), String(p.id));
                });
            }
        } catch (err) {}
@@ -139,7 +71,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
        for (const msg of (tgData.messages || [])) {
            if (msg.type !== "message") continue;
            let textContent = Array.isArray(msg.text) ? msg.text.map((t:any) => typeof t === "string" ? t : t.text).join("") : (msg.text || "");
-           if (textContent.length > 15) {
+           if (textContent.length > 5) {
                currentProduct = { description: textContent, photos: msg.photo ? [msg.photo] : [], date: msg.date_unixtime };
                productsMap.push(currentProduct);
            } else if (msg.photo && currentProduct && Math.abs(msg.date_unixtime - currentProduct.date) < 120) {
@@ -148,6 +80,10 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
        }
 
        const photoFilesArr = Array.from(photoFiles);
+       const photoMap = new Map<string, File>();
+       photoFilesArr.forEach(f => {
+           photoMap.set(f.name.toLowerCase(), f);
+       });
 
        let successCount = 0;
        let skippedCount = 0;
@@ -166,7 +102,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
            const rawData = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
 
            let headerRowIndex = -1;
-           let colMap = { name: -1, buyPrice: -1, stock: -1, shipping: -1 };
+           let colMap = { name: -1, buyPrice: -1, stock: -1, shipping: -1, photo: -1 };
 
            for (let i = 0; i < Math.min(100, rawData.length); i++) {
                if (!rawData[i]) continue;
@@ -180,6 +116,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                    if(colMap.buyPrice === -1) colMap.buyPrice = headers.findIndex((h:any) => h.includes("قیمت"));
                    colMap.stock = headers.findIndex((h:any) => h.includes("موجود"));
                    colMap.shipping = headers.findIndex((h:any) => h.includes("ارسال"));
+                   colMap.photo = headers.findIndex((h:any) => h.includes("عکس") || h.includes("تصویر") || h.includes("photo") || h.includes("image"));
                    break;
                }
            }
@@ -193,7 +130,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                if (!row || !row[colMap.name]) continue;
 
                const productName = String(row[colMap.name]).trim();
-               const cleanProdName = normalizeStr(productName);
+               const exactProdName = exactNormalize(productName);
                const buyPrice = Number(String(row[colMap.buyPrice] || "0").replace(/\D/g, ""));
                
                let stock = defaultStock;
@@ -213,46 +150,69 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                if (buyPrice === 0) continue;
                if (onlyAvailable && stock <= 0) { skippedCount++; continue; }
                
-               const existingId = existingProductsMap.get(cleanProdName);
+               const existingId = existingProductsMap.get(exactProdName);
                if (skipExisting && existingId) { skippedCount++; continue; }
 
                setProgress({ current: successCount, step: (existingId ? "آپدیت: " : "ثبت: ") + productName.slice(0,25) + "..." });
                
-               // 🌟 اجرای الگوریتم پیشرفته یافتن توضیحات و عکس
-               const matchedTg = findBestMatch(productName, productsMap);
-               
                let uploadedUrls: string[] = [];
                let descriptionToUse = productName; 
+               let filesToUpload: File[] = [];
 
-               if (matchedTg) {
-                   descriptionToUse = matchedTg.description || productName;
-                   if (matchedTg.photos && matchedTg.photos.length > 0) {
-                       for (const photoPath of matchedTg.photos) {
-                           if (cancelRef.current) break;
-                           
-                           // یافتن فایل صحیح از پوشه عکس‌ها با هوش مصنوعی
-                           const photoFile = findPhotoFile(photoPath, photoFilesArr);
-                           
-                           if (photoFile) {
-                               const formData = new FormData();
-                               formData.append("file", photoFile);
-                               await new Promise(resolve => setTimeout(resolve, 300));
-                               try {
-                                   const upRes = await fetch("/api/admin/upload", { method: "POST", body: formData });
-                                   if (upRes.ok) {
-                                       const upJson = await upRes.json();
-                                       if (upJson.success && (upJson.rawUrl || upJson.url)) {
-                                           uploadedUrls.push(upJson.rawUrl || upJson.url);
-                                       }
+               // 🌟 روش 1 (استاندارد جهانی): استفاده از ستون عکس در اکسل
+               if (colMap.photo !== -1 && row[colMap.photo]) {
+                   const explicitPhotoName = String(row[colMap.photo]).trim().toLowerCase();
+                   const matchedFile = photoMap.get(explicitPhotoName) || photoMap.get(explicitPhotoName + ".jpg");
+                   if (matchedFile) filesToUpload.push(matchedFile);
+               }
+               
+               // 🌟 روش 2 (تطبیق قطعی از تلگرام): اگر در اکسل ستون عکس نبود، فقط و فقط تطبیق 100 درصدی پذیرفته است
+               if (filesToUpload.length === 0) {
+                   const exactTgMatch = productsMap.find(p => {
+                       const tgDesc = exactNormalize(p.description);
+                       // شرط تطابق قطعی: نام محصول باید عیناً در متن تلگرام باشد
+                       return tgDesc.includes(exactProdName); 
+                   });
+
+                   if (exactTgMatch) {
+                       descriptionToUse = exactTgMatch.description || productName;
+                       if (exactTgMatch.photos && exactTgMatch.photos.length > 0) {
+                           for (const photoPath of exactTgMatch.photos) {
+                               const baseName = (photoPath.split("/").pop() || photoPath.split("\\").pop() || "").toLowerCase();
+                               let foundFile = photoMap.get(baseName);
+                               // اگر با نام مستقیم پیدا نشد، از طریق photo_id جستجو میکنیم
+                               if (!foundFile) {
+                                   const matchId = baseName.match(/(photo_\d+)/);
+                                   if (matchId) {
+                                       foundFile = photoFilesArr.find(f => f.name.toLowerCase().includes(matchId[1]) && !f.name.toLowerCase().includes("thumb"));
                                    }
-                               } catch (err) {}
+                               }
+                               if (foundFile) filesToUpload.push(foundFile);
                            }
                        }
                    }
                }
 
-               const priceWithProfit = buyPrice * (1 + (profitMargin / 100));
-               const finalPrice = Math.ceil(priceWithProfit / 1000) * 1000; 
+               // 🌟 آپلود تصاویر پیدا شده
+               for (const f of filesToUpload) {
+                   if (cancelRef.current) break;
+                   const formData = new FormData();
+                   formData.append("file", f);
+                   await new Promise(resolve => setTimeout(resolve, 300));
+                   try {
+                       const upRes = await fetch("/api/admin/upload", { method: "POST", body: formData });
+                       if (upRes.ok) {
+                           const upJson = await upRes.json();
+                           if (upJson.success && (upJson.rawUrl || upJson.url)) {
+                               uploadedUrls.push(upJson.rawUrl || upJson.url);
+                           }
+                       }
+                   } catch (err) {}
+               }
+
+               if (uploadedUrls.length === 0) uploadedUrls.push("/placeholder.png");
+
+               const finalPrice = Math.ceil((buyPrice * (1 + (profitMargin / 100))) / 1000) * 1000; 
 
                let finalShipping = shippingType;
                if (shippingType === "auto") {
@@ -269,7 +229,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
                const productPayload: any = {
                    title: productName,
-                   brand: "متفرقه", 
+                   brand: "\u200B", // جایگزین قطعی کلمه Apple
                    category: fallbackCategory,
                    price: finalPrice,
                    stock: stock,
@@ -298,7 +258,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                        body: JSON.stringify(productPayload)
                    });
                    if (pRes.ok) {
-                       if(!existingId) existingProductsMap.set(cleanProdName, "saved"); 
+                       if(!existingId) existingProductsMap.set(exactProdName, "saved"); 
                        successCount++;
                    }
                } catch (err) {}
@@ -308,7 +268,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
        if (!cancelRef.current) {
            soundEngine?.playSuccess?.();
            setProgress({ current: successCount, step: "عملیات پایان یافت!" });
-           setMessage({ text: "🎉 عالی! " + successCount + " کالا ثبت یا آپدیت شد. (" + skippedCount + " رد شد)", type: "success" });
+           setMessage({ text: "🎉 تمام! " + successCount + " کالا ثبت یا آپدیت شد. (" + skippedCount + " رد شد)", type: "success" });
            if (onImportComplete) setTimeout(() => { window.location.reload(); }, 2500);
        }
 
@@ -344,7 +304,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-sans select-text dir-rtl">
       <div className="w-full max-w-4xl bg-[var(--modal-bg)] rounded-[2rem] shadow-2xl border border-[var(--card-border)] flex flex-col max-h-[96vh]">
         <div className="flex items-center justify-between p-5 border-b border-[var(--card-border)] bg-[var(--modal-bg)] z-10 rounded-t-[2rem]">
-          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت هوشمند تلگرام (الگوریتم دقیق تطبیق کالا)</h2>
+          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت قطعی و استاندارد (Strict Match)</h2>
           <div className="flex gap-2">
             {loading && <button type="button" onClick={() => setIsMinimized(true)} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] hover:bg-slate-200 font-black cursor-pointer transition text-slate-600 flex items-center gap-1">➖ مینیمایز</button>}
             {loading && <button type="button" onClick={handleCancel} className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white font-black cursor-pointer transition flex items-center gap-1">⏹ توقف</button>}
@@ -401,7 +361,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
               <input type="checkbox" className="hidden" checked={skipExisting} onChange={e => setSkipExisting(e.target.checked)} />
               <span className="font-bold text-xs text-[var(--text-primary)]">
                  اگر محصول در سایت هست، skip کن 
-                 <span className="text-rose-500 mr-1 block sm:inline mt-1 sm:mt-0 bg-rose-500/10 px-2 py-0.5 rounded-lg">(برای آپدیت شدن محصولات قبلی، خاموش بماند)</span>
+                 <span className="text-rose-500 mr-1 block sm:inline mt-1 sm:mt-0 bg-rose-500/10 px-2 py-0.5 rounded-lg">(برای آپدیت تنظیمات، خاموش بماند)</span>
               </span>
             </label>
           </div>
@@ -430,7 +390,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
           )}
 
           <button onClick={handleRunImport} disabled={loading} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-xl transition cursor-pointer disabled:opacity-50">
-            {loading ? "در حال پردازش..." : "🚀 شروع ایمپورت هوشمند تلگرام"}
+            {loading ? "در حال پردازش..." : "🚀 شروع ایمپورت هوشمند"}
           </button>
         </div>
       </div>

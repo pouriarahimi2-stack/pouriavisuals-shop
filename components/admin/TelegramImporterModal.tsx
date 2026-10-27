@@ -3,10 +3,8 @@ import React, { useState } from "react";
 import * as XLSX from "xlsx";
 import { soundEngine } from "@/lib/soundEngine";
 
-// تمیز کردن رشته‌ها برای الگوریتم تطبیق
 const normalizeStr = (s: string) => String(s || "").replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').toLowerCase();
 
-// الگوریتم هوشمند امتیازدهی (Scoring) برای پیدا کردن دقیق‌ترین عکس بدون قاطی شدن
 const findBestMatch = (excelName: string, tgProducts: any[]) => {
     const exName = normalizeStr(excelName);
     const exWords = exName.split(/\s+/).filter(w => w.length > 1 && w !== 'مدل' && w !== 'دستگاه');
@@ -17,26 +15,19 @@ const findBestMatch = (excelName: string, tgProducts: any[]) => {
     for (const tg of tgProducts) {
         const tgDesc = normalizeStr(tg.description);
         let score = 0;
-        
-        // اگر دقیقاً کل نام محصول در متن تلگرام بود، امتیاز فوق‌العاده بالا می‌گیرد
         if (tgDesc.includes(exName)) score += 100;
         
-        // بررسی کلمه به کلمه برای پیدا کردن مشابه‌ترین محصول
         let wordMatches = 0;
         for (const w of exWords) {
             if (tgDesc.includes(w)) wordMatches++;
         }
-        
         score += (wordMatches / exWords.length) * 50;
         
-        // پیدا کردن بالاترین امتیاز
         if (score > maxScore) {
             maxScore = score;
             bestTg = tg;
         }
     }
-    
-    // اگر حداقل مقداری شباهت داشت (امتیاز بالای 20)، آن را قبول می‌کند تا عکس از دست نرود
     return maxScore > 20 ? bestTg : null;
 };
 
@@ -48,8 +39,8 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
   const [profitMargin, setProfitMargin] = useState(25);
   const [defaultStock, setDefaultStock] = useState(10);
   const [globalCategory, setGlobalCategory] = useState("");
-  
   const [shippingType, setShippingType] = useState("auto");
+  
   const [onlyAvailable, setOnlyAvailable] = useState(true);
   const [skipExisting, setSkipExisting] = useState(true);
 
@@ -77,9 +68,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                const existingJson = await resExisting.json();
                existingTitles = new Set((existingJson.data || []).map((p: any) => normalizeStr(p.title)));
            }
-       } catch (err) {
-           console.warn("Fetch Existing Error:", err);
-       }
+       } catch (err) {}
 
        setProgress({ current: 0, step: "در حال پردازش هوشمند فایل تلگرام..." });
        const jsonText = await jsonFile.text();
@@ -110,7 +99,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
            const file = excelFiles[e];
            const fallbackCategory = globalCategory || file.name.split("-")[0].split("_")[0].trim() || "عمومی";
            
-           setProgress({ current: successCount, step: "در حال خواندن فایل اکسل: " + file.name });
+           setProgress({ current: successCount, step: "در حال خواندن اکسل: " + file.name });
            
            const buffer = await file.arrayBuffer();
            const workbook = XLSX.read(buffer, { type: "array" });
@@ -144,16 +133,19 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                const productName = String(row[colMap.name]).trim();
                const cleanProdName = normalizeStr(productName);
                const buyPrice = Number(String(row[colMap.buyPrice] || "0").replace(/\D/g, ""));
-               const stock = colMap.stock !== -1 ? Number(String(row[colMap.stock] || String(defaultStock)).replace(/\D/g, "")) : defaultStock;
-               const rowShipping = colMap.shipping !== -1 ? String(row[colMap.shipping] || "both") : "both";
+               
+               // 🌟 اعمال قطعی موجودی پیش‌فرض (اگر سلول اکسل خالی بود، مقدار شما را می‌خواند)
+               let stock = defaultStock;
+               if (colMap.stock !== -1 && row[colMap.stock] !== undefined && String(row[colMap.stock]).trim() !== "") {
+                   const parsed = Number(String(row[colMap.stock]).replace(/\D/g, ""));
+                   if (!isNaN(parsed)) stock = parsed;
+               }
 
                if (buyPrice === 0) continue;
                if (onlyAvailable && stock <= 0) { skippedCount++; continue; }
                if (skipExisting && existingTitles.has(cleanProdName)) { skippedCount++; continue; }
 
                setProgress({ current: successCount, step: "پردازش: " + productName.slice(0,25) + "..." });
-               
-               // 🌟 استفاده از الگوریتم جدید امتیازدهی برای پیدا کردن دقیق‌ترین عکس
                const matchedTg = findBestMatch(productName, productsMap);
                
                let uploadedUrls: string[] = [];
@@ -184,23 +176,34 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                    }
                }
 
-               if (uploadedUrls.length === 0) {
-                   uploadedUrls.push("/placeholder.png");
-               }
+               if (uploadedUrls.length === 0) uploadedUrls.push("/placeholder.png");
 
-               const priceWithProfit = buyPrice * (1 + (profitMargin / 100));
-               const finalPrice = Math.ceil((priceWithProfit * 1.10) / 1000) * 1000; 
+               // 🌟 فرمول قیمت اصلاح شد: فقط و فقط درصد سودی که کاربر وارد کرده اعمال می‌شود (مالیات مخفی 1.10 حذف شد)
+               const finalPrice = Math.ceil((buyPrice * (1 + (profitMargin / 100))) / 1000) * 1000; 
+
+               // 🌟 اعمال قطعی نوع ارسال (آکبند کردن داده بر اساس درخواست شما)
+               let finalShipping = shippingType;
+               if (shippingType === "auto") {
+                   if (colMap.shipping !== -1 && row[colMap.shipping] !== undefined) {
+                       const strShip = String(row[colMap.shipping]).trim();
+                       if (strShip.includes("پست") && strShip.includes("تیپاکس")) finalShipping = "both";
+                       else if (strShip.includes("پست")) finalShipping = "post";
+                       else if (strShip.includes("تیپاکس")) finalShipping = "tipax";
+                       else finalShipping = "both";
+                   } else {
+                       finalShipping = "both";
+                   }
+               }
 
                const productPayload = {
                    title: productName,
-                   // 🌟 ارسال کلمه نامرئی (Zero Width Space) برای دور زدن باگ Apple در دیتابیس
-                   brand: "\u200B", 
+                   brand: "\u200B", // حذف اپل
                    category: fallbackCategory,
                    price: finalPrice,
                    stock: stock,
                    is_available: stock > 0,
                    description: descriptionToUse,
-                   shipping_type: shippingType === "auto" ? rowShipping : shippingType,
+                   shipping_type: finalShipping, // ثبت دقیق سیستم ارسال
                    image: uploadedUrls[0],
                    images: uploadedUrls
                };
@@ -217,15 +220,13 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                        existingTitles.add(cleanProdName); 
                        successCount++;
                    }
-               } catch (err) {
-                   console.warn("Insert error:", err);
-               }
+               } catch (err) {}
            }
        }
 
        soundEngine?.playSuccess?.();
        setProgress({ current: successCount, step: "عملیات با موفقیت پایان یافت!" });
-       setMessage({ text: "🎉 تمام شد! " + successCount + " کالا دقیقاً با عکس مچ شد. (" + skippedCount + " اسکیپ شد)", type: "success" });
+       setMessage({ text: "🎉 تمام شد! " + successCount + " کالا ثبت شد. (" + skippedCount + " اسکیپ شد)", type: "success" });
        if (onImportComplete) setTimeout(() => { window.location.reload(); }, 2500);
 
     } catch (err: any) {
@@ -239,7 +240,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-sans select-text dir-rtl">
       <div className="w-full max-w-4xl bg-[var(--modal-bg)] rounded-[2rem] shadow-2xl border border-[var(--card-border)] flex flex-col max-h-[96vh]">
         <div className="flex items-center justify-between p-5 border-b border-[var(--card-border)] bg-[var(--modal-bg)] z-10 rounded-t-[2rem]">
-          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت هوشمند تلگرام (تطبیق عکس ۱۰۰٪ و بدون Apple)</h2>
+          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت هوشمند تلگرام (احترام ۱۰۰٪ به تنظیمات کاربر)</h2>
           {!loading && <button type="button" onClick={onClose} className="p-2 rounded-xl bg-[var(--input-bg)] font-black cursor-pointer hover:bg-rose-500 hover:text-white transition">✕</button>}
         </div>
         
@@ -251,8 +252,8 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
           )}
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div><label className="block font-bold mb-1.5">موجودی پیش‌فرض:</label><input type="number" value={defaultStock} onChange={e=>setDefaultStock(Number(e.target.value))} className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono" /></div>
-            <div><label className="block font-bold mb-1.5">درصد سود (+مالیات):</label><input type="number" value={profitMargin} onChange={e=>setProfitMargin(Number(e.target.value))} className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono" /></div>
+            <div><label className="block font-bold mb-1.5">موجودی پیش‌فرض:</label><input type="number" value={defaultStock} onChange={e=>setDefaultStock(Number(e.target.value))} className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--accent-blue)]" /></div>
+            <div><label className="block font-bold mb-1.5">درصد سود (+مالیات):</label><input type="number" value={profitMargin} onChange={e=>setProfitMargin(Number(e.target.value))} className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-emerald-500" /></div>
             <div><label className="block font-bold mb-1.5">دسته‌بندی کلی (اختیاری):</label><input type="text" value={globalCategory} onChange={e=>setGlobalCategory(e.target.value)} placeholder="مثال: کمپینگ" className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none" /></div>
           </div>
 

@@ -3,93 +3,12 @@ import React, { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { soundEngine } from "@/lib/soundEngine";
 
-// 👑 ۱. نرمال‌سازی و استخراج دقیق کلمات (جداسازی قطعی اعداد از حروف)
-const normalizeToWords = (str: string) => {
-    let s = String(str || "").toLowerCase();
-    s = s.replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 1776));
-    s = s.replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 1632));
-    s = s.replace(/[^a-z0-9\u0600-\u06FF]/ig, ' ');
-    s = s.replace(/([0-9]+)/g, ' $1 '); // اعداد کاملا جدا می‌شوند
-    return s.split(/\s+/).filter(w => w.length > 1 || /^[0-9]$/.test(w));
-};
-
-// 👑 ۲. الگوریتم استاندارد انبارداری (Token Locking AI)
-const findBestMatch = (excelName: string, tgProducts: any[]) => {
-    const exWords = normalizeToWords(excelName);
-    const exNumbers = exWords.filter(w => /^[0-9]+$/.test(w)); // استخراج مدل‌ها و ظرفیت‌ها (مثل 3834 و 200)
-    const mainNoun = exWords.find(w => /^[\u0600-\u06FF]+$/.test(w)); // هسته کالا (مثل پروژکتور)
-
-    let bestTg = null;
-    let maxScore = 0;
-
-    for (const tg of tgProducts) {
-        const tgWords = normalizeToWords(tg.description);
-        
-        // 🔒 قانون اول: تمام اعداد اکسل باید دقیقاً در تلگرام باشند
-        let missingNum = false;
-        for (const num of exNumbers) {
-            if (!tgWords.includes(num)) {
-                missingNum = true; 
-                break;
-            }
-        }
-        if (missingNum) continue; // محال است 200 با 20000 مچ شود!
-
-        // 🔒 قانون دوم: هسته اصلی کالا باید یکی باشد
-        if (mainNoun && !tgWords.includes(mainNoun)) {
-            continue; // پروژکتور با پاوربانک مچ نمی‌شود
-        }
-
-        // بررسی تطابق ۱۰۰ درصدی (Exact Substring)
-        const exStr = exWords.join(" ");
-        const tgStr = tgWords.join(" ");
-        if (tgStr.includes(exStr)) {
-            return tg;
-        }
-
-        // 🎯 قانون سوم: محاسبه پوشش کلمات
-        let matchCount = 0;
-        for (const w of exWords) {
-            if (tgWords.includes(w)) matchCount++;
-        }
-        const coverage = matchCount / exWords.length;
-        
-        // ⚖️ قانون چهارم: جریمه کلمات متضاد (تک در برابر دو)
-        let penalty = 0;
-        if (exWords.includes("تک") && !tgWords.includes("تک")) penalty += 0.5;
-        if (exWords.includes("دو") && !tgWords.includes("دو")) penalty += 0.5;
-        if (exWords.includes("سه") && !tgWords.includes("سه")) penalty += 0.5;
-        
-        const finalScore = coverage - penalty;
-
-        if (finalScore > maxScore && finalScore >= 0.5) {
-            maxScore = finalScore;
-            bestTg = tg;
-        }
-    }
-    return bestTg;
-};
-
-// تابع هوشمند یافتن فایل تصویر از پوشه
-const findPhotoFile = (photoPath: string, filesArr: File[]) => {
-    if (!photoPath) return null;
-    const baseName = (photoPath.split("/").pop() || photoPath.split("\\").pop() || "").toLowerCase();
-    
-    let found = filesArr.find(f => f.name.toLowerCase() === baseName);
-    if (found) return found;
-    
-    const match = baseName.match(/(photo_\d+)/);
-    if (match) {
-        const coreId = match[1];
-        found = filesArr.find(f => f.name.toLowerCase().includes(coreId) && !f.name.toLowerCase().includes("thumb"));
-        if (found) return found;
-        found = filesArr.find(f => f.name.toLowerCase().includes(coreId));
-        return found;
-    }
-    return null;
-};
+const normalizeStr = (s: string) => String(s || "").replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim().toLowerCase();
 
 export default function TelegramImporterModal({ onClose, onImportComplete }: any) {
+  // 🌟 استیت‌های کنترل مراحل
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  
   const [jsonFile, setJsonFile] = useState<File | null>(null);
   const [excelFiles, setExcelFiles] = useState<FileList | null>(null);
   const [photoFiles, setPhotoFiles] = useState<FileList | null>(null);
@@ -97,84 +16,60 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
   const [profitMargin, setProfitMargin] = useState(25);
   const [defaultStock, setDefaultStock] = useState(10);
   const [globalCategory, setGlobalCategory] = useState("");
-  
-  const [stockMode, setStockMode] = useState("from_file");
   const [shippingType, setShippingType] = useState("auto");
   
   const [onlyAvailable, setOnlyAvailable] = useState(true);
   const [skipExisting, setSkipExisting] = useState(false);
 
+  // 🌟 استیت‌های مربوط به گام ۲ (Visual Mapper)
+  const [parsedRows, setParsedRows] = useState<any[]>([]);
+  const [photoFilesArr, setPhotoFilesArr] = useState<File[]>([]);
+  const [galleryOpenFor, setGalleryOpenFor] = useState<number | null>(null); // شماره ردیفی که کاربر در حال تغییر عکس آن است
+
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, step: "آماده شروع..." });
   const [message, setMessage] = useState<{ text: string, type: "success" | "error" } | null>(null);
-
   const [isMinimized, setIsMinimized] = useState(false);
   const cancelRef = useRef(false);
 
-  const handleCancel = () => {
-      cancelRef.current = true;
-      setMessage({ text: "⚠️ عملیات ایمپورت متوقف شد.", type: "error" });
-      setLoading(false);
-      setIsMinimized(false);
-  };
-
-  const handleRunImport = async () => {
-    if (!jsonFile || !excelFiles || excelFiles.length === 0 || !photoFiles || photoFiles.length === 0) {
-       setMessage({ text: "⚠️ لطفاً فایل تلگرام، فایل‌های اکسل و پوشه عکس‌ها را انتخاب کنید.", type: "error" });
+  // 👑 پردازش اولیه و تولید لیست برای بازبینی (گام ۱ به ۲)
+  const handlePrepareData = async () => {
+    if (!excelFiles || excelFiles.length === 0 || !photoFiles || photoFiles.length === 0) {
+       setMessage({ text: "⚠️ لطفاً حداقل فایل اکسل و پوشه عکس‌ها را انتخاب کنید.", type: "error" });
        return;
     }
     
-    setLoading(true);
-    setMessage(null);
-    cancelRef.current = false;
-    soundEngine?.playClick?.();
+    setLoading(true); setMessage(null); soundEngine?.playClick?.();
     
     try {
-       setProgress({ current: 0, step: "دریافت اطلاعات دیتابیس..." });
-       
-       let existingProductsMap = new Map<string, string>();
-       try {
-           const resExisting = await fetch("/api/products", { cache: "no-store", headers: { "Connection": "keep-alive" } });
-           if (resExisting.ok) {
-               const existingJson = await resExisting.json();
-               (existingJson.data || []).forEach((p: any) => {
-                   existingProductsMap.set(String(p.title).trim().toLowerCase(), String(p.id));
-               });
-           }
-       } catch (err) {}
+       setProgress({ current: 0, step: "در حال پردازش فایل‌ها برای پیش‌نمایش..." });
+       const photosArray = Array.from(photoFiles);
+       setPhotoFilesArr(photosArray);
 
-       if (cancelRef.current) return;
-
-       setProgress({ current: 0, step: "پردازش فایل تلگرام..." });
-       const jsonText = await jsonFile.text();
-       const tgData = JSON.parse(jsonText);
-       
-       const productsMap: any[] = [];
-       let currentProduct: any = null;
-       for (const msg of (tgData.messages || [])) {
-           if (msg.type !== "message") continue;
-           let textContent = Array.isArray(msg.text) ? msg.text.map((t:any) => typeof t === "string" ? t : t.text).join("") : (msg.text || "");
-           if (textContent.length > 5) {
-               currentProduct = { description: textContent, photos: msg.photo ? [msg.photo] : [], date: msg.date_unixtime };
-               productsMap.push(currentProduct);
-           } else if (msg.photo && currentProduct && Math.abs(msg.date_unixtime - currentProduct.date) < 120) {
-               currentProduct.photos.push(msg.photo);
-           }
+       // استخراج دیتای تلگرام (اگر کاربر داده باشد، برای حدس اولیه استفاده می‌شود)
+       let tgProducts: any[] = [];
+       if (jsonFile) {
+           try {
+               const jsonText = await jsonFile.text();
+               const tgData = JSON.parse(jsonText);
+               let currentProduct: any = null;
+               for (const msg of (tgData.messages || [])) {
+                   if (msg.type !== "message") continue;
+                   let textContent = Array.isArray(msg.text) ? msg.text.map((t:any) => typeof t === "string" ? t : t.text).join("") : (msg.text || "");
+                   if (textContent.length > 5) {
+                       currentProduct = { description: textContent, photos: msg.photo ? [msg.photo] : [], date: msg.date_unixtime };
+                       tgProducts.push(currentProduct);
+                   } else if (msg.photo && currentProduct && Math.abs(msg.date_unixtime - currentProduct.date) < 120) {
+                       currentProduct.photos.push(msg.photo);
+                   }
+               }
+           } catch (e) { console.warn("JSON Parse error", e); }
        }
 
-       const photoFilesArr = Array.from(photoFiles);
+       let allExtractedRows: any[] = [];
 
-       let successCount = 0;
-       let skippedCount = 0;
-
-       for (let e=0; e<excelFiles.length; e++) {
-           if (cancelRef.current) break;
-
+       for (let e = 0; e < excelFiles.length; e++) {
            const file = excelFiles[e];
-           const fallbackCategory = globalCategory || file.name.split("-")[0].split("_")[0].trim() || "عمومی";
-           
-           setProgress({ current: successCount, step: "پردازش اکسل: " + file.name });
-           
            const buffer = await file.arrayBuffer();
            const workbook = XLSX.read(buffer, { type: "array" });
            const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -199,11 +94,9 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                }
            }
 
-           if (headerRowIndex === -1 || colMap.name === -1 || colMap.buyPrice === -1) continue;
+           if (headerRowIndex === -1) continue;
 
            for (let i = headerRowIndex + 1; i < rawData.length; i++) {
-               if (cancelRef.current) break;
-
                const row = rawData[i];
                if (!row || !row[colMap.name]) continue;
 
@@ -211,57 +104,18 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                const buyPrice = Number(String(row[colMap.buyPrice] || "0").replace(/\D/g, ""));
                
                let stock = defaultStock;
-               if (stockMode === "from_file" && colMap.stock !== -1) {
-                   const rawStock = row[colMap.stock];
-                   if (rawStock !== undefined && rawStock !== null) {
-                       const sStr = String(rawStock).trim();
-                       if (sStr.includes("ناموجود") || sStr.includes("اتمام") || sStr === "0") {
-                           stock = 0;
-                       } else {
-                           const parsed = Number(sStr.replace(/\D/g, ""));
-                           if (!isNaN(parsed) && parsed > 0) stock = parsed;
-                       }
+               if (colMap.stock !== -1 && row[colMap.stock] !== undefined) {
+                   const sStr = String(row[colMap.stock]).trim();
+                   if (sStr.includes("ناموجود") || sStr.includes("اتمام") || sStr === "0") {
+                       stock = 0;
+                   } else {
+                       const parsed = Number(sStr.replace(/\D/g, ""));
+                       if (!isNaN(parsed) && parsed > 0) stock = parsed;
                    }
                }
 
                if (buyPrice === 0) continue;
-               if (onlyAvailable && stock <= 0) { skippedCount++; continue; }
-               
-               const existingId = existingProductsMap.get(productName.toLowerCase());
-               if (skipExisting && existingId) { skippedCount++; continue; }
-
-               setProgress({ current: successCount, step: (existingId ? "آپدیت: " : "ثبت: ") + productName.slice(0,25) + "..." });
-               
-               // 🌟 اجرای الگوریتم قفل‌دار قطعی
-               const matchedTg = findBestMatch(productName, productsMap);
-               
-               let uploadedUrls: string[] = [];
-               let descriptionToUse = productName; 
-
-               if (matchedTg) {
-                   descriptionToUse = matchedTg.description || productName;
-                   if (matchedTg.photos && matchedTg.photos.length > 0) {
-                       for (const photoPath of matchedTg.photos) {
-                           if (cancelRef.current) break;
-                           
-                           const photoFile = findPhotoFile(photoPath, photoFilesArr);
-                           if (photoFile) {
-                               const formData = new FormData();
-                               formData.append("file", photoFile);
-                               await new Promise(resolve => setTimeout(resolve, 200));
-                               try {
-                                   const upRes = await fetch("/api/admin/upload", { method: "POST", body: formData });
-                                   if (upRes.ok) {
-                                       const upJson = await upRes.json();
-                                       if (upJson.success && (upJson.rawUrl || upJson.url)) {
-                                           uploadedUrls.push(upJson.rawUrl || upJson.url);
-                                       }
-                                   }
-                               } catch (err) {}
-                           }
-                       }
-                   }
-               }
+               if (onlyAvailable && stock <= 0) continue;
 
                const priceWithProfit = buyPrice * (1 + (profitMargin / 100));
                const finalPrice = Math.ceil(priceWithProfit / 1000) * 1000; 
@@ -279,56 +133,164 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                    }
                }
 
-               const productPayload: any = {
-                   title: productName,
-                   brand: "\u200B", // خنثی کننده قطعی اپل
-                   category: fallbackCategory,
-                   price: finalPrice,
-                   stock: stock,
-                   is_available: stock > 0,
-                   description: descriptionToUse,
-                   shipping_type: finalShipping
-               };
+               // 🤖 حدس اولیه عکس (اگر جیسون تلگرام باشد)
+               let guessedFile: File | null = null;
+               let guessedDesc = productName;
                
-               if (uploadedUrls.length > 0) {
-                   productPayload.image = uploadedUrls[0];
-                   productPayload.images = uploadedUrls;
-               } else if (!existingId) {
-                   productPayload.image = "/placeholder.png";
-                   productPayload.images = ["/placeholder.png"];
+               if (tgProducts.length > 0) {
+                   const exClean = normalizeStr(productName);
+                   let bestMatch = null;
+                   let maxScore = 0;
+                   // یک جستجوی ساده برای حدس اولیه
+                   for (const tg of tgProducts) {
+                       const tgDesc = normalizeStr(tg.description);
+                       if (tgDesc.includes(exClean)) { bestMatch = tg; break; } // Exact match
+                       const words = exClean.split(/\s+/).filter(w => w.length > 2);
+                       let hits = 0;
+                       for (const w of words) { if (tgDesc.includes(w)) hits++; }
+                       if (hits > maxScore) { maxScore = hits; bestMatch = tg; }
+                   }
+
+                   if (bestMatch && maxScore >= 2) {
+                       guessedDesc = bestMatch.description || productName;
+                       if (bestMatch.photos && bestMatch.photos.length > 0) {
+                           const pPath = bestMatch.photos[0];
+                           const bName = (pPath.split("/").pop() || pPath.split("\\").pop() || "").toLowerCase();
+                           
+                           guessedFile = photosArray.find(f => f.name.toLowerCase() === bName) || null;
+                           if (!guessedFile) {
+                               const matchId = bName.match(/(photo_\d+)/);
+                               if (matchId) {
+                                   guessedFile = photosArray.find(f => f.name.toLowerCase().includes(matchId[1]) && !f.name.toLowerCase().includes("thumb")) || null;
+                               }
+                           }
+                       }
+                   }
                }
 
-               if (existingId) productPayload.id = existingId;
-
-               await new Promise(resolve => setTimeout(resolve, 250));
-               if (cancelRef.current) break;
-
-               try {
-                   const pRes = await fetch("/api/admin/products", {
-                       method: "POST",
-                       headers: { "Content-Type": "application/json" },
-                       body: JSON.stringify(productPayload)
-                   });
-                   if (pRes.ok) {
-                       if(!existingId) existingProductsMap.set(productName.toLowerCase(), "saved"); 
-                       successCount++;
-                   }
-               } catch (err) {}
+               allExtractedRows.push({
+                   title: productName,
+                   price: finalPrice,
+                   stock: stock,
+                   shipping_type: finalShipping,
+                   category: globalCategory || file.name.split("-")[0].split("_")[0].trim() || "عمومی",
+                   description: guessedDesc,
+                   matchedFile: guessedFile // 🌟 فایلی که بعداً در UI قابل ویرایش است
+               });
            }
        }
 
-       if (!cancelRef.current) {
-           soundEngine?.playSuccess?.();
-           setProgress({ current: successCount, step: "عملیات پایان یافت!" });
-           setMessage({ text: "🎉 عالی! " + successCount + " کالا دقیق و قطعی ثبت شد. (" + skippedCount + " رد شد)", type: "success" });
-           if (onImportComplete) setTimeout(() => { window.location.reload(); }, 2500);
-       }
+       setParsedRows(allExtractedRows);
+       setStep(2); // رفتن به گام بررسی چشمی
+       soundEngine?.playSuccess?.();
 
     } catch (err: any) {
-       if (!cancelRef.current) setMessage({ text: "❌ خطای شبکه: " + err.message, type: "error" });
+       setMessage({ text: "❌ خطا در پردازش فایل‌ها: " + err.message, type: "error" });
     } finally {
        setLoading(false);
     }
+  };
+
+  // 👑 گام ۳: ایمپورت نهایی قطعی بر اساس مپینگ انجام شده توسط کاربر
+  const handleFinalImport = async () => {
+      setLoading(true);
+      setStep(3);
+      cancelRef.current = false;
+      let successCount = 0;
+      let skippedCount = 0;
+
+      try {
+          setProgress({ current: 0, step: "دریافت دیتابیس برای جلوگیری از تکرار..." });
+          let existingProductsMap = new Map<string, string>();
+          try {
+              const resExisting = await fetch("/api/products", { cache: "no-store" });
+              if (resExisting.ok) {
+                  const existingJson = await resExisting.json();
+                  (existingJson.data || []).forEach((p: any) => {
+                      existingProductsMap.set(normalizeStr(p.title), String(p.id));
+                  });
+              }
+          } catch (err) {}
+
+          for (let i = 0; i < parsedRows.length; i++) {
+              if (cancelRef.current) break;
+              const row = parsedRows[i];
+              
+              const cleanProdName = normalizeStr(row.title);
+              const existingId = existingProductsMap.get(cleanProdName);
+              
+              if (skipExisting && existingId) {
+                  skippedCount++; continue;
+              }
+
+              setProgress({ current: successCount, step: "در حال آپلود: " + row.title.slice(0, 25) + "..." });
+
+              let finalImageUrl = "/placeholder.png";
+              let imagesArr = ["/placeholder.png"];
+
+              // آپلود عکسی که تایید یا به صورت دستی انتخاب شده است
+              if (row.matchedFile) {
+                  const formData = new FormData();
+                  formData.append("file", row.matchedFile);
+                  await new Promise(resolve => setTimeout(resolve, 200));
+                  try {
+                      const upRes = await fetch("/api/admin/upload", { method: "POST", body: formData });
+                      if (upRes.ok) {
+                          const upJson = await upRes.json();
+                          if (upJson.success && (upJson.rawUrl || upJson.url)) {
+                              finalImageUrl = upJson.rawUrl || upJson.url;
+                              imagesArr = [finalImageUrl];
+                          }
+                      }
+                  } catch (err) {}
+              }
+
+              const productPayload: any = {
+                  title: row.title,
+                  brand: "\u200B", // دور زدن باگ Apple
+                  category: row.category,
+                  price: row.price,
+                  stock: row.stock,
+                  is_available: row.stock > 0,
+                  description: row.description,
+                  shipping_type: row.shipping_type,
+                  image: finalImageUrl,
+                  images: imagesArr
+              };
+
+              if (existingId) productPayload.id = existingId;
+
+              await new Promise(resolve => setTimeout(resolve, 200));
+              if (cancelRef.current) break;
+
+              try {
+                  const pRes = await fetch("/api/admin/products", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(productPayload)
+                  });
+                  if (pRes.ok) successCount++;
+              } catch (err) {}
+          }
+
+          if (!cancelRef.current) {
+              soundEngine?.playSuccess?.();
+              setProgress({ current: successCount, step: "عملیات پایان یافت!" });
+              setMessage({ text: "🎉 عالی! " + successCount + " کالا ثبت شد. (" + skippedCount + " رد شد)", type: "success" });
+              if (onImportComplete) setTimeout(() => { window.location.reload(); }, 2500);
+          }
+      } catch (err: any) {
+          if (!cancelRef.current) setMessage({ text: "❌ خطای شبکه: " + err.message, type: "error" });
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  const handleCancel = () => {
+      cancelRef.current = true;
+      setMessage({ text: "⚠️ عملیات متوقف شد.", type: "error" });
+      setLoading(false);
+      setIsMinimized(false);
   };
 
   if (isMinimized) {
@@ -342,7 +304,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                   </div>
               </div>
               <div className="text-[10px] font-bold text-[var(--text-secondary)] truncate">{progress.step}</div>
-              <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div className="h-full bg-emerald-500 animate-pulse w-full"></div>
               </div>
               <div className="text-xs font-black text-center text-[var(--accent-blue)]">
@@ -353,97 +315,181 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-sans select-text dir-rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-sans select-text dir-rtl transition-all">
+      
+      {/* 👑 گالری انتخاب دستی عکس (Visual Mapper Picker) */}
+      {galleryOpenFor !== null && (
+          <div className="fixed inset-0 z-[60] bg-black/90 flex flex-col p-4 sm:p-10 animate-fadeIn" onClick={() => setGalleryOpenFor(null)}>
+              <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-white font-black">یک عکس را برای این محصول انتخاب کنید:</h3>
+                  <button className="text-rose-500 font-black p-2 bg-white/10 rounded-xl hover:bg-white/20">انصراف (✕)</button>
+              </div>
+              <div className="flex-1 overflow-y-auto grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4 content-start" onClick={e => e.stopPropagation()}>
+                  {/* دکمه عکس خالی */}
+                  <div 
+                     onClick={() => {
+                         setParsedRows(prev => { const arr = [...prev]; arr[galleryOpenFor].matchedFile = null; return arr; });
+                         setGalleryOpenFor(null);
+                     }}
+                     className="aspect-square bg-slate-800 rounded-2xl flex flex-col items-center justify-center cursor-pointer border-2 border-transparent hover:border-slate-500 transition text-slate-400">
+                     <span className="text-3xl mb-2">🚫</span>
+                     <span className="text-[10px] font-bold">بدون عکس</span>
+                  </div>
+                  {/* رندر تمام عکس‌های آپلود شده */}
+                  {photoFilesArr.map((f, idx) => (
+                      <div key={idx} 
+                          onClick={() => {
+                              setParsedRows(prev => { const arr = [...prev]; arr[galleryOpenFor].matchedFile = f; return arr; });
+                              setGalleryOpenFor(null);
+                          }}
+                          className="relative aspect-square rounded-2xl overflow-hidden cursor-pointer border-2 border-transparent hover:border-[var(--accent-blue)] transition">
+                          <img src={URL.createObjectURL(f)} className="w-full h-full object-cover bg-white" alt="تصویر" />
+                          <div className="absolute bottom-0 inset-x-0 bg-black/60 p-1 text-[8px] text-white truncate text-center" dir="ltr">{f.name}</div>
+                      </div>
+                  ))}
+              </div>
+          </div>
+      )}
+
       <div className="w-full max-w-4xl bg-[var(--modal-bg)] rounded-[2rem] shadow-2xl border border-[var(--card-border)] flex flex-col max-h-[96vh]">
         <div className="flex items-center justify-between p-5 border-b border-[var(--card-border)] bg-[var(--modal-bg)] z-10 rounded-t-[2rem]">
-          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت قطعی و دقیق (Token Locking)</h2>
+          <h2 className="font-black text-sm text-emerald-500">
+              {step === 1 ? "🤖 مرحله ۱: انتخاب فایل‌ها و تنظیمات" : step === 2 ? "👀 مرحله ۲: تایید و اصلاح چشمی عکس‌ها (Visual Mapper)" : "⏳ مرحله ۳: در حال ایمپورت..."}
+          </h2>
           <div className="flex gap-2">
-            {loading && <button type="button" onClick={() => setIsMinimized(true)} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] hover:bg-slate-200 font-black cursor-pointer transition text-slate-600 flex items-center gap-1">➖ مینیمایز</button>}
-            {loading && <button type="button" onClick={handleCancel} className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white font-black cursor-pointer transition flex items-center gap-1">⏹ توقف</button>}
+            {step === 3 && loading && <button type="button" onClick={() => setIsMinimized(true)} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] font-black cursor-pointer transition text-slate-600">➖ مینیمایز</button>}
+            {step === 3 && loading && <button type="button" onClick={handleCancel} className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white font-black cursor-pointer transition">⏹ توقف</button>}
             {!loading && <button type="button" onClick={onClose} className="p-2 rounded-xl bg-[var(--input-bg)] font-black cursor-pointer hover:bg-rose-500 hover:text-white transition">✕</button>}
           </div>
         </div>
         
-        <div className="p-6 space-y-6 text-xs overflow-y-auto flex-1">
+        <div className="p-6 space-y-6 text-xs overflow-y-auto flex-1 relative">
           {message && (
             <div className={"p-4 rounded-2xl font-bold border " + (message.type === "error" ? "bg-rose-500/10 text-rose-500 border-rose-500/30" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/30")}>
               {message.text}
             </div>
           )}
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-            <div><label className="block font-bold mb-1.5">موجودی پیش‌فرض:</label><input type="number" value={defaultStock} onChange={e=>setDefaultStock(Number(e.target.value))} className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--accent-blue)]" /></div>
-            <div><label className="block font-bold mb-1.5">درصد سود (+مالیات):</label><input type="number" value={profitMargin} onChange={e=>setProfitMargin(Number(e.target.value))} className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-emerald-500" /></div>
-            <div><label className="block font-bold mb-1.5">دسته‌بندی کلی (اختیاری):</label><input type="text" value={globalCategory} onChange={e=>setGlobalCategory(e.target.value)} placeholder="مثال: روشنایی" className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none" /></div>
-          </div>
+          {/* ══════════ گام ۱: تنظیمات ══════════ */}
+          {step === 1 && (
+              <>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                    <div><label className="block font-bold mb-1.5">موجودی پیش‌فرض:</label><input type="number" value={defaultStock} onChange={e=>setDefaultStock(Number(e.target.value))} className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--accent-blue)]" /></div>
+                    <div><label className="block font-bold mb-1.5">درصد سود (+مالیات):</label><input type="number" value={profitMargin} onChange={e=>setProfitMargin(Number(e.target.value))} className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-emerald-500" /></div>
+                    <div><label className="block font-bold mb-1.5">دسته‌بندی کلی (اختیاری):</label><input type="text" value={globalCategory} onChange={e=>setGlobalCategory(e.target.value)} placeholder="مثال: روشنایی" className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none" /></div>
+                  </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
-              <label className="block font-black text-xs mb-2 text-[var(--text-secondary)]">📦 نحوه اعمال موجودی:</label>
-              <select value={stockMode} onChange={e=>setStockMode(e.target.value)} className="w-full p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold text-xs cursor-pointer">
-                <option value="from_file">📊 اولویت با فایل اکسل (استفاده از پیش‌فرض برای خالی‌ها)</option>
-                <option value="force_default">⚡ اعمال اجباری موجودی پیش‌فرض به تمام محصولات</option>
-              </select>
-            </div>
-            
-            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
-              <label className="block font-black text-xs mb-2 text-[var(--text-secondary)]">🚚 نوع ارسال (برای همه محصولات):</label>
-              <select value={shippingType} onChange={e=>setShippingType(e.target.value)} className="w-full p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold text-xs cursor-pointer">
-                <option value="auto">📋 خودکار — از ستون نوع ارسال فایل بخوان</option>
-                <option value="post">📮 پست — همه محصولات فقط پست</option>
-                <option value="tipax">🚚 تیپاکس (پس‌کرایه) — همه محصولات فقط تیپاکس</option>
-                <option value="both">📦 هر دو روش — مشتری انتخاب کند</option>
-              </select>
-            </div>
-          </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+                      <label className="block font-black text-xs mb-2 text-[var(--text-secondary)]">🚚 نوع ارسال (برای همه محصولات):</label>
+                      <select value={shippingType} onChange={e=>setShippingType(e.target.value)} className="w-full p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold text-xs cursor-pointer">
+                        <option value="auto">📋 خودکار — از ستون نوع ارسال فایل بخوان</option>
+                        <option value="post">📮 پست — همه محصولات فقط پست</option>
+                        <option value="tipax">🚚 تیپاکس (پس‌کرایه) — همه محصولات فقط تیپاکس</option>
+                        <option value="both">📦 هر دو روش — مشتری انتخاب کند</option>
+                      </select>
+                    </div>
+                  </div>
 
-          <div className="space-y-4 border-b border-[var(--card-border)] pb-6 mt-4">
-            <label className="flex items-center gap-3 cursor-pointer select-none group">
-              <div className={"relative w-11 h-6 rounded-full transition-colors " + (onlyAvailable ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600")}>
-                <div className={"absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform " + (onlyAvailable ? "translate-x-5" : "translate-x-0")} />
-              </div>
-              <input type="checkbox" className="hidden" checked={onlyAvailable} onChange={e => setOnlyAvailable(e.target.checked)} />
-              <span className="font-bold text-xs">فقط محصولات موجود در فایل را وارد کن</span>
-            </label>
+                  <div className="space-y-4 border-b border-[var(--card-border)] pb-6 mt-4">
+                    <label className="flex items-center gap-3 cursor-pointer select-none group">
+                      <div className={"relative w-11 h-6 rounded-full transition-colors " + (onlyAvailable ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600")}>
+                        <div className={"absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform " + (onlyAvailable ? "translate-x-5" : "translate-x-0")} />
+                      </div>
+                      <input type="checkbox" className="hidden" checked={onlyAvailable} onChange={e => setOnlyAvailable(e.target.checked)} />
+                      <span className="font-bold text-xs">فقط محصولات موجود در فایل را وارد کن</span>
+                    </label>
 
-            <label className="flex items-center gap-3 cursor-pointer select-none group">
-              <div className={"relative w-11 h-6 rounded-full transition-colors " + (skipExisting ? "bg-amber-500" : "bg-slate-300 dark:bg-slate-600")}>
-                <div className={"absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform " + (skipExisting ? "translate-x-5" : "translate-x-0")} />
-              </div>
-              <input type="checkbox" className="hidden" checked={skipExisting} onChange={e => setSkipExisting(e.target.checked)} />
-              <span className="font-bold text-xs text-[var(--text-primary)]">
-                 اگر محصول در سایت هست، skip کن 
-                 <span className="text-rose-500 mr-1 block sm:inline mt-1 sm:mt-0 bg-rose-500/10 px-2 py-0.5 rounded-lg">(برای آپدیت تنظیمات، خاموش بماند)</span>
-              </span>
-            </label>
-          </div>
+                    <label className="flex items-center gap-3 cursor-pointer select-none group">
+                      <div className={"relative w-11 h-6 rounded-full transition-colors " + (skipExisting ? "bg-amber-500" : "bg-slate-300 dark:bg-slate-600")}>
+                        <div className={"absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform " + (skipExisting ? "translate-x-5" : "translate-x-0")} />
+                      </div>
+                      <input type="checkbox" className="hidden" checked={skipExisting} onChange={e => setSkipExisting(e.target.checked)} />
+                      <span className="font-bold text-xs text-[var(--text-primary)]">
+                         اگر محصول در سایت هست، skip کن (برای آپدیت تنظیمات، خاموش بماند)
+                      </span>
+                    </label>
+                  </div>
 
-          <div className="space-y-3">
-             <div className="p-4 rounded-2xl border border-sky-500/30 bg-sky-500/5">
-                <label className="block font-black mb-2 text-sky-500">۱. انتخاب فایل JSON تلگرام</label>
-                <input type="file" accept=".json" onChange={e => setJsonFile(e.target.files?.[0] || null)} className="w-full font-mono text-[10px]" />
-             </div>
-             <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/5">
-                <label className="block font-black mb-2 text-amber-500">۲. انتخاب فایل‌های اکسل</label>
-                <input type="file" multiple accept=".xlsx,.xls" onChange={e => setExcelFiles(e.target.files)} className="w-full font-mono text-[10px]" />
-             </div>
-             <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5">
-                <label className="block font-black mb-2 text-emerald-500">۳. انتخاب پوشه عکس‌ها</label>
-                <input type="file" {...{ webkitdirectory: "", directory: "" } as any} multiple onChange={e => setPhotoFiles(e.target.files)} className="w-full font-mono text-[10px]" />
-             </div>
-          </div>
+                  <div className="space-y-3">
+                     <div className="p-4 rounded-2xl border border-sky-500/30 bg-sky-500/5">
+                        <label className="block font-black mb-2 text-sky-500">۱. انتخاب فایل JSON تلگرام (اختیاری جهت حدس اولیه)</label>
+                        <input type="file" accept=".json" onChange={e => setJsonFile(e.target.files?.[0] || null)} className="w-full font-mono text-[10px]" />
+                     </div>
+                     <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/5">
+                        <label className="block font-black mb-2 text-amber-500">۲. انتخاب فایل‌های اکسل *</label>
+                        <input type="file" multiple accept=".xlsx,.xls" onChange={e => setExcelFiles(e.target.files)} className="w-full font-mono text-[10px]" />
+                     </div>
+                     <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5">
+                        <label className="block font-black mb-2 text-emerald-500">۳. انتخاب پوشه عکس‌ها *</label>
+                        <input type="file" {...{ webkitdirectory: "", directory: "" } as any} multiple onChange={e => setPhotoFiles(e.target.files)} className="w-full font-mono text-[10px]" />
+                     </div>
+                  </div>
 
-          {loading && (
-             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center space-y-2">
-                <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                <p className="font-bold text-emerald-500">{progress.step}</p>
-                <p className="font-mono text-slate-500 font-black text-sm">تعداد قطعی: <span className="text-[var(--accent-blue)]">{progress.current}</span> کالا</p>
-             </div>
+                  <button onClick={handlePrepareData} disabled={loading} className="w-full py-4 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-black shadow-xl transition cursor-pointer disabled:opacity-50">
+                    {loading ? "در حال استخراج لیست..." : "➡️ رفتن به مرحله بررسی چشمی عکس‌ها"}
+                  </button>
+              </>
           )}
 
-          <button onClick={handleRunImport} disabled={loading} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-xl transition cursor-pointer disabled:opacity-50">
-            {loading ? "در حال پردازش..." : "🚀 شروع ایمپورت هوشمند"}
-          </button>
+          {/* ══════════ گام ۲: Visual Mapper (تطبیق چشمی) ══════════ */}
+          {step === 2 && (
+              <div className="space-y-4">
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
+                      <h3 className="font-black text-amber-600 mb-2">👀 لطفاً عکس‌ها را چک کنید</h3>
+                      <p className="text-[10px] text-amber-600/80 leading-relaxed">
+                          سیستم سعی کرده عکس‌ها را متصل کند. اگر عکسی اشتباه است یا خالی مانده، کافیست روی دکمه <b>«تغییر عکس»</b> کلیک کنید و از گالری، تصویر درست را انتخاب کنید. پس از اطمینان، دکمه ایمپورت نهایی در پایین صفحه را بزنید.
+                      </p>
+                  </div>
+
+                  <div className="space-y-3">
+                      {parsedRows.map((row, idx) => (
+                          <div key={idx} className="flex items-center gap-4 p-3 border border-[var(--card-border)] bg-[var(--input-bg)] rounded-2xl">
+                              <div className="flex-shrink-0 w-16 h-16 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
+                                  {row.matchedFile ? (
+                                      <img src={URL.createObjectURL(row.matchedFile)} alt="Preview" className="w-full h-full object-contain" />
+                                  ) : (
+                                      <span className="text-xl opacity-50">🚫</span>
+                                  )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                  <h4 className="font-black text-xs text-[var(--text-primary)] truncate" title={row.title}>{row.title}</h4>
+                                  <div className="text-[10px] font-mono text-emerald-500 font-bold mt-1">{row.price.toLocaleString("fa-IR")} تومان | موجودی: {row.stock}</div>
+                              </div>
+                              <button 
+                                  type="button" 
+                                  onClick={() => setGalleryOpenFor(idx)}
+                                  className="px-4 py-2 bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] font-black text-[10px] rounded-xl hover:bg-[var(--accent-blue)]/20 transition whitespace-nowrap">
+                                  ✏️ تغییر عکس
+                              </button>
+                          </div>
+                      ))}
+                  </div>
+
+                  <div className="sticky bottom-0 p-4 bg-[var(--modal-bg)] border-t border-[var(--card-border)] rounded-b-[2rem] -mx-6 mt-6">
+                      <div className="flex gap-3">
+                          <button onClick={() => setStep(1)} className="flex-1 py-4 rounded-2xl bg-[var(--input-bg)] text-slate-600 font-black shadow-sm hover:bg-slate-200 transition">
+                              بازگشت
+                          </button>
+                          <button onClick={handleFinalImport} className="flex-[2] py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-xl transition cursor-pointer">
+                              ✅ عکس‌ها تایید شد، ایمپورت را شروع کن
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          )}
+
+          {/* ══════════ گام ۳: آپلود ══════════ */}
+          {step === 3 && (
+              <div className="flex flex-col items-center justify-center py-20 space-y-6">
+                 <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                 <div className="text-center">
+                     <p className="font-black text-lg text-emerald-500 mb-2">{progress.step}</p>
+                     <p className="font-mono text-slate-500 font-black">ردیف پردازش شده: <span className="text-[var(--accent-blue)] text-xl">{progress.current}</span></p>
+                 </div>
+              </div>
+          )}
+
         </div>
       </div>
     </div>

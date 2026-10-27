@@ -3,99 +3,74 @@ import React, { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { soundEngine } from "@/lib/soundEngine";
 
-// 👑 ۱. تمیزسازی فوق‌حرفه‌ای متن (تبدیل اعداد فارسی، حذف ویرگول هزارگان و استخراج حروف)
-const cleanStr = (s: string) => {
-    if (!s) return "";
-    let s2 = String(s).toLowerCase();
-    s2 = s2.replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776));
-    s2 = s2.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632));
-    s2 = s2.replace(/(\d)[,،.](\d)/g, '$1$2'); // 80,000 -> 80000
-    s2 = s2.replace(/[^\w\s\u0600-\u06FF]/gi, ' ');
-    s2 = s2.replace(/[يى]/g, 'ی').replace(/[كڪ]/g, 'ک');
-    s2 = s2.replace(/[\u200B-\u200D\uFEFF]/g, ' ');
-    return s2.replace(/\s+/g, ' ').trim();
+// 👑 ۱. نرمال‌سازی و استخراج دقیق کلمات (جداسازی قطعی اعداد از حروف)
+const normalizeToWords = (str: string) => {
+    let s = String(str || "").toLowerCase();
+    s = s.replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 1776));
+    s = s.replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 1632));
+    s = s.replace(/[^a-z0-9\u0600-\u06FF]/ig, ' ');
+    s = s.replace(/([0-9]+)/g, ' $1 '); // اعداد کاملا جدا می‌شوند
+    return s.split(/\s+/).filter(w => w.length > 1 || /^[0-9]$/.test(w));
 };
 
-// 👑 ۲. الگوریتم Sørensen–Dice Coefficient (استاندارد جهانی جستجوی شباهت)
-const getBigrams = (str: string) => {
-    const bg = [];
-    for (let i = 0; i < str.length - 1; i++) bg.push(str.slice(i, i + 2));
-    return bg;
-};
-const diceCoefficient = (s1: string, s2: string) => {
-    if (!s1 || !s2) return 0;
-    if (s1 === s2) return 1;
-    const bg1 = getBigrams(s1);
-    const bg2 = getBigrams(s2);
-    if (!bg1.length || !bg2.length) return 0;
-    let intersection = 0;
-    const bg2Copy = [...bg2];
-    for (let i = 0; i < bg1.length; i++) {
-        const idx = bg2Copy.indexOf(bg1[i]);
-        if (idx !== -1) {
-            intersection++;
-            bg2Copy.splice(idx, 1);
-        }
-    }
-    return (2.0 * intersection) / (bg1.length + bg2.length);
-};
-
-// 👑 ۳. استخراج قطعی توکن‌های مدل (اعداد و حروف انگلیسی مثل w892 یا 30)
-const extractModels = (str: string) => {
-    const tokens = str.match(/[a-z0-9]+/g) || [];
-    return tokens.filter(t => /\d/.test(t) && t.length >= 2);
-};
-
-// 👑 ۴. موتور تطبیق انبارداری (Retail Matcher)
+// 👑 ۲. الگوریتم استاندارد انبارداری (Token Locking AI)
 const findBestMatch = (excelName: string, tgProducts: any[]) => {
-    const exClean = cleanStr(excelName);
-    if (!exClean) return null;
-    
-    const exModels = extractModels(exClean);
+    const exWords = normalizeToWords(excelName);
+    const exNumbers = exWords.filter(w => /^[0-9]+$/.test(w)); // استخراج مدل‌ها و ظرفیت‌ها (مثل 3834 و 200)
+    const mainNoun = exWords.find(w => /^[\u0600-\u06FF]+$/.test(w)); // هسته کالا (مثل پروژکتور)
+
     let bestTg = null;
-    let highestScore = 0;
+    let maxScore = 0;
 
     for (const tg of tgProducts) {
-        const tgDesc = tg.description || "";
-        const tgCleanFull = cleanStr(tgDesc);
+        const tgWords = normalizeToWords(tg.description);
         
-        // 🔒 قفل امنیتی: اگر نام محصول عدد/مدل دارد (مثل 3834)، تلگرام موظف است آن را داشته باشد!
-        let missingCritical = false;
-        for (const m of exModels) {
-            if (!tgCleanFull.includes(m)) {
-                missingCritical = true;
+        // 🔒 قانون اول: تمام اعداد اکسل باید دقیقاً در تلگرام باشند
+        let missingNum = false;
+        for (const num of exNumbers) {
+            if (!tgWords.includes(num)) {
+                missingNum = true; 
                 break;
             }
         }
-        // اگر حتی یک عدد/مدل مهم در تلگرام نبود، کالا ۱۰۰٪ نامربوط است و رد می‌شود.
-        if (missingCritical) continue; 
+        if (missingNum) continue; // محال است 200 با 20000 مچ شود!
 
-        // 🎯 محاسبه شباهت واقعی جملات با الگوریتم دایس
-        let score = 0;
-        if (tgCleanFull.includes(exClean)) {
-            score = 1; // تطابق ۱۰۰ درصدی
-        } else {
-            // مقایسه خط به خط برای پیدا کردن نزدیک‌ترین جمله تلگرام به نام اکسل
-            const lines = tgDesc.split('\n');
-            for (const line of lines) {
-                const lineClean = cleanStr(line);
-                if (!lineClean) continue;
-                const sim = diceCoefficient(exClean, lineClean);
-                if (sim > score) score = sim;
-            }
+        // 🔒 قانون دوم: هسته اصلی کالا باید یکی باشد
+        if (mainNoun && !tgWords.includes(mainNoun)) {
+            continue; // پروژکتور با پاوربانک مچ نمی‌شود
         }
 
-        if (score > highestScore) {
-            highestScore = score;
+        // بررسی تطابق ۱۰۰ درصدی (Exact Substring)
+        const exStr = exWords.join(" ");
+        const tgStr = tgWords.join(" ");
+        if (tgStr.includes(exStr)) {
+            return tg;
+        }
+
+        // 🎯 قانون سوم: محاسبه پوشش کلمات
+        let matchCount = 0;
+        for (const w of exWords) {
+            if (tgWords.includes(w)) matchCount++;
+        }
+        const coverage = matchCount / exWords.length;
+        
+        // ⚖️ قانون چهارم: جریمه کلمات متضاد (تک در برابر دو)
+        let penalty = 0;
+        if (exWords.includes("تک") && !tgWords.includes("تک")) penalty += 0.5;
+        if (exWords.includes("دو") && !tgWords.includes("دو")) penalty += 0.5;
+        if (exWords.includes("سه") && !tgWords.includes("سه")) penalty += 0.5;
+        
+        const finalScore = coverage - penalty;
+
+        if (finalScore > maxScore && finalScore >= 0.5) {
+            maxScore = finalScore;
             bestTg = tg;
         }
     }
-    
-    // حداقل شباهت ساختاری ۳۵ درصد برای تایید نهایی
-    return highestScore >= 0.35 ? bestTg : null;
+    return bestTg;
 };
 
-// تابع هوشمند یافتن فایل تصویر
+// تابع هوشمند یافتن فایل تصویر از پوشه
 const findPhotoFile = (photoPath: string, filesArr: File[]) => {
     if (!photoPath) return null;
     const baseName = (photoPath.split("/").pop() || photoPath.split("\\").pop() || "").toLowerCase();
@@ -138,7 +113,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
   const handleCancel = () => {
       cancelRef.current = true;
-      setMessage({ text: "⚠️ عملیات ایمپورت توسط شما متوقف شد.", type: "error" });
+      setMessage({ text: "⚠️ عملیات ایمپورت متوقف شد.", type: "error" });
       setLoading(false);
       setIsMinimized(false);
   };
@@ -163,7 +138,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
            if (resExisting.ok) {
                const existingJson = await resExisting.json();
                (existingJson.data || []).forEach((p: any) => {
-                   existingProductsMap.set(cleanStr(p.title), String(p.id));
+                   existingProductsMap.set(String(p.title).trim().toLowerCase(), String(p.id));
                });
            }
        } catch (err) {}
@@ -233,7 +208,6 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                if (!row || !row[colMap.name]) continue;
 
                const productName = String(row[colMap.name]).trim();
-               const exactProdName = cleanStr(productName);
                const buyPrice = Number(String(row[colMap.buyPrice] || "0").replace(/\D/g, ""));
                
                let stock = defaultStock;
@@ -253,12 +227,12 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                if (buyPrice === 0) continue;
                if (onlyAvailable && stock <= 0) { skippedCount++; continue; }
                
-               const existingId = existingProductsMap.get(exactProdName);
+               const existingId = existingProductsMap.get(productName.toLowerCase());
                if (skipExisting && existingId) { skippedCount++; continue; }
 
                setProgress({ current: successCount, step: (existingId ? "آپدیت: " : "ثبت: ") + productName.slice(0,25) + "..." });
                
-               // 🌟 استفاده از هوش مصنوعی قفل توکنی (Token Locking AI)
+               // 🌟 اجرای الگوریتم قفل‌دار قطعی
                const matchedTg = findBestMatch(productName, productsMap);
                
                let uploadedUrls: string[] = [];
@@ -274,7 +248,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                            if (photoFile) {
                                const formData = new FormData();
                                formData.append("file", photoFile);
-                               await new Promise(resolve => setTimeout(resolve, 300));
+                               await new Promise(resolve => setTimeout(resolve, 200));
                                try {
                                    const upRes = await fetch("/api/admin/upload", { method: "POST", body: formData });
                                    if (upRes.ok) {
@@ -307,7 +281,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
                const productPayload: any = {
                    title: productName,
-                   brand: "\u200B", // ترفند حذف Apple
+                   brand: "\u200B", // خنثی کننده قطعی اپل
                    category: fallbackCategory,
                    price: finalPrice,
                    stock: stock,
@@ -326,7 +300,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
                if (existingId) productPayload.id = existingId;
 
-               await new Promise(resolve => setTimeout(resolve, 300));
+               await new Promise(resolve => setTimeout(resolve, 250));
                if (cancelRef.current) break;
 
                try {
@@ -336,7 +310,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                        body: JSON.stringify(productPayload)
                    });
                    if (pRes.ok) {
-                       if(!existingId) existingProductsMap.set(exactProdName, "saved"); 
+                       if(!existingId) existingProductsMap.set(productName.toLowerCase(), "saved"); 
                        successCount++;
                    }
                } catch (err) {}
@@ -346,7 +320,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
        if (!cancelRef.current) {
            soundEngine?.playSuccess?.();
            setProgress({ current: successCount, step: "عملیات پایان یافت!" });
-           setMessage({ text: "🎉 عالی! " + successCount + " کالا ثبت یا آپدیت شد. (" + skippedCount + " رد شد)", type: "success" });
+           setMessage({ text: "🎉 عالی! " + successCount + " کالا دقیق و قطعی ثبت شد. (" + skippedCount + " رد شد)", type: "success" });
            if (onImportComplete) setTimeout(() => { window.location.reload(); }, 2500);
        }
 
@@ -382,7 +356,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-sans select-text dir-rtl">
       <div className="w-full max-w-4xl bg-[var(--modal-bg)] rounded-[2rem] shadow-2xl border border-[var(--card-border)] flex flex-col max-h-[96vh]">
         <div className="flex items-center justify-between p-5 border-b border-[var(--card-border)] bg-[var(--modal-bg)] z-10 rounded-t-[2rem]">
-          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت قطعی و هوشمند (استاندارد جهانی)</h2>
+          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت قطعی و دقیق (Token Locking)</h2>
           <div className="flex gap-2">
             {loading && <button type="button" onClick={() => setIsMinimized(true)} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] hover:bg-slate-200 font-black cursor-pointer transition text-slate-600 flex items-center gap-1">➖ مینیمایز</button>}
             {loading && <button type="button" onClick={handleCancel} className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white font-black cursor-pointer transition flex items-center gap-1">⏹ توقف</button>}
@@ -400,7 +374,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
             <div><label className="block font-bold mb-1.5">موجودی پیش‌فرض:</label><input type="number" value={defaultStock} onChange={e=>setDefaultStock(Number(e.target.value))} className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--accent-blue)]" /></div>
             <div><label className="block font-bold mb-1.5">درصد سود (+مالیات):</label><input type="number" value={profitMargin} onChange={e=>setProfitMargin(Number(e.target.value))} className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-emerald-500" /></div>
-            <div><label className="block font-bold mb-1.5">دسته‌بندی کلی (اختیاری):</label><input type="text" value={globalCategory} onChange={e=>setGlobalCategory(e.target.value)} placeholder="مثال: کمپینگ" className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none" /></div>
+            <div><label className="block font-bold mb-1.5">دسته‌بندی کلی (اختیاری):</label><input type="text" value={globalCategory} onChange={e=>setGlobalCategory(e.target.value)} placeholder="مثال: روشنایی" className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none" /></div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -408,7 +382,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
               <label className="block font-black text-xs mb-2 text-[var(--text-secondary)]">📦 نحوه اعمال موجودی:</label>
               <select value={stockMode} onChange={e=>setStockMode(e.target.value)} className="w-full p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold text-xs cursor-pointer">
                 <option value="from_file">📊 اولویت با فایل اکسل (استفاده از پیش‌فرض برای خالی‌ها)</option>
-                <option value="force_default">⚡ اعمال اجباری موجودی پیش‌فرض بالا به تمام محصولات</option>
+                <option value="force_default">⚡ اعمال اجباری موجودی پیش‌فرض به تمام محصولات</option>
               </select>
             </div>
             
@@ -468,7 +442,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
           )}
 
           <button onClick={handleRunImport} disabled={loading} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-xl transition cursor-pointer disabled:opacity-50">
-            {loading ? "در حال پردازش..." : "🚀 شروع ایمپورت قطعی و هوشمند"}
+            {loading ? "در حال پردازش..." : "🚀 شروع ایمپورت هوشمند"}
           </button>
         </div>
       </div>

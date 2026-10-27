@@ -3,38 +3,75 @@ import React, { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { soundEngine } from "@/lib/soundEngine";
 
-// فقط کلمات کلیدی اصلی و نام کالا حفظ می‌شوند
-const normalizeStr = (s: string) => String(s || "").replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/فوق\s*العاده/g, '').replace(/بسیار/g, '').trim().toLowerCase();
+// پاکسازی متن برای مقایسه دقیق
+const normalizeStr = (s: string) => String(s || "").replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim().toLowerCase();
 
+// الگوریتم امتیازدهی هوشمند (تشخیص هسته کلمه + تشخیص مدل انگلیسی/عددی)
 const findBestMatch = (excelName: string, tgProducts: any[]) => {
     const exName = normalizeStr(excelName);
-    const exWords = exName.split(/\s+/).filter(w => w.length > 2 && w !== 'مدل' && w !== 'دستگاه');
+    // فیلتر کردن کلمات زائد که باعث فریب خوردن سیستم می‌شوند
+    const exWords = exName.split(/\s+/).filter(w => w.length > 2 && !['مدل','دستگاه','برند','وات','قوی','فوق','العاده','شارژی','واقعی','دار','تک','دو'].includes(w));
     
     let bestTg = null;
-    let maxScore = 0;
+    let maxScore = -999;
+    
+    // کلمه کلیدی اصلی (اولین کلمه معنادار مثل: پروژکتور، پاوربانک، اینورتر)
+    const coreNoun = exWords[0] || "";
 
     for (const tg of tgProducts) {
         const tgDesc = normalizeStr(tg.description);
         let score = 0;
         
-        // اگر دقیقاً کلمه اصلی بود، امتیاز قطعی
-        if (tgDesc.includes(exName)) score += 100;
+        if (tgDesc.includes(exName)) score += 1000;
         
         let wordMatches = 0;
         for (const w of exWords) {
-            if (tgDesc.includes(w)) wordMatches++;
+            if (tgDesc.includes(w)) {
+                wordMatches++;
+                score += 10;
+                // اگر کلمه شامل عدد یا حروف انگلیسی باشد (مثل w892 یا 128w)، ارزش بسیار بالایی برای یافتن کالا دارد
+                if (/[a-z0-9]/i.test(w)) {
+                    score += 150;
+                }
+            }
         }
         
-        const matchPercentage = wordMatches / Math.max(exWords.length, 1);
-        score += matchPercentage * 100;
+        // جریمه سنگین: اگر کلمه اصلی محصول در توضیحات تلگرام نبود، احتمالاً محصول اشتباه است
+        if (coreNoun && !tgDesc.includes(coreNoun)) {
+            score -= 100;
+        }
+
+        score += (wordMatches / Math.max(exWords.length, 1)) * 30;
         
         if (score > maxScore) {
             maxScore = score;
             bestTg = tg;
         }
     }
-    // 🌟 فیلتر بسیار سخت‌گیرانه: باید حداقل 80 درصد کلمات نام کالا در کپشن تلگرام باشد تا عکس را بدهد!
-    return maxScore >= 80 ? bestTg : null;
+    
+    // حداقل امتیاز قابل قبول (باید کلمه کلیدی یا مدل نامبر پیدا شده باشد)
+    return maxScore >= 10 ? bestTg : null;
+};
+
+// حل مشکل پیدا نکردن نام فایل‌ها در صورت تغییر اسم توسط سیستم عامل
+const findPhotoFile = (photoPath: string, filesArr: File[]) => {
+    if (!photoPath) return null;
+    const baseName = (photoPath.split("/").pop() || photoPath.split("\\").pop() || "").toLowerCase();
+    
+    let found = filesArr.find(f => f.name.toLowerCase() === baseName);
+    if (found) return found;
+    
+    const match = baseName.match(/(photo_\d+)/);
+    if (match) {
+        const coreId = match[1];
+        // اولویت با عکس‌های اصلی (نه تصاویر بندانگشتی)
+        found = filesArr.find(f => f.name.toLowerCase().includes(coreId) && !f.name.toLowerCase().includes("thumb"));
+        if (found) return found;
+        
+        found = filesArr.find(f => f.name.toLowerCase().includes(coreId));
+        return found;
+    }
+    return null;
 };
 
 export default function TelegramImporterModal({ onClose, onImportComplete }: any) {
@@ -61,7 +98,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
   const handleCancel = () => {
       cancelRef.current = true;
-      setMessage({ text: "⚠️ عملیات ایمپورت توسط شما متوقف شد.", type: "error" });
+      setMessage({ text: "⚠️ عملیات ایمپورت متوقف شد.", type: "error" });
       setLoading(false);
       setIsMinimized(false);
   };
@@ -78,7 +115,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     soundEngine?.playClick?.();
     
     try {
-       setProgress({ current: 0, step: "در حال دریافت دیتابیس برای آپدیت هوشمند..." });
+       setProgress({ current: 0, step: "دریافت اطلاعات دیتابیس..." });
        
        let existingProductsMap = new Map<string, string>();
        try {
@@ -93,7 +130,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
        if (cancelRef.current) return;
 
-       setProgress({ current: 0, step: "در حال پردازش پیام‌های تلگرام..." });
+       setProgress({ current: 0, step: "پردازش فایل تلگرام..." });
        const jsonText = await jsonFile.text();
        const tgData = JSON.parse(jsonText);
        
@@ -110,10 +147,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
            }
        }
 
-       const photoMap = new Map<string, File>();
-       for(let i=0; i<photoFiles.length; i++) {
-           photoMap.set(photoFiles[i].name, photoFiles[i]);
-       }
+       const photoFilesArr = Array.from(photoFiles);
 
        let successCount = 0;
        let skippedCount = 0;
@@ -184,6 +218,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
                setProgress({ current: successCount, step: (existingId ? "آپدیت: " : "ثبت: ") + productName.slice(0,25) + "..." });
                
+               // 🌟 اجرای الگوریتم پیشرفته یافتن توضیحات و عکس
                const matchedTg = findBestMatch(productName, productsMap);
                
                let uploadedUrls: string[] = [];
@@ -195,8 +230,8 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                        for (const photoPath of matchedTg.photos) {
                            if (cancelRef.current) break;
                            
-                           const photoName = photoPath.split("/").pop() || photoPath.split("\\").pop();
-                           const photoFile = photoMap.get(photoName);
+                           // یافتن فایل صحیح از پوشه عکس‌ها با هوش مصنوعی
+                           const photoFile = findPhotoFile(photoPath, photoFilesArr);
                            
                            if (photoFile) {
                                const formData = new FormData();
@@ -234,7 +269,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
                const productPayload: any = {
                    title: productName,
-                   brand: "متفرقه", // جایگزین ایمن
+                   brand: "متفرقه", 
                    category: fallbackCategory,
                    price: finalPrice,
                    stock: stock,
@@ -272,8 +307,8 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
        if (!cancelRef.current) {
            soundEngine?.playSuccess?.();
-           setProgress({ current: successCount, step: "عملیات با موفقیت پایان یافت!" });
-           setMessage({ text: "🎉 تمام شد! " + successCount + " کالا ثبت یا آپدیت شد. (" + skippedCount + " اسکیپ شد)", type: "success" });
+           setProgress({ current: successCount, step: "عملیات پایان یافت!" });
+           setMessage({ text: "🎉 عالی! " + successCount + " کالا ثبت یا آپدیت شد. (" + skippedCount + " رد شد)", type: "success" });
            if (onImportComplete) setTimeout(() => { window.location.reload(); }, 2500);
        }
 
@@ -299,7 +334,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                   <div className="h-full bg-emerald-500 animate-pulse w-full"></div>
               </div>
               <div className="text-xs font-black text-center text-[var(--accent-blue)]">
-                 عملیات انجام شده: {progress.current} محصول
+                 انجام شده: {progress.current} کالا
               </div>
           </div>
       );
@@ -309,7 +344,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-sans select-text dir-rtl">
       <div className="w-full max-w-4xl bg-[var(--modal-bg)] rounded-[2rem] shadow-2xl border border-[var(--card-border)] flex flex-col max-h-[96vh]">
         <div className="flex items-center justify-between p-5 border-b border-[var(--card-border)] bg-[var(--modal-bg)] z-10 rounded-t-[2rem]">
-          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت و آپدیت هوشمند تلگرام</h2>
+          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت هوشمند تلگرام (الگوریتم دقیق تطبیق کالا)</h2>
           <div className="flex gap-2">
             {loading && <button type="button" onClick={() => setIsMinimized(true)} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] hover:bg-slate-200 font-black cursor-pointer transition text-slate-600 flex items-center gap-1">➖ مینیمایز</button>}
             {loading && <button type="button" onClick={handleCancel} className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white font-black cursor-pointer transition flex items-center gap-1">⏹ توقف</button>}
@@ -390,7 +425,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center space-y-2">
                 <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
                 <p className="font-bold text-emerald-500">{progress.step}</p>
-                <p className="font-mono text-slate-500 font-black text-sm">آپلود یا آپدیت شده: <span className="text-[var(--accent-blue)]">{progress.current}</span> کالا</p>
+                <p className="font-mono text-slate-500 font-black text-sm">تعداد قطعی: <span className="text-[var(--accent-blue)]">{progress.current}</span> کالا</p>
              </div>
           )}
 

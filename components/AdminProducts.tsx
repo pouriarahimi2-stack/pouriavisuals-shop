@@ -504,7 +504,7 @@ export function AdminProducts(_props: any = {}) {
           image:imgUrl, image_url:imgUrl,
           images: allImages,
           description:row.description||ex?.description||"",
-          brand:row.brand||ex?.brand||"متفرقه",
+          brand: row.brand || ex?.brand || "متفرقه",
           sku:row.sku||ex?.sku||"",
           warranty:row.warranty||ex?.warranty||"",
           shipping_type:row.shipping_type||ex?.shipping_type||"both",

@@ -1,13 +1,14 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { soundEngine } from "@/lib/soundEngine";
 
 const normalizeStr = (s: string) => String(s || "").replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').toLowerCase();
 
+// الگوریتم بسیار سخت‌گیرانه برای جلوگیری از قاطی شدن عکس‌ها
 const findBestMatch = (excelName: string, tgProducts: any[]) => {
     const exName = normalizeStr(excelName);
-    const exWords = exName.split(/\s+/).filter(w => w.length > 1 && w !== 'مدل' && w !== 'دستگاه');
+    const exWords = exName.split(/\s+/).filter(w => w.length > 2 && w !== 'مدل' && w !== 'دستگاه' && w !== 'برند' && w !== 'وات');
     
     let bestTg = null;
     let maxScore = 0;
@@ -15,20 +16,23 @@ const findBestMatch = (excelName: string, tgProducts: any[]) => {
     for (const tg of tgProducts) {
         const tgDesc = normalizeStr(tg.description);
         let score = 0;
+        
+        // اگر دقیقاً کلمه اصلی بود، امتیاز کامل
         if (tgDesc.includes(exName)) score += 100;
         
         let wordMatches = 0;
         for (const w of exWords) {
             if (tgDesc.includes(w)) wordMatches++;
         }
-        score += (wordMatches / exWords.length) * 50;
+        score += (wordMatches / Math.max(exWords.length, 1)) * 50;
         
         if (score > maxScore) {
             maxScore = score;
             bestTg = tg;
         }
     }
-    return maxScore > 20 ? bestTg : null;
+    // 🌟 سخت‌گیری بالا: حداقل امتیاز 40 (یعنی 80 درصد کلمات مچ باشند یا کل عبارت دقیقاً پیدا شود)
+    return maxScore >= 40 ? bestTg : null;
 };
 
 export default function TelegramImporterModal({ onClose, onImportComplete }: any) {
@@ -48,6 +52,17 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
   const [progress, setProgress] = useState({ current: 0, step: "آماده شروع..." });
   const [message, setMessage] = useState<{ text: string, type: "success" | "error" } | null>(null);
 
+  // 🌟 استیت‌های جدید برای مینیمایز و کنسل کردن
+  const [isMinimized, setIsMinimized] = useState(false);
+  const cancelRef = useRef(false);
+
+  const handleCancel = () => {
+      cancelRef.current = true;
+      setMessage({ text: "⚠️ عملیات ایمپورت توسط شما متوقف شد.", type: "error" });
+      setLoading(false);
+      setIsMinimized(false);
+  };
+
   const handleRunImport = async () => {
     if (!jsonFile || !excelFiles || excelFiles.length === 0 || !photoFiles || photoFiles.length === 0) {
        setMessage({ text: "⚠️ لطفاً فایل تلگرام، فایل‌های اکسل و پوشه عکس‌ها را انتخاب کنید.", type: "error" });
@@ -56,6 +71,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     
     setLoading(true);
     setMessage(null);
+    cancelRef.current = false;
     soundEngine?.playClick?.();
     
     try {
@@ -69,6 +85,8 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                existingTitles = new Set((existingJson.data || []).map((p: any) => normalizeStr(p.title)));
            }
        } catch (err) {}
+
+       if (cancelRef.current) return;
 
        setProgress({ current: 0, step: "در حال پردازش هوشمند فایل تلگرام..." });
        const jsonText = await jsonFile.text();
@@ -96,6 +114,8 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
        let skippedCount = 0;
 
        for (let e=0; e<excelFiles.length; e++) {
+           if (cancelRef.current) break; // توقف در سطح فایل
+
            const file = excelFiles[e];
            const fallbackCategory = globalCategory || file.name.split("-")[0].split("_")[0].trim() || "عمومی";
            
@@ -127,6 +147,8 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
            if (headerRowIndex === -1 || colMap.name === -1 || colMap.buyPrice === -1) continue;
 
            for (let i = headerRowIndex + 1; i < rawData.length; i++) {
+               if (cancelRef.current) break; // توقف در سطح محصول
+
                const row = rawData[i];
                if (!row || !row[colMap.name]) continue;
 
@@ -134,7 +156,6 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                const cleanProdName = normalizeStr(productName);
                const buyPrice = Number(String(row[colMap.buyPrice] || "0").replace(/\D/g, ""));
                
-               // 🌟 اعمال قطعی موجودی پیش‌فرض (اگر سلول اکسل خالی بود، مقدار شما را می‌خواند)
                let stock = defaultStock;
                if (colMap.stock !== -1 && row[colMap.stock] !== undefined && String(row[colMap.stock]).trim() !== "") {
                    const parsed = Number(String(row[colMap.stock]).replace(/\D/g, ""));
@@ -146,6 +167,8 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                if (skipExisting && existingTitles.has(cleanProdName)) { skippedCount++; continue; }
 
                setProgress({ current: successCount, step: "پردازش: " + productName.slice(0,25) + "..." });
+               
+               // 🌟 پیدا کردن عکس با الگوریتم سخت‌گیر
                const matchedTg = findBestMatch(productName, productsMap);
                
                let uploadedUrls: string[] = [];
@@ -155,13 +178,14 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                    descriptionToUse = matchedTg.description || productName;
                    if (matchedTg.photos && matchedTg.photos.length > 0) {
                        for (const photoPath of matchedTg.photos) {
+                           if (cancelRef.current) break; // توقف هنگام آپلود عکس
                            const photoName = photoPath.split("/").pop() || photoPath.split("\\").pop();
                            const photoFile = photoMap.get(photoName);
                            
                            if (photoFile) {
                                const formData = new FormData();
                                formData.append("file", photoFile);
-                               await new Promise(resolve => setTimeout(resolve, 400));
+                               await new Promise(resolve => setTimeout(resolve, 300));
                                try {
                                    const upRes = await fetch("/api/admin/upload", { method: "POST", body: formData });
                                    if (upRes.ok) {
@@ -178,10 +202,8 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
                if (uploadedUrls.length === 0) uploadedUrls.push("/placeholder.png");
 
-               // 🌟 فرمول قیمت اصلاح شد: فقط و فقط درصد سودی که کاربر وارد کرده اعمال می‌شود (مالیات مخفی 1.10 حذف شد)
                const finalPrice = Math.ceil((buyPrice * (1 + (profitMargin / 100))) / 1000) * 1000; 
 
-               // 🌟 اعمال قطعی نوع ارسال (آکبند کردن داده بر اساس درخواست شما)
                let finalShipping = shippingType;
                if (shippingType === "auto") {
                    if (colMap.shipping !== -1 && row[colMap.shipping] !== undefined) {
@@ -197,18 +219,20 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
                const productPayload = {
                    title: productName,
-                   brand: "\u200B", // حذف اپل
+                   brand: "متفرقه", 
                    category: fallbackCategory,
                    price: finalPrice,
                    stock: stock,
                    is_available: stock > 0,
                    description: descriptionToUse,
-                   shipping_type: finalShipping, // ثبت دقیق سیستم ارسال
+                   shipping_type: finalShipping,
                    image: uploadedUrls[0],
                    images: uploadedUrls
                };
 
-               await new Promise(resolve => setTimeout(resolve, 400));
+               await new Promise(resolve => setTimeout(resolve, 300));
+               
+               if (cancelRef.current) break; // چک نهایی قبل از درج
 
                try {
                    const pRes = await fetch("/api/admin/products", {
@@ -224,24 +248,52 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
            }
        }
 
-       soundEngine?.playSuccess?.();
-       setProgress({ current: successCount, step: "عملیات با موفقیت پایان یافت!" });
-       setMessage({ text: "🎉 تمام شد! " + successCount + " کالا ثبت شد. (" + skippedCount + " اسکیپ شد)", type: "success" });
-       if (onImportComplete) setTimeout(() => { window.location.reload(); }, 2500);
+       if (!cancelRef.current) {
+           soundEngine?.playSuccess?.();
+           setProgress({ current: successCount, step: "عملیات با موفقیت پایان یافت!" });
+           setMessage({ text: "🎉 تمام شد! " + successCount + " کالا ثبت شد. (" + skippedCount + " اسکیپ شد)", type: "success" });
+           if (onImportComplete) setTimeout(() => { window.location.reload(); }, 2500);
+       }
 
     } catch (err: any) {
-       setMessage({ text: "❌ خطای شبکه: " + err.message, type: "error" });
+       if (!cancelRef.current) setMessage({ text: "❌ خطای شبکه: " + err.message, type: "error" });
     } finally {
        setLoading(false);
     }
   };
 
+  // 🌟 رابط کاربری مینیمایز شده (گوشه پایین)
+  if (isMinimized) {
+      return (
+          <div className="fixed bottom-6 right-6 z-[9999] w-80 bg-[var(--modal-bg)] rounded-3xl shadow-2xl border border-[var(--card-border)] p-5 flex flex-col gap-4 font-sans select-none dir-rtl transition-all" dir="rtl">
+              <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-emerald-500">🤖 ایمپورت در حال اجرا...</h3>
+                  <div className="flex gap-2">
+                      <button type="button" onClick={() => setIsMinimized(false)} className="p-2 rounded-xl bg-[var(--input-bg)] hover:bg-slate-200 text-slate-600 font-black transition cursor-pointer">🔼</button>
+                      <button type="button" onClick={handleCancel} className="p-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white font-black transition cursor-pointer">⏹</button>
+                  </div>
+              </div>
+              <div className="text-[10px] font-bold text-slate-500 truncate">{progress.step}</div>
+              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 animate-pulse w-full"></div>
+              </div>
+              <div className="text-xs font-black text-center text-[var(--accent-blue)]">
+                 آپلود شده: {progress.current} محصول
+              </div>
+          </div>
+      );
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-sans select-text dir-rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-sans select-text dir-rtl transition-all">
       <div className="w-full max-w-4xl bg-[var(--modal-bg)] rounded-[2rem] shadow-2xl border border-[var(--card-border)] flex flex-col max-h-[96vh]">
         <div className="flex items-center justify-between p-5 border-b border-[var(--card-border)] bg-[var(--modal-bg)] z-10 rounded-t-[2rem]">
-          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت هوشمند تلگرام (احترام ۱۰۰٪ به تنظیمات کاربر)</h2>
-          {!loading && <button type="button" onClick={onClose} className="p-2 rounded-xl bg-[var(--input-bg)] font-black cursor-pointer hover:bg-rose-500 hover:text-white transition">✕</button>}
+          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت هوشمند تلگرام (ضد تداخل + کنترل کامل)</h2>
+          <div className="flex gap-2">
+            {loading && <button type="button" onClick={() => setIsMinimized(true)} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] hover:bg-slate-200 font-black cursor-pointer transition text-slate-600 flex items-center gap-1">➖ مینیمایز</button>}
+            {loading && <button type="button" onClick={handleCancel} className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white font-black cursor-pointer transition flex items-center gap-1">⏹ توقف</button>}
+            {!loading && <button type="button" onClick={onClose} className="p-2 rounded-xl bg-[var(--input-bg)] font-black cursor-pointer hover:bg-rose-500 hover:text-white transition">✕</button>}
+          </div>
         </div>
         
         <div className="p-6 space-y-6 text-xs overflow-y-auto flex-1">

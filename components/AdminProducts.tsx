@@ -643,7 +643,7 @@ export function AdminProducts(_props: any = {}) {
                   <div className="flex-1 space-y-1 min-w-0">
                     <span className="text-[10px] text-[var(--accent-blue)] font-bold">{p.category}</span>
                     <h3 className="font-black text-xs line-clamp-2">{p.title}</h3>
-                    {p.brand && p.brand!=="متفرقه" && <span className="text-[10px] text-[var(--text-secondary)]">{p.brand}</span>}
+                    {p.brand && p.brand!=="متفرقه" && p.brand.toLowerCase()!=="apple" && <span className="text-[10px] text-[var(--text-secondary)]">{p.brand}</span>}
                     <div className="font-mono text-emerald-500 font-bold">{p.price.toLocaleString("fa-IR")} تومان</div>
                     {p.shipping_type && p.shipping_type !== "both" && (
                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${p.shipping_type==="post"?"bg-blue-500/15 text-blue-500":"bg-amber-500/15 text-amber-500"}`}>

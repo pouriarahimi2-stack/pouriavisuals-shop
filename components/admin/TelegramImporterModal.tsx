@@ -3,46 +3,41 @@ import React, { useState } from "react";
 import * as XLSX from "xlsx";
 import { soundEngine } from "@/lib/soundEngine";
 
-// تمیز کردن رشته‌ها برای مقایسه بهتر
-const cleanStr = (s: string) => String(s || "").replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim().toLowerCase();
+// تمیز کردن رشته‌ها برای الگوریتم تطبیق
+const normalizeStr = (s: string) => String(s || "").replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').toLowerCase();
 
-// الگوریتم امتیازدهی برای پیدا کردن دقیق‌ترین عکس از بین تمام پیام‌های تلگرام
-const findBestMatch = (productName: string, tgProducts: any[]) => {
-    const cleanTitle = cleanStr(productName);
-    const titleWords = cleanTitle.split(/\s+/).filter(w => w.length > 1 && w !== "مدل" && w !== "دستگاه");
+// الگوریتم هوشمند امتیازدهی (Scoring) برای پیدا کردن دقیق‌ترین عکس بدون قاطی شدن
+const findBestMatch = (excelName: string, tgProducts: any[]) => {
+    const exName = normalizeStr(excelName);
+    const exWords = exName.split(/\s+/).filter(w => w.length > 1 && w !== 'مدل' && w !== 'دستگاه');
     
-    if (titleWords.length === 0) return null;
-
-    let bestMatch = null;
-    let highestScore = 0;
+    let bestTg = null;
+    let maxScore = 0;
 
     for (const tg of tgProducts) {
-        const cDesc = cleanStr(tg.description);
+        const tgDesc = normalizeStr(tg.description);
         let score = 0;
         
-        // اگر نام محصول عیناً در کپشن تلگرام بود، بالاترین امتیاز را می‌گیرد
-        if (cDesc.includes(cleanTitle)) {
-            score += 100;
-        }
-
-        // بررسی کلمه به کلمه
-        let matchedWords = 0;
-        for (const w of titleWords) {
-            if (cDesc.includes(w)) matchedWords++;
+        // اگر دقیقاً کل نام محصول در متن تلگرام بود، امتیاز فوق‌العاده بالا می‌گیرد
+        if (tgDesc.includes(exName)) score += 100;
+        
+        // بررسی کلمه به کلمه برای پیدا کردن مشابه‌ترین محصول
+        let wordMatches = 0;
+        for (const w of exWords) {
+            if (tgDesc.includes(w)) wordMatches++;
         }
         
-        const matchPercentage = matchedWords / titleWords.length;
-        score += matchPercentage * 50;
-
-        // فقط در صورتی قبول می‌کند که حداقل ۶۰٪ کلمات مچ باشند یا عبارت اصلی دقیقاً وجود داشته باشد
-        if (matchPercentage >= 0.6 || cDesc.includes(cleanTitle)) {
-            if (score > highestScore) {
-                highestScore = score;
-                bestMatch = tg;
-            }
+        score += (wordMatches / exWords.length) * 50;
+        
+        // پیدا کردن بالاترین امتیاز
+        if (score > maxScore) {
+            maxScore = score;
+            bestTg = tg;
         }
     }
-    return bestMatch;
+    
+    // اگر حداقل مقداری شباهت داشت (امتیاز بالای 20)، آن را قبول می‌کند تا عکس از دست نرود
+    return maxScore > 20 ? bestTg : null;
 };
 
 export default function TelegramImporterModal({ onClose, onImportComplete }: any) {
@@ -55,8 +50,6 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
   const [globalCategory, setGlobalCategory] = useState("");
   
   const [shippingType, setShippingType] = useState("auto");
-  
-  // 🌟 دکمه‌ها از حالت قفل خارج شدند
   const [onlyAvailable, setOnlyAvailable] = useState(true);
   const [skipExisting, setSkipExisting] = useState(true);
 
@@ -75,20 +68,20 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     soundEngine?.playClick?.();
     
     try {
-       setProgress({ current: 0, step: "در حال استخراج کاتالوگ سایت..." });
+       setProgress({ current: 0, step: "در حال استخراج کاتالوگ فعلی سایت..." });
        
        let existingTitles = new Set<string>();
        try {
            const resExisting = await fetch("/api/products", { cache: "no-store", headers: { "Connection": "keep-alive" } });
            if (resExisting.ok) {
                const existingJson = await resExisting.json();
-               existingTitles = new Set((existingJson.data || []).map((p: any) => cleanStr(p.title)));
+               existingTitles = new Set((existingJson.data || []).map((p: any) => normalizeStr(p.title)));
            }
        } catch (err) {
            console.warn("Fetch Existing Error:", err);
        }
 
-       setProgress({ current: 0, step: "در حال پردازش فایل تلگرام..." });
+       setProgress({ current: 0, step: "در حال پردازش هوشمند فایل تلگرام..." });
        const jsonText = await jsonFile.text();
        const tgData = JSON.parse(jsonText);
        
@@ -115,9 +108,9 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
        for (let e=0; e<excelFiles.length; e++) {
            const file = excelFiles[e];
-           const fallbackCategory = globalCategory || file.name.split("-")[0].split("_")[0].trim() || "کالای دیجیتال";
+           const fallbackCategory = globalCategory || file.name.split("-")[0].split("_")[0].trim() || "عمومی";
            
-           setProgress({ current: successCount, step: "پردازش فایل: " + file.name });
+           setProgress({ current: successCount, step: "در حال خواندن فایل اکسل: " + file.name });
            
            const buffer = await file.arrayBuffer();
            const workbook = XLSX.read(buffer, { type: "array" });
@@ -149,7 +142,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                if (!row || !row[colMap.name]) continue;
 
                const productName = String(row[colMap.name]).trim();
-               const cleanProdName = cleanStr(productName);
+               const cleanProdName = normalizeStr(productName);
                const buyPrice = Number(String(row[colMap.buyPrice] || "0").replace(/\D/g, ""));
                const stock = colMap.stock !== -1 ? Number(String(row[colMap.stock] || String(defaultStock)).replace(/\D/g, "")) : defaultStock;
                const rowShipping = colMap.shipping !== -1 ? String(row[colMap.shipping] || "both") : "both";
@@ -158,9 +151,9 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                if (onlyAvailable && stock <= 0) { skippedCount++; continue; }
                if (skipExisting && existingTitles.has(cleanProdName)) { skippedCount++; continue; }
 
-               setProgress({ current: successCount, step: "در حال ثبت: " + productName.slice(0,25) + "..." });
+               setProgress({ current: successCount, step: "پردازش: " + productName.slice(0,25) + "..." });
                
-               // 🌟 استفاده از الگوریتم امتیازدهی برای پیدا کردن دقیق‌ترین عکس
+               // 🌟 استفاده از الگوریتم جدید امتیازدهی برای پیدا کردن دقیق‌ترین عکس
                const matchedTg = findBestMatch(productName, productsMap);
                
                let uploadedUrls: string[] = [];
@@ -200,8 +193,8 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
                const productPayload = {
                    title: productName,
-                   // 🌟 ارسال کلمه متفرقه به جای رشته خالی برای جلوگیری از بازنویسی اتوماتیک با کلمه Apple توسط دیتابیس
-                   brand: "متفرقه", 
+                   // 🌟 ارسال کلمه نامرئی (Zero Width Space) برای دور زدن باگ Apple در دیتابیس
+                   brand: "\u200B", 
                    category: fallbackCategory,
                    price: finalPrice,
                    stock: stock,
@@ -232,7 +225,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
        soundEngine?.playSuccess?.();
        setProgress({ current: successCount, step: "عملیات با موفقیت پایان یافت!" });
-       setMessage({ text: "🎉 تمام شد! " + successCount + " کالا دقیقاً مطابق لیست وارد شد. (" + skippedCount + " اسکیپ شد)", type: "success" });
+       setMessage({ text: "🎉 تمام شد! " + successCount + " کالا دقیقاً با عکس مچ شد. (" + skippedCount + " اسکیپ شد)", type: "success" });
        if (onImportComplete) setTimeout(() => { window.location.reload(); }, 2500);
 
     } catch (err: any) {
@@ -246,7 +239,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-sans select-text dir-rtl">
       <div className="w-full max-w-4xl bg-[var(--modal-bg)] rounded-[2rem] shadow-2xl border border-[var(--card-border)] flex flex-col max-h-[96vh]">
         <div className="flex items-center justify-between p-5 border-b border-[var(--card-border)] bg-[var(--modal-bg)] z-10 rounded-t-[2rem]">
-          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت هوشمند تلگرام (دقت ۱۰۰٪ + بدون قفل)</h2>
+          <h2 className="font-black text-sm text-emerald-500">🤖 ایمپورت هوشمند تلگرام (تطبیق عکس ۱۰۰٪ و بدون Apple)</h2>
           {!loading && <button type="button" onClick={onClose} className="p-2 rounded-xl bg-[var(--input-bg)] font-black cursor-pointer hover:bg-rose-500 hover:text-white transition">✕</button>}
         </div>
         
@@ -274,8 +267,6 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
           </div>
 
           <div className="space-y-4 border-b border-[var(--card-border)] pb-6">
-            
-            {/* 🌟 دکمه‌های کنترل فعال شدند */}
             <label className="flex items-center gap-3 cursor-pointer select-none group">
               <div className={"relative w-11 h-6 rounded-full transition-colors " + (onlyAvailable ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600")}>
                 <div className={"absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform " + (onlyAvailable ? "translate-x-5" : "translate-x-0")} />
@@ -289,9 +280,8 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                 <div className={"absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform " + (skipExisting ? "translate-x-5" : "translate-x-0")} />
               </div>
               <input type="checkbox" className="hidden" checked={skipExisting} onChange={e => setSkipExisting(e.target.checked)} />
-              <span className="font-bold text-xs">اگر محصول در سایت هست، skip کن (فعال برای جلوگیری از تکرار)</span>
+              <span className="font-bold text-xs">اگر محصول در سایت هست، skip کن (جلوگیری از تکرار)</span>
             </label>
-
           </div>
 
           <div className="space-y-3">

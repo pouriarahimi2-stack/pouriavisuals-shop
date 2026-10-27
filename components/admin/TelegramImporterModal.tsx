@@ -6,7 +6,6 @@ import { soundEngine } from "@/lib/soundEngine";
 const normalizeStr = (s: string) => String(s || "").replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim().toLowerCase();
 
 export default function TelegramImporterModal({ onClose, onImportComplete }: any) {
-  // 🌟 استیت‌های کنترل مراحل
   const [step, setStep] = useState<1 | 2 | 3>(1);
   
   const [jsonFile, setJsonFile] = useState<File | null>(null);
@@ -21,10 +20,12 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
   const [onlyAvailable, setOnlyAvailable] = useState(true);
   const [skipExisting, setSkipExisting] = useState(false);
 
-  // 🌟 استیت‌های مربوط به گام ۲ (Visual Mapper)
   const [parsedRows, setParsedRows] = useState<any[]>([]);
   const [photoFilesArr, setPhotoFilesArr] = useState<File[]>([]);
-  const [galleryOpenFor, setGalleryOpenFor] = useState<number | null>(null); // شماره ردیفی که کاربر در حال تغییر عکس آن است
+  const [galleryOpenFor, setGalleryOpenFor] = useState<number | null>(null);
+  
+  // 🌟 استیت جدید برای جستجو در گالری
+  const [gallerySearch, setGallerySearch] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, step: "آماده شروع..." });
@@ -32,7 +33,6 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
   const [isMinimized, setIsMinimized] = useState(false);
   const cancelRef = useRef(false);
 
-  // 👑 پردازش اولیه و تولید لیست برای بازبینی (گام ۱ به ۲)
   const handlePrepareData = async () => {
     if (!excelFiles || excelFiles.length === 0 || !photoFiles || photoFiles.length === 0) {
        setMessage({ text: "⚠️ لطفاً حداقل فایل اکسل و پوشه عکس‌ها را انتخاب کنید.", type: "error" });
@@ -46,7 +46,6 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
        const photosArray = Array.from(photoFiles);
        setPhotoFilesArr(photosArray);
 
-       // استخراج دیتای تلگرام (اگر کاربر داده باشد، برای حدس اولیه استفاده می‌شود)
        let tgProducts: any[] = [];
        if (jsonFile) {
            try {
@@ -63,7 +62,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                        currentProduct.photos.push(msg.photo);
                    }
                }
-           } catch (e) { console.warn("JSON Parse error", e); }
+           } catch (e) {}
        }
 
        let allExtractedRows: any[] = [];
@@ -133,7 +132,6 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                    }
                }
 
-               // 🤖 حدس اولیه عکس (اگر جیسون تلگرام باشد)
                let guessedFile: File | null = null;
                let guessedDesc = productName;
                
@@ -141,10 +139,9 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                    const exClean = normalizeStr(productName);
                    let bestMatch = null;
                    let maxScore = 0;
-                   // یک جستجوی ساده برای حدس اولیه
                    for (const tg of tgProducts) {
                        const tgDesc = normalizeStr(tg.description);
-                       if (tgDesc.includes(exClean)) { bestMatch = tg; break; } // Exact match
+                       if (tgDesc.includes(exClean)) { bestMatch = tg; break; }
                        const words = exClean.split(/\s+/).filter(w => w.length > 2);
                        let hits = 0;
                        for (const w of words) { if (tgDesc.includes(w)) hits++; }
@@ -175,13 +172,13 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                    shipping_type: finalShipping,
                    category: globalCategory || file.name.split("-")[0].split("_")[0].trim() || "عمومی",
                    description: guessedDesc,
-                   matchedFile: guessedFile // 🌟 فایلی که بعداً در UI قابل ویرایش است
+                   matchedFile: guessedFile 
                });
            }
        }
 
        setParsedRows(allExtractedRows);
-       setStep(2); // رفتن به گام بررسی چشمی
+       setStep(2); 
        soundEngine?.playSuccess?.();
 
     } catch (err: any) {
@@ -191,7 +188,6 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
     }
   };
 
-  // 👑 گام ۳: ایمپورت نهایی قطعی بر اساس مپینگ انجام شده توسط کاربر
   const handleFinalImport = async () => {
       setLoading(true);
       setStep(3);
@@ -228,7 +224,6 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
               let finalImageUrl = "/placeholder.png";
               let imagesArr = ["/placeholder.png"];
 
-              // آپلود عکسی که تایید یا به صورت دستی انتخاب شده است
               if (row.matchedFile) {
                   const formData = new FormData();
                   formData.append("file", row.matchedFile);
@@ -247,7 +242,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
               const productPayload: any = {
                   title: row.title,
-                  brand: "\u200B", // دور زدن باگ Apple
+                  brand: "\u200B", 
                   category: row.category,
                   price: row.price,
                   stock: row.stock,
@@ -317,36 +312,70 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-sans select-text dir-rtl transition-all">
       
-      {/* 👑 گالری انتخاب دستی عکس (Visual Mapper Picker) */}
+      {/* 👑 گالری انتخاب دستی عکس (Visual Mapper Picker) اصلاح شده */}
       {galleryOpenFor !== null && (
-          <div className="fixed inset-0 z-[60] bg-black/90 flex flex-col p-4 sm:p-10 animate-fadeIn" onClick={() => setGalleryOpenFor(null)}>
-              <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-white font-black">یک عکس را برای این محصول انتخاب کنید:</h3>
-                  <button className="text-rose-500 font-black p-2 bg-white/10 rounded-xl hover:bg-white/20">انصراف (✕)</button>
-              </div>
-              <div className="flex-1 overflow-y-auto grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4 content-start" onClick={e => e.stopPropagation()}>
-                  {/* دکمه عکس خالی */}
-                  <div 
-                     onClick={() => {
-                         setParsedRows(prev => { const arr = [...prev]; arr[galleryOpenFor].matchedFile = null; return arr; });
-                         setGalleryOpenFor(null);
-                     }}
-                     className="aspect-square bg-slate-800 rounded-2xl flex flex-col items-center justify-center cursor-pointer border-2 border-transparent hover:border-slate-500 transition text-slate-400">
-                     <span className="text-3xl mb-2">🚫</span>
-                     <span className="text-[10px] font-bold">بدون عکس</span>
+          <div className="fixed inset-0 z-[60] bg-black/95 flex flex-col p-4 sm:p-8 animate-fadeIn" onClick={() => setGalleryOpenFor(null)}>
+              
+              {/* هدر گالری به همراه سرچ */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4" onClick={e => e.stopPropagation()}>
+                  <h3 className="text-white font-black text-sm sm:text-base">انتخاب دستی تصویر:</h3>
+                  
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                      <input 
+                          type="text" 
+                          placeholder="🔍 جستجوی نام عکس..." 
+                          value={gallerySearch}
+                          onChange={e => setGallerySearch(e.target.value)}
+                          className="flex-1 sm:w-72 p-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/50 outline-none font-mono text-xs focus:border-sky-500 transition"
+                      />
+                      <button onClick={() => setGalleryOpenFor(null)} className="text-rose-500 font-black p-3 bg-white/10 rounded-xl hover:bg-white/20 transition whitespace-nowrap cursor-pointer">انصراف ✕</button>
                   </div>
-                  {/* رندر تمام عکس‌های آپلود شده */}
-                  {photoFilesArr.map((f, idx) => (
-                      <div key={idx} 
-                          onClick={() => {
-                              setParsedRows(prev => { const arr = [...prev]; arr[galleryOpenFor].matchedFile = f; return arr; });
-                              setGalleryOpenFor(null);
-                          }}
-                          className="relative aspect-square rounded-2xl overflow-hidden cursor-pointer border-2 border-transparent hover:border-[var(--accent-blue)] transition">
-                          <img src={URL.createObjectURL(f)} className="w-full h-full object-cover bg-white" alt="تصویر" />
-                          <div className="absolute bottom-0 inset-x-0 bg-black/60 p-1 text-[8px] text-white truncate text-center" dir="ltr">{f.name}</div>
+              </div>
+              
+              {/* بدنه گالری - اصلاح شده برای جلوگیری از له‌شدگی عکس‌ها */}
+              <div className="flex-1 overflow-y-auto pr-2" onClick={e => e.stopPropagation()}>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pb-10 auto-rows-max">
+                      
+                      {/* دکمه بدون عکس */}
+                      <div 
+                         onClick={() => {
+                             setParsedRows(prev => { const arr = [...prev]; arr[galleryOpenFor].matchedFile = null; return arr; });
+                             setGalleryOpenFor(null);
+                         }}
+                         className="h-32 sm:h-40 bg-slate-800 rounded-2xl flex flex-col items-center justify-center cursor-pointer border-2 border-transparent hover:border-slate-500 transition text-slate-400">
+                         <span className="text-3xl mb-2">🚫</span>
+                         <span className="text-[10px] font-bold">بدون عکس</span>
                       </div>
-                  ))}
+
+                      {/* رندر عکس‌های فیلتر شده - با محدودیت 200 تایی برای جلوگیری از کرش مرورگر */}
+                      {photoFilesArr
+                          .filter(f => f.name.toLowerCase().includes(gallerySearch.toLowerCase()))
+                          .slice(0, 200)
+                          .map((f, idx) => (
+                          <div key={idx} 
+                              onClick={() => {
+                                  setParsedRows(prev => { const arr = [...prev]; arr[galleryOpenFor].matchedFile = f; return arr; });
+                                  setGalleryOpenFor(null);
+                              }}
+                              className="relative h-32 sm:h-40 rounded-2xl overflow-hidden cursor-pointer border-2 border-transparent hover:border-emerald-500 transition group bg-white p-1">
+                              <img 
+                                  src={URL.createObjectURL(f)} 
+                                  loading="lazy"
+                                  className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" 
+                                  alt="تصویر" 
+                              />
+                              <div className="absolute bottom-0 inset-x-0 bg-black/75 p-1.5 text-[9px] text-white truncate text-center font-mono backdrop-blur-md" dir="ltr">
+                                  {f.name}
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+                  
+                  {photoFilesArr.filter(f => f.name.toLowerCase().includes(gallerySearch.toLowerCase())).length > 200 && (
+                      <p className="text-center text-white/50 font-bold text-xs mt-6 mb-10 bg-white/5 p-4 rounded-xl">
+                          ⚠️ بیش از ۲۰۰ عکس پیدا شد. برای مشاهده سایر عکس‌ها، نام آن‌ها را در کادر بالا جستجو کنید.
+                      </p>
+                  )}
               </div>
           </div>
       )}

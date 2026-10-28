@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { soundEngine } from "@/lib/soundEngine";
 
@@ -97,16 +97,18 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
   const [parsedRows, setParsedRows] = useState<any[]>([]);
   const [photoFilesArr, setPhotoFilesArr] = useState<File[]>([]);
   
-  // 🌟 استیت‌های گالری
   const [galleryOpenFor, setGalleryOpenFor] = useState<number | null>(null);
   const [gallerySearch, setGallerySearch] = useState("");
   const [visiblePhotos, setVisiblePhotos] = useState(50);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [tempSelectedFiles, setTempSelectedFiles] = useState<File[]>([]);
 
-  // 🌟 استیت‌های ویرایشگر داخلی (Inline Staging Editor)
   const [inlineEditIndex, setInlineEditIndex] = useState<number | null>(null);
   const [inlineEditForm, setInlineEditForm] = useState<any>(null);
+
+  // 🌟 استیت‌های مربوط به ردیابی محصول ویرایش شده و اسکرول نرم
+  const [lastEditedIndex, setLastEditedIndex] = useState<number | null>(null);
+  const itemRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, step: "آماده شروع..." });
@@ -116,6 +118,16 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
   const [isPaused, setIsPaused] = useState(false);
   const cancelRef = useRef(false);
   const pauseRef = useRef(false);
+
+  // 🌟 افکت هوشمند اسکرول اتوماتیک
+  useEffect(() => {
+      if (lastEditedIndex !== null && itemRefs.current[lastEditedIndex] && galleryOpenFor === null && inlineEditIndex === null) {
+          // استفاده از تایم‌اوت کوتاه تا بعد از بسته شدن مودال، اسکرول دقیق انجام شود
+          setTimeout(() => {
+              itemRefs.current[lastEditedIndex]?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }, 100);
+      }
+  }, [lastEditedIndex, galleryOpenFor, inlineEditIndex]);
 
   const togglePause = () => {
       pauseRef.current = !pauseRef.current;
@@ -307,7 +319,6 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
        }
 
        setParsedRows(allExtractedRows);
-       
        const hasNewProducts = allExtractedRows.some(r => r.action === "new");
        if (hasNewProducts) {
            setStep(2);
@@ -427,11 +438,11 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
               arr[originalIndex].matchedFiles = tempSelectedFiles; 
               return arr; 
           });
+          setLastEditedIndex(galleryOpenFor); // 🌟 ثبت موقعیت کاربر
       }
       setGalleryOpenFor(null);
   };
 
-  // 🌟 توابع استیجینگ ادیتور
   const openInlineEditor = (idx: number) => {
       setInlineEditIndex(idx);
       setInlineEditForm({ ...newProductsOnly[idx] });
@@ -442,10 +453,10 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
           const originalIndex = parsedRows.findIndex(r => r === newProductsOnly[inlineEditIndex]);
           setParsedRows(prev => {
               const arr = [...prev];
-              // آپدیت متن‌ها (عکس‌ها جداگانه توسط گالری آپدیت می‌شوند و در arr موجودند)
               arr[originalIndex] = { ...arr[originalIndex], ...inlineEditForm };
               return arr;
           });
+          setLastEditedIndex(inlineEditIndex); // 🌟 ثبت موقعیت کاربر
       }
       setInlineEditIndex(null);
   };
@@ -457,7 +468,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 font-sans select-text dir-rtl transition-all">
       
-      {/* 👑 لایت‌باکس بزرگنمایی عکس (روی گالری) */}
+      {/* 👑 لایت‌باکس بزرگنمایی عکس */}
       {previewFile && (
           <div className="fixed inset-0 z-[70] bg-black/95 flex flex-col items-center justify-center p-4 animate-fadeIn" onClick={() => setPreviewFile(null)}>
               <div className="absolute top-4 right-4 flex gap-3" onClick={e => e.stopPropagation()}>
@@ -472,13 +483,13 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
           </div>
       )}
 
-      {/* 👑 گالری Visual Mapper (با حفظ اسکرول) */}
+      {/* 👑 گالری Visual Mapper */}
       {galleryOpenFor !== null && (
           <div className={`fixed inset-0 z-[60] bg-black/95 flex-col p-4 sm:p-8 animate-fadeIn ${previewFile ? "hidden" : "flex"}`} onClick={() => confirmGallerySelection()}>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4" onClick={e => e.stopPropagation()}>
                   <div className="text-white">
-                     <h3 className="font-black text-lg mb-1">گالری عکس‌ها:</h3>
-                     <p className="text-sky-400 font-bold text-sm">{newProductsOnly[galleryOpenFor]?.title}</p>
+                     <h3 className="font-black text-lg mb-1">انتخاب تصاویر برای:</h3>
+                     <p className="text-sky-400 font-bold text-sm">{newProductsOnly[galleryOpenFor].title}</p>
                      <p className="text-slate-400 text-xs mt-1">تعداد {tempSelectedFiles.length} عکس انتخاب شده است. اولین عکس کاور اصلی خواهد بود.</p>
                   </div>
                   <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -491,6 +502,9 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                       />
                       <button onClick={() => confirmGallerySelection()} className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-white font-black rounded-xl shadow-lg transition cursor-pointer text-sm whitespace-nowrap">
                           ✅ تایید عکس‌های انتخاب شده
+                      </button>
+                      <button onClick={() => { setLastEditedIndex(galleryOpenFor); setGalleryOpenFor(null); }} className="px-4 py-3 bg-rose-500/20 text-rose-500 hover:bg-rose-500 hover:text-white font-black rounded-xl transition cursor-pointer text-sm">
+                          انصراف ✕
                       </button>
                   </div>
               </div>
@@ -514,12 +528,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                                   onClick={() => toggleImageSelection(f)} 
                                   className={`relative aspect-square rounded-2xl overflow-hidden cursor-pointer border-4 transition-all group p-1 ${isSelected ? 'border-emerald-500 bg-emerald-50' : 'border-transparent bg-white hover:border-slate-300'}`}>
                                   
-                                  <img 
-                                      src={URL.createObjectURL(f)} 
-                                      loading="lazy"
-                                      className="w-full h-full object-contain transition-transform duration-300" 
-                                      alt="تصویر" 
-                                  />
+                                  <img src={URL.createObjectURL(f)} loading="lazy" className="w-full h-full object-contain transition-transform duration-300" alt="تصویر" />
                                   
                                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
                                       <button 
@@ -565,11 +574,11 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
 
       {/* 👑 پنجره ویرایش داخلی (Inline Staging Editor) */}
       {inlineEditIndex !== null && inlineEditForm && (
-          <div className="fixed inset-0 z-[55] bg-black/80 flex flex-col items-center justify-center p-4 animate-fadeIn" onClick={() => setInlineEditIndex(null)}>
+          <div className="fixed inset-0 z-[55] bg-black/80 flex flex-col items-center justify-center p-4 animate-fadeIn" onClick={() => { setLastEditedIndex(inlineEditIndex); setInlineEditIndex(null); }}>
               <div className="w-full max-w-3xl bg-[var(--modal-bg)] rounded-[2rem] p-6 sm:p-8 shadow-2xl border border-[var(--card-border)] overflow-y-auto max-h-full" onClick={e => e.stopPropagation()}>
                   <div className="flex items-center justify-between mb-6 pb-4 border-b border-[var(--card-border)]">
                       <h3 className="font-black text-lg text-[var(--accent-blue)]">✏️ ویرایش کامل اطلاعات پیش از آپلود</h3>
-                      <button onClick={() => setInlineEditIndex(null)} className="p-2 rounded-xl bg-[var(--input-bg)] font-black cursor-pointer hover:bg-rose-500 hover:text-white transition">✕</button>
+                      <button onClick={() => { setLastEditedIndex(inlineEditIndex); setInlineEditIndex(null); }} className="p-2 rounded-xl bg-[var(--input-bg)] font-black cursor-pointer hover:bg-rose-500 hover:text-white transition">✕</button>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -603,13 +612,11 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                       </div>
                   </div>
                   
-                  {/* بخش نمایش عکس‌ها داخل ادیتور */}
                   <div className="p-4 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl">
                       <div className="flex justify-between items-center mb-3">
                           <label className="block text-xs font-black text-[var(--text-secondary)]">گالری عکس‌های انتخاب شده:</label>
                           <button 
                               onClick={() => {
-                                  // عکس‌های فعلی محصول را به استیت موقت گالری بفرست
                                   setTempSelectedFiles(newProductsOnly[inlineEditIndex].matchedFiles || []);
                                   setGalleryOpenFor(inlineEditIndex);
                                   setVisiblePhotos(50);
@@ -633,11 +640,11 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                   </div>
 
                   <div className="flex gap-3 mt-6">
-                      <button onClick={() => setInlineEditIndex(null)} className="flex-1 py-4 rounded-2xl bg-[var(--input-bg)] text-slate-600 font-black hover:bg-slate-200 transition cursor-pointer">
+                      <button onClick={() => { setLastEditedIndex(inlineEditIndex); setInlineEditIndex(null); }} className="flex-1 py-4 rounded-2xl bg-[var(--input-bg)] text-slate-600 font-black hover:bg-slate-200 transition cursor-pointer">
                           انصراف
                       </button>
                       <button onClick={saveInlineEditor} className="flex-[2] py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black shadow-lg hover:opacity-90 transition cursor-pointer">
-                          💾 ذخیره این تغییرات در پیش‌نویس
+                          💾 ذخیره تغییرات
                       </button>
                   </div>
               </div>
@@ -666,7 +673,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
           </div>
         </div>
         
-        <div className="p-6 space-y-6 text-xs overflow-y-auto flex-1 relative">
+        <div className="p-6 space-y-6 text-xs overflow-y-auto flex-1 relative custom-scrollbar">
           {message && (
             <div className={"p-4 rounded-2xl font-bold border " + (message.type === "error" ? "bg-rose-500/10 text-rose-500 border-rose-500/30" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/30")}>
               {message.text}
@@ -717,7 +724,7 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                       <input type="checkbox" className="hidden" checked={skipExisting} onChange={e => setSkipExisting(e.target.checked)} />
                       <span className="font-bold text-xs text-[var(--text-primary)]">
                          نادیده گرفتن محصولات تکراری 
-                         <span className="text-rose-500 mr-1 block sm:inline mt-1 sm:mt-0 bg-rose-500/10 px-2 py-0.5 rounded-lg">(برای آپدیتِ سریع قیمت‌ها، این تیک حتماً باید خاموش باشد)</span>
+                         <span className="text-rose-500 mr-1 block sm:inline mt-1 sm:mt-0 bg-rose-500/10 px-2 py-0.5 rounded-lg">(برای آپدیتِ سریع قیمت‌ها، خاموش بماند)</span>
                       </span>
                     </label>
                   </div>
@@ -749,13 +756,13 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                      {updatingProductsCount > 0 && (
                          <div className="flex-1 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl">
                              <h3 className="font-black text-emerald-600 mb-1">⚡ آپدیت فوق‌سریع</h3>
-                             <p className="text-[10px] text-emerald-600/80"><b>{updatingProductsCount} کالا</b> از قبل در سایت وجود دارند. فقط قیمت و موجودی آن‌ها آپدیت خواهد شد.</p>
+                             <p className="text-[10px] text-emerald-600/80"><b>{updatingProductsCount} کالا</b> از قبل در سایت وجود دارند. فقط قیمت و موجودی آن‌ها آپدیت خواهد شد و نیازی به انتخاب عکس ندارند.</p>
                          </div>
                      )}
                      {newProductsOnly.length > 0 && (
                          <div className="flex-1 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
                              <h3 className="font-black text-amber-600 mb-1">🆕 محیط استیجینگ محصولات جدید (PIM)</h3>
-                             <p className="text-[10px] text-amber-600/80">این <b>{newProductsOnly.length} کالا</b> جدید هستند. روی دکمه ویرایش کامل کلیک کنید تا تمام مشخصات و عکس‌هایشان را پیش از آپلود بازبینی کنید.</p>
+                             <p className="text-[10px] text-amber-600/80">این <b>{newProductsOnly.length} کالا</b> جدید هستند. روی دکمه ویرایش کلیک کنید تا مشخصات و عکس‌هایشان را پیش از آپلود بازبینی کنید.</p>
                          </div>
                      )}
                   </div>
@@ -765,7 +772,11 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
                   ) : (
                       <div className="space-y-3">
                           {newProductsOnly.map((row, idx) => (
-                              <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-[var(--card-border)] bg-[var(--input-bg)] rounded-2xl hover:border-sky-500/50 transition">
+                              <div 
+                                  key={idx} 
+                                  ref={el => { itemRefs.current[idx] = el; }}
+                                  className={`flex flex-col sm:flex-row sm:items-center gap-4 p-4 border rounded-2xl transition-all duration-500 ${lastEditedIndex === idx ? 'border-emerald-500 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.15)]' : 'border-[var(--card-border)] bg-[var(--input-bg)] hover:border-sky-500/50'}`}
+                              >
                                   <div className="flex gap-2 items-center">
                                       <div className="flex-shrink-0 w-20 h-20 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center p-1 relative shadow-sm">
                                           {row.matchedFiles && row.matchedFiles.length > 0 ? (

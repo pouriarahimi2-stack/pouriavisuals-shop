@@ -27,11 +27,10 @@ export default function ProductCard({ product }: { product: any }) {
     <Link 
       href={`/products/${product.slug || product.id}`} 
       onClick={() => soundEngine?.playClick?.()} 
-      className="flex flex-col bg-white overflow-hidden border border-slate-100 hover:shadow-[0_2px_12px_rgba(0,0,0,0.08)] transition-all duration-200 h-full group w-full relative"
-      style={{ borderRadius: '8px' }}
+      className="flex flex-col bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow h-full group w-full relative border border-slate-100/50"
       dir="rtl"
     >
-      {/* لیبل تخفیف */}
+      {/* لیبل تخفیف و ناموجود */}
       {(hasDiscount || isOutOfStock) && (
           <div className="absolute top-2 right-2 z-10">
               {isOutOfStock ? (
@@ -48,19 +47,19 @@ export default function ProductCard({ product }: { product: any }) {
           src={imageUrl} 
           alt={product.title} 
           loading="lazy"
-          className={`w-full h-full object-contain mix-blend-multiply transition-transform duration-300 ${isOutOfStock ? 'opacity-50' : 'group-hover:scale-105'}`} 
+          className={`w-full h-full object-contain mix-blend-multiply transition-transform duration-300 ${isOutOfStock ? 'opacity-50 grayscale' : 'group-hover:scale-105'}`} 
         />
       </div>
 
-      {/* اطلاعات کالا (دیجی‌کالا استایل) */}
+      {/* اطلاعات کالا */}
       <div className="p-3 flex flex-col flex-1 bg-white">
-        <div className="flex-1">
+        <div className="flex-1 mb-2">
           <h3 className="text-xs text-slate-800 line-clamp-2 leading-relaxed font-medium">
             {product.title}
           </h3>
         </div>
         
-        <div className="mt-2 flex flex-col items-end w-full">
+        <div className="mt-auto flex flex-col items-end w-full">
           <div className="h-4 flex items-end justify-start w-full">
             {hasDiscount && !isOutOfStock && (
               <span className="text-[11px] text-slate-400 line-through">{price.toLocaleString('fa-IR')}</span>
@@ -68,15 +67,16 @@ export default function ProductCard({ product }: { product: any }) {
           </div>
           
           <div className="flex items-center justify-between w-full mt-1">
+            {/* دکمه + مشابه دیجی‌کالا */}
             <button 
               onClick={handleFastBuy} 
               disabled={isOutOfStock}
-              className="w-7 h-7 rounded-full bg-rose-500 text-white flex shrink-0 items-center justify-center hover:bg-rose-600 transition-colors shadow-sm disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer"
+              className="w-7 h-7 rounded-full bg-rose-50 text-rose-500 flex shrink-0 items-center justify-center hover:bg-rose-500 hover:text-white transition-colors disabled:bg-slate-50 disabled:text-slate-300 cursor-pointer"
             >
-              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
             </button>
             <div className="flex items-center gap-1">
-              <span className={`text-sm font-bold tracking-tight ${isOutOfStock ? 'text-slate-400' : 'text-slate-800'}`}>
+              <span className={`text-sm sm:text-base font-bold tracking-tight ${isOutOfStock ? 'text-slate-400' : 'text-slate-800'}`}>
                 {finalPrice.toLocaleString('fa-IR')}
               </span>
               <span className={`text-[9px] font-bold ${isOutOfStock ? 'text-slate-300' : 'text-slate-800'}`}>تومان</span>

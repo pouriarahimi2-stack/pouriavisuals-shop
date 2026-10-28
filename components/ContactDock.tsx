@@ -26,7 +26,7 @@ export default function ContactDock() {
         const bg = json?.config?.globalBackground || {};
         setChatConfig({
           svg: bg.chatIconSvg || "",
-          sizeMob: Number(bg.chatSizeMobile ?? 44),
+          sizeMob: Number(bg.chatSizeMobile ?? 40),
           sizeDesk: Number(bg.chatSizeDesktop ?? 60),
           side: bg.chatButtonSide === "right" ? "right" : "left",
           bottomPx: Number(bg.chatButtonBottomPx ?? 24)

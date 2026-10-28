@@ -157,7 +157,7 @@ export const productService = {
           title: cleanTitle,
           title_fa: product.title_fa || cleanTitle,
           sku: product.sku || ("SKU-" + productId.slice(-6).toUpperCase()),
-          brand: product.brand || "Apple",
+          brand: product.brand || "",
           category: product.category || "تجهیزات تخصصی",
           price: Number(product.price || 0),
           discount_price: product.discountPrice ? Number(product.discountPrice) : (product.discount_price ? Number(product.discount_price) : null),

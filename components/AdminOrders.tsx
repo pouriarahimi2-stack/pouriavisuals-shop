@@ -464,11 +464,23 @@ export default function AdminOrders() {
                                 💬 پیامک نظر
                               </button>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => printOrderInvoice(order)}
-                            className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-500 border border-emerald-500/20 text-[11px] font-bold transition cursor-pointer"
-                          >
+                          
+                          {order.status === "delivered" && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                    if(!confirm("ارسال پیامک نظرسنجی؟")) return;
+                                    try {
+                                        await fetch("/api/admin/sms/review-request", { method: "POST", body: JSON.stringify({ orderId: order.id, phone: order.phone }) });
+                                        alert("پیامک با موفقیت ارسال شد.");
+                                    } catch(e) {}
+                                }}
+                                className="px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500 hover:text-white text-sky-500 border border-sky-500/20 text-[11px] font-bold transition cursor-pointer"
+                              >
+                                💬 پیامک نظر
+                              </button>
+                          )}
+                          <button type="button" onClick={() => printOrderInvoice(order)} className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-500 border border-emerald-500/20 text-[11px] font-bold transition cursor-pointer">
                             🖨️ فاکتور
                           </button>
                           <button

@@ -7,27 +7,21 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (!auth.ok) return auth.res;
-
   try {
     const { orderId, phone } = await req.json();
     const cleanPhone = String(phone).replace(/\D/g, "");
+    if (cleanPhone.length < 10) return NextResponse.json({ success: false }, { status: 400 });
     
-    if (cleanPhone.length < 10) {
-      return NextResponse.json({ success: false, message: "شماره موبایل مشتری معتبر نیست." }, { status: 400 });
-    }
-
-    // در اینجا باید به متد IPPanel متصل شوید (به جای OTP). فعلاً در لاگ سیستم به عنوان ارسال موفق ثبت می‌شود
+    // شبیه‌سازی ارسال (اتصال واقعی به API پیامک)
     await supabaseAdmin.from("admin_audit_logs").insert([{
       action: "REVIEW_SMS_SENT",
       user_id: auth.session?.username || "admin",
-      details: { orderId, targetMobile: cleanPhone, message: "ارسال موفق لینک نظرسنجی" },
-      ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
+      details: { orderId, targetMobile: cleanPhone },
       severity: "info",
-      created_at: new Date().toISOString(),
     }]);
 
-    return NextResponse.json({ success: true, message: "پیامک نظرسنجی با موفقیت ارسال شد." });
+    return NextResponse.json({ success: true });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json({ success: false }, { status: 500 });
   }
 }

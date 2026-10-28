@@ -136,6 +136,21 @@ export default function AdminOrders() {
     }
   };
 
+  
+  const handleSendReviewSms = async (order: any) => {
+    if(!confirm("آیا مایل به ارسال پیامک درخواست ثبت نظر برای این سفارش هستید؟")) return;
+    try {
+      const res = await fetch("/api/admin/sms/review-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id, phone: order.phone || order.customer?.phone })
+      });
+      const json = await res.json();
+      if(res.ok && json.success) alert("پیامک نظرسنجی با موفقیت ارسال شد.");
+      else alert("خطا: " + json.message);
+    } catch(e) { alert("خطا در برقراری ارتباط با سرور"); }
+  };
+
   const handleDeleteOrder = async (orderId: string | number) => {
     if (!confirm("آیا از حذف کامل این سفارش از دیتابیس اطمینان دارید؟")) return;
     soundEngine.playClick();
@@ -438,6 +453,17 @@ export default function AdminOrders() {
                             👁️ پرونده
                           </button>
 
+                          
+                          {selectedOrder?.status === "delivered" && (
+                              <button
+                                type="button"
+                                onClick={() => handleSendReviewSms(selectedOrder!)}
+                                className="px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500 hover:text-white text-sky-500 border border-sky-500/20 text-[11px] font-bold transition cursor-pointer whitespace-nowrap"
+                                title="ارسال دستی پیامک نظرسنجی به مشتری"
+                              >
+                                💬 پیامک نظر
+                              </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => printOrderInvoice(order)}
@@ -542,9 +568,20 @@ export default function AdminOrders() {
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-[var(--card-border)]">
-              <button
-                type="button"
-                onClick={() => printOrderInvoice(selectedOrder)}
+              
+                          {selectedOrder?.status === "delivered" && (
+                              <button
+                                type="button"
+                                onClick={() => handleSendReviewSms(selectedOrder!)}
+                                className="px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500 hover:text-white text-sky-500 border border-sky-500/20 text-[11px] font-bold transition cursor-pointer whitespace-nowrap"
+                                title="ارسال دستی پیامک نظرسنجی به مشتری"
+                              >
+                                💬 پیامک نظر
+                              </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => printOrderInvoice(selectedOrder)}
                 className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition shadow-lg cursor-pointer flex items-center gap-1.5"
               >
                 <span>🖨️</span>

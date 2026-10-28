@@ -486,8 +486,8 @@ export default function TelegramImporterModal({ onClose, onImportComplete }: any
       )}
 
       {/* 👑 گالری Visual Mapper (با سرچ و صفحه‌بندی) */}
-      {galleryOpenFor !== null && !previewFile && (
-          <div className="fixed inset-0 z-[60] bg-black/95 flex flex-col p-4 sm:p-8 animate-fadeIn" onClick={() => setGalleryOpenFor(null)}>
+      {galleryOpenFor !== null && (
+          <div className={`fixed inset-0 z-[60] bg-black/95 flex-col p-4 sm:p-8 animate-fadeIn ${previewFile ? "hidden" : "flex"}`} onClick={() => setGalleryOpenFor(null)}>
               
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4" onClick={e => e.stopPropagation()}>
                   <div className="text-white">

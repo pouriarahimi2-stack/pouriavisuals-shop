@@ -63,17 +63,17 @@ export const DEFAULT_SECTIONS_ORDER: ResponsiveSectionItem[] = [
     title: "نمایشگاه تعاملی سه‌بعدی محصولات پرچمدار",
     subtitle: "پیمایش لمسی جهت بررسی دقیق مشخصات و گارانتی",
     enabled: true,
-    showOnMobile: true,
+    showOnMobile: false,
     showOnTablet: false,
     showOnDesktop: false,
   },
   {
     id: "sec_catalog",
     type: "NativeProductCatalog",
-    title: "کاتالوگ تجهیزات تخصصی و کالای دیجیتال",
-    subtitle: "تمامی کالاها با گارانتی اصالت طلایی عرضه می‌شوند",
+    title: "محصولات ویژه آکسون کور",
+    subtitle: "با گارانتی اصالت طلایی و ارسال سریع",
     enabled: true,
-    showOnMobile: false,
+    showOnMobile: true,
     showOnTablet: true,
     showOnDesktop: true,
   },
@@ -381,7 +381,7 @@ export default function DynamicHomeSections({
 
   return (
     <div
-      className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 space-y-6 sm:space-y-10 font-sans select-text"
+      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12 pb-24 font-sans select-text"
       dir="rtl"
     >
       {rawSections.map((sec: any) => renderSectionByConfig(sec))}

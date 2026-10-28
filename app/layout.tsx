@@ -143,9 +143,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <div className="pb-16 lg:pb-0">{children}</div>
             </LayoutShell>
             <LiveStoreSyncGuard />
+            <MobileBottomNav />
           </SiteInfoProvider>
         </CartProvider>
-        <MobileBottomNav />
       </body>
     </html>
   );

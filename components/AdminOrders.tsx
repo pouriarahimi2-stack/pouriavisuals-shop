@@ -480,9 +480,24 @@ export default function AdminOrders() {
                                 💬 پیامک نظر
                               </button>
                           )}
-                          <button type="button" onClick={() => printOrderInvoice(order)} className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-500 border border-emerald-500/20 text-[11px] font-bold transition cursor-pointer">
+                          <button type="button" onClick={() => printOrderInvoice(order)} className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-500 border border-emerald-500/20 text-[11px] font-bold transition cursor-pointer whitespace-nowrap">
                             🖨️ فاکتور
                           </button>
+                          {order.status === "delivered" && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                    if(!confirm("ارسال پیامک درخواست نظر به این مشتری؟")) return;
+                                    try {
+                                        const res = await fetch("/api/admin/sms/review-request", { method:"POST", body: JSON.stringify({orderId: order.id, phone: order.phone})});
+                                        if(res.ok) alert("پیامک ارسال شد.");
+                                    } catch(e){}
+                                }}
+                                className="px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500 hover:text-white text-sky-500 border border-sky-500/20 text-[11px] font-bold transition cursor-pointer whitespace-nowrap"
+                              >
+                                💬 پیامک نظر
+                              </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleDeleteOrder(order.id)}
@@ -593,12 +608,28 @@ export default function AdminOrders() {
                           )}
                           <button
                             type="button"
-                            onClick={() => printOrderInvoice(selectedOrder)}
+                            onClick={() => printOrderInvoice(selectedOrder!)}
                 className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition shadow-lg cursor-pointer flex items-center gap-1.5"
               >
                 <span>🖨️</span>
                 <span>چاپ فاکتور رسمی</span>
               </button>
+              {selectedOrder?.status === "delivered" && (
+                 <button
+                   type="button"
+                   onClick={async () => {
+                       if(!confirm("ارسال پیامک درخواست نظر به این مشتری؟")) return;
+                       try {
+                           const res = await fetch("/api/admin/sms/review-request", { method:"POST", body: JSON.stringify({orderId: selectedOrder.id, phone: selectedOrder.phone})});
+                           if(res.ok) alert("پیامک ارسال شد.");
+                       } catch(e){}
+                   }}
+                   className="px-6 py-3 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-black transition shadow-lg cursor-pointer flex items-center gap-1.5"
+                 >
+                   <span>💬</span>
+                   <span>ارسال پیامک نظرسنجی</span>
+                 </button>
+              )}
             </div>
           </div>
         </div>

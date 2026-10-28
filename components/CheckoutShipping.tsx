@@ -82,9 +82,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
         </span>
         <div>
           <h3 className="font-black text-sm">مشخصات گیرنده و نشانی پستی</h3>
-          <p className="text-[11px] text-[var(--text-secondary)] font-medium">
-            انتخاب استاندارد استان و شهر جهت صدور بارنامه پست پیشتاز (مجهز به حافظه فرم)
-          </p>
+          <p className="text-[11px] text-[var(--text-secondary)] font-medium">لطفاً آدرس دقیق خود را برای ارسال کالا وارد نمایید.</p>
         </div>
       </div>
 
@@ -229,9 +227,9 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
           >
             <div className="space-y-1">
               <span className="font-extrabold text-xs block text-[var(--text-primary)]">
-                📦 پست پیشتاز سراسری
+                📦 پست پیشتاز
               </span>
-              <span className="text-[10px] opacity-80">تحویل ۲ الی ۴ روز کاری</span>
+              <span className="text-[10px] opacity-80"></span>
             </div>
             <span className="font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400">
               رایگان

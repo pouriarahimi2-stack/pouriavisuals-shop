@@ -31,12 +31,13 @@ export default function ProductDetailClient({ initialProduct }: { initialProduct
   const hasDiscount = currentPrice > 0 && currentPrice < oldPrice;
   const isAvailable = Number(product.stock || 0) > 0 && product.is_available !== false;
   
-  // دیتای داینامیک
+  // خواندن دیتای دقیق محصول از دیتابیس (بدون هاردکد پیش‌فرض)
   const warrantyText = product.warranty || "";
   const brandText = product.brand && product.brand !== "متفرقه" ? product.brand : "";
+  
   let shippingText = "";
-  if (product.shipping_type === "post") shippingText = "ارسال با پست پیشتاز";
-  else if (product.shipping_type === "tipax") shippingText = "ارسال سریع با تیپاکس (پس‌کرایه)";
+  if (product.shipping_type === "post") shippingText = "ارسال فقط با پست پیشتاز";
+  else if (product.shipping_type === "tipax") shippingText = "ارسال با تیپاکس (پس‌کرایه)";
   else if (product.shipping_type === "both") shippingText = "ارسال سراسری (پست / تیپاکس)";
 
   const handleBuy = () => {
@@ -62,15 +63,16 @@ export default function ProductDetailClient({ initialProduct }: { initialProduct
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10 flex flex-col lg:flex-row gap-12 lg:gap-20">
         
-        {/* گالری تصاویر */}
+        {/* بخش گالری تصاویر */}
         <div className="w-full lg:w-1/2 flex flex-col gap-4">
-          <div className="w-full aspect-square bg-slate-50 rounded-[2rem] p-4 flex items-center justify-center border border-slate-100">
-             <img src={allImages[selectedImg]} className="w-full h-full object-contain drop-shadow-sm transition-transform duration-500" alt={product.title} />
+          <div className="w-full aspect-square bg-slate-50 rounded-[2rem] p-4 flex items-center justify-center border border-slate-100 relative">
+             {hasDiscount && <span className="absolute top-4 right-4 bg-rose-500 text-white text-xs font-black px-3 py-1 rounded-full shadow-sm z-10">فروش ویژه</span>}
+             <img src={allImages[selectedImg]} className="w-full h-full object-contain drop-shadow-sm transition-transform duration-500 hover:scale-105" alt={product.title} />
           </div>
           {allImages.length > 1 && (
             <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
               {allImages.map((img, idx) => (
-                <button key={idx} onClick={() => setSelectedImg(idx)} className={`flex-shrink-0 w-20 h-20 rounded-2xl border-2 bg-white p-1 transition-all ${selectedImg === idx ? 'border-slate-800' : 'border-transparent hover:border-slate-200'}`}>
+                <button key={idx} onClick={() => setSelectedImg(idx)} className={`flex-shrink-0 w-20 h-20 rounded-2xl border-2 bg-white p-1 transition-all cursor-pointer ${selectedImg === idx ? 'border-slate-900 shadow-sm' : 'border-slate-100 hover:border-slate-300'}`}>
                   <img src={img} className="w-full h-full object-contain rounded-xl" alt="" />
                 </button>
               ))}
@@ -78,7 +80,7 @@ export default function ProductDetailClient({ initialProduct }: { initialProduct
           )}
         </div>
 
-        {/* اطلاعات محصول */}
+        {/* بخش اطلاعات محصول و دکمه خرید */}
         <div className="w-full lg:w-1/2 flex flex-col justify-center">
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 leading-tight">{product.title}</h1>
           <p className="mt-4 text-sm leading-relaxed text-slate-500 whitespace-pre-wrap">{rawDesc || "توضیحات تکمیلی ثبت نشده است."}</p>
@@ -112,7 +114,7 @@ export default function ProductDetailClient({ initialProduct }: { initialProduct
         </div>
       </div>
 
-      {/* دکمه چسبان موبایل */}
+      {/* دکمه چسبان خرید مخصوص موبایل (بهینه‌شده برای UI/UX) */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-xl border-t border-slate-200 p-4 pb-safe z-[90] flex items-center justify-between shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
          <div className="flex flex-col">
             {hasDiscount && <span className="text-[10px] text-slate-400 line-through font-bold">{oldPrice.toLocaleString("fa-IR")}</span>}

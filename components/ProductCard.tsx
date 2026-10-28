@@ -15,20 +15,20 @@ export default function ProductCard({ product }: { product: any }) {
     <Link 
       href={`/products/${product.slug || product.id}`} 
       onClick={() => soundEngine?.playClick?.()} 
-      className="flex flex-col bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 hover:shadow-xl transition-all duration-300 h-full group w-full relative"
+      className="flex flex-col bg-white rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 hover:shadow-lg hover:border-slate-200 transition-all duration-300 h-full group w-full relative"
       dir="rtl"
     >
       {(hasDiscount || isOutOfStock) && (
-          <div className="absolute top-2 right-2 z-10">
+          <div className="absolute top-3 right-3 z-10">
               {isOutOfStock ? (
-                  <span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded-lg">ناموجود</span>
+                  <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-1 rounded-full border border-slate-200">ناموجود</span>
               ) : (
-                  <span className="bg-rose-500 text-white text-[9px] font-black px-2 py-1 rounded-lg shadow-sm">تخفیف</span>
+                  <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-1 rounded-full shadow-sm">تخفیف</span>
               )}
           </div>
       )}
 
-      <div className="relative aspect-square p-4 bg-white flex justify-center items-center w-full">
+      <div className="relative aspect-square p-5 bg-white flex justify-center items-center w-full overflow-hidden">
         <img 
           src={imageUrl} 
           alt={product.title} 
@@ -37,21 +37,21 @@ export default function ProductCard({ product }: { product: any }) {
         />
       </div>
 
-      <div className="p-3 sm:p-4 flex flex-col flex-1 gap-2 bg-slate-50/50">
+      <div className="p-4 flex flex-col flex-1 gap-2 bg-slate-50/50">
         <div className="flex-1">
-          <h3 className="text-[11px] sm:text-xs font-black text-slate-800 line-clamp-2 leading-relaxed group-hover:text-sky-600 transition-colors">
+          <h3 className="text-xs sm:text-sm font-bold text-slate-800 line-clamp-2 leading-relaxed group-hover:text-sky-600 transition-colors">
             {product.title}
           </h3>
         </div>
         
-        <div className="mt-auto pt-2 border-t border-slate-200/60 flex flex-col items-start gap-0.5">
-          <div className="h-3 flex items-end w-full">
+        <div className="mt-auto pt-3 border-t border-slate-200/50 flex flex-col items-start gap-1">
+          <div className="h-4 flex items-end w-full">
             {hasDiscount && !isOutOfStock && (
-              <span className="text-[9px] text-slate-400 line-through font-bold">{price.toLocaleString('fa-IR')}</span>
+              <span className="text-[10px] text-slate-400 line-through font-bold">{price.toLocaleString('fa-IR')}</span>
             )}
           </div>
           <div className="flex items-center gap-1 w-full">
-            <span className={`text-xs sm:text-sm font-black ${isOutOfStock ? 'text-slate-400' : 'text-slate-900'}`}>
+            <span className={`text-sm sm:text-base font-black ${isOutOfStock ? 'text-slate-400' : 'text-slate-900'}`}>
               {finalPrice.toLocaleString('fa-IR')}
             </span>
             <span className={`text-[9px] font-bold ${isOutOfStock ? 'text-slate-300' : 'text-slate-500'}`}>تومان</span>

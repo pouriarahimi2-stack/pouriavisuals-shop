@@ -170,9 +170,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       if (!existing) return prev;
 
       let newQty = deltaOrQty;
-      if (deltaOrQty === 1 || deltaOrQty === -1) {
-        newQty = existing.quantity + deltaOrQty;
-      }
 
       if (newQty <= 0) {
         const filtered = prev.filter((i) => String(i.id) !== String(id));

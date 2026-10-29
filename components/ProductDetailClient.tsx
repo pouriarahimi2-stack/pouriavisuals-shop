@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
-import { ShieldCheck, Truck, ShieldAlert } from "lucide-react";
+import { ShieldCheck, Truck } from "lucide-react";
 
 export default function ProductDetailClient({ initialProduct }: { initialProduct?: any; productId?: string }) {
   const { addToCart, setIsCartOpen } = useCart() as any;
@@ -32,12 +32,7 @@ export default function ProductDetailClient({ initialProduct }: { initialProduct
   const isAvailable = Number(product.stock || 0) > 0 && product.is_available !== false;
   
   const warrantyText = product.warranty || "";
-  const brandText = product.brand && product.brand !== "متفرقه" ? product.brand : "";
-  
-  let shippingText = "";
-  if (product.shipping_type === "post") shippingText = "ارسال با پست پیشتاز";
-  else if (product.shipping_type === "tipax") shippingText = "ارسال با تیپاکس (پس‌کرایه)";
-  else if (product.shipping_type === "both") shippingText = "ارسال سراسری (پست / تیپاکس)";
+  const shippingText = product.shipping_type === "post" ? "ارسال با پست پیشتاز" : product.shipping_type === "tipax" ? "ارسال با تیپاکس" : "ارسال سراسری (پست / تیپاکس)";
 
   const handleBuy = () => {
     if (!isAvailable) return;
@@ -47,25 +42,19 @@ export default function ProductDetailClient({ initialProduct }: { initialProduct
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-28 lg:pb-10" dir="rtl">
-      {/* منوی راهنما (Breadcrumb) */}
-      <div className="max-w-7xl mx-auto px-4 pt-4 pb-2 flex items-center gap-2 text-[10px] font-bold text-slate-400 overflow-x-auto whitespace-nowrap">
-         <span>آکسون کور</span><span>/</span><span>{product.category || "فروشگاه"}</span>
-         {brandText && <><span>/</span><span className="text-slate-600">{brandText}</span></>}
-      </div>
-
+    <div className="min-h-screen bg-white md:bg-slate-50 text-slate-900 font-sans pb-28 lg:pb-10" dir="rtl">
+      
       <div className="max-w-6xl mx-auto lg:mt-4 bg-white lg:rounded-2xl shadow-sm border-y lg:border border-slate-200 overflow-hidden">
         <div className="flex flex-col lg:flex-row">
           
-          {/* گالری تصویر */}
-          <div className="w-full lg:w-5/12 p-4 flex flex-col gap-4 border-b lg:border-b-0 lg:border-l border-slate-100 relative">
+          <div className="w-full lg:w-5/12 p-2 sm:p-4 flex flex-col gap-4 border-b lg:border-b-0 lg:border-l border-slate-100 relative">
              <div className="w-full aspect-square flex items-center justify-center bg-white">
                  <img src={allImages[selectedImg]} className="w-full h-full object-contain mix-blend-multiply" alt={product.title} />
              </div>
              {allImages.length > 1 && (
                <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar justify-center">
                  {allImages.map((img, idx) => (
-                   <button key={idx} onClick={() => setSelectedImg(idx)} className={`flex-shrink-0 w-16 h-16 rounded-xl border p-1 transition-all cursor-pointer ${selectedImg === idx ? 'border-rose-500' : 'border-slate-200 opacity-60 hover:opacity-100'}`}>
+                   <button key={idx} onClick={() => setSelectedImg(idx)} className={`flex-shrink-0 w-16 h-16 rounded-xl border p-1 transition-all cursor-pointer ${selectedImg === idx ? 'border-rose-500' : 'border-slate-200 opacity-60'}`}>
                      <img src={img} className="w-full h-full object-contain mix-blend-multiply" alt="" />
                    </button>
                  ))}
@@ -73,18 +62,17 @@ export default function ProductDetailClient({ initialProduct }: { initialProduct
              )}
           </div>
 
-          {/* اطلاعات کالا */}
-          <div className="w-full lg:w-7/12 p-5 flex flex-col">
+          <div className="w-full lg:w-7/12 p-4 sm:p-5 flex flex-col">
             <h1 className="text-lg sm:text-xl lg:text-2xl font-black text-slate-800 leading-snug">{product.title}</h1>
             
-            <div className="mt-6 space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <div className="mt-4 space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-100">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
                  <ShieldCheck className="w-4 h-4 text-slate-400" />
                  <span>{warrantyText || "بدون گارانتی شرکتی"}</span>
               </div>
               <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
                  <Truck className="w-4 h-4 text-slate-400" />
-                 <span>{shippingText || "ارسال سریع سراسری"}</span>
+                 <span>{shippingText}</span>
               </div>
             </div>
 
@@ -93,7 +81,6 @@ export default function ProductDetailClient({ initialProduct }: { initialProduct
                 <p className="text-xs leading-loose text-slate-600 whitespace-pre-wrap">{rawDesc || "توضیحات تکمیلی ثبت نشده است."}</p>
             </div>
             
-            {/* دکمه خرید فقط دسکتاپ */}
             <div className="mt-auto hidden lg:flex items-center justify-between pt-8 border-t border-slate-100">
               <div className="flex flex-col">
                  {hasDiscount && <span className="text-sm font-bold text-slate-400 line-through">{oldPrice.toLocaleString("fa-IR")}</span>}
@@ -104,7 +91,6 @@ export default function ProductDetailClient({ initialProduct }: { initialProduct
               </button>
             </div>
           </div>
-
         </div>
       </div>
 

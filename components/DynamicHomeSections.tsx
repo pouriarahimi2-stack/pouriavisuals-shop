@@ -114,14 +114,14 @@ function normalizeProductRow(p: any) {
 }
 
 function getDeviceVisibilityClasses(sec: ResponsiveSectionItem): string {
+  if (sec.type === "NativePerspectiveSlider") return "hidden md:block lg:block"; // خاموش کردن اسلایدر ۳بعدی در موبایل
+  if (sec.type === "NativeProductCatalog") return "block md:block lg:block"; // روشن کردن کاتالوگ دیجی‌کالایی در موبایل
   const defaultMob = sec.type === "NativeProductCatalog" ? false : true;
   const defaultTab = sec.type === "NativePerspectiveSlider" ? false : true;
   const defaultDesk = sec.type === "NativePerspectiveSlider" ? false : true;
-
   const mob = sec.showOnMobile !== undefined ? Boolean(sec.showOnMobile) : defaultMob;
   const tab = sec.showOnTablet !== undefined ? Boolean(sec.showOnTablet) : defaultTab;
   const desk = sec.showOnDesktop !== undefined ? Boolean(sec.showOnDesktop) : defaultDesk;
-
   if (!mob && !tab && !desk) return "hidden";
   return (mob ? "block" : "hidden") + " " + (tab ? "md:block" : "md:hidden") + " " + (desk ? "lg:block" : "lg:hidden");
 }

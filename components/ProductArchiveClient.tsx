@@ -74,10 +74,10 @@ export default function ProductArchiveClient({
               soundEngine.playClick();
               setSelectedCat("all");
             }}
-            className={`px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
+            className={`px-4 py-2.5 rounded-full text-xs font-black transition cursor-pointer ${
               selectedCat === "all"
-                ? "bg-[var(--accent-blue)] text-white shadow-md"
-                : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
+                ? "bg-sky-500/90 text-white shadow-[0_8px_16px_rgba(14,165,233,0.3)] rounded-full backdrop-blur-md border border-sky-400"
+                : "bg-white/50 dark:bg-white/5 border border-white/50 dark:border-white/10 text-slate-600 dark:text-slate-300 rounded-full backdrop-blur-md hover:bg-white/80"
             }`}
           >
             همه کالاها ({initialProducts.length})
@@ -89,10 +89,10 @@ export default function ProductArchiveClient({
                 soundEngine.playClick();
                 setSelectedCat(c);
               }}
-              className={`px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
+              className={`px-4 py-2.5 rounded-full text-xs font-black transition cursor-pointer ${
                 selectedCat === c
-                  ? "bg-[var(--accent-blue)] text-white shadow-md"
-                  : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
+                  ? "bg-sky-500/90 text-white shadow-[0_8px_16px_rgba(14,165,233,0.3)] rounded-full backdrop-blur-md border border-sky-400"
+                  : "bg-white/50 dark:bg-white/5 border border-white/50 dark:border-white/10 text-slate-600 dark:text-slate-300 rounded-full backdrop-blur-md hover:bg-white/80"
               }`}
             >
               {c}
@@ -106,7 +106,7 @@ export default function ProductArchiveClient({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="🔍 جستجو در کالاها..."
-            className="flex-1 md:w-60 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none text-xs font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+            className="flex-1 md:w-60 p-2.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] outline-none text-xs font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
           />
           <select
             value={sortOrder}
@@ -114,7 +114,7 @@ export default function ProductArchiveClient({
               soundEngine.playClick();
               setSortOrder(e.target.value as any);
             }}
-            className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] cursor-pointer outline-none"
+            className="p-2.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] cursor-pointer outline-none"
           >
             <option value="default">پیش‌فرض</option>
             <option value="price_asc">ارزان‌ترین</option>

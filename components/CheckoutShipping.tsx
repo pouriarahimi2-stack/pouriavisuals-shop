@@ -73,11 +73,11 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
 
   return (
     <div
-      className="p-5 sm:p-8 rounded-[2.2rem] sm:rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 font-sans select-text text-[var(--text-primary)]"
+      className="p-5 sm:p-8 rounded-[2.5rem] sm:rounded-[2.5rem] bg-white/70 dark:bg-black/40 backdrop-blur-2xl border border-[var(--card-border)] shadow-xl space-y-6 font-sans select-text text-[var(--text-primary)]"
       dir="rtl"
     >
       <div className="flex items-center gap-3 border-b border-[var(--card-border)] pb-4">
-        <span className="p-2.5 rounded-2xl bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] text-lg">
+        <span className="p-2.5 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] text-lg">
           📍
         </span>
         <div>
@@ -98,7 +98,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
             value={formData.fullName}
             onChange={(e) => onChange("fullName", e.target.value)}
             placeholder="مثال: پوریا رحیمی"
-            className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)] transition"
+            className="w-full p-3.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)] transition"
           />
         </div>
 
@@ -115,7 +115,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
             value={formData.phone}
             onChange={(e) => onChange("phone", e.target.value.replace(/\D/g, ""))}
             placeholder="09123456789"
-            className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-[var(--text-primary)] focus:border-[var(--accent-blue)] transition"
+            className="w-full p-3.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-[var(--text-primary)] focus:border-[var(--accent-blue)] transition"
           />
         </div>
 
@@ -131,7 +131,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
               const nextCities = IRAN_PROVINCES_MAP[nextProv] || [];
               onChange("city", nextCities[0] || "");
             }}
-            className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)] cursor-pointer transition"
+            className="w-full p-3.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)] cursor-pointer transition"
           >
             {provinces.map((prov) => (
               <option key={prov} value={prov}>
@@ -150,7 +150,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
               soundEngine.playClick();
               onChange("city", e.target.value);
             }}
-            className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)] cursor-pointer transition"
+            className="w-full p-3.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)] cursor-pointer transition"
           >
             {cities.map((c) => (
               <option key={c} value={c}>
@@ -173,7 +173,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
             value={formData.postalCode}
             onChange={(e) => onChange("postalCode", e.target.value.replace(/\D/g, ""))}
             placeholder="1234567890"
-            className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-[var(--text-primary)] focus:border-[var(--accent-blue)] transition"
+            className="w-full p-3.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-[var(--text-primary)] focus:border-[var(--accent-blue)] transition"
           />
           {formData.postalCode && !isPostalValid && (
             <p className="text-[10px] text-rose-500 font-bold mt-1">
@@ -193,7 +193,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
             value={formData.address}
             onChange={(e) => onChange("address", e.target.value)}
             placeholder="نشانی کامل جهت تحویل مرسوله..."
-            className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-[var(--text-primary)] focus:border-[var(--accent-blue)] transition leading-relaxed"
+            className="w-full p-3.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-[var(--text-primary)] focus:border-[var(--accent-blue)] transition leading-relaxed"
           />
         </div>
 
@@ -207,7 +207,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
             value={formData.notes}
             onChange={(e) => onChange("notes", e.target.value)}
             placeholder="نکات تحویل، زمان تحویل و..."
-            className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-[var(--text-primary)] focus:border-[var(--accent-blue)] transition"
+            className="w-full p-3.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-[var(--text-primary)] focus:border-[var(--accent-blue)] transition"
           />
         </div>
       </div>
@@ -219,7 +219,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
           <div
             onClick={() => handleMethodChange("regular")}
             className={
-              "p-4 rounded-2xl border transition cursor-pointer flex items-center justify-between " +
+              "p-4 rounded-full border transition cursor-pointer flex items-center justify-between " +
               (formData.shippingMethod === "regular"
                 ? "bg-[var(--accent-blue)]/10 border-[var(--accent-blue)] text-[var(--text-primary)] shadow-md"
                 : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)]")
@@ -239,7 +239,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
           <div
             onClick={() => handleMethodChange("express")}
             className={
-              "p-4 rounded-2xl border transition cursor-pointer flex items-center justify-between " +
+              "p-4 rounded-full border transition cursor-pointer flex items-center justify-between " +
               (formData.shippingMethod === "express"
                 ? "bg-[var(--accent-blue)]/10 border-[var(--accent-blue)] text-[var(--text-primary)] shadow-md"
                 : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)]")

@@ -1,55 +1,154 @@
 "use client";
+import React, { useState } from "react";
 import Link from "next/link";
+import { formatPrice } from "@/lib/formatters";
 import { soundEngine } from "@/lib/soundEngine";
-import { useCart } from "@/context/CartContext";
+import AddToCartButton from "@/components/AddToCartButton";
 
-export default function ProductCard({ product }: { product: any }) {
-  const { addToCart, setIsCartOpen } = useCart() as any;
-  const price = Number(product.price || 0);
-  const discountPrice = Number(product.discount_price || product.discountPrice || 0);
-  const finalPrice = discountPrice > 0 && discountPrice < price ? discountPrice : price;
-  const hasDiscount = discountPrice > 0 && discountPrice < price;
-  const imageUrl = product.image_url || product.image || (product.images && product.images[0]) || "/placeholder.png";
-  const isOutOfStock = Number(product.stock || 0) <= 0 || product.is_available === false;
-
-  const handleFastBuy = (e: React.MouseEvent) => {
-    e.preventDefault(); e.stopPropagation();
-    if (!isOutOfStock) {
-      soundEngine?.playClick?.();
-      addToCart({ id: product.id, title: product.title, price: finalPrice, quantity: 1, image: imageUrl });
-      setIsCartOpen(true);
-    }
+interface ProductCardProps {
+  product: {
+    id:              string | number;
+    title?:          string;
+    name?:           string;
+    price:           number;
+    discount_price?: number | null;
+    discountPrice?:  number | null;
+    image?:          string | null;
+    image_url?:      string | null;
+    images?:         string[];
+    category?:       string;
+    stock?:          number;
+    warranty?:       string;
   };
+}
+
+function getImg(p: ProductCardProps["product"]): string {
+  if (Array.isArray(p.images) && p.images.length > 0) {
+    const f = p.images[0];
+    if (f && (f.startsWith("http") || f.startsWith("/"))) return f;
+  }
+  if (p.image_url?.trim()) return p.image_url;
+  if (p.image?.trim())     return p.image;
+  return "/placeholder.png";
+}
+
+export default function ProductCard({ product }: ProductCardProps) {
+  const title        = product.title || product.name || "کالای دیجیتال";
+  const basePrice    = Number(product.price || 0);
+  const discountVal  = product.discount_price || product.discountPrice;
+  const finalPrice   = discountVal && Number(discountVal) > 0 ? Number(discountVal) : basePrice;
+  const discPct      = discountVal && basePrice > 0 ? Math.round((1 - Number(discountVal) / basePrice) * 100) : 0;
+  const [imgSrc, setImgSrc] = useState(getImg(product));
+  const isLowStock   = product.stock !== undefined && product.stock > 0 && product.stock <= 3;
+  const isOutOfStock = product.stock === 0;
 
   return (
-    <Link href={`/products/${product.slug || product.id}`} onClick={() => soundEngine?.playClick?.()} className="flex flex-col bg-white/70 dark:bg-black/40 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-[2rem] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.04)] hover:shadow-lg transition-all duration-300 w-full relative" dir="rtl">
-      {(hasDiscount || isOutOfStock) && (
-          <div className="absolute top-3 right-3 z-10">
-              {isOutOfStock ? <span className="bg-slate-800/80 backdrop-blur-md text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-sm">ناموجود</span> : <span className="bg-rose-500/90 backdrop-blur-md text-white text-[11px] font-black px-3 py-1.5 rounded-full shadow-sm">% تخفیف</span>}
-          </div>
-      )}
-      <div className="relative w-full aspect-square p-4 flex justify-center items-center overflow-hidden">
-        <img src={imageUrl} alt={product.title} loading="lazy" className={`w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal transition-transform duration-500 ${isOutOfStock ? 'opacity-40 grayscale' : 'hover:scale-105'}`} />
-      </div>
-      <div className="p-4 flex flex-col flex-1 bg-white/40 dark:bg-black/20 backdrop-blur-md border-t border-white/30 dark:border-white/5">
-        <div className="flex-1 mb-3">
-          <h3 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 line-clamp-2 leading-relaxed group-hover:text-blue-500 transition-colors">{product.title}</h3>
+    <div
+      className="group card-glass card-liquid-shine card-hover-glow flex flex-col justify-between relative h-full overflow-hidden"
+      style={{ borderRadius: "1.5rem" }}
+    >
+      {/* لایه glow پس‌زمینه روی hover */}
+      <div
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+        style={{
+          background: "radial-gradient(ellipse 70% 60% at 50% 0%, var(--accent-glow) 0%, transparent 70%)",
+          borderRadius: "inherit",
+        }}
+      />
+
+      <Link
+        href={"/products/" + product.id}
+        onClick={() => soundEngine.playClick()}
+        className="flex-1 block p-3 sm:p-4 space-y-2 sm:space-y-3 relative z-10"
+      >
+        {/* تصویر */}
+        <div
+          className="relative aspect-square overflow-hidden flex items-center justify-center p-3 sm:p-4"
+          style={{
+            borderRadius: "1.25rem",
+            background: "var(--input-bg)",
+            border: "1px solid var(--glass-border)",
+          }}
+        >
+          <img
+            src={imgSrc}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-contain transition-transform duration-500"
+            onMouseEnter={e => { (e.currentTarget as HTMLImageElement).style.transform = "scale(1.07)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLImageElement).style.transform = "scale(1)"; }}
+            onError={() => { if (imgSrc !== "/placeholder.png") setImgSrc("/placeholder.png"); }}
+          />
+
+          {discPct > 0 && (
+            <span className="badge-capsule badge-discount absolute top-2.5 right-2.5 text-[10px]">
+              {discPct}٪ تخفیف
+            </span>
+          )}
+          {isLowStock && (
+            <span className="badge-capsule badge-warning absolute top-2.5 left-2.5 text-[9px]">
+              تنها {product.stock} عدد
+            </span>
+          )}
+          {isOutOfStock && (
+            <div
+              className="absolute inset-0 flex items-center justify-center"
+              style={{ borderRadius: "inherit", background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
+            >
+              <span
+                className="badge-capsule text-[11px]"
+                style={{ background: "rgba(0,0,0,0.7)", color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }}
+              >
+                ناموجود
+              </span>
+            </div>
+          )}
         </div>
-        <div className="mt-auto flex flex-col items-end w-full gap-1">
-          <div className="h-4 flex items-end justify-start w-full">
-            {hasDiscount && !isOutOfStock && <span className="text-[11px] text-slate-400 line-through font-bold">{price.toLocaleString('fa-IR')}</span>}
-          </div>
-          <div className="flex items-center justify-between w-full">
-             <button onClick={handleFastBuy} disabled={isOutOfStock} className="w-10 h-10 flex shrink-0 items-center justify-center rounded-full bg-white/80 dark:bg-white/10 backdrop-blur-md border border-white/50 dark:border-white/5 text-blue-600 dark:text-blue-400 shadow-sm hover:bg-blue-600 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-               <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-             </button>
-             <div className="flex flex-col items-end">
-               <span className={`text-sm sm:text-base font-black tracking-tight ${isOutOfStock ? 'text-slate-400' : 'text-slate-900 dark:text-white'}`}>{finalPrice.toLocaleString('fa-IR')}</span>
-               <span className={`text-[10px] font-bold ${isOutOfStock ? 'text-slate-300' : 'text-slate-500'}`}>تومان</span>
-             </div>
-          </div>
+
+        {/* اطلاعات محصول */}
+        <div className="space-y-1.5 px-0.5">
+          {product.category && (
+            <span
+              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black"
+              style={{
+                background: "linear-gradient(135deg, var(--accent-blue), var(--accent-violet))",
+                color: "#fff",
+                opacity: 0.9,
+              }}
+            >
+              {product.category}
+            </span>
+          )}
+          <h3 className="text-[11px] sm:text-xs font-black text-[var(--text-primary)] line-clamp-2 leading-relaxed min-h-[30px] sm:min-h-[34px]">
+            {title}
+          </h3>
         </div>
+      </Link>
+
+      {/* قیمت و دکمه */}
+      <div
+        className="p-3 sm:p-4 pt-2 relative z-10"
+        style={{ borderTop: "1px solid var(--glass-border)" }}
+      >
+        <div className="flex items-center justify-between mb-2.5">
+          {discountVal && Number(discountVal) > 0 ? (
+            <div className="space-y-0.5">
+              <span className="line-through text-[var(--text-secondary)] text-[9px] sm:text-[10px] block" suppressHydrationWarning>
+                {formatPrice(basePrice)} ت
+              </span>
+              <span className="font-black text-sm sm:text-base block" style={{ color: "var(--accent-blue)" }} suppressHydrationWarning>
+                {formatPrice(finalPrice)} ت
+              </span>
+            </div>
+          ) : (
+            <span className="text-[var(--text-primary)] font-black text-sm sm:text-base" suppressHydrationWarning>
+              {formatPrice(basePrice)} ت
+            </span>
+          )}
+        </div>
+        <AddToCartButton product={{ ...product, image: imgSrc }} showCounter={false} />
       </div>
-    </Link>
+    </div>
   );
 }

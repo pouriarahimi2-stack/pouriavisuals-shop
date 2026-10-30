@@ -2,32 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════
+   AXON DESIGN SYSTEM — Liquid Glass Edition
+   ═══════════════════════════════════════════════════ */
+
 :root {
-  --bg-primary: #f8fafc;
-  --bg-secondary: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --card-border: rgba(15, 23, 42, 0.08);
-  --card-border-hover: rgba(2, 132, 199, 0.35);
-  --accent-blue: #0284c7;
-  --accent-glow: rgba(2, 132, 199, 0.15);
-  --modal-bg: #ffffff;
-  --input-bg: #f1f5f9;
-  --glass-surface: rgba(255, 255, 255, 0.88);
+  --bg-primary:         #f0f4ff;
+  --bg-secondary:       #e8eeff;
+  --text-primary:       #0a0f1e;
+  --text-secondary:     #4b5680;
+  --modal-bg:           rgba(255, 255, 255, 0.92);
+  --input-bg:           rgba(240, 244, 255, 0.9);
+  --card-border:        rgba(0, 66, 200, 0.12);
+  --card-border-hover:  rgba(0, 102, 255, 0.45);
+  --card-hover:         rgba(0, 102, 255, 0.08);
+  --accent-blue:        #0066ff;
+  --accent-violet:      #7c3aed;
+  --accent-cyan:        #06b6d4;
+  --accent-glow:        rgba(0, 102, 255, 0.22);
+  --accent-glow-v:      rgba(124, 58, 237, 0.18);
+  --glass-bg:           rgba(255, 255, 255, 0.72);
+  --glass-bg-strong:    rgba(255, 255, 255, 0.92);
+  --glass-border:       rgba(255, 255, 255, 0.85);
+  --glass-border-inner: rgba(0, 102, 255, 0.18);
+  --glass-shadow:       0 8px 32px rgba(0, 50, 180, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --glass-surface:      rgba(255, 255, 255, 0.75);
 }
 
 .dark {
-  --bg-primary: #07090e;
-  --bg-secondary: #0c1017;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --card-border: rgba(255, 255, 255, 0.08);
-  --card-border-hover: rgba(56, 189, 248, 0.4);
-  --accent-blue: #38bdf8;
-  --accent-glow: rgba(56, 189, 248, 0.3);
-  --modal-bg: #0c1017;
-  --input-bg: rgba(255, 255, 255, 0.04);
-  --glass-surface: rgba(12, 16, 23, 0.85);
+  --bg-primary:         #04060f;
+  --bg-secondary:       #080c1a;
+  --text-primary:       #f0f4ff;
+  --text-secondary:     #8896c8;
+  --modal-bg:           rgba(8, 12, 26, 0.92);
+  --input-bg:           rgba(20, 28, 60, 0.8);
+  --card-border:        rgba(59, 130, 246, 0.14);
+  --card-border-hover:  rgba(59, 130, 246, 0.55);
+  --card-hover:         rgba(59, 130, 246, 0.08);
+  --accent-blue:        #3b82f6;
+  --accent-violet:      #a78bfa;
+  --accent-cyan:        #22d3ee;
+  --accent-glow:        rgba(59, 130, 246, 0.35);
+  --accent-glow-v:      rgba(167, 139, 250, 0.25);
+  --glass-bg:           rgba(10, 15, 40, 0.65);
+  --glass-bg-strong:    rgba(8, 12, 26, 0.92);
+  --glass-border:       rgba(255, 255, 255, 0.10);
+  --glass-border-inner: rgba(59, 130, 246, 0.22);
+  --glass-shadow:       0 8px 40px rgba(0, 0, 0, 0.55), 0 2px 12px rgba(0, 0, 0, 0.4);
+  --glass-surface:      rgba(10, 15, 40, 0.72);
 }
 
 html, body {
@@ -44,57 +66,177 @@ html, body {
 body {
   font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-.pb-safe {
-  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
-}
+/* ══ Liquid Glass System ══════════════════════════════════════ */
 
 .glass-morphism {
-  background: var(--glass-surface);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--card-border);
-  box-shadow: 0 8px 30px 0 rgba(0, 0, 0, 0.06);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
-.dark .glass-morphism {
-  box-shadow: 0 10px 35px 0 rgba(0, 0, 0, 0.45);
+.glass-morphism-strong {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
+.glass-header {
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 4px 24px rgba(0, 102, 255, 0.10),
+    0 1px 4px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@media (max-width: 768px) {
-  button, input, select, textarea {
-    min-height: 44px;
-  }
-  .backdrop-blur-md, .backdrop-blur-lg, .backdrop-blur-xl {
-    backdrop-filter: none !important;
-    background-color: rgba(18, 18, 20, 0.96) !important;
-  }
+.dark .glass-header {
+  box-shadow:
+    0 4px 32px rgba(0, 0, 0, 0.6),
+    0 1px 4px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
-/* ══════════════════════════════════════════════
-   AXON MOTION SYSTEM — 21st.dev inspired
-   ══════════════════════════════════════════════ */
+/* ══ دکمه کپسولی شیشه‌ای ══════════════════════════════════ */
 
-/* ── Keyframes ─────────────────────────────── */
+.btn-glass {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 9999px;
+  padding: 8px 18px;
+  font-weight: 700;
+  font-size: 13px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  user-select: none;
+}
+.btn-glass:hover {
+  background: var(--glass-bg-strong);
+  box-shadow: 0 4px 20px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transform: translateY(-1px);
+}
+.btn-glass:active {
+  transform: scale(0.96) translateY(0);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn-glass-primary {
+  background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-violet) 100%);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  border-radius: 9999px;
+  box-shadow:
+    0 4px 20px var(--accent-glow),
+    0 1px 4px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.btn-glass-primary:hover {
+  box-shadow:
+    0 6px 28px var(--accent-glow),
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  filter: brightness(1.07);
+  transform: translateY(-2px);
+}
+
+/* ══ کارت شیشه‌ای ══════════════════════════════════════════ */
+
+.card-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  border-radius: 1.5rem;
+  box-shadow: var(--glass-shadow);
+  transition: all 0.30s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.card-glass:hover {
+  border-color: var(--card-border-hover);
+  box-shadow:
+    0 12px 40px var(--accent-glow),
+    0 4px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px);
+}
+
+/* ══ بج کپسولی ════════════════════════════════════════════ */
+
+.badge-capsule {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.badge-discount {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.badge-warning {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.9), rgba(217, 119, 6, 0.9));
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.badge-new {
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-violet));
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* ══ گرادیان بکگراند ══════════════════════════════════════ */
+
+.axon-bg-gradient {
+  background:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(0, 102, 255, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 110%, rgba(124, 58, 237, 0.10) 0%, transparent 55%),
+    var(--bg-primary);
+}
+.dark .axon-bg-gradient {
+  background:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(59, 130, 246, 0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 110%, rgba(167, 139, 250, 0.14) 0%, transparent 55%),
+    var(--bg-primary);
+}
+
+/* ══ متن گرادیان ══════════════════════════════════════════ */
+
+.axon-gradient-text {
+  background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-violet) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.axon-gradient-text-cyan {
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ══ انیمیشن‌ها ══════════════════════════════════════════ */
+
 @keyframes axon-slide-up {
   from { opacity: 0; transform: translateY(28px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -109,7 +251,7 @@ body {
 }
 @keyframes axon-scale-in {
   from { opacity: 0; transform: scale(0.90) translateY(12px); }
-  to   { opacity: 1; transform: scale(1)    translateY(0); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 @keyframes axon-fade {
   from { opacity: 0; }
@@ -117,7 +259,7 @@ body {
 }
 @keyframes axon-glow-pulse {
   0%,100% { box-shadow: 0 0 0 0 var(--accent-glow); }
-  50%      { box-shadow: 0 0 22px 6px var(--accent-glow); }
+  50%     { box-shadow: 0 0 24px 8px var(--accent-glow); }
 }
 @keyframes axon-shimmer {
   0%   { background-position: -200% center; }
@@ -127,108 +269,135 @@ body {
   0%,100% { transform: translateY(0px); }
   50%     { transform: translateY(-6px); }
 }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes axon-page-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes axonReveal {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes liquid-shimmer {
+  0%   { transform: translateX(-100%) skewX(-15deg); }
+  100% { transform: translateX(200%) skewX(-15deg); }
+}
 
-/* ── Reveal classes (JS adds .revealed to trigger) ── */
+.animate-fadeIn  { animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.axon-page-enter { animation: axon-page-in 0.35s cubic-bezier(0.22,1,0.36,1) forwards; }
+.axon-float      { animation: axon-float 4s ease-in-out infinite; }
+
+/* ══ Reveal ══════════════════════════════════════════════ */
+
 .axon-reveal {
   opacity: 0;
   transform: translateY(24px);
-  transition: opacity 0.55s cubic-bezier(0.22,1,0.36,1),
-              transform 0.55s cubic-bezier(0.22,1,0.36,1);
+  transition: opacity 0.55s cubic-bezier(0.22,1,0.36,1), transform 0.55s cubic-bezier(0.22,1,0.36,1);
 }
-.axon-reveal.revealed {
-  opacity: 1;
-  transform: translateY(0);
-}
+.axon-reveal.revealed { opacity: 1; transform: translateY(0); }
+
 .axon-reveal-scale {
   opacity: 0;
   transform: scale(0.92);
-  transition: opacity 0.5s cubic-bezier(0.22,1,0.36,1),
-              transform 0.5s cubic-bezier(0.22,1,0.36,1);
+  transition: opacity 0.5s cubic-bezier(0.22,1,0.36,1), transform 0.5s cubic-bezier(0.22,1,0.36,1);
+  animation: axonReveal 0.45s ease both;
 }
-.axon-reveal-scale.revealed {
-  opacity: 1;
-  transform: scale(1);
-}
+.axon-reveal-scale.revealed { opacity: 1; transform: scale(1); }
+
 .axon-reveal-right {
   opacity: 0;
   transform: translateX(-20px);
   transition: opacity 0.5s ease, transform 0.5s ease;
 }
-.axon-reveal-right.revealed {
-  opacity: 1;
-  transform: translateX(0);
-}
+.axon-reveal-right.revealed { opacity: 1; transform: translateX(0); }
 
-/* ── Stagger delays ─────────────────────────── */
-.stagger-0  { transition-delay: 0ms; }
-.stagger-1  { transition-delay: 60ms; }
-.stagger-2  { transition-delay: 120ms; }
-.stagger-3  { transition-delay: 180ms; }
-.stagger-4  { transition-delay: 240ms; }
-.stagger-5  { transition-delay: 300ms; }
-.stagger-6  { transition-delay: 360ms; }
-.stagger-7  { transition-delay: 420ms; }
+/* ══ Stagger ══════════════════════════════════════════════ */
 
-/* ── Product card glow hover ────────────────── */
+.stagger-0 { transition-delay: 0ms;   animation-delay: 0ms; }
+.stagger-1 { transition-delay: 60ms;  animation-delay: 50ms; }
+.stagger-2 { transition-delay: 120ms; animation-delay: 100ms; }
+.stagger-3 { transition-delay: 180ms; animation-delay: 150ms; }
+.stagger-4 { transition-delay: 240ms; animation-delay: 200ms; }
+.stagger-5 { transition-delay: 300ms; animation-delay: 250ms; }
+.stagger-6 { transition-delay: 360ms; animation-delay: 300ms; }
+.stagger-7 { transition-delay: 420ms; animation-delay: 350ms; }
+
+/* ══ Card glow hover ══════════════════════════════════════ */
+
 .card-hover-glow {
   transition: box-shadow 0.35s ease, border-color 0.3s ease, transform 0.3s cubic-bezier(0.22,1,0.36,1);
 }
 .card-hover-glow:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 32px -4px var(--accent-glow),
-              0 2px 8px -2px rgba(0,0,0,0.1);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 36px -4px var(--accent-glow), 0 2px 8px -2px rgba(0,0,0,0.10);
+  border-color: var(--card-border-hover) !important;
 }
 .dark .card-hover-glow:hover {
-  box-shadow: 0 8px 32px -4px var(--accent-glow),
-              0 4px 16px rgba(0,0,0,0.5);
+  box-shadow: 0 12px 36px -4px var(--accent-glow), 0 4px 16px rgba(0,0,0,0.5);
 }
 
-/* ── Shimmer skeleton ───────────────────────── */
+/* ══ Skeleton shimmer ══════════════════════════════════════ */
+
 .axon-skeleton {
-  background: linear-gradient(90deg,
-    var(--card-border) 25%,
-    var(--input-bg)    50%,
-    var(--card-border) 75%);
+  background: linear-gradient(90deg, var(--card-border) 25%, var(--input-bg) 50%, var(--card-border) 75%);
   background-size: 200% 100%;
   animation: axon-shimmer 1.4s ease-in-out infinite;
 }
 
-/* ── Float animation (hero elements) ───────── */
-.axon-float {
-  animation: axon-float 4s ease-in-out infinite;
+/* ══ Button press ══════════════════════════════════════════ */
+
+.btn-press { transition: transform 0.1s ease, box-shadow 0.1s ease; }
+.btn-press:active { transform: scale(0.95); }
+
+/* ══ Glow focus ════════════════════════════════════════════ */
+
+.axon-glow-focus:focus-within { animation: axon-glow-pulse 2s ease-in-out infinite; }
+
+/* ══ جداول ادمین موبایل ════════════════════════════════════ */
+
+.admin-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 1rem;
+}
+.admin-table-wrapper table { min-width: 600px; }
+
+/* ══ safe-area ═════════════════════════════════════════════ */
+
+.pb-safe { padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)); }
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .mobile-bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
 }
 
-/* ── Button press effect ────────────────────── */
-.btn-press {
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
-}
-.btn-press:active {
-  transform: scale(0.96);
+/* ══ موبایل ════════════════════════════════════════════════ */
+
+@media screen and (max-width: 768px) {
+  input, select, textarea { font-size: 16px !important; }
+  button, input, select, textarea { min-height: 44px; }
+
+  /* glass روی موبایل‌های مدرن — فعال نگه داشتن */
+  @supports (backdrop-filter: blur(1px)) {
+    .glass-morphism, .glass-header, .card-glass, .glass-morphism-strong {
+      backdrop-filter: blur(18px) saturate(180%);
+      -webkit-backdrop-filter: blur(18px) saturate(180%);
+    }
+  }
+  /* fallback موبایل‌های قدیمی */
+  @supports not (backdrop-filter: blur(1px)) {
+    .glass-morphism, .glass-header { background: var(--glass-bg-strong) !important; }
+  }
 }
 
-/* ── Glow pulse on focus ────────────────────── */
-.axon-glow-focus:focus-within {
-  animation: axon-glow-pulse 2s ease-in-out infinite;
-}
+/* ══ اسکرول‌بار ════════════════════════════════════════════ */
 
-/* ── Page transition ────────────────────────── */
-@keyframes axon-page-in {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.axon-page-enter {
-  animation: axon-page-in 0.35s cubic-bezier(0.22,1,0.36,1) forwards;
-}
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* ── Gradient text ──────────────────────────── */
-.axon-gradient-text {
-  background: linear-gradient(135deg, var(--accent-blue) 0%, #818cf8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
+/* ══ Noise overlay ═════════════════════════════════════════ */
 
-/* ── Noise texture overlay (subtle) ────────── */
 .axon-noise::before {
   content: "";
   position: absolute;
@@ -238,454 +407,19 @@ body {
   border-radius: inherit;
 }
 
-/* ═══ رفع overflow افقی در جداول ادمین روی موبایل ═══ */
-.admin-table-wrapper {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  border-radius: 1rem;
-}
-.admin-table-wrapper table {
-  min-width: 600px;
-}
+/* ══ Liquid shimmer روی کارت ══════════════════════════════ */
 
-/* safe-area برای MobileBottomNav */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .mobile-bottom-nav {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
+.card-liquid-shine { position: relative; overflow: hidden; }
+.card-liquid-shine::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.12) 50%, transparent 80%);
+  transform: translateX(-100%) skewX(-15deg);
+  pointer-events: none;
+  border-radius: inherit;
 }
-
-/* انیمیشن reveal برای کارت‌های محصول */
-.axon-reveal-scale {
-  animation: axonReveal 0.45s ease both;
-}
-@keyframes axonReveal {
-  from { opacity: 0; transform: scale(0.96) translateY(8px); }
-  to   { opacity: 1; transform: scale(1)    translateY(0);   }
-}
-.stagger-0 { animation-delay: 0ms; }
-.stagger-1 { animation-delay: 50ms; }
-.stagger-2 { animation-delay: 100ms; }
-.stagger-3 { animation-delay: 150ms; }
-.stagger-4 { animation-delay: 200ms; }
-.stagger-5 { animation-delay: 250ms; }
-.stagger-6 { animation-delay: 300ms; }
-.stagger-7 { animation-delay: 350ms; }
-
-/* ═══════════════════════════════════════════════════════
-   رفع مشکل zoom ناخواسته در موبایل هنگام focus روی input
-   استاندارد: font-size باید حداقل 16px باشد
-   ═══════════════════════════════════════════════════════ */
-@media screen and (max-width: 768px) {
-  input,
-  select,
-  textarea {
-    font-size: 16px !important;
-  }
-}
-
-/* ═══════════════════════════════════════════════════════
-   دارک/لایت تم کامل برای موبایل
-   ═══════════════════════════════════════════════════════ */
-:root {
-  --bg-primary:    #ffffff;
-  --bg-secondary:  #f8f9fa;
-  --text-primary:  #0f1117;
-  --text-secondary:#6b7280;
-  --modal-bg:      #ffffff;
-  --input-bg:      #f3f4f6;
-  --card-border:   #e5e7eb;
-  --card-hover:    #f9fafb;
-  --card-bg:       #f3f4f6;
-}
-
-.dark {
-  --bg-primary:    #0a0c10;
-  --bg-secondary:  #0f1117;
-  --text-primary:  #f1f5f9;
-  --text-secondary:#94a3b8;
-  --modal-bg:      #111827;
-  --input-bg:      #1e2330;
-  --card-border:   #1e2a3a;
-  --card-hover:    #1a2235;
-  --card-bg:       #1a2235;
-}
-
-/* اطمینان از اینکه در موبایل تم اعمال میشه */
-/* System theme handled cleanly via .dark class on html */
-
-/* ═══ AI Chat لوگوی شناور کوچک ═══ */
-.ai-chat-float-btn {
-  position: fixed;
-  z-index: 40;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--accent-blue, #0071e3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 4px 24px rgba(0,113,227,0.35);
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-.ai-chat-float-btn:hover {
-  transform: scale(1.08);
-  box-shadow: 0 6px 32px rgba(0,113,227,0.5);
-}
-/* موبایل: بالاتر از MobileBottomNav */
-@media (max-width: 768px) {
-  .ai-chat-float-btn {
-    bottom: 76px; /* بالای navbar موبایل */
-    right: 14px;
-    width: 40px;
-    height: 40px;
-  }
-}
-/* دسکتاپ */
-@media (min-width: 769px) {
-  .ai-chat-float-btn {
-    bottom: 24px;
-    right: 24px;
-  }
-}
-
-/* ═══ انیمیشن دکمه خرید — رفع keyframes ═══ */
-@keyframes kineticCartLeft {
-  0%   { transform: translateX(0)    scale(1);    }
-  30%  { transform: translateX(-6px) scale(0.95); }
-  60%  { transform: translateX(-10px) scale(0.9); }
-  85%  { transform: translateX(-4px) scale(0.97); }
-  100% { transform: translateX(0)    scale(1);    }
-}
-@keyframes kineticItemDrop {
-  0%   { opacity: 0; transform: translateY(-12px) scale(0.8); }
-  40%  { opacity: 1; transform: translateY(0)     scale(1.1); }
-  70%  { transform: translateY(2px)  scale(0.95); }
-  100% { opacity: 0; transform: translateY(4px)   scale(0.9); }
-}
-@keyframes kineticCounterBump {
-  0%   { transform: scale(1);    }
-  40%  { transform: scale(1.35); }
-  70%  { transform: scale(0.9);  }
-  100% { transform: scale(1);    }
-}
-
-.animate-kinetic-cart-left   { animation: kineticCartLeft   0.85s ease-in-out forwards; }
-.animate-kinetic-item-drop   { animation: kineticItemDrop   0.7s  ease-out    forwards; }
-.animate-kinetic-counter-bump{ animation: kineticCounterBump 0.45s ease-out forwards; }
-
-/* ═══ رسپانسیو کامل در موبایل و تبلت ═══ */
-* { box-sizing: border-box; }
-img { max-width: 100%; height: auto; }
-.overflow-x-safe { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-
-/* ═══════════════════════════════════════════════════════
-   AXON RESPONSIVE SYSTEM — Mobile + Tablet + Desktop
-   ═══════════════════════════════════════════════════════ */
-
-/* رفع zoom ناخواسته در موبایل */
-@media screen and (max-width: 768px) {
-  input, select, textarea, button {
-    font-size: 16px !important;
-  }
-}
-
-/* CSS Variables کامل */
-:root {
-  --accent-blue: #0071e3;
-  --accent-purple: #4f46e5;
-  --border-radius-card: 1.5rem;
-  --font-primary: "Vazirmatn", sans-serif;
-}
-
-/* دارک/لایت تم کامل */
-:root:not(.dark) {
-  --bg-primary:    #f8fafc;
-  --bg-secondary:  #f1f5f9;
-  --text-primary:  #0f172a;
-  --text-secondary:#475569;
-  --modal-bg:      #ffffff;
-  --input-bg:      #f1f5f9;
-  --card-border:   rgba(15,23,42,0.08);
-  --card-hover:    #f8fafc;
-  --card-bg:       #f1f5f9;
-}
-.dark {
-  --bg-primary:    #07090e;
-  --bg-secondary:  #0c1017;
-  --text-primary:  #f8fafc;
-  --text-secondary:#94a3b8;
-  --modal-bg:      #0c1017;
-  --input-bg:      rgba(255,255,255,0.04);
-  --card-border:   rgba(255,255,255,0.08);
-  --card-hover:    #111827;
-  --card-bg:       #111827;
-}
-/* System theme handled cleanly via .dark class on html */
-
-/* ═══ Box sizing ═══ */
-*, *::before, *::after { box-sizing: border-box; }
-img { max-width: 100%; height: auto; }
-
-/* ═══ overflow جداول در موبایل ═══ */
-.overflow-x-safe {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-table {
-  border-collapse: collapse;
-  width: 100%;
-}
-.admin-table-wrapper {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  border-radius: 1rem;
-}
-.admin-table-wrapper table {
-  min-width: 600px;
-}
-
-/* ═══ safe-area برای iOS ═══ */
-.pb-safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-.nav-bottom-safe {
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
-}
-
-/* ═══ AI Chat Float Button ═══ */
-.ai-chat-float-btn {
-  position: fixed;
-  z-index: 40;
-  border-radius: 50%;
-  background: var(--accent-blue, #0071e3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 4px 24px rgba(0,113,227,0.35);
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-.ai-chat-float-btn:hover {
-  transform: scale(1.08);
-  box-shadow: 0 6px 32px rgba(0,113,227,0.5);
-}
-@media (max-width: 768px) {
-  .ai-chat-float-btn {
-    bottom: 76px;
-    right: 14px;
-    width: 42px;
-    height: 42px;
-  }
-}
-@media (min-width: 769px) {
-  .ai-chat-float-btn {
-    bottom: 24px;
-    right: 24px;
-    width: 48px;
-    height: 48px;
-  }
-}
-
-/* ═══ انیمیشن‌های کارت محصول ═══ */
-.axon-reveal-scale {
-  animation: axonReveal 0.4s ease both;
-}
-@keyframes axonReveal {
-  from { opacity: 0; transform: scale(0.96) translateY(6px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-.stagger-0 { animation-delay: 0ms; }
-.stagger-1 { animation-delay: 50ms; }
-.stagger-2 { animation-delay: 100ms; }
-.stagger-3 { animation-delay: 150ms; }
-.stagger-4 { animation-delay: 200ms; }
-.stagger-5 { animation-delay: 250ms; }
-.stagger-6 { animation-delay: 300ms; }
-.stagger-7 { animation-delay: 350ms; }
-
-/* ═══ تبلت — رفع layout ═══ */
-@media (min-width: 768px) and (max-width: 1024px) {
-  .admin-sidebar-tablet {
-    width: 240px !important;
-  }
-  .product-grid-tablet {
-    grid-template-columns: repeat(3, 1fr) !important;
-  }
-}
-
-/* ═══ موبایل — رفع layout ═══ */
-@media (max-width: 767px) {
-  .mobile-full-width { width: 100% !important; }
-  .mobile-px { padding-left: 1rem; padding-right: 1rem; }
-  .mobile-stack { flex-direction: column !important; }
-  .hide-mobile { display: none !important; }
-  /* رفع overflow در ادمین */
-  .admin-content { overflow-x: hidden; }
-}
-
-/* ALLOW_TEXT_COPY_GLOBAL */
-html, body, div, span, p, h1, h2, h3, h4, h5, h6, pre, code, td, th, input, textarea {
-  -webkit-user-select: text !important;
-  -moz-user-select: text !important;
-  user-select: text !important;
-}
-
-
-/* =========================================
-   Enterprise Mobile UX Fixes (Anti-Zoom & Tables)
-   ========================================= */
-@media screen and (max-width: 768px) {
-  /* جلوگیری از زوم خودکار سافاری در iOS هنگام تایپ */
-  input, select, textarea {
-    font-size: 16px !important;
-  }
-  
-  /* اسکرول نرم و روان برای جداول طولانی در موبایل */
-  .overflow-x-auto {
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-  }
-  
-  .overflow-x-auto::-webkit-scrollbar {
-    height: 4px;
-  }
-}
-
-/* =========================================
-   Axon Core - Mobile UI & Overlaps Fixes
-   ========================================= */
-body, main, #__next {
-  /* جلوگیری از رفتن محتوا زیر منوی موبایل در تمام صفحات */
-  padding-bottom: 85px !important; 
-}
-
-/* حل تداخل دکمه پشتیبانی/چت (بالا بردن آیکون چت در موبایل) */
-iframe[id^="raychat"], 
-iframe[id^="crisp"], 
-.crisp-client, 
-.raychat_main, 
-#raychat_btn,
-.chat-widget-container {
-  bottom: 90px !important;
-  z-index: 99 !important;
-}
-
-@media (max-width: 768px) {
-  /* اطمینان از فاصله ایمن هدر */
-  main {
-    padding-top: 20px;
-  }
-}
-
-
-/* رفع باگ لکه سیاه اسلایدر در موبایل */
-.swiper-button-next, .swiper-button-prev, .swiper-scrollbar, .slick-arrow, .slick-prev, .slick-next {
-  display: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
-}
-
-/* اجبار قطعی به گرید ۲ ستونه در موبایل */
-@media (max-width: 768px) {
-  .grid-cols-1, .grid-cols-2, .sm\:grid-cols-2 {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-}
-
-
-/* =========================================
-   AXON CORE - AGGRESSIVE MOBILE FIXES
-   این قوانین تمام کش‌های مرورگر را نادیده می‌گیرند
-   ========================================= */
-
-@media (max-width: 768px) {
-  /* 1. اجبار به دو ستونه شدن شبکه محصولات (گرید) در موبایل */
-  .grid-cols-1,
-  [class*="grid-cols-"],
-  .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 8px !important;
-  }
-
-  /* 2. کوچک کردن کارت محصول برای جا شدن در دو ستون */
-  .ProductCard_container,
-  div[class*="product-card"],
-  .aspect-square {
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-  
-  /* کوچک کردن متون کارت محصول در موبایل */
-  div[class*="product-card"] h3,
-  .ProductCard_container h3 {
-    font-size: 11px !important;
-    line-height: 1.4 !important;
-  }
-  
-  div[class*="product-card"] .text-xs,
-  div[class*="product-card"] .text-sm {
-    font-size: 10px !important;
-  }
-
-  /* 3. حل مشکل لکه سیاه اسلایدرها (حذف دکمه‌های ناوبری پیش‌فرض در موبایل) */
-  .swiper-button-next,
-  .swiper-button-prev,
-  .swiper-scrollbar,
-  .slick-arrow,
-  .slick-prev,
-  .slick-next {
-    display: none !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
-  }
-
-  /* 4. مخفی کردن منوی قدیمی و تکراری پایین صفحه */
-  nav.fixed.bottom-0:not(.MobileBottomNav_container),
-  div.fixed.bottom-0.bg-black,
-  div.fixed.bottom-0.bg-\[\#1a1a1a\] {
-     display: none !important;
-  }
-
-  /* 5. بالا آوردن دکمه گفتگوی زنده (چت) برای جلوگیری از تداخل با دکمه خرید یا منوی پایین */
-  #raychat_btn,
-  .crisp-client,
-  iframe[id^="raychat"],
-  .chat-widget {
-    bottom: 90px !important;
-    z-index: 9999 !important;
-  }
-
-  /* 6. ایجاد فضای خالی در انتهای صفحات برای جلوگیری از افتادن محتوا زیر منوی موبایل */
-  body, main, #axon-admin-shell {
-    padding-bottom: 80px !important;
-  }
-}
-
-
-/* =========================================
-   AXON CORE - AGGRESSIVE MOBILE UI FIXES
-   ========================================= */
-@media (max-width: 768px) {
-  /* شبکه دو ستونه اجباری */
-  .grid, .grid-cols-1, .grid-cols-2, .sm\:grid-cols-2 {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 8px !important;
-  }
-  
-  /* مخفی کردن لکه‌های سیاه و دکمه‌های خراب اسلایدر در موبایل */
-  .swiper-button-next, .swiper-button-prev, .swiper-scrollbar, .slick-arrow { 
-    display: none !important; opacity: 0 !important; visibility: hidden !important; 
-  }
-  
-  /* حذف کامل منوی قدیمی سایت که در پایین صفحه گیر کرده بود */
-  nav.fixed.bottom-0:not(.MobileBottomNav_container), div.fixed.bottom-0.bg-black { 
-    display: none !important; 
-  }
-  
-  /* فاصله ایمن برای چت و فوتر */
-  iframe[id^="raychat"], .crisp-client, #raychat_btn, .chat-widget { bottom: 90px !important; z-index: 9999 !important; }
-  body, main { padding-bottom: 80px !important; }
-}
+.card-liquid-shine:hover::before { animation: liquid-shimmer 0.75s ease forwards; }

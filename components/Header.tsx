@@ -287,7 +287,7 @@ export default function Header() {
             className={
               "mx-auto w-full px-4 sm:px-8 transition-all duration-300 flex items-center justify-between gap-4 border shadow-xl backdrop-blur-2xl " +
               (isCapsule ? "rounded-full" : "rounded-2xl") +
-              " bg-[var(--modal-bg)]/95 border-[var(--card-border)]"
+              " glass-header"
             }
           >
             <div className="flex items-center gap-6 sm:gap-8">

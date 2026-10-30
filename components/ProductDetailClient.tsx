@@ -187,9 +187,7 @@ export default function ProductDetailClient({
                   <span className="text-sm font-bold mr-1.5" style={{ color: "var(--text-secondary)" }}>تومان</span>
                 </span>
               </div>
-              <div className="mobile-sticky-cart-wrapper md:static md:p-0 md:bg-transparent md:border-none md:shadow-none">
-<AddToCartButton product={product} showCounter={false} />
-</div>
+              <AddToCartButton product={product} showCounter={false} />
             </div>
           </div>
         </div>

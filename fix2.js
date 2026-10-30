@@ -1148,7 +1148,7 @@ try {
   execSync("git push origin main", { stdio: "inherit" });
   console.log("🚀 push به main انجام شد!");
 } catch (e) {
-  console.warn("⚠️ git:", e instanceof Error ? e.message : String(e));
+  console.warn("⚠️ git:", e && e.message ? e.message : String(e));
 }
 
 console.log(`

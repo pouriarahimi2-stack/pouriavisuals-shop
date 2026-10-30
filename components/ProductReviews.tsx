@@ -242,7 +242,7 @@ export function ProductReviews(props: ProductReviewsProps) {
                 key={rev.id}
                 className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between review-item-mobile">
                   <div className="flex items-center gap-2">
                     <span className="font-black text-sm">
                       {rev.user_name || rev.author_name || "خریدار محصول"}

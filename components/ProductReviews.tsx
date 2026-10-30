@@ -162,7 +162,7 @@ export function ProductReviews(props: ProductReviewsProps) {
         {/* فرم ثبت دیدگاه جدید */}
         <form
           onSubmit={handleSubmitReview}
-          className="lg:col-span-5 p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4 h-fit"
+          className="w-full lg:w-5/12 p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4 h-fit"
         >
           <h4 className="font-black text-sm text-[var(--text-primary)]">
             ✍️ ثبت دیدگاه و امتیاز شما برای این محصول
@@ -227,7 +227,7 @@ export function ProductReviews(props: ProductReviewsProps) {
         </form>
 
         {/* لیست دیدگاه‌های ثبت‌شده */}
-        <div className="lg:col-span-7 space-y-3 max-h-[520px] overflow-y-auto pr-1">
+        <div className="w-full lg:w-7/12 space-y-3 max-h-[520px] overflow-y-auto pr-1">
           {loading ? (
             <div className="py-12 text-center text-slate-400 font-bold">
               در حال بارگذاری دیدگاه‌های خریداران...

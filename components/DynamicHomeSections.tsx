@@ -1,5 +1,5 @@
-// File Path: components/DynamicHomeSections.tsx
 "use client";
+// File Path: components/DynamicHomeSections.tsx
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -39,13 +39,14 @@ export interface BannerSizingConfig {
 
 export const DEFAULT_BANNER_SIZING: BannerSizingConfig = {
   mobileHeight: 220,
-  tabletHeight: 250,
+  tabletHeight: 260,
   desktopHeight: 340,
   mobileImageSize: 120,
   desktopImageSize: 220,
-  mobileLayout: "horizontal",
+  mobileLayout: "vertical",
 };
 
+// اسلایدر بنر فقط موبایل + تبلت — دسکتاپ یک اسلایدر کافیه
 export const DEFAULT_SECTIONS_ORDER: ResponsiveSectionItem[] = [
   {
     id: "sec_banners",
@@ -55,7 +56,7 @@ export const DEFAULT_SECTIONS_ORDER: ResponsiveSectionItem[] = [
     enabled: true,
     showOnMobile: true,
     showOnTablet: true,
-    showOnDesktop: false,
+    showOnDesktop: false,   // ← دسکتاپ: مخفی (NativePerspectiveSlider جای آن)
   },
   {
     id: "sec_perspective",
@@ -65,7 +66,7 @@ export const DEFAULT_SECTIONS_ORDER: ResponsiveSectionItem[] = [
     enabled: true,
     showOnMobile: false,
     showOnTablet: false,
-    showOnDesktop: false,
+    showOnDesktop: true,    // ← دسکتاپ: نمایش
   },
   {
     id: "sec_catalog",
@@ -85,18 +86,14 @@ function normalizeProductRow(p: any) {
   let meta: Record<string, any> = {};
   const match = rawDesc.match(/<!--MEDIA_METADATA:([\s\S]*?)-->/);
   if (match && match[1]) {
-    try {
-      meta = JSON.parse(match[1]);
-    } catch {}
+    try { meta = JSON.parse(match[1]); } catch {}
     rawDesc = rawDesc.replace(/<!--MEDIA_METADATA:[\s\S]*?-->/g, "").trim();
   }
   const primaryImg =
-    p.image ||
-    p.image_url ||
+    p.image || p.image_url ||
     (Array.isArray(p.images) && p.images[0]) ||
     (Array.isArray(meta.images) && meta.images[0]) ||
     "/placeholder.png";
-
   return {
     ...p,
     id: String(p.id),
@@ -104,55 +101,51 @@ function normalizeProductRow(p: any) {
     image: primaryImg,
     image_url: primaryImg,
     images:
-      Array.isArray(p.images) && p.images.length > 0
-        ? p.images
-        : Array.isArray(meta.images) && meta.images.length > 0
-        ? meta.images
-        : [primaryImg],
+      Array.isArray(p.images) && p.images.length > 0 ? p.images
+      : Array.isArray(meta.images) && meta.images.length > 0 ? meta.images
+      : [primaryImg],
     description: rawDesc,
   };
 }
 
 function getDeviceVisibilityClasses(sec: ResponsiveSectionItem): string {
-  if (sec.type === "NativePerspectiveSlider") return "hidden md:block lg:block";
-  if (sec.type === "NativeProductCatalog") return "block md:block lg:block";
-  const defaultMob = sec.type === "NativeProductCatalog" ? false : true;
-  const defaultTab = sec.type === "NativePerspectiveSlider" ? false : true;
-  const defaultDesk = sec.type === "NativePerspectiveSlider" ? false : true;
-  const mob = sec.showOnMobile !== undefined ? Boolean(sec.showOnMobile) : defaultMob;
-  const tab = sec.showOnTablet !== undefined ? Boolean(sec.showOnTablet) : defaultTab;
-  const desk = sec.showOnDesktop !== undefined ? Boolean(sec.showOnDesktop) : defaultDesk;
+  if (sec.type === "NativePerspectiveSlider") return "hidden lg:block";
+  if (sec.type === "NativeProductCatalog")    return "block";
+  const mob  = sec.showOnMobile  !== undefined ? Boolean(sec.showOnMobile)  : true;
+  const tab  = sec.showOnTablet  !== undefined ? Boolean(sec.showOnTablet)  : true;
+  const desk = sec.showOnDesktop !== undefined ? Boolean(sec.showOnDesktop) : true;
   if (!mob && !tab && !desk) return "hidden";
-  return (mob ? "block" : "hidden") + " " + (tab ? "md:block" : "md:hidden") + " " + (desk ? "lg:block" : "lg:hidden");
+  return (
+    (mob  ? "block"    : "hidden")    + " " +
+    (tab  ? "md:block" : "md:hidden") + " " +
+    (desk ? "lg:block" : "lg:hidden")
+  );
 }
 
 export default function DynamicHomeSections({
   initialProducts = [],
-  initialBanners = [],
+  initialBanners  = [],
   initialSiteInfo = null,
 }: Props) {
   const { siteInfo: ctxSiteInfo } = useSiteInfo();
   const activeSiteInfo =
     ctxSiteInfo && Object.keys(ctxSiteInfo).length > 0 ? ctxSiteInfo : initialSiteInfo;
   const layoutCfg = activeSiteInfo?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
-  const tbCfg =
-    activeSiteInfo?.theme_builder_config || layoutCfg?.theme_builder_config || {};
+  const tbCfg     = activeSiteInfo?.theme_builder_config   || layoutCfg?.theme_builder_config || {};
 
   const bannerSizing: BannerSizingConfig = {
     ...DEFAULT_BANNER_SIZING,
     ...(tbCfg?.bannerSizing || layoutCfg?.bannerSizing || {}),
   };
 
-  const [products, setProducts] = useState<any[]>(() =>
-    (initialProducts || []).map(normalizeProductRow)
-  );
-  const [banners, setBanners] = useState<any[]>(initialBanners);
+  const [products,    setProducts]    = useState<any[]>(() => (initialProducts || []).map(normalizeProductRow));
+  const [banners,     setBanners]     = useState<any[]>(initialBanners);
   const [activeSlide, setActiveSlide] = useState(0);
 
   const fetchLiveHomeData = useCallback(async () => {
     try {
       const [pRes, bRes] = await Promise.all([
-        fetch("/api/products", { cache: "no-store" }).catch(() => null),
+        fetch("/api/products",       { cache: "no-store" }).catch(() => null),
         fetch("/api/public/banners", { cache: "no-store" }).catch(() => null),
       ]);
       if (pRes && pRes.ok) {
@@ -162,30 +155,23 @@ export default function DynamicHomeSections({
       }
       if (bRes && bRes.ok) {
         const bJson = await bRes.json();
-        const bList = (bJson.banners || bJson.data || []).filter(
-          (b: any) => b.is_active !== false
-        );
+        const bList = (bJson.banners || bJson.data || []).filter((b: any) => b.is_active !== false);
         setBanners(bList);
       }
     } catch {}
   }, []);
 
   useEffect(() => {
-    if (initialProducts.length === 0) {
-      fetchLiveHomeData();
-    }
-
-    window.addEventListener("banners_updated", fetchLiveHomeData);
+    if (initialProducts.length === 0) fetchLiveHomeData();
+    window.addEventListener("banners_updated",  fetchLiveHomeData);
     window.addEventListener("products_updated", fetchLiveHomeData);
-
     const chHome = supabase
       .channel("realtime-home-unified-stream")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, fetchLiveHomeData)
-      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, fetchLiveHomeData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "banners"  }, fetchLiveHomeData)
       .subscribe();
-
     return () => {
-      window.removeEventListener("banners_updated", fetchLiveHomeData);
+      window.removeEventListener("banners_updated",  fetchLiveHomeData);
       window.removeEventListener("products_updated", fetchLiveHomeData);
       supabase.removeChannel(chHome);
     };
@@ -194,26 +180,24 @@ export default function DynamicHomeSections({
   const effectiveSlides =
     banners.length > 0
       ? banners.map((b: any) => ({
-          id: String(b.id),
-          title: b.title || "پیشنهاد ویژه آکسون",
+          id:       String(b.id),
+          title:    b.title    || "پیشنهاد ویژه آکسون",
           subtitle: b.subtitle || "مشاهده مشخصات و خرید آنلاین با گارانتی اصالت",
-          image: b.image_url || b.image || "/placeholder.png",
-          link: b.link_url || b.link || "/products",
-          price: b.price ? Number(b.price) : null,
-          badge: b.badge_text || b.badge || "پیشنهاد ویژه",
-          cta: b.cta_text || "مشاهده و خرید",
+          image:    b.image_url || b.image || "/placeholder.png",
+          link:     b.link_url  || b.link  || "/products",
+          price:    b.price ? Number(b.price) : null,
+          badge:    b.badge_text || b.badge  || "پیشنهاد ویژه",
+          cta:      b.cta_text  || "مشاهده و خرید",
         }))
       : products.slice(0, 5).map((p: any) => ({
-          id: String(p.id),
-          title: p.title || p.name || "محصول ویژه",
-          subtitle:
-            p.short_description ||
-            (p.description ? String(p.description).slice(0, 110) : "خرید مستقیم با گارانتی اصالت"),
-          image: p.image || p.image_url || "/placeholder.png",
-          link: "/products/" + p.id,
-          price: Number(p.discount_price || p.discountPrice || p.price || 0),
-          badge: p.category || "ویژه",
-          cta: "مشاهده و خرید محصول",
+          id:       String(p.id),
+          title:    p.title || p.name || "محصول ویژه",
+          subtitle: p.short_description || (p.description ? String(p.description).slice(0, 110) : "خرید مستقیم با گارانتی اصالت"),
+          image:    p.image || p.image_url || "/placeholder.png",
+          link:     "/products/" + p.id,
+          price:    Number(p.discount_price || p.discountPrice || p.price || 0),
+          badge:    p.category || "ویژه",
+          cta:      "مشاهده و خرید محصول",
         }));
 
   useEffect(() => {
@@ -225,42 +209,39 @@ export default function DynamicHomeSections({
   }, [effectiveSlides.length]);
 
   const rawSections: ResponsiveSectionItem[] =
-    Array.isArray(tbCfg?.homeSections) && tbCfg.homeSections.length > 0
-      ? tbCfg.homeSections
-      : Array.isArray(layoutCfg?.homeSections) && layoutCfg.homeSections.length > 0
-      ? layoutCfg.homeSections
-      : DEFAULT_SECTIONS_ORDER;
+    Array.isArray(tbCfg?.homeSections)    && tbCfg.homeSections.length    > 0 ? tbCfg.homeSections
+    : Array.isArray(layoutCfg?.homeSections) && layoutCfg.homeSections.length > 0 ? layoutCfg.homeSections
+    : DEFAULT_SECTIONS_ORDER;
 
-  const isHorizontalMobile = bannerSizing.mobileLayout !== "vertical";
+  const isVerticalMobile = bannerSizing.mobileLayout === "vertical";
 
   const renderSectionByConfig = (sec: ResponsiveSectionItem) => {
     if (sec.enabled === false) return null;
     const visibilityClass = getDeviceVisibilityClasses(sec);
     if (visibilityClass === "hidden") return null;
 
+    // ── اسلایدر بنر (موبایل + تبلت) ──────────────────────────────
     if (sec.type === "banners_slider") {
       if (effectiveSlides.length === 0) return null;
       return (
         <div key={sec.id} className={visibilityClass}>
           <section
-            style={
-              {
-                "--axon-banner-h-mob": (bannerSizing.mobileHeight || 160) + "px",
-                "--axon-banner-h-tab": (bannerSizing.tabletHeight || 250) + "px",
-                "--axon-banner-h-desk": (bannerSizing.desktopHeight || 340) + "px",
-                "--axon-banner-img-mob": (bannerSizing.mobileImageSize || 90) + "px",
-                "--axon-banner-img-desk": (bannerSizing.desktopImageSize || 220) + "px",
-              } as React.CSSProperties
-            }
-            className="axon-hero-banner-box relative w-full rounded-3xl sm:rounded-[2.5rem] overflow-hidden border border-[var(--card-border)] shadow-xl bg-[var(--modal-bg)] flex items-center"
+            style={{
+              "--axon-banner-h-mob":   (bannerSizing.mobileHeight  || 220) + "px",
+              "--axon-banner-h-tab":   (bannerSizing.tabletHeight  || 260) + "px",
+              "--axon-banner-h-desk":  (bannerSizing.desktopHeight || 340) + "px",
+              "--axon-banner-img-mob": (bannerSizing.mobileImageSize  || 120) + "px",
+              "--axon-banner-img-desk":(bannerSizing.desktopImageSize || 220) + "px",
+            } as React.CSSProperties}
+            className="axon-hero-banner-box relative w-full rounded-3xl overflow-hidden border border-[var(--card-border)] shadow-xl bg-[var(--modal-bg)]"
           >
-            <style>{
-              ".axon-hero-banner-box { min-height: var(--axon-banner-h-mob); } " +
-              "@media (min-width: 768px) { .axon-hero-banner-box { min-height: var(--axon-banner-h-tab); } } " +
-              "@media (min-width: 1024px) { .axon-hero-banner-box { min-height: var(--axon-banner-h-desk); } } " +
-              ".axon-hero-banner-img { width: var(--axon-banner-img-mob); height: var(--axon-banner-img-mob); } " +
-              "@media (min-width: 768px) { .axon-hero-banner-img { width: var(--axon-banner-img-desk); height: var(--axon-banner-img-desk); } }"
-            }</style>
+            <style>{`
+              .axon-hero-banner-box { min-height: var(--axon-banner-h-mob); }
+              @media (min-width: 768px) { .axon-hero-banner-box { min-height: var(--axon-banner-h-tab); } }
+              @media (min-width: 1024px){ .axon-hero-banner-box { min-height: var(--axon-banner-h-desk);} }
+              .axon-hero-banner-img { width: var(--axon-banner-img-mob); height: var(--axon-banner-img-mob); }
+              @media (min-width: 768px) { .axon-hero-banner-img { width: var(--axon-banner-img-desk); height: var(--axon-banner-img-desk); } }
+            `}</style>
 
             {effectiveSlides.map((slide, idx) => {
               const isActive = idx === activeSlide;
@@ -271,54 +252,50 @@ export default function DynamicHomeSections({
                   onClick={() => soundEngine.playClick()}
                   className={
                     "w-full h-full transition-all duration-700 " +
-                    (isActive
-                      ? "opacity-100 relative z-10 block"
-                      : "opacity-0 absolute inset-0 z-0 pointer-events-none")
+                    (isActive ? "opacity-100 relative z-10 block" : "opacity-0 absolute inset-0 z-0 pointer-events-none")
                   }
                 >
                   <div
                     className={
-                      isHorizontalMobile
-                        ? "flex flex-row items-center justify-between gap-3 sm:gap-6 p-3.5 sm:p-8 md:p-10"
-                        : "flex flex-col-reverse md:flex-row items-center justify-between gap-4 sm:gap-6 p-4 sm:p-8 md:p-10"
+                      isVerticalMobile
+                        ? "flex flex-col items-center justify-center gap-4 p-5 text-center"
+                        : "flex flex-row items-center justify-between gap-3 sm:gap-6 p-3.5 sm:p-8 md:p-10"
                     }
                   >
-                    <div className="flex-1 min-w-0 space-y-1 sm:space-y-3 text-right">
-                      <span className="inline-block px-2.5 py-0.5 sm:px-3.5 sm:py-1 rounded-full bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 text-[var(--accent-blue)] text-[10px] sm:text-xs font-black">
-                        🔥 {slide.badge}
-                      </span>
-
-                      <h2 className="text-sm sm:text-2xl md:text-3xl lg:text-4xl font-black leading-snug text-[var(--text-primary)] hover:text-[var(--accent-blue)] transition line-clamp-1 sm:line-clamp-2">
-                        {slide.title}
-                      </h2>
-
-                      {slide.subtitle && (
-                        <p className="text-[11px] sm:text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-1 sm:line-clamp-2 font-medium max-w-xl">
-                          {slide.subtitle}
-                        </p>
-                      )}
-
-                      <div className="pt-1 sm:pt-2 flex flex-wrap items-center gap-2 sm:gap-4">
-                        <span className="px-3 py-1.5 sm:px-6 sm:py-3 rounded-xl sm:rounded-2xl bg-[var(--accent-blue)] text-white font-black text-[10px] sm:text-xs md:text-sm shadow-md hover:opacity-90 transition inline-flex items-center gap-1.5">
-                          <span>{slide.cta}</span>
-                          <span>←</span>
-                        </span>
-
-                        {slide.price ? (
-                          <span className="font-mono font-black text-xs sm:text-base md:text-lg text-emerald-500">
-                            {formatPrice(slide.price)} تومان
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-
+                    {/* تصویر — در حالت عمودی بالا، افقی کنار */}
                     <div className="shrink-0 flex items-center justify-center">
-                      <div className="axon-hero-banner-img rounded-2xl sm:rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] p-2 sm:p-4 flex items-center justify-center overflow-hidden shadow-inner">
+                      <div className="axon-hero-banner-img rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
                         <img
                           src={slide.image}
                           alt={slide.title}
                           className="w-full h-full object-contain transition-transform duration-500 hover:scale-105"
                         />
+                      </div>
+                    </div>
+
+                    {/* متن */}
+                    <div className={"flex-1 min-w-0 space-y-2 " + (isVerticalMobile ? "text-center" : "text-right")}>
+                      <span className="inline-block px-2.5 py-0.5 rounded-full bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 text-[var(--accent-blue)] text-[10px] font-black">
+                        🔥 {slide.badge}
+                      </span>
+                      <h2 className="text-base sm:text-2xl md:text-3xl font-black leading-snug text-[var(--text-primary)] line-clamp-2">
+                        {slide.title}
+                      </h2>
+                      {slide.subtitle && (
+                        <p className="text-[11px] sm:text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-2 font-medium">
+                          {slide.subtitle}
+                        </p>
+                      )}
+                      <div className={"flex flex-wrap items-center gap-2 pt-1 " + (isVerticalMobile ? "justify-center" : "")}>
+                        <span className="px-4 py-2 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-[11px] shadow-md inline-flex items-center gap-1.5">
+                          <span>{slide.cta}</span>
+                          <span>←</span>
+                        </span>
+                        {slide.price ? (
+                          <span className="font-mono font-black text-xs sm:text-base text-emerald-500">
+                            {formatPrice(slide.price)} تومان
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -327,20 +304,13 @@ export default function DynamicHomeSections({
             })}
 
             {effectiveSlides.length > 1 && (
-              <div className="absolute bottom-2 sm:bottom-3.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
                 {effectiveSlides.map((_, idx) => (
                   <button
                     key={idx}
                     type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      soundEngine.playClick();
-                      setActiveSlide(idx);
-                    }}
-                    className={
-                      "h-1.5 sm:h-2 rounded-full transition-all cursor-pointer " +
-                      (idx === activeSlide ? "w-5 sm:w-6 bg-[var(--accent-blue)]" : "w-1.5 sm:w-2 bg-white/50")
-                    }
+                    onClick={(e) => { e.preventDefault(); soundEngine.playClick(); setActiveSlide(idx); }}
+                    className={"h-1.5 rounded-full transition-all cursor-pointer " + (idx === activeSlide ? "w-5 bg-[var(--accent-blue)]" : "w-1.5 bg-white/50")}
                     aria-label={"اسلاید " + (idx + 1)}
                   />
                 ))}
@@ -351,27 +321,21 @@ export default function DynamicHomeSections({
       );
     }
 
+    // ── اسلایدر پرسپکتیو (فقط دسکتاپ) ────────────────────────────
     if (sec.type === "NativePerspectiveSlider") {
       if (products.length === 0) return null;
       return (
         <div key={sec.id} className={visibilityClass}>
-          <ProductPerspectiveSlider
-            products={products}
-            customTitle={sec.title}
-            customSubtitle={sec.subtitle}
-          />
+          <ProductPerspectiveSlider products={products} customTitle={sec.title} customSubtitle={sec.subtitle} />
         </div>
       );
     }
 
+    // ── کاتالوگ محصولات ───────────────────────────────────────────
     if (sec.type === "NativeProductCatalog") {
       return (
         <div key={sec.id} className={visibilityClass}>
-          <ProductList
-            initialProducts={products}
-            customHeading={sec.title}
-            customSubtitle={sec.subtitle}
-          />
+          <ProductList initialProducts={products} customHeading={sec.title} customSubtitle={sec.subtitle} />
         </div>
       );
     }

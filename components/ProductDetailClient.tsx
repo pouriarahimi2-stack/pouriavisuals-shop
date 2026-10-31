@@ -209,7 +209,7 @@ export default function ProductDetailClient({
 
       {/* نوار پایین موبایل — گرادیان کپسولی */}
       <div
-        className="lg:hidden fixed bottom-0 inset-x-0 z-[110] px-3 py-2.5"
+        className="lg:hidden fixed bottom-14 inset-x-0 z-[110] px-3 py-2.5"
         style={{
           paddingBottom: "calc(0.625rem + env(safe-area-inset-bottom,0px))",
           background: "var(--glass-bg-strong)",

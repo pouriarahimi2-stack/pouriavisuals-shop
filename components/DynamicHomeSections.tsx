@@ -38,7 +38,7 @@ export interface BannerSizingConfig {
 }
 
 export const DEFAULT_BANNER_SIZING: BannerSizingConfig = {
-  mobileHeight: 210,
+  mobileHeight: 220,
   tabletHeight: 260,
   desktopHeight: 340,
   mobileImageSize: 120,
@@ -247,49 +247,66 @@ export default function DynamicHomeSections({
 
             {effectiveSlides.map((slide, idx) => {
               const isActive = idx === activeSlide;
+              const gradients = [
+                "linear-gradient(135deg,#0f0c29 0%,#302b63 50%,#24243e 100%)",
+                "linear-gradient(135deg,#000428 0%,#004e92 100%)",
+                "linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)",
+                "linear-gradient(135deg,#0d0d0d 0%,#1a0533 50%,#2d0b5a 100%)",
+              ];
+              const grad = gradients[idx % gradients.length];
               return (
                 <div
                   key={(slide.id ?? idx) + "_" + idx}
-                  className={"absolute inset-0 transition-opacity duration-500 " + (isActive ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none")}
+                  className={"absolute inset-0 transition-opacity duration-700 " + (isActive ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none")}
+                  style={{ background: grad }}
                 >
                   <Link href={slide.link || "#"} onClick={() => soundEngine.playClick()} className="block w-full h-full">
-                    <div className="relative w-full h-full flex items-stretch overflow-hidden">
-                      {/* ناحیه متن — راست (RTL) */}
-                      <div className="relative z-10 flex flex-col justify-center pr-4 pl-3 py-4 gap-2" style={{ width: "58%" }}>
+                    <div className="relative w-full h-full flex items-center overflow-hidden px-4">
+
+                      {/* تصویر محصول — سمت چپ */}
+                      <div className="absolute left-2 top-1/2 -translate-y-1/2 w-[42%] aspect-square flex items-center justify-center">
+                        {slide.image ? (
+                          <img
+                            src={slide.image}
+                            alt={slide.title || ""}
+                            className="w-full h-full object-contain drop-shadow-2xl"
+                            style={{ filter: "drop-shadow(0 0 24px rgba(99,102,241,0.5))" }}
+                            loading={idx === 0 ? "eager" : "lazy"}
+                            draggable={false}
+                          />
+                        ) : (
+                          <div className="w-full h-full rounded-2xl bg-white/5 border border-white/10" />
+                        )}
+                      </div>
+
+                      {/* محتوای متن — سمت راست */}
+                      <div className="relative z-10 mr-auto flex flex-col justify-center gap-2 text-right" style={{ width: "54%", marginRight: "4%" }}>
                         {slide.badge ? (
-                          <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full w-fit border border-[var(--accent-blue)]/30 bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]">
+                          <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full w-fit self-end border border-cyan-400/40 bg-cyan-400/15 text-cyan-300">
                             🔥 {slide.badge}
                           </span>
                         ) : null}
-                        <h2 className="text-sm font-black text-[var(--text-primary)] leading-snug line-clamp-2 text-right">
+                        <h2 className="text-[15px] font-black text-white leading-tight line-clamp-2 text-right" style={{ textShadow:"0 2px 12px rgba(0,0,0,0.8)" }}>
                           {slide.title}
                         </h2>
                         {slide.subtitle ? (
-                          <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed line-clamp-1">
+                          <p className="text-[11px] text-white/70 leading-relaxed line-clamp-2 text-right">
                             {slide.subtitle}
                           </p>
                         ) : null}
                         {slide.price ? (
-                          <p className="text-[11px] font-bold text-emerald-500 text-right">
+                          <p className="text-[13px] font-black text-emerald-400 text-right">
                             {formatPrice(slide.price)} تومان
                           </p>
                         ) : null}
-                        <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-bold text-white bg-gradient-to-l from-[var(--accent-blue)] to-[var(--accent-violet)] rounded-full px-3 py-1.5 w-fit shadow-md">
-                          <span>{slide.cta || "مشاهده"}</span>
+                        <span className="mt-1 inline-flex items-center justify-center gap-1.5 text-[11px] font-bold text-white rounded-full px-4 py-2 w-fit self-end shadow-xl" style={{ background: "linear-gradient(135deg,#0066ff,#7c3aed)" }}>
+                          <span>{slide.cta || "مشاهده محصول"}</span>
                           <span>←</span>
                         </span>
                       </div>
-                      {/* ناحیه تصویر — چپ */}
-                      <div className="absolute left-0 top-0 bottom-0 overflow-hidden" style={{ width: "46%" }}>
-                        <img
-                          src={slide.image || ""}
-                          alt={slide.title || ""}
-                          className="absolute inset-0 w-full h-full object-contain object-center p-2"
-                          loading={idx === 0 ? "eager" : "lazy"}
-                          draggable={false}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-l from-[var(--modal-bg)] via-[var(--modal-bg)]/50 to-transparent pointer-events-none" />
-                      </div>
+
+                      {/* گرادیان جداکننده */}
+                      <div className="absolute inset-y-0 left-[38%] w-16 bg-gradient-to-r from-transparent to-transparent pointer-events-none" style={{ background: "linear-gradient(to right, transparent, rgba(0,0,0,0.15))" }} />
                     </div>
                   </Link>
                 </div>

@@ -248,60 +248,51 @@ export default function DynamicHomeSections({
             {effectiveSlides.map((slide, idx) => {
               const isActive = idx === activeSlide;
               return (
-                <Link
-                  key={slide.id + "_" + idx}
-                  href={slide.link}
-                  onClick={() => soundEngine.playClick()}
-                  className={
-                    "w-full h-full transition-all duration-700 " +
-                    (isActive ? "opacity-100 relative z-10 block" : "opacity-0 absolute inset-0 z-0 pointer-events-none")
-                  }
+                <div
+                  key={(slide.id ?? idx) + "_" + idx}
+                  className={"absolute inset-0 transition-opacity duration-500 " + (isActive ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none")}
                 >
-                  <div
-                    className={
-                      isVerticalMobile
-                        ? "flex flex-col items-center justify-center gap-4 p-5 text-center"
-                        : "flex flex-row items-center justify-between gap-3 sm:gap-6 p-3.5 sm:p-8 md:p-10"
-                    }
-                  >
-                    {/* تصویر — در حالت عمودی بالا، افقی کنار */}
-                    <div className="shrink-0 flex items-center justify-center">
-                      <div className="axon-hero-banner-img rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
-                        <img
-                          src={slide.image}
-                          alt={slide.title}
-                          className="w-full h-full object-contain transition-transform duration-500 hover:scale-105"
-                        />
-                      </div>
-                    </div>
-
-                    {/* متن */}
-                    <div className={"flex-1 min-w-0 space-y-2 " + (isVerticalMobile ? "text-center" : "text-right")}>
-                      <span className="inline-block px-2.5 py-0.5 rounded-full bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 text-[var(--accent-blue)] text-[10px] font-black">
-                        🔥 {slide.badge}
-                      </span>
-                      <h2 className="text-base sm:text-2xl md:text-3xl font-black leading-snug text-[var(--text-primary)] line-clamp-2">
-                        {slide.title}
-                      </h2>
-                      {slide.subtitle && (
-                        <p className="text-[11px] sm:text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-2 font-medium">
-                          {slide.subtitle}
-                        </p>
-                      )}
-                      <div className={"flex flex-wrap items-center gap-2 pt-1 " + (isVerticalMobile ? "justify-center" : "")}>
-                        <span className="px-4 py-2 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-[11px] shadow-md inline-flex items-center gap-1.5">
-                          <span>{slide.cta}</span>
-                          <span>←</span>
-                        </span>
-                        {slide.price ? (
-                          <span className="font-mono font-black text-xs sm:text-base text-emerald-500">
-                            {formatPrice(slide.price)} تومان
+                  <Link href={slide.link || "#"} onClick={() => soundEngine.playClick()} className="block w-full h-full">
+                    <div className="relative w-full h-full flex items-stretch overflow-hidden">
+                      {/* ناحیه متن — راست (RTL) */}
+                      <div className="relative z-10 flex flex-col justify-center pr-4 pl-3 py-4 gap-2" style={{ width: "58%" }}>
+                        {slide.badge ? (
+                          <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full w-fit border border-[var(--accent-blue)]/30 bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]">
+                            🔥 {slide.badge}
                           </span>
                         ) : null}
+                        <h2 className="text-sm font-black text-[var(--text-primary)] leading-snug line-clamp-2 text-right">
+                          {slide.title}
+                        </h2>
+                        {slide.subtitle ? (
+                          <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed line-clamp-1">
+                            {slide.subtitle}
+                          </p>
+                        ) : null}
+                        {slide.price ? (
+                          <p className="text-[11px] font-bold text-emerald-500 text-right">
+                            {formatPrice(slide.price)} تومان
+                          </p>
+                        ) : null}
+                        <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-bold text-white bg-gradient-to-l from-[var(--accent-blue)] to-[var(--accent-violet)] rounded-full px-3 py-1.5 w-fit shadow-md">
+                          <span>{slide.cta || "مشاهده"}</span>
+                          <span>←</span>
+                        </span>
+                      </div>
+                      {/* ناحیه تصویر — چپ */}
+                      <div className="absolute left-0 top-0 bottom-0 overflow-hidden" style={{ width: "46%" }}>
+                        <img
+                          src={slide.image || ""}
+                          alt={slide.title || ""}
+                          className="absolute inset-0 w-full h-full object-contain object-center p-2"
+                          loading={idx === 0 ? "eager" : "lazy"}
+                          draggable={false}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-l from-[var(--modal-bg)] via-[var(--modal-bg)]/50 to-transparent pointer-events-none" />
                       </div>
                     </div>
-                  </div>
-                </Link>
+                  </Link>
+                </div>
               );
             })}
 

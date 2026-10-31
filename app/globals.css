@@ -170,3 +170,24 @@ body { font-family:'Vazirmatn',-apple-system,BlinkMacSystemFont,'Segoe UI',Robot
   }
 }
 
+/* ── اسلایدر wrapper ─────────────────────────────────── */
+.axon-sl-wrap {
+  height: 200px !important;
+  min-height: 200px !important;
+  max-height: 200px !important;
+}
+@media (min-width: 640px) {
+  .axon-sl-wrap {
+    height: 260px !important;
+    min-height: 260px !important;
+    max-height: 260px !important;
+  }
+}
+@media (min-width: 1024px) {
+  .axon-sl-wrap {
+    height: 340px !important;
+    min-height: 340px !important;
+    max-height: 340px !important;
+  }
+}
+

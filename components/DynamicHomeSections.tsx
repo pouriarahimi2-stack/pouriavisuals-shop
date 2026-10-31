@@ -233,7 +233,7 @@ export default function DynamicHomeSections({
       return (
         <div key={sec.id} className={visibilityClass}>
           <div
-            className="relative w-full overflow-hidden rounded-3xl shadow-2xl"
+            className="axon-sl-wrap relative w-full overflow-hidden rounded-3xl shadow-2xl"
             style={{ height: "200px" }}
           >
             <style>{`

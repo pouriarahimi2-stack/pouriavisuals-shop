@@ -120,6 +120,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <head>
+      <script dangerouslySetInnerHTML={{ __html: `
+        // پاک‌سازی service worker cache
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            regs.forEach(function(r) { r.unregister(); });
+          });
+        }
+      ` }} />
         <script
           dangerouslySetInnerHTML={{
             __html:

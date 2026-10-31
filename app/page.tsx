@@ -81,7 +81,7 @@ export default async function HomePage() {
   };
 
   return (
-    <div className="font-sans select-text text-[var(--text-primary)] space-y-12 pb-32 sm:pb-8" dir="rtl">
+    <div className="font-sans select-text text-[var(--text-primary)] space-y-12 pb-36 sm:pb-28 md:pb-8" dir="rtl">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(organizationJsonLd) }} />
       <DynamicHomeSections initialProducts={products} initialBanners={banners} initialSiteInfo={siteSettings} />
     </div>

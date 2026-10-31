@@ -140,7 +140,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <SiteInfoProvider>
             <AnnouncementBar />
             <LayoutShell>
-              <div className="pb-16 lg:pb-0">{children}</div>
+              <div className="pb-20 md:pb-0">{children}</div>
             </LayoutShell>
             <LiveStoreSyncGuard />
             <MobileBottomNav />

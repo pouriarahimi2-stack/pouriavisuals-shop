@@ -38,7 +38,7 @@ export interface BannerSizingConfig {
 }
 
 export const DEFAULT_BANNER_SIZING: BannerSizingConfig = {
-  mobileHeight: 300,
+  mobileHeight: 210,
   tabletHeight: 260,
   desktopHeight: 340,
   mobileImageSize: 120,

@@ -9,7 +9,7 @@ import { CartProvider } from "@/context/CartContext";
 import { SiteInfoProvider } from "@/context/SiteInfoContext";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import RealtimeGlobalListener from "@/components/RealtimeGlobalListener";
-import MobileBottomNav from "@/components/layout/MobileBottomNav";
+import MobileBottomNav from "@/components/MobileBottomNav";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

@@ -147,32 +147,26 @@ body { font-family:'Vazirmatn',-apple-system,BlinkMacSystemFont,'Segoe UI',Robot
 /* ── چت باتون شناور ──────────────────────────────────── */
 .ai-chat-float-btn {
   position: fixed !important;
-  bottom: 80px !important;   /* بالاتر از MobileBottomNav (56px) + فاصله */
+  bottom: 80px !important;
   right: 16px !important;
-  z-index: 40 !important;
-  width: 52px !important;
-  height: 52px !important;
+  z-index: 45 !important;
+  width: 50px !important;
+  height: 50px !important;
   border-radius: 9999px !important;
-  background: linear-gradient(135deg, var(--accent-blue, #0066ff) 0%, var(--accent-violet, #7c3aed) 100%) !important;
+  background: linear-gradient(135deg,#0066ff,#7c3aed) !important;
   border: none !important;
-  box-shadow: 0 4px 20px rgba(0,102,255,0.45), 0 2px 8px rgba(0,0,0,0.25) !important;
+  box-shadow: 0 4px 20px rgba(0,102,255,0.4), 0 0 0 2px rgba(255,255,255,0.15) !important;
   cursor: pointer !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   transition: transform 0.2s, box-shadow 0.2s !important;
 }
-.ai-chat-float-btn:hover,
-.ai-chat-float-btn:active {
-  transform: scale(1.08) !important;
-  box-shadow: 0 8px 32px rgba(124,58,237,0.55) !important;
-}
+.ai-chat-float-btn:hover { transform: scale(1.08) !important; }
 @media (min-width: 768px) {
   .ai-chat-float-btn {
-    bottom: 24px !important;
-    right: 24px !important;
-    width: 56px !important;
-    height: 56px !important;
+    bottom: 28px !important;
+    right: 28px !important;
   }
 }
 

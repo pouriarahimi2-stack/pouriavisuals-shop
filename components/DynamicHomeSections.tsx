@@ -225,108 +225,197 @@ export default function DynamicHomeSections({
     // ── اسلایدر بنر (موبایل + تبلت) ──────────────────────────────
     if (sec.type === "banners_slider") {
       if (effectiveSlides.length === 0) return null;
+
+      /* ──────────────────────────────────────────────────────
+         اسلایدر موبایل — طراحی کامل جدید
+         ارتفاع ثابت 200px موبایل / 260px تبلت / 340px دسکتاپ
+      ────────────────────────────────────────────────────── */
       return (
         <div key={sec.id} className={visibilityClass}>
-          <section
-            style={{
-              "--axon-banner-h-mob": (bannerSizing.mobileHeight  || 300) + "px",
-              "--axon-banner-h-tab":   (bannerSizing.tabletHeight  || 260) + "px",
-              "--axon-banner-h-desk":  (bannerSizing.desktopHeight || 340) + "px",
-              "--axon-banner-img-mob": (bannerSizing.mobileImageSize  || 120) + "px",
-              "--axon-banner-img-desk":(bannerSizing.desktopImageSize || 220) + "px",
-            } as React.CSSProperties}
-            className="axon-hero-banner-box relative w-full rounded-3xl overflow-hidden border border-[var(--card-border)] shadow-xl bg-[var(--modal-bg)]"
+          <div
+            className="relative w-full overflow-hidden rounded-3xl shadow-2xl"
+            style={{ height: "200px" }}
           >
             <style>{`
-              .axon-hero-banner-box { min-height: var(--axon-banner-h-mob); }
-              @media (min-width: 768px) { .axon-hero-banner-box { min-height: var(--axon-banner-h-tab); } }
-              @media (min-width: 1024px){ .axon-hero-banner-box { min-height: var(--axon-banner-h-desk);} }
-              .axon-hero-banner-img { width: var(--axon-banner-img-mob); height: var(--axon-banner-img-mob); }
-              @media (min-width: 768px) { .axon-hero-banner-img { width: var(--axon-banner-img-desk); height: var(--axon-banner-img-desk); } }
+              @media (min-width: 640px)  { .axon-sl-wrap { height: 260px !important; } }
+              @media (min-width: 1024px) { .axon-sl-wrap { height: 340px !important; } }
             `}</style>
-
+            {/* slides */}
             {effectiveSlides.map((slide, idx) => {
               const isActive = idx === activeSlide;
-              const gradients = [
-                "linear-gradient(135deg,#0f0c29 0%,#302b63 50%,#24243e 100%)",
-                "linear-gradient(135deg,#000428 0%,#004e92 100%)",
-                "linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)",
-                "linear-gradient(135deg,#0d0d0d 0%,#1a0533 50%,#2d0b5a 100%)",
+              const GRADS = [
+                "linear-gradient(120deg,#0f0c29,#302b63)",
+                "linear-gradient(120deg,#000428,#004e92)",
+                "linear-gradient(120deg,#1a1a2e,#0f3460)",
+                "linear-gradient(120deg,#200122,#6f0000)",
               ];
-              const grad = gradients[idx % gradients.length];
               return (
                 <div
-                  key={(slide.id ?? idx) + "_" + idx}
-                  className={"absolute inset-0 transition-opacity duration-700 " + (isActive ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none")}
-                  style={{ background: grad }}
+                  key={idx}
+                  className="absolute inset-0 transition-opacity duration-700"
+                  style={{
+                    opacity: isActive ? 1 : 0,
+                    zIndex: isActive ? 2 : 1,
+                    pointerEvents: isActive ? "auto" : "none",
+                    background: GRADS[idx % GRADS.length],
+                  }}
                 >
-                  <Link href={slide.link || "#"} onClick={() => soundEngine.playClick()} className="block w-full h-full">
-                    <div className="relative w-full h-full flex items-center overflow-hidden px-4">
+                  <Link
+                    href={slide.link || "#"}
+                    onClick={() => soundEngine.playClick()}
+                    className="flex items-center w-full h-full"
+                  >
+                    {/* تصویر — سمت چپ */}
+                    <div className="relative flex-shrink-0 flex items-center justify-center" style={{ width: "44%", height: "100%" }}>
+                      {slide.image ? (
+                        <img
+                          src={slide.image}
+                          alt={slide.title || ""}
+                          style={{
+                            maxWidth: "90%",
+                            maxHeight: "90%",
+                            objectFit: "contain",
+                            filter: "drop-shadow(0 0 20px rgba(139,92,246,0.6))",
+                          }}
+                          loading={idx === 0 ? "eager" : "lazy"}
+                          draggable={false}
+                        />
+                      ) : (
+                        <div style={{ width: 80, height: 80, borderRadius: 16, background: "rgba(255,255,255,0.07)" }} />
+                      )}
+                    </div>
 
-                      {/* تصویر محصول — سمت چپ */}
-                      <div className="absolute left-2 top-1/2 -translate-y-1/2 w-[42%] aspect-square flex items-center justify-center">
-                        {slide.image ? (
-                          <img
-                            src={slide.image}
-                            alt={slide.title || ""}
-                            className="w-full h-full object-contain drop-shadow-2xl"
-                            style={{ filter: "drop-shadow(0 0 24px rgba(99,102,241,0.5))" }}
-                            loading={idx === 0 ? "eager" : "lazy"}
-                            draggable={false}
-                          />
-                        ) : (
-                          <div className="w-full h-full rounded-2xl bg-white/5 border border-white/10" />
-                        )}
-                      </div>
+                    {/* جداکننده گرادیان */}
+                    <div
+                      className="absolute"
+                      style={{
+                        left: "38%",
+                        top: 0,
+                        bottom: 0,
+                        width: 40,
+                        background: "linear-gradient(to right, rgba(0,0,0,0.15), transparent)",
+                        pointerEvents: "none",
+                      }}
+                    />
 
-                      {/* محتوای متن — سمت راست */}
-                      <div className="relative z-10 mr-auto flex flex-col justify-center gap-2 text-right" style={{ width: "54%", marginRight: "4%" }}>
-                        {slide.badge ? (
-                          <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full w-fit self-end border border-cyan-400/40 bg-cyan-400/15 text-cyan-300">
-                            🔥 {slide.badge}
-                          </span>
-                        ) : null}
-                        <h2 className="text-[15px] font-black text-white leading-tight line-clamp-2 text-right" style={{ textShadow:"0 2px 12px rgba(0,0,0,0.8)" }}>
-                          {slide.title}
-                        </h2>
-                        {slide.subtitle ? (
-                          <p className="text-[11px] text-white/70 leading-relaxed line-clamp-2 text-right">
-                            {slide.subtitle}
-                          </p>
-                        ) : null}
-                        {slide.price ? (
-                          <p className="text-[13px] font-black text-emerald-400 text-right">
-                            {formatPrice(slide.price)} تومان
-                          </p>
-                        ) : null}
-                        <span className="mt-1 inline-flex items-center justify-center gap-1.5 text-[11px] font-bold text-white rounded-full px-4 py-2 w-fit self-end shadow-xl" style={{ background: "linear-gradient(135deg,#0066ff,#7c3aed)" }}>
-                          <span>{slide.cta || "مشاهده محصول"}</span>
-                          <span>←</span>
+                    {/* متن — سمت راست */}
+                    <div
+                      className="flex flex-col gap-1.5 px-3 py-4 text-right"
+                      style={{ flex: 1, direction: "rtl", overflow: "hidden" }}
+                    >
+                      {slide.badge ? (
+                        <span style={{
+                          display: "inline-block",
+                          alignSelf: "flex-end",
+                          fontSize: 10,
+                          fontWeight: 800,
+                          padding: "2px 10px",
+                          borderRadius: 999,
+                          background: "rgba(6,182,212,0.2)",
+                          border: "1px solid rgba(6,182,212,0.4)",
+                          color: "#67e8f9",
+                        }}>
+                          🔥 {slide.badge}
                         </span>
-                      </div>
+                      ) : null}
 
-                      {/* گرادیان جداکننده */}
-                      <div className="absolute inset-y-0 left-[38%] w-16 bg-gradient-to-r from-transparent to-transparent pointer-events-none" style={{ background: "linear-gradient(to right, transparent, rgba(0,0,0,0.15))" }} />
+                      <h2 style={{
+                        fontSize: 15,
+                        fontWeight: 900,
+                        color: "#fff",
+                        lineHeight: 1.4,
+                        margin: 0,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                        textShadow: "0 2px 8px rgba(0,0,0,0.7)",
+                      }}>
+                        {slide.title}
+                      </h2>
+
+                      {slide.subtitle ? (
+                        <p style={{
+                          fontSize: 11,
+                          color: "rgba(255,255,255,0.65)",
+                          margin: 0,
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                          lineHeight: 1.5,
+                        }}>
+                          {slide.subtitle}
+                        </p>
+                      ) : null}
+
+                      {slide.price ? (
+                        <p style={{ fontSize: 13, fontWeight: 900, color: "#34d399", margin: 0 }}>
+                          {formatPrice(slide.price)} تومان
+                        </p>
+                      ) : null}
+
+                      <span style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        alignSelf: "flex-end",
+                        marginTop: 4,
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: "#fff",
+                        background: "linear-gradient(135deg,#0066ff,#7c3aed)",
+                        borderRadius: 999,
+                        padding: "6px 14px",
+                        boxShadow: "0 2px 12px rgba(124,58,237,0.4)",
+                      }}>
+                        {slide.cta || "مشاهده"} ←
+                      </span>
                     </div>
                   </Link>
                 </div>
               );
             })}
 
+            {/* dots — ثابت در پایین */}
             {effectiveSlides.length > 1 && (
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 10,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  zIndex: 10,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: "rgba(0,0,0,0.35)",
+                  backdropFilter: "blur(8px)",
+                  borderRadius: 999,
+                  padding: "5px 10px",
+                }}
+              >
                 {effectiveSlides.map((_, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={(e) => { e.preventDefault(); soundEngine.playClick(); setActiveSlide(idx); }}
-                    className={"h-1.5 rounded-full transition-all cursor-pointer " + (idx === activeSlide ? "w-5 bg-[var(--accent-blue)]" : "w-1.5 bg-white/50")}
+                    style={{
+                      width: idx === activeSlide ? 20 : 6,
+                      height: 6,
+                      borderRadius: 999,
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 0,
+                      background: idx === activeSlide ? "#0066ff" : "rgba(255,255,255,0.45)",
+                      transition: "all 0.3s",
+                    }}
                     aria-label={"اسلاید " + (idx + 1)}
                   />
                 ))}
               </div>
             )}
-          </section>
+          </div>
         </div>
       );
     }

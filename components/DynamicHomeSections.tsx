@@ -38,7 +38,7 @@ export interface BannerSizingConfig {
 }
 
 export const DEFAULT_BANNER_SIZING: BannerSizingConfig = {
-  mobileHeight: 220,
+  mobileHeight: 300,
   tabletHeight: 260,
   desktopHeight: 340,
   mobileImageSize: 120,
@@ -109,6 +109,8 @@ function normalizeProductRow(p: any) {
 }
 
 function getDeviceVisibilityClasses(sec: ResponsiveSectionItem): string {
+  // اسلایدر بنر: فقط موبایل + تبلت — دسکتاپ همیشه مخفی
+  if (sec.type === "banners_slider")         return "block md:block lg:hidden";
   if (sec.type === "NativePerspectiveSlider") return "hidden lg:block";
   if (sec.type === "NativeProductCatalog")    return "block";
   const mob  = sec.showOnMobile  !== undefined ? Boolean(sec.showOnMobile)  : true;
@@ -227,7 +229,7 @@ export default function DynamicHomeSections({
         <div key={sec.id} className={visibilityClass}>
           <section
             style={{
-              "--axon-banner-h-mob":   (bannerSizing.mobileHeight  || 220) + "px",
+              "--axon-banner-h-mob": (bannerSizing.mobileHeight  || 300) + "px",
               "--axon-banner-h-tab":   (bannerSizing.tabletHeight  || 260) + "px",
               "--axon-banner-h-desk":  (bannerSizing.desktopHeight || 340) + "px",
               "--axon-banner-img-mob": (bannerSizing.mobileImageSize  || 120) + "px",

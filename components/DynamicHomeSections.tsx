@@ -38,10 +38,10 @@ export interface BannerSizingConfig {
 }
 
 export const DEFAULT_BANNER_SIZING: BannerSizingConfig = {
-  mobileHeight: 160,
+  mobileHeight: 220,
   tabletHeight: 250,
   desktopHeight: 340,
-  mobileImageSize: 90,
+  mobileImageSize: 120,
   desktopImageSize: 220,
   mobileLayout: "horizontal",
 };
@@ -55,7 +55,7 @@ export const DEFAULT_SECTIONS_ORDER: ResponsiveSectionItem[] = [
     enabled: true,
     showOnMobile: true,
     showOnTablet: true,
-    showOnDesktop: true,
+    showOnDesktop: false,
   },
   {
     id: "sec_perspective",
@@ -381,7 +381,7 @@ export default function DynamicHomeSections({
 
   return (
     <div
-      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12 pb-24 font-sans select-text"
+      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12 pb-40 sm:pb-24 font-sans select-text"
       dir="rtl"
     >
       {rawSections.map((sec: any) => renderSectionByConfig(sec))}

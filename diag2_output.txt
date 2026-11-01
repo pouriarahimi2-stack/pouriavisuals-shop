@@ -1,0 +1,1211 @@
+
+============================================================
+=== AddToCartButton.tsx — کامل (275 خط)
+============================================================
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { soundEngine } from "@/lib/soundEngine";
+import { useCart } from "@/context/CartContext";
+
+interface AddToCartButtonProps {
+  product: {
+    id: string | number;
+    title?: string;
+    name?: string;
+    price: number;
+    discount_price?: number | null;
+    image?: string | null;
+    images?: string[];
+    stock?: number;
+    category?: string;
+    color_options?: { name: string; hex: string }[];
+    shipping_type?: string;
+  };
+  className?: string;
+  showCounter?: boolean;
+}
+
+export default function AddToCartButton({
+  product,
+  className = "",
+  showCounter = true,
+}: AddToCartButtonProps) {
+  const { cartItems, addToCart, openCart } = useCart();
+  const [animState, setAnimState] = useState<"idle" | "adding">("idle");
+  const [bumpCounter, setBumpCounter] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const hasColors =
+    Array.isArray(product.color_options) && product.color_options.length > 0;
+
+  useEffect(() => { setMounted(true); }, []);
+
+  const cartItem = cartItems.find(
+    (i) => String(i.id) === String(product.id)
+  );
+  const currentCount = cartItem?.quantity || 0;
+  const stockLimit =
+    product.stock !== undefined && product.stock !== null
+      ? Number(product.stock)
+      : 10;
+  const isAvailable = stockLimit > 0;
+  const isMaxReached = currentCount >= stockLimit;
+
+  const guaranteedImage =
+    (Array.isArray(product.images) && product.images[0]) ||
+    product.image ||
+    "/placeholder.png";
+
+  const doAddToCart = (colorName?: string) => {
+    soundEngine.playAddToCart();
+    setAnimState("adding");
+    addToCart(
+      {
+        id: product.id,
+        title: product.title || product.name,
+        name: product.title || product.name,
+        price: product.price,
+        discount_price: product.discount_price,
+        image: guaranteedImage,
+        images: [guaranteedImage],
+        stock: stockLimit,
+        category: product.category || "تکنولوژی",
+        quantity: 1,
+        selectedColor: colorName || undefined,
+        shipping_type: product.shipping_type || undefined,
+      },
+      false
+    );
+    setTimeout(() => {
+      setBumpCounter(true);
+      setTimeout(() => setBumpCounter(false), 500);
+    }, 550);
+    setTimeout(() => {
+      setAnimState("idle");
+      openCart();
+    }, 1250);
+  };
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isAvailable || isMaxReached || animState !== "idle") return;
+    if (hasColors) {
+      setShowColorPicker((prev) => !prev);
+      return;
+    }
+    doAddToCart();
+  };
+
+  const handleColorSelect = (e: React.MouseEvent, colorName: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowColorPicker(false);
+    doAddToCart(colorName);
+  };
+
+  const isAnimating = animState === "adding";
+
+  return (
+    <div
+      className={"flex flex-col items-center gap-1.5 w-full select-text relative " + className}
+      dir="rtl"
+      suppressHydrationWarning
+    >
+      {/* Color Picker Popup */}
+      {showColorPicker && hasColors && (
+        <div
+          className="absolute bottom-full mb-2 right-0 left-0 z-50 border rounded-2xl shadow-2xl p-3"
+          style={{
+            background: "var(--modal-bg)",
+            border: "1px solid var(--card-border)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+          }}
+          dir="rtl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="font-black text-[11px]" style={{ color: "var(--text-primary)" }}>
+              انتخاب رنگ
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowColorPicker(false);
+              }}
+              className="w-5 h-5 flex items-center justify-center rounded-full text-base leading-none transition-colors"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              ×
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {product.color_options!.map((c) => (
+              <button
+                key={c.hex + c.name}
+                type="button"
+                onClick={(e) => handleColorSelect(e, c.name)}
+                className="flex flex-col items-center gap-1 p-1.5 rounded-xl transition"
+                title={c.name}
+                style={{ border: "1px solid transparent" }}
+              >
+                <span
+                  className="w-7 h-7 rounded-full border-2 shadow-md block"
+                  style={{
+                    backgroundColor: c.hex,
+                    borderColor: "rgba(255,255,255,0.2)",
+                  }}
+                />
+                <span
+                  className="text-[9px] font-bold max-w-[52px] truncate"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {c.name}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Main Button — گرادیان آبی‌بنفش کپسولی */}
+      <button
+        type="button"
+        disabled={!isAvailable || isMaxReached}
+        onClick={handleAddToCart}
+        className="relative w-full h-[50px] rounded-full overflow-hidden transition-all duration-300 flex items-center justify-center cursor-pointer active:scale-[0.98]"
+        style={
+          !isAvailable || isMaxReached
+            ? {
+                background: "rgba(148,163,184,0.25)",
+                border: "1px solid rgba(148,163,184,0.2)",
+                color: "var(--text-secondary)",
+                cursor: "not-allowed",
+                opacity: 0.55,
+              }
+            : {
+                background:
+                  "linear-gradient(135deg,var(--accent-blue) 0%,var(--accent-violet) 100%)",
+                border: "1px solid rgba(255,255,255,0.25)",
+                color: "#fff",
+                boxShadow:
+                  "0 4px 20px var(--accent-glow),0 1px 4px rgba(0,0,0,0.15),inset 0 1px 0 rgba(255,255,255,0.25)",
+              }
+        }
+      >
+        <div className="relative w-full h-full flex items-center justify-center px-4 overflow-hidden">
+          {/* Cart icon */}
+          <div
+            className={
+              "flex items-center justify-center transition-all duration-300 " +
+              (isAnimating
+                ? "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 animate-kinetic-cart-left z-20"
+                : "translate-x-0")
+            }
+          >
+            {isAnimating && (
+              <div className="absolute -top-3.5 left-[8px] z-30 pointer-events-none animate-kinetic-item-drop">
+                <div className="w-3.5 h-3.5 rounded-[3px] bg-white shadow-md border border-slate-300 flex items-center justify-center relative">
+                  <span className="w-full h-[1.5px] bg-blue-500 absolute top-1/2 -translate-y-1/2" />
+                  <span className="h-full w-[1.5px] bg-blue-500 absolute left-1/2 -translate-x-1/2" />
+                </div>
+              </div>
+            )}
+            <svg
+              className="w-5 h-5 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M3 3H5.2L7.1 14.2C7.25 15.1 8 15.8 8.9 15.8H18.2C19.1 15.8 19.85 15.1 20 14.2L21.4 7.2C21.55 6.4 20.95 5.7 20.15 5.7H6.2"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle cx="9.5" cy="19.5" r="1.8" fill="currentColor" />
+              <circle cx="17.5" cy="19.5" r="1.8" fill="currentColor" />
+            </svg>
+          </div>
+
+          {/* Label */}
+          <span
+            className={
+              "font-black text-xs tracking-wider mr-2.5 transition-all duration-300 whitespace-nowrap " +
+              (isAnimating
+                ? "opacity-0 scale-75 -translate-x-6 pointer-events-none w-0 overflow-hidden"
+                : "opacity-100 scale-100 translate-x-0")
+            }
+          >
+            {isMaxReached
+              ? "حداکثر موجودی"
+              : !isAvailable
+              ? "ناموجود"
+              : "افزودن به سبد خرید"}
+          </span>
+        </div>
+      </button>
+
+      {showCounter && (
+        <div
+          className="flex items-center justify-center gap-1.5 text-[11px] font-bold font-sans"
+          style={{ color: "var(--text-secondary)" }}
+          suppressHydrationWarning
+        >
+          <span
+            className={
+              "font-mono font-black transition-all " +
+              (bumpCounter
+                ? "animate-kinetic-counter-bump text-emerald-500"
+                : "")
+            }
+            style={
+              !bumpCounter ? { color: "var(--text-primary)" } : {}
+            }
+          >
+            {mounted ? currentCount : 0}
+          </span>
+          <span>عدد در سبد شما</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+============================================================
+=== ProductCard.tsx — کامل (182 خط)
+============================================================
+"use client";
+import React, { useState } from "react";
+import Link from "next/link";
+import { formatPrice } from "@/lib/formatters";
+import { soundEngine } from "@/lib/soundEngine";
+import AddToCartButton from "@/components/AddToCartButton";
+
+interface ProductCardProps {
+  product: {
+    id: string | number;
+    title?: string;
+    name?: string;
+    price: number;
+    discount_price?: number | null;
+    discountPrice?: number | null;
+    image?: string | null;
+    image_url?: string | null;
+    images?: string[];
+    category?: string;
+    stock?: number;
+    warranty?: string;
+  };
+}
+
+function getImg(p: ProductCardProps["product"]): string {
+  if (Array.isArray(p.images) && p.images.length > 0) {
+    const f = p.images[0];
+    if (f && (f.startsWith("http") || f.startsWith("/"))) return f;
+  }
+  if (p.image_url?.trim()) return p.image_url;
+  if (p.image?.trim()) return p.image;
+  return "/placeholder.png";
+}
+
+export default function ProductCard({ product }: ProductCardProps) {
+  const title = product.title || product.name || "کالای دیجیتال";
+  const basePrice = Number(product.price || 0);
+  const discountVal = product.discount_price || product.discountPrice;
+  const finalPrice =
+    discountVal && Number(discountVal) > 0
+      ? Number(discountVal)
+      : basePrice;
+  const discPct =
+    discountVal && basePrice > 0
+      ? Math.round((1 - Number(discountVal) / basePrice) * 100)
+      : 0;
+  const [imgSrc, setImgSrc] = useState(getImg(product));
+  const isLowStock =
+    product.stock !== undefined &&
+    product.stock > 0 &&
+    product.stock <= 3;
+  const isOutOfStock = product.stock === 0;
+
+  return (
+    <div
+      className="group card-glass card-liquid-shine card-hover-glow flex flex-col justify-between relative h-full overflow-hidden"
+      style={{ borderRadius: "1.5rem" }}
+    >
+      <div
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse 70% 60% at 50% 0%,var(--accent-glow) 0%,transparent 70%)",
+          borderRadius: "inherit",
+        }}
+      />
+      <Link
+        href={"/products/" + product.id}
+        onClick={() => soundEngine.playClick()}
+        className="flex-1 block p-3 sm:p-4 space-y-2 sm:space-y-3 relative z-10"
+      >
+        <div
+          className="relative aspect-square overflow-hidden flex items-center justify-center p-3 sm:p-4"
+          style={{
+            borderRadius: "1.25rem",
+            background: "var(--input-bg)",
+            border: "1px solid var(--glass-border)",
+          }}
+        >
+          <img
+            src={imgSrc}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+            onError={() => {
+              if (imgSrc !== "/placeholder.png") setImgSrc("/placeholder.png");
+            }}
+          />
+          {discPct > 0 && (
+            <span className="badge-capsule badge-discount absolute top-2.5 right-2.5 text-[10px]">
+              {discPct}٪
+            </span>
+          )}
+          {isLowStock && (
+            <span className="badge-capsule badge-warning absolute top-2.5 left-2.5 text-[9px]">
+              تنها {product.stock}
+            </span>
+          )}
+          {isOutOfStock && (
+            <div
+              className="absolute inset-0 flex items-center justify-center"
+              style={{
+                borderRadius: "inherit",
+                background: "rgba(0,0,0,0.45)",
+                backdropFilter: "blur(4px)",
+                WebkitBackdropFilter: "blur(4px)",
+              }}
+            >
+              <span
+                className="badge-capsule text-[11px]"
+                style={{
+                  background: "rgba(0,0,0,0.7)",
+                  color: "#fff",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                }}
+              >
+                ناموجود
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="space-y-1.5 px-0.5">
+          {product.category && (
+            <span
+              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black"
+              style={{
+                background:
+                  "linear-gradient(135deg,var(--accent-blue),var(--accent-violet))",
+                color: "#fff",
+                opacity: 0.9,
+              }}
+            >
+              {product.category}
+            </span>
+          )}
+          <h3
+            className="text-[11px] sm:text-xs font-black line-clamp-2 leading-relaxed min-h-[30px] sm:min-h-[34px]"
+            style={{ color: "var(--text-primary)" }}
+          >
+            {title}
+          </h3>
+        </div>
+      </Link>
+      <div
+        className="p-3 sm:p-4 pt-2 relative z-10"
+        style={{ borderTop: "1px solid var(--glass-border)" }}
+      >
+        <div className="flex items-center justify-between mb-2.5">
+          {discountVal && Number(discountVal) > 0 ? (
+            <div className="space-y-0.5">
+              <span
+                className="line-through text-[9px] sm:text-[10px] block"
+                style={{ color: "var(--text-secondary)" }}
+                suppressHydrationWarning
+              >
+                {formatPrice(basePrice)} ت
+              </span>
+              <span
+                className="font-black text-sm sm:text-base block"
+                style={{ color: "var(--accent-blue)" }}
+                suppressHydrationWarning
+              >
+                {formatPrice(finalPrice)} ت
+              </span>
+            </div>
+          ) : (
+            <span
+              className="font-black text-sm sm:text-base"
+              style={{ color: "var(--text-primary)" }}
+              suppressHydrationWarning
+            >
+              {formatPrice(basePrice)} ت
+            </span>
+          )}
+        </div>
+        <AddToCartButton product={{ ...product, image: imgSrc }} showCounter={false} />
+      </div>
+    </div>
+  );
+}
+
+
+============================================================
+=== MobileBottomNav.tsx
+============================================================
+"use client";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useCart } from "@/context/CartContext";
+import { soundEngine } from "@/lib/soundEngine";
+
+const ICONS = {
+  home:  <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
+  box:   <><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></>,
+  cart:  <><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></>,
+  truck: <><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></>,
+  user:  <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+};
+
+export default function MobileBottomNav() {
+  const pathname = usePathname();
+  const cart = useCart() as any;
+  const [userPhone, setUserPhone] = useState<string | null>(null);
+
+  const cartItems: any[] = Array.isArray(cart?.cartItems)
+    ? cart.cartItems
+    : Array.isArray(cart?.items)
+    ? cart.items
+    : [];
+  const cartCount = cartItems.reduce(
+    (a: number, i: any) => a + (Number(i?.quantity) || 1),
+    0
+  );
+
+  useEffect(() => {
+    try {
+      const u = JSON.parse(
+        localStorage.getItem("axon_user_session") || "{}"
+      );
+      if (u.phone) setUserPhone(String(u.phone));
+      else if (u.name) setUserPhone(u.name);
+    } catch {}
+    const h = (e: any) => {
+      if (e.detail?.phone) setUserPhone(String(e.detail.phone));
+      else if (e.detail?.name) setUserPhone(e.detail.name);
+      else setUserPhone(null);
+    };
+    window.addEventListener("user_auth_changed", h);
+    return () => window.removeEventListener("user_auth_changed", h);
+  }, []);
+
+  if (pathname?.startsWith("/admin")) return null;
+
+  const navItems = [
+    { label: "خانه",   href: "/",            icon: ICONS.home  },
+    { label: "کالاها", href: "/products",    icon: ICONS.box   },
+    { label: "سبد",    href: "#",            isCart: true, icon: ICONS.cart },
+    { label: "پیگیری", href: "/track-order", icon: ICONS.truck },
+    {
+      label: userPhone ? "حساب" : "ورود",
+      href: userPhone ? "/my-orders" : "/login",
+      icon: ICONS.user,
+    },
+  ];
+
+  return (
+    <nav
+      className="fixed bottom-0 inset-x-0 z-30 md:hidden mobile-bottom-nav"
+      style={{
+        paddingBottom: "env(safe-area-inset-bottom,0px)",
+        background: "var(--glass-bg-strong)",
+        backdropFilter: "blur(24px) saturate(200%)",
+        WebkitBackdropFilter: "blur(24px) saturate(200%)",
+        borderTop: "1px solid var(--glass-border)",
+        boxShadow:
+          "0 -4px 24px var(--accent-glow),0 -1px 0 var(--glass-border)",
+      }}
+    >
+      <div className="h-14 px-2 flex items-center justify-around gap-1">
+        {navItems.map((item) => {
+          const isActive =
+            !item.isCart &&
+            (pathname === item.href ||
+              (item.href !== "/" &&
+                (pathname ?? "").startsWith(item.href)));
+
+          if (item.isCart) {
+            return (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => {
+                  soundEngine.playClick();
+                  if (typeof cart?.openCart === "function")
+                    cart.openCart();
+                }}
+                className="relative flex flex-col items-center justify-center gap-0.5 flex-1 py-1 transition-all duration-200 cursor-pointer"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                <span
+                  className="w-10 h-10 rounded-full flex items-center justify-center relative transition-all duration-200"
+                  style={{
+                    background:
+                      "linear-gradient(135deg,var(--accent-blue),var(--accent-violet))",
+                    boxShadow: "0 4px 16px var(--accent-glow)",
+                  }}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#fff"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    width={20}
+                    height={20}
+                  >
+                    {item.icon}
+                  </svg>
+                  {cartCount > 0 && (
+                    <span
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-white text-[8px] font-black flex items-center justify-center"
+                      style={{
+                        background: "#ef4444",
+                        boxShadow: "0 0 8px rgba(239,68,68,0.6)",
+                      }}
+                    >
+                      {cartCount > 9 ? "9+" : cartCount}
+                    </span>
+                  )}
+                </span>
+                <span className="text-[9px] font-bold">{item.label}</span>
+              </button>
+            );
+          }
+
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              onClick={() => soundEngine.playClick()}
+              className="flex flex-col items-center justify-center gap-0.5 flex-1 py-1 transition-all duration-200"
+              style={{
+                color: isActive
+                  ? "var(--accent-blue)"
+                  : "var(--text-secondary)",
+              }}
+            >
+              <span
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200"
+                style={{
+                  background: isActive
+                    ? "var(--accent-glow)"
+                    : "transparent",
+                  border: isActive
+                    ? "1px solid var(--card-border-hover)"
+                    : "1px solid transparent",
+                  transform: isActive ? "scale(1.08)" : "scale(1)",
+                }}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={isActive ? 2.5 : 2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  width={18}
+                  height={18}
+                >
+                  {item.icon}
+                </svg>
+              </span>
+              <span
+                className={"text-[9px] " + (isActive ? "font-black" : "font-bold")}
+              >
+                {item.label}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+
+============================================================
+=== AIAssistantChat.tsx
+============================================================
+"use client";
+
+import React, { useState, useRef, useEffect } from "react";
+import { soundEngine } from "@/lib/soundEngine";
+
+export default function AIAssistantChat() {
+  const [isOpen, setIsOpen]     = useState(false);
+  const [messages, setMessages] = useState<{ role: "user" | "bot"; text: string }[]>([
+    { role: "bot", text: "سلام! دستیار هوشمند آکسون کور هستم. چطور می‌توانم کمکتان کنم؟" },
+  ]);
+  const [input,   setInput]   = useState("");
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isOpen]);
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || loading) return;
+    soundEngine.playClick();
+    const userText = input.trim();
+    setInput("");
+    const newMsgs = [...messages, { role: "user" as const, text: userText }];
+    setMessages(newMsgs);
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/ai-assistant", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ message: userText, history: newMsgs }),
+      });
+      const data = await res.json();
+      setMessages([...newMsgs, {
+        role: "bot",
+        text: data.reply || data.message || "متأسفم، پاسخی دریافت نشد.",
+      }]);
+    } catch {
+      setMessages([...newMsgs, { role: "bot", text: "خطا در اتصال. مجدداً تلاش کنید." }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      {/* دکمه شناور کوچک */}
+      <button
+        className="ai-chat-float-btn"
+        style={{ position: "fixed", bottom: "80px", right: "16px", zIndex: 45 }}
+        onClick={() => { soundEngine.playClick(); setIsOpen(!isOpen); }}
+        aria-label="دستیار هوشمند آکسون"
+        title="دستیار هوشمند"
+      >
+        <span className="text-white text-base select-text">
+          {isOpen ? "✕" : "🤖"}
+        </span>
+      </button>
+
+      {/* پنل چت */}
+      {isOpen && (
+        <>
+          {/* overlay موبایل */}
+          <div
+            className="fixed inset-0 z-40 bg-black/20 md:hidden"
+            onClick={() => setIsOpen(false)}
+          />
+
+          <div
+            className={[
+              "fixed z-50 bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl rounded-3xl",
+              "flex flex-col overflow-hidden",
+              // موبایل: bottom sheet
+              "bottom-[120px] right-3 left-3 md:left-auto",
+              // دسکتاپ
+              "md:bottom-[80px] md:right-20 md:w-80 md:h-[420px]",
+              // ارتفاع موبایل
+              "h-[60vh] md:h-[420px]",
+            ].join(" ")}
+            dir="rtl"
+          >
+            {/* هدر */}
+            <div className="p-4 border-b border-[var(--card-border)] flex items-center justify-between bg-[var(--accent-blue)] rounded-t-3xl">
+              <div className="flex items-center gap-2 text-white">
+                <span className="text-lg">🤖</span>
+                <div>
+                  <p className="text-xs font-black">دستیار هوشمند آکسون</p>
+                  <p className="text-[10px] opacity-80">آنلاین و آماده پاسخگویی</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-white/80 hover:text-white font-black cursor-pointer text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* پیام‌ها */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 text-xs">
+              {messages.map((m, i) => (
+                <div
+                  key={i}
+                  className={`flex ${m.role === "user" ? "justify-start" : "justify-end"}`}
+                >
+                  <div className={`max-w-[80%] px-3 py-2 rounded-2xl font-medium leading-relaxed ${
+                    m.role === "user"
+                      ? "bg-[var(--accent-blue)] text-white"
+                      : "bg-[var(--input-bg)] text-[var(--text-primary)]"
+                  }`}>
+                    {m.text}
+                  </div>
+                </div>
+              ))}
+              {loading && (
+                <div className="flex justify-end">
+                  <div className="bg-[var(--input-bg)] px-4 py-2 rounded-2xl">
+                    <span className="inline-flex gap-1">
+                      {[0,1,2].map(i => (
+                        <span
+                          key={i}
+                          className="w-1.5 h-1.5 rounded-full bg-[var(--accent-blue)] animate-bounce"
+                          style={{ animationDelay: i * 150 + "ms" }}
+                        />
+                      ))}
+                    </span>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* ورودی */}
+            <form onSubmit={handleSend} className="p-3 border-t border-[var(--card-border)] flex gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder="سؤال یا درخواست خود را بنویسید..."
+                className="flex-1 px-3 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+                style={{ fontSize: "16px" }}
+              />
+              <button
+                type="submit"
+                disabled={loading || !input.trim()}
+                className="px-3 py-2 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs disabled:opacity-50 cursor-pointer"
+              >
+                ←
+              </button>
+            </form>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+
+============================================================
+=== ProductDetailClient.tsx — آخرین ۵۰ خط
+============================================================
+195:         {/* بخش دیدگاه‌ها */}
+196:         <div
+197:           className="p-5 sm:p-8"
+198:           style={{
+199:             borderTop: "1px solid var(--glass-border)",
+200:             background: "rgba(0,0,0,0.02)",
+201:           }}
+202:         >
+203:           <ProductReviews
+204:             productId={product.id || productId}
+205:             productTitle={product.title}
+206:           />
+207:         </div>
+208:       </div>
+209: 
+210:       {/* نوار پایین موبایل — گرادیان کپسولی */}
+211:       <div
+212:         className="lg:hidden fixed bottom-14 inset-x-0 z-[110] px-3 py-2.5"
+213:         style={{
+214:           paddingBottom: "calc(0.625rem + env(safe-area-inset-bottom,0px))",
+215:           background: "var(--glass-bg-strong)",
+216:           backdropFilter: "blur(24px) saturate(200%)",
+217:           WebkitBackdropFilter: "blur(24px) saturate(200%)",
+218:           borderTop: "1px solid var(--glass-border)",
+219:           boxShadow: "0 -4px 24px var(--accent-glow)",
+220:         }}
+221:       >
+222:         <div className="flex items-center justify-between gap-3">
+223:           <div className="flex flex-col items-end shrink-0">
+224:             {hasDiscount && (
+225:               <span className="text-[10px] font-bold line-through"
+226:                 style={{ color: "var(--text-secondary)" }}
+227:               >
+228:                 {oldPrice.toLocaleString("fa-IR")}
+229:               </span>
+230:             )}
+231:             <span className="text-base font-black" style={{ color: "var(--accent-blue)" }}>
+232:               {currentPrice.toLocaleString("fa-IR")}
+233:               <span className="text-[10px] font-bold mr-1" style={{ color: "var(--text-secondary)" }}>ت</span>
+234:             </span>
+235:           </div>
+236:           <div className="flex-1">
+237:             <AddToCartButton product={product} showCounter={false} />
+238:           </div>
+239:         </div>
+240:       </div>
+241:     </div>
+242:   );
+243: }
+244: 
+
+============================================================
+=== DynamicHomeSections.tsx — render block (خطوط 113-193)
+============================================================
+113:   if (sec.type === "banners_slider")         return "block md:block lg:hidden";
+114:   if (sec.type === "NativePerspectiveSlider") return "hidden lg:block";
+115:   if (sec.type === "NativeProductCatalog")    return "block";
+116:   const mob  = sec.showOnMobile  !== undefined ? Boolean(sec.showOnMobile)  : true;
+117:   const tab  = sec.showOnTablet  !== undefined ? Boolean(sec.showOnTablet)  : true;
+118:   const desk = sec.showOnDesktop !== undefined ? Boolean(sec.showOnDesktop) : true;
+119:   if (!mob && !tab && !desk) return "hidden";
+120:   return (
+121:     (mob  ? "block"    : "hidden")    + " " +
+122:     (tab  ? "md:block" : "md:hidden") + " " +
+123:     (desk ? "lg:block" : "lg:hidden")
+124:   );
+125: }
+126: 
+127: export default function DynamicHomeSections({
+128:   initialProducts = [],
+129:   initialBanners  = [],
+130:   initialSiteInfo = null,
+131: }: Props) {
+132:   const { siteInfo: ctxSiteInfo } = useSiteInfo();
+133:   const activeSiteInfo =
+134:     ctxSiteInfo && Object.keys(ctxSiteInfo).length > 0 ? ctxSiteInfo : initialSiteInfo;
+135:   const layoutCfg = activeSiteInfo?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
+136:   const tbCfg     = activeSiteInfo?.theme_builder_config   || layoutCfg?.theme_builder_config || {};
+137: 
+138:   const bannerSizing: BannerSizingConfig = {
+139:     ...DEFAULT_BANNER_SIZING,
+140:     ...(tbCfg?.bannerSizing || layoutCfg?.bannerSizing || {}),
+141:   };
+142: 
+143:   const [products,    setProducts]    = useState<any[]>(() => (initialProducts || []).map(normalizeProductRow));
+144:   const [banners,     setBanners]     = useState<any[]>(initialBanners);
+145:   const [activeSlide, setActiveSlide] = useState(0);
+146: 
+147:   const fetchLiveHomeData = useCallback(async () => {
+148:     try {
+149:       const [pRes, bRes] = await Promise.all([
+150:         fetch("/api/products",       { cache: "no-store" }).catch(() => null),
+151:         fetch("/api/public/banners", { cache: "no-store" }).catch(() => null),
+152:       ]);
+153:       if (pRes && pRes.ok) {
+154:         const pJson = await pRes.json();
+155:         const pList = pJson.data || pJson.products || [];
+156:         if (Array.isArray(pList)) setProducts(pList.map(normalizeProductRow));
+157:       }
+158:       if (bRes && bRes.ok) {
+159:         const bJson = await bRes.json();
+160:         const bList = (bJson.banners || bJson.data || []).filter((b: any) => b.is_active !== false);
+161:         setBanners(bList);
+162:       }
+163:     } catch {}
+164:   }, []);
+165: 
+166:   useEffect(() => {
+167:     if (initialProducts.length === 0) fetchLiveHomeData();
+168:     window.addEventListener("banners_updated",  fetchLiveHomeData);
+169:     window.addEventListener("products_updated", fetchLiveHomeData);
+170:     const chHome = supabase
+171:       .channel("realtime-home-unified-stream")
+172:       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, fetchLiveHomeData)
+173:       .on("postgres_changes", { event: "*", schema: "public", table: "banners"  }, fetchLiveHomeData)
+174:       .subscribe();
+175:     return () => {
+176:       window.removeEventListener("banners_updated",  fetchLiveHomeData);
+177:       window.removeEventListener("products_updated", fetchLiveHomeData);
+178:       supabase.removeChannel(chHome);
+179:     };
+180:   }, [fetchLiveHomeData, initialProducts.length]);
+181: 
+182:   const effectiveSlides =
+183:     banners.length > 0
+184:       ? banners.map((b: any) => ({
+185:           id:       String(b.id),
+186:           title:    b.title    || "پیشنهاد ویژه آکسون",
+187:           subtitle: b.subtitle || "مشاهده مشخصات و خرید آنلاین با گارانتی اصالت",
+188:           image:    b.image_url || b.image || "/placeholder.png",
+189:           link:     b.link_url  || b.link  || "/products",
+190:           price:    b.price ? Number(b.price) : null,
+191:           badge:    b.badge_text || b.badge  || "پیشنهاد ویژه",
+192:           cta:      b.cta_text  || "مشاهده و خرید",
+193:         }))
+
+============================================================
+=== globals.css — کلاس‌های مرتبط
+============================================================
+.btn-glass { display:inline-flex; align-items:center; justify-content:center; gap:6px; border-radius:9999px; padding:8px 18px; font-weight:700; font-size:13px; background:var(--glass-bg); backdrop-filter:blur(16px) saturate(180%); -webkit-backdrop-filter:blur(16px) saturate(180%); border:1px solid var(--glass-border); color:var(--text-primary); cursor:pointer; transition:all .22s cubic-bezier(.22,1,.36,1); box-shadow:0 2px 12px rgba(0,0,0,.08),inset 0 1px 0 rgba(255,255,255,.5); white-space:nowrap; user-select:none; }
+.btn-glass:hover { background:var(--glass-bg-strong); box-shadow:0 4px 20px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.6); transform:translateY(-1px); }
+.btn-glass:active { transform:scale(.96) translateY(0); }
+.btn-glass-primary { display:inline-flex; align-items:center; justify-content:center; gap:6px; border-radius:9999px; padding:8px 18px; font-weight:700; font-size:13px; background:linear-gradient(135deg,var(--accent-blue) 0%,var(--accent-violet) 100%); border:1px solid rgba(255,255,255,.25); color:#fff; cursor:pointer; transition:all .22s cubic-bezier(.22,1,.36,1); box-shadow:0 4px 20px var(--accent-glow),0 1px 4px rgba(0,0,0,.15),inset 0 1px 0 rgba(255,255,255,.25); white-space:nowrap; user-select:none; }
+.btn-glass-primary:hover { box-shadow:0 6px 28px var(--accent-glow),0 2px 8px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.3); filter:brightness(1.07); transform:translateY(-2px); }
+.btn-glass-primary:active { transform:scale(.96) translateY(0); }
+.btn-glass-primary:disabled { opacity:.45; cursor:not-allowed; transform:none; filter:none; }
+.card-glass { background:var(--glass-bg); backdrop-filter:blur(16px) saturate(160%); -webkit-backdrop-filter:blur(16px) saturate(160%); border:1px solid var(--glass-border); border-radius:1.5rem; box-shadow:var(--glass-shadow); transition:all .30s cubic-bezier(.22,1,.36,1); }
+.card-glass:hover { border-color:var(--card-border-hover); box-shadow:0 12px 40px var(--accent-glow),0 4px 16px rgba(0,0,0,.12); transform:translateY(-4px); }
+.pb-safe { padding-bottom:calc(0.5rem + env(safe-area-inset-bottom)); }
+@supports (padding-bottom:env(safe-area-inset-bottom)) { .mobile-bottom-nav { padding-bottom:env(safe-area-inset-bottom); } }
+    .glass-morphism,.glass-header,.card-glass,.glass-morphism-strong { backdrop-filter:blur(18px) saturate(180%); -webkit-backdrop-filter:blur(18px) saturate(180%); }
+.ai-chat-float-btn {
+.ai-chat-float-btn:hover { transform: scale(1.08) !important; }
+  .ai-chat-float-btn {
+.axon-sl-wrap {
+  .axon-sl-wrap {
+  .axon-sl-wrap {
+
+============================================================
+=== globals.css — آخرین ۵۰ خط
+============================================================
+145: }
+146: 
+147: /* ── چت باتون شناور ──────────────────────────────────── */
+148: .ai-chat-float-btn {
+149:   position: fixed !important;
+150:   bottom: 80px !important;
+151:   right: 16px !important;
+152:   z-index: 45 !important;
+153:   width: 50px !important;
+154:   height: 50px !important;
+155:   border-radius: 9999px !important;
+156:   background: linear-gradient(135deg,#0066ff,#7c3aed) !important;
+157:   border: none !important;
+158:   box-shadow: 0 4px 20px rgba(0,102,255,0.4), 0 0 0 2px rgba(255,255,255,0.15) !important;
+159:   cursor: pointer !important;
+160:   display: flex !important;
+161:   align-items: center !important;
+162:   justify-content: center !important;
+163:   transition: transform 0.2s, box-shadow 0.2s !important;
+164: }
+165: .ai-chat-float-btn:hover { transform: scale(1.08) !important; }
+166: @media (min-width: 768px) {
+167:   .ai-chat-float-btn {
+168:     bottom: 28px !important;
+169:     right: 28px !important;
+170:   }
+171: }
+172: 
+173: /* ── اسلایدر wrapper ─────────────────────────────────── */
+174: .axon-sl-wrap {
+175:   height: 200px !important;
+176:   min-height: 200px !important;
+177:   max-height: 200px !important;
+178: }
+179: @media (min-width: 640px) {
+180:   .axon-sl-wrap {
+181:     height: 260px !important;
+182:     min-height: 260px !important;
+183:     max-height: 260px !important;
+184:   }
+185: }
+186: @media (min-width: 1024px) {
+187:   .axon-sl-wrap {
+188:     height: 340px !important;
+189:     min-height: 340px !important;
+190:     max-height: 340px !important;
+191:   }
+192: }
+193: 
+194: 
+
+============================================================
+=== app/layout.tsx
+============================================================
+// File Path: app/layout.tsx
+import LiveStoreSyncGuard from "@/components/LiveStoreSyncGuard";
+import AnnouncementBar from "@/components/AnnouncementBar";
+import type { Metadata, Viewport } from "next";
+import "./globals.css";
+import LayoutShell from "@/components/LayoutShell";
+import MotionInit from "@/components/MotionInit";
+import { CartProvider } from "@/context/CartContext";
+import { SiteInfoProvider } from "@/context/SiteInfoContext";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import RealtimeGlobalListener from "@/components/RealtimeGlobalListener";
+import MobileBottomNav from "@/components/MobileBottomNav";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  minimumScale: 1,
+  maximumScale: 5,
+  themeColor: "#0284c7",
+};
+
+const GOOGLE_FONT_MAP: Record<string, string> = {
+  Vazirmatn: "https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;900&display=swap",
+  IRANSans: "",
+  Yekan: "",
+  Shabnam: "",
+  Samim: "https://fonts.googleapis.com/css2?family=Samim&display=swap",
+};
+
+async function getSiteStyles() {
+  try {
+    const { data } = await supabaseAdmin
+      .from("site_styles")
+      .select("primary_color,secondary_color,font_family,border_radius,custom_css")
+      .limit(1)
+      .maybeSingle();
+    return data || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  let siteName = "آکسون کور | Axon Core";
+  let tagline = "فروشگاه تخصصی محصولات تکنولوژی و گجت‌های هوشمند";
+  let desc = "مرجع تخصصی خرید آنلاین جدیدترین کالاهای تکنولوژی با تضمین اصالت و ارسال سریع.";
+  let allowIndex = true;
+  let faviconUrl = "/favicon.ico";
+
+  try {
+    if (supabaseAdmin) {
+      const { data } = await supabaseAdmin
+        .from("site_info")
+        .select("*")
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        const layoutCfg = data.homepage_layout_config || {};
+        const tbHeader = layoutCfg?.theme_builder_config?.globalHeader || {};
+        if (tbHeader.brandName || data.site_name) {
+          siteName = tbHeader.brandName || data.site_name;
+        }
+        if (data.tagline) tagline = data.tagline;
+        if (data.description) desc = data.description;
+        if (data.allow_google_index !== undefined) {
+          allowIndex = Boolean(data.allow_google_index);
+        }
+        if (layoutCfg?.system_settings?.noIndex === true) {
+          allowIndex = false;
+        }
+        if (tbHeader.faviconUrl || data.favicon_url) {
+          faviconUrl = tbHeader.faviconUrl || data.favicon_url;
+        }
+      }
+    }
+  } catch {}
+
+  return {
+    metadataBase: new URL("https://axoncore.ir"),
+    title: { default: siteName + " | " + tagline, template: "%s | " + siteName },
+    description: desc,
+    icons: {
+      icon: faviconUrl,
+      shortcut: faviconUrl,
+      apple: faviconUrl,
+    },
+    robots: {
+      index: allowIndex,
+      follow: allowIndex,
+      googleBot: { index: allowIndex, follow: allowIndex },
+    },
+    alternates: { canonical: "https://axoncore.ir" },
+  };
+}
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const styles = await getSiteStyles();
+
+  const primaryColor = styles?.primary_color || "#0071e3";
+  const secondaryColor = styles?.secondary_color || "#4f46e5";
+  const fontFamily = styles?.font_family || "Vazirmatn";
+  const borderRadius = styles?.border_radius || "1.5rem";
+  const customCss = styles?.custom_css || "";
+  const googleFontUrl = GOOGLE_FONT_MAP[fontFamily] || GOOGLE_FONT_MAP["Vazirmatn"];
+
+  const cssVars = [
+    "--accent-blue: " + primaryColor + ";",
+    "--accent-purple: " + secondaryColor + ";",
+    "--font-primary: " + JSON.stringify(fontFamily) + ", Vazirmatn, sans-serif;",
+    "--border-radius-card: " + borderRadius + ";",
+  ].join(" ");
+
+  const inlineStyle =
+    ":root { " + cssVars + " } body { font-family: var(--font-primary); } " + customCss;
+
+  return (
+    <html lang="fa" dir="rtl" suppressHydrationWarning>
+      <head>
+      <script dangerouslySetInnerHTML={{ __html: `
+        // پاک‌سازی service worker cache
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            regs.forEach(function(r) { r.unregister(); });
+          });
+        }
+      ` }} />
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var m=sessionStorage.getItem('axon_theme_manual_override')==='true';var t=localStorage.getItem('theme');var sys=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';var active=(m&&(t==='dark'||t==='light'))?t:sys;if(active==='dark'){document.documentElement.classList.add('dark');document.documentElement.setAttribute('data-theme','dark');}else{document.documentElement.classList.remove('dark');document.documentElement.setAttribute('data-theme','light');}}catch(e){}})();",
+          }}
+        />
+        {googleFontUrl && <link rel="preconnect" href="https://fonts.googleapis.com" />}
+        {googleFontUrl && (
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        )}
+        {googleFontUrl && <link href={googleFontUrl} rel="stylesheet" />}
+        <style id="axon-live-custom-css" dangerouslySetInnerHTML={{ __html: inlineStyle }} />
+      </head>
+      <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased selection:bg-[var(--accent-blue)] selection:text-white">
+        <RealtimeGlobalListener />
+        <MotionInit />
+        <CartProvider>
+          <SiteInfoProvider>
+            <AnnouncementBar />
+            <LayoutShell>
+              <div className="pb-20 md:pb-0">{children}</div>
+            </LayoutShell>
+            <LiveStoreSyncGuard />
+            <MobileBottomNav />
+          </SiteInfoProvider>
+        </CartProvider>
+      </body>
+    </html>
+  );
+}
+
+
+============================================================
+=== layout.tsx — imports
+============================================================
+import LiveStoreSyncGuard from "@/components/LiveStoreSyncGuard";
+import AnnouncementBar from "@/components/AnnouncementBar";
+import type { Metadata, Viewport } from "next";
+import "./globals.css";
+import LayoutShell from "@/components/LayoutShell";
+import MotionInit from "@/components/MotionInit";
+import { CartProvider } from "@/context/CartContext";
+import { SiteInfoProvider } from "@/context/SiteInfoContext";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import RealtimeGlobalListener from "@/components/RealtimeGlobalListener";
+import MobileBottomNav from "@/components/MobileBottomNav";
+
+✅ دیاگ کامل شد

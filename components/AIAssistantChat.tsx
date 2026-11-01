@@ -49,7 +49,7 @@ export default function AIAssistantChat() {
       {/* دکمه شناور کوچک */}
       <button
         className="ai-chat-float-btn"
-        style={{ position: "fixed", bottom: "80px", right: "16px", zIndex: 45 }}
+        style={{ position: "fixed", bottom: "130px", right: "16px", zIndex: 45 }}
         onClick={() => { soundEngine.playClick(); setIsOpen(!isOpen); }}
         aria-label="دستیار هوشمند آکسون"
         title="دستیار هوشمند"

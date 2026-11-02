@@ -1,4 +1,5 @@
 "use client";
+import MobileSlider from "@/components/MobileSlider";
 // File Path: components/DynamicHomeSections.tsx
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -224,201 +225,16 @@ export default function DynamicHomeSections({
 
     // ── اسلایدر بنر (موبایل + تبلت) ──────────────────────────────
     if (sec.type === "banners_slider") {
-      if (effectiveSlides.length === 0) return null;
-
-      /* ──────────────────────────────────────────────────────
-         اسلایدر موبایل — طراحی کامل جدید
-         ارتفاع ثابت 200px موبایل / 260px تبلت / 340px دسکتاپ
-      ────────────────────────────────────────────────────── */
-      return (
-        <div key={sec.id} className={visibilityClass}>
-          <div
-            className="axon-sl-wrap relative w-full overflow-hidden rounded-3xl shadow-2xl"
-            style={{ height: "200px" }}
-          >
-            <style>{`
-              @media (min-width: 640px)  { .axon-sl-wrap { height: 260px !important; } }
-              @media (min-width: 1024px) { .axon-sl-wrap { height: 340px !important; } }
-            `}</style>
-            {/* slides */}
-            {effectiveSlides.map((slide, idx) => {
-              const isActive = idx === activeSlide;
-              const GRADS = [
-                "linear-gradient(120deg,#0f0c29,#302b63)",
-                "linear-gradient(120deg,#000428,#004e92)",
-                "linear-gradient(120deg,#1a1a2e,#0f3460)",
-                "linear-gradient(120deg,#200122,#6f0000)",
-              ];
-              return (
-                <div
-                  key={idx}
-                  className="absolute inset-0 transition-opacity duration-700"
-                  style={{
-                    opacity: isActive ? 1 : 0,
-                    zIndex: isActive ? 2 : 1,
-                    pointerEvents: isActive ? "auto" : "none",
-                    background: GRADS[idx % GRADS.length],
-                  }}
-                >
-                  <Link
-                    href={slide.link || "#"}
-                    onClick={() => soundEngine.playClick()}
-                    className="flex items-center w-full h-full"
-                  >
-                    {/* تصویر — سمت چپ */}
-                    <div className="relative flex-shrink-0 flex items-center justify-center" style={{ width: "44%", height: "100%" }}>
-                      {slide.image ? (
-                        <img
-                          src={slide.image}
-                          alt={slide.title || ""}
-                          style={{
-                            maxWidth: "90%",
-                            maxHeight: "90%",
-                            objectFit: "contain",
-                            filter: "drop-shadow(0 0 20px rgba(139,92,246,0.6))",
-                          }}
-                          loading={idx === 0 ? "eager" : "lazy"}
-                          draggable={false}
-                        />
-                      ) : (
-                        <div style={{ width: 80, height: 80, borderRadius: 16, background: "rgba(255,255,255,0.07)" }} />
-                      )}
-                    </div>
-
-                    {/* جداکننده گرادیان */}
-                    <div
-                      className="absolute"
-                      style={{
-                        left: "38%",
-                        top: 0,
-                        bottom: 0,
-                        width: 40,
-                        background: "linear-gradient(to right, rgba(0,0,0,0.15), transparent)",
-                        pointerEvents: "none",
-                      }}
-                    />
-
-                    {/* متن — سمت راست */}
-                    <div
-                      className="flex flex-col gap-1.5 px-3 py-4 text-right"
-                      style={{ flex: 1, direction: "rtl", overflow: "hidden" }}
-                    >
-                      {slide.badge ? (
-                        <span style={{
-                          display: "inline-block",
-                          alignSelf: "flex-end",
-                          fontSize: 10,
-                          fontWeight: 800,
-                          padding: "2px 10px",
-                          borderRadius: 999,
-                          background: "rgba(6,182,212,0.2)",
-                          border: "1px solid rgba(6,182,212,0.4)",
-                          color: "#67e8f9",
-                        }}>
-                          🔥 {slide.badge}
-                        </span>
-                      ) : null}
-
-                      <h2 style={{
-                        fontSize: 15,
-                        fontWeight: 900,
-                        color: "#fff",
-                        lineHeight: 1.4,
-                        margin: 0,
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                        textShadow: "0 2px 8px rgba(0,0,0,0.7)",
-                      }}>
-                        {slide.title}
-                      </h2>
-
-                      {slide.subtitle ? (
-                        <p style={{
-                          fontSize: 11,
-                          color: "rgba(255,255,255,0.65)",
-                          margin: 0,
-                          display: "-webkit-box",
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
-                          lineHeight: 1.5,
-                        }}>
-                          {slide.subtitle}
-                        </p>
-                      ) : null}
-
-                      {slide.price ? (
-                        <p style={{ fontSize: 13, fontWeight: 900, color: "#34d399", margin: 0 }}>
-                          {formatPrice(slide.price)} تومان
-                        </p>
-                      ) : null}
-
-                      <span style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        alignSelf: "flex-end",
-                        marginTop: 4,
-                        fontSize: 11,
-                        fontWeight: 800,
-                        color: "#fff",
-                        background: "linear-gradient(135deg,#0066ff,#7c3aed)",
-                        borderRadius: 999,
-                        padding: "6px 14px",
-                        boxShadow: "0 2px 12px rgba(124,58,237,0.4)",
-                      }}>
-                        {slide.cta || "مشاهده"} ←
-                      </span>
-                    </div>
-                  </Link>
-                </div>
-              );
-            })}
-
-            {/* dots — ثابت در پایین */}
-            {effectiveSlides.length > 1 && (
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: 10,
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  zIndex: 10,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  background: "rgba(0,0,0,0.35)",
-                  backdropFilter: "blur(8px)",
-                  borderRadius: 999,
-                  padding: "5px 10px",
-                }}
-              >
-                {effectiveSlides.map((_, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={(e) => { e.preventDefault(); soundEngine.playClick(); setActiveSlide(idx); }}
-                    style={{
-                      width: idx === activeSlide ? 20 : 6,
-                      height: 6,
-                      borderRadius: 999,
-                      border: "none",
-                      cursor: "pointer",
-                      padding: 0,
-                      background: idx === activeSlide ? "#0066ff" : "rgba(255,255,255,0.45)",
-                      transition: "all 0.3s",
-                    }}
-                    aria-label={"اسلاید " + (idx + 1)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
+          if (effectiveSlides.length === 0) return null;
+          return (
+            <div key={sec.id} className={visibilityClass}>
+              <MobileSlider
+                slides={effectiveSlides}
+                config={{ height: 224, autoPlay: true, interval: 4200, showDots: true }}
+              />
+            </div>
+          );
+        }
 
     // ── اسلایدر پرسپکتیو (فقط دسکتاپ) ────────────────────────────
     if (sec.type === "NativePerspectiveSlider") {

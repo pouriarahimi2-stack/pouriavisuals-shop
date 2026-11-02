@@ -143,7 +143,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
       </Link>
       <div
-        className="p-3 sm:p-4 pt-2 relative z-10"
+        className="px-4 pb-4 pt-2 relative z-10"
         style={{ borderTop: "1px solid var(--glass-border)" }}
       >
         <div className="flex items-center justify-between mb-2.5">

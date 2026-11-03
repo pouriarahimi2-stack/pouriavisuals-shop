@@ -356,12 +356,12 @@ export default function CheckoutPage() {
 
       {errorMsg && <div className="p-4 rounded-2xl bg-rose-500/15 text-rose-500 text-xs font-bold animate-fadeIn">⚠️ {errorMsg}</div>}
 
-      <form onSubmit={handlePrimaryCheckoutClick} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6">
+      <form onSubmit={handlePrimaryCheckoutClick} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 md:grid-cols-1 xl:grid-cols-3 lg:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6">
         <div className="lg:col-span-7 space-y-5">
           {/* بخش ۱: مشخصات گیرنده */}
           <div className="p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
             <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">۱. مشخصات خریدار و نشانی دقیق تحویل مرسوله</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-1 xl:grid-cols-3 lg:grid-cols-3 lg:grid-cols-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2 md:gap-4">
               {/* نام */}
               <div>
                 <label className="block mb-1.5 font-bold">نام گیرنده *</label>
@@ -426,7 +426,7 @@ export default function CheckoutPage() {
                   : "این سفارش فقط از طریق پست پیشتاز ارسال می‌شود."}
               </div>
             )}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4 pt-1">
+            <div className="grid grid-cols-2 md:grid-cols-1 xl:grid-cols-3 lg:grid-cols-3 lg:grid-cols-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2 md:gap-4 pt-1">
               {allowedShipping !== "tipax_only" && (
                 <label className={"p-4 rounded-2xl border-2 cursor-pointer transition flex flex-col gap-2 " + (shippingMethod === "post" ? "border-emerald-500 bg-emerald-500/10" : "border-[var(--card-border)] bg-[var(--input-bg)]")}>
                   <div className="flex items-center gap-3">

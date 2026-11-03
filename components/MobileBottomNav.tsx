@@ -61,7 +61,7 @@ export default function MobileBottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 z-30 md:hidden mobile-bottom-nav"
+      className="fixed bottom-0 pb-[env(safe-area-inset-bottom)] inset-x-0 z-30 md:hidden mobile-bottom-nav"
       style={{
         paddingBottom: "env(safe-area-inset-bottom,0px)",
         background: "var(--glass-bg-strong)",

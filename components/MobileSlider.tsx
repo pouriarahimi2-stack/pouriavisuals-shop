@@ -1,248 +1,223 @@
 "use client";
+// File Path: components/MobileSlider.tsx
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 
-export interface MobileSlide {
-  id: string | number;
-  title?: string;
+interface Slide {
+  id: string;
+  title: string;
   subtitle?: string;
-  image?: string;
-  link?: string;
+  image: string;
+  link: string;
   price?: number | null;
   badge?: string;
   cta?: string;
-  gradient?: string;
 }
 
-interface SliderConfig {
+interface MobileSliderConfig {
+  height?: number;
   autoPlay?: boolean;
   interval?: number;
-  height?: number;
   showDots?: boolean;
-  borderRadius?: number;
 }
 
 interface Props {
-  slides: MobileSlide[];
-  config?: SliderConfig;
+  slides: Slide[];
+  config?: MobileSliderConfig;
 }
 
 const GRADS = [
-  "linear-gradient(135deg,#0f0c29 0%,#302b63 50%,#24243e 100%)",
-  "linear-gradient(135deg,#000428 0%,#004e92 100%)",
-  "linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)",
-  "linear-gradient(135deg,#0d0d0d 0%,#1a0533 50%,#2d1b69 100%)",
-  "linear-gradient(135deg,#141e30 0%,#243b55 100%)",
+  "linear-gradient(135deg,#0a0f2e 0%,#1a1040 50%,#0d1a4a 100%)",
+  "linear-gradient(135deg,#0d1a3a 0%,#1e0a40 50%,#0a1a2e 100%)",
+  "linear-gradient(135deg,#0a1e3a 0%,#001a35 50%,#0f1428 100%)",
+  "linear-gradient(135deg,#140a2e 0%,#0a1428 50%,#1e1040 100%)",
+  "linear-gradient(135deg,#001428 0%,#0a0f2e 50%,#140e3a 100%)",
 ];
 
 export default function MobileSlider({ slides, config = {} }: Props) {
-  const {
-    autoPlay   = true,
-    interval   = 4200,
-    height     = 224,
-    showDots   = true,
-    borderRadius = 20,
-  } = config;
+  const { height = 220, autoPlay = true, interval = 4500, showDots = true } = config;
+  const [active, setActive] = useState(0);
+  const startX = useRef(0);
+  const startY = useRef(0);
+  const dragging = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [active,  setActive]  = useState(0);
-  const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startX    = useRef(0);
-  const startY    = useRef(0);
-  const dragging  = useRef(false);
-
-  const goTo = useCallback((i: number) => {
-    setActive(((i % slides.length) + slides.length) % slides.length);
+  const goTo = useCallback((idx: number) => {
+    setActive(((idx % slides.length) + slides.length) % slides.length);
   }, [slides.length]);
 
-  const startTimer = useCallback(() => {
-    if (!autoPlay || slides.length <= 1) return;
-    timerRef.current = setInterval(
-      () => setActive(p => (p + 1) % slides.length),
-      interval
-    );
+  const resetTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (autoPlay && slides.length > 1) {
+      timerRef.current = setInterval(() => {
+        setActive(prev => (prev + 1) % slides.length);
+      }, interval);
+    }
   }, [autoPlay, interval, slides.length]);
 
-  const stopTimer = useCallback(() => {
-    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-  }, []);
-
-  useEffect(() => { startTimer(); return stopTimer; }, [startTimer, stopTimer]);
+  useEffect(() => {
+    resetTimer();
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [resetTimer]);
 
   const onTouchStart = (e: React.TouchEvent) => {
-    startX.current   = e.touches[0].clientX;
-    startY.current   = e.touches[0].clientY;
+    startX.current = e.touches[0].clientX;
+    startY.current = e.touches[0].clientY;
     dragging.current = true;
-    stopTimer();
   };
-
   const onTouchEnd = (e: React.TouchEvent) => {
     if (!dragging.current) return;
     dragging.current = false;
-    const dx = startX.current - e.changedTouches[0].clientX;
-    const dy = Math.abs(startY.current - e.changedTouches[0].clientY);
-    if (Math.abs(dx) > 44 && dy < 70) goTo(dx > 0 ? active + 1 : active - 1);
-    startTimer();
+    const dx = e.changedTouches[0].clientX - startX.current;
+    const dy = Math.abs(e.changedTouches[0].clientY - startY.current);
+    if (Math.abs(dx) < 40 || dy > Math.abs(dx)) return;
+    if (dx > 0) goTo(active - 1);
+    else        goTo(active + 1);
+    resetTimer();
   };
 
-  if (!slides.length) return null;
+  if (!slides || slides.length === 0) return null;
+
+  const slide = slides[active];
 
   return (
     <div
-      style={{
-        height,
-        borderRadius,
-        overflow: "hidden",
-        position: "relative",
-        direction: "rtl",
-        touchAction: "pan-y",
-        userSelect: "none",
-        WebkitUserSelect: "none",
-      } as React.CSSProperties}
+      style={{ position: "relative", width: "100%", height: height + "px", borderRadius: "20px", overflow: "hidden", userSelect: "none" }}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      {slides.map((s, i) => {
-        const grad = s.gradient || GRADS[i % GRADS.length];
-        const isActive = i === active;
-        return (
-          <div
-            key={s.id}
-            aria-hidden={!isActive}
+      {/* پس‌زمینه گرادیان */}
+      <div style={{
+        position: "absolute", inset: 0,
+        background: GRADS[active % GRADS.length],
+        transition: "background 0.5s ease",
+      }} />
+
+      {/* محتوای اسلاید */}
+      <Link
+        href={slide.link || "/products"}
+        style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: "16px 14px", textDecoration: "none" }}
+      >
+        {/* متن */}
+        <div style={{ flex: 1, minWidth: 0, paddingLeft: "8px" }}>
+          {slide.badge && (
+            <span style={{
+              display: "inline-block",
+              padding: "2px 10px",
+              borderRadius: "9999px",
+              background: "rgba(0,102,255,0.25)",
+              border: "1px solid rgba(0,102,255,0.4)",
+              color: "#60a5fa",
+              fontSize: "10px",
+              fontWeight: 800,
+              marginBottom: "6px",
+            }}>🔥 {slide.badge}</span>
+          )}
+          <h2 style={{
+            color: "#f0f4ff",
+            fontSize: "14px",
+            fontWeight: 900,
+            lineHeight: 1.3,
+            margin: "0 0 4px",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}>{slide.title}</h2>
+          {slide.subtitle && (
+            <p style={{
+              color: "rgba(240,244,255,0.65)",
+              fontSize: "10px",
+              fontWeight: 500,
+              lineHeight: 1.4,
+              margin: "0 0 8px",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}>{slide.subtitle}</p>
+          )}
+          <span style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+            padding: "6px 14px",
+            borderRadius: "9999px",
+            background: "linear-gradient(135deg,#0066ff,#7c3aed)",
+            color: "#fff",
+            fontSize: "11px",
+            fontWeight: 800,
+            boxShadow: "0 4px 14px rgba(0,102,255,0.4)",
+          }}>
+            {slide.cta || "مشاهده و خرید"} ←
+          </span>
+          {slide.price && slide.price > 0 && (
+            <p style={{ color: "#34d399", fontSize: "11px", fontWeight: 900, marginTop: "6px" }}>
+              {slide.price.toLocaleString("fa-IR")} ت
+            </p>
+          )}
+        </div>
+
+        {/* تصویر */}
+        <div style={{
+          width: "100px",
+          height: (height - 32) + "px",
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: "14px",
+          background: "rgba(255,255,255,0.06)",
+          border: "1px solid rgba(255,255,255,0.10)",
+          padding: "8px",
+        }}>
+          <img
+            src={slide.image || "/placeholder.png"}
+            alt={slide.title}
             style={{
-              position:    "absolute",
-              inset:       0,
-              background:  grad,
-              opacity:     isActive ? 1 : 0,
-              transition:  "opacity 0.52s cubic-bezier(.4,0,.2,1)",
-              pointerEvents: isActive ? "auto" : "none",
-              display:     "flex",
-              alignItems:  "center",
-              padding:     "0 20px",
-              gap:         14,
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              filter: "drop-shadow(0 6px 18px rgba(0,0,0,0.5))",
+              transition: "transform 0.4s ease",
             }}
-          >
-            {/* متن */}
-            <div style={{ flex: "1 1 56%", minWidth: 0, paddingRight: 4 }}>
-              {s.badge && (
-                <div style={{
-                  display:        "inline-flex",
-                  alignItems:     "center",
-                  marginBottom:   8,
-                  padding:        "3px 10px",
-                  borderRadius:   9999,
-                  background:     "rgba(255,255,255,.18)",
-                  backdropFilter: "blur(8px)",
-                  WebkitBackdropFilter: "blur(8px)",
-                  border:         "1px solid rgba(255,255,255,.28)",
-                  color:          "#fff",
-                  fontSize:       10,
-                  fontWeight:     700,
-                }}>
-                  {s.badge}
-                </div>
-              )}
-              {s.title && (
-                <h2 style={{
-                  margin:      "0 0 6px",
-                  color:       "#fff",
-                  fontSize:    "clamp(14px,3.8vw,20px)",
-                  fontWeight:  800,
-                  lineHeight:  1.3,
-                  textShadow:  "0 2px 10px rgba(0,0,0,.6)",
-                  overflow:    "hidden",
-                  display:     "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                } as React.CSSProperties}>
-                  {s.title}
-                </h2>
-              )}
-              {s.subtitle && (
-                <p style={{
-                  margin:      "0 0 14px",
-                  color:       "rgba(255,255,255,.78)",
-                  fontSize:    "clamp(10px,2.8vw,13px)",
-                  lineHeight:  1.5,
-                  overflow:    "hidden",
-                  display:     "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                } as React.CSSProperties}>
-                  {s.subtitle}
-                </p>
-              )}
-              {s.cta && (
-                <a
-                  href={s.link || "#"}
-                  onClick={e => !s.link && e.preventDefault()}
-                  style={{
-                    display:        "inline-flex",
-                    alignItems:     "center",
-                    gap:            4,
-                    background:     "rgba(255,255,255,.2)",
-                    backdropFilter: "blur(10px)",
-                    WebkitBackdropFilter: "blur(10px)",
-                    color:          "#fff",
-                    fontSize:       12,
-                    fontWeight:     700,
-                    padding:        "7px 18px",
-                    borderRadius:   9999,
-                    border:         "1px solid rgba(255,255,255,.32)",
-                    textDecoration: "none",
-                    whiteSpace:     "nowrap",
-                  }}
-                >
-                  {s.cta}
-                  <span style={{ fontSize: 14, opacity: 0.8 }}>←</span>
-                </a>
-              )}
-            </div>
+            onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
+          />
+        </div>
+      </Link>
 
-            {/* تصویر */}
-            {s.image && s.image !== "/placeholder.png" && (
-              <div style={{ flex: "0 0 38%", height: "82%", position: "relative", flexShrink: 0 }}>
-                <img
-                  src={s.image}
-                  alt={s.title || ""}
-                  loading="lazy"
-                  style={{
-                    width:  "100%",
-                    height: "100%",
-                    objectFit:   "contain",
-                    filter: "drop-shadow(0 6px 22px rgba(0,0,0,.55))",
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        );
-      })}
-
-      {/* نشانگرها (dots) */}
+      {/* نقطه‌های ناوبری */}
       {showDots && slides.length > 1 && (
         <div style={{
-          position:  "absolute",
-          bottom:    10,
-          left:      "50%",
+          position: "absolute",
+          bottom: "10px",
+          left: "50%",
           transform: "translateX(-50%)",
-          display:   "flex",
-          gap:       5,
-          zIndex:    10,
+          zIndex: 10,
+          display: "flex",
+          alignItems: "center",
+          gap: "5px",
+          background: "rgba(0,0,0,0.35)",
+          backdropFilter: "blur(8px)",
+          padding: "4px 10px",
+          borderRadius: "9999px",
+          border: "1px solid rgba(255,255,255,0.10)",
         }}>
-          {slides.map((_, i) => (
+          {slides.map((_, idx) => (
             <button
-              key={i}
-              aria-label={`اسلاید ${i + 1}`}
-              onClick={() => { stopTimer(); goTo(i); startTimer(); }}
+              key={idx}
+              type="button"
+              onClick={(e) => { e.preventDefault(); goTo(idx); resetTimer(); }}
               style={{
-                width:        i === active ? 20 : 6,
-                height:       6,
-                borderRadius: 9999,
-                background:   i === active ? "#fff" : "rgba(255,255,255,.38)",
-                border:       "none",
-                padding:      0,
-                cursor:       "pointer",
-                transition:   "all .3s ease",
-                flexShrink:   0,
+                height: "6px",
+                width:  idx === active ? "20px" : "6px",
+                borderRadius: "9999px",
+                background: idx === active ? "#0066ff" : "rgba(255,255,255,0.4)",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+                transition: "width 0.3s ease, background 0.3s ease",
+                minHeight: "unset",
               }}
             />
           ))}

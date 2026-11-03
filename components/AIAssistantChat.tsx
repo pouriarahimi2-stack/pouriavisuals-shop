@@ -1,5 +1,5 @@
 "use client";
-
+// File Path: components/AIAssistantChat.tsx
 import React, { useState, useRef, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 
@@ -25,7 +25,6 @@ export default function AIAssistantChat() {
     const newMsgs = [...messages, { role: "user" as const, text: userText }];
     setMessages(newMsgs);
     setLoading(true);
-
     try {
       const res = await fetch("/api/ai-assistant", {
         method:  "POST",
@@ -46,86 +45,105 @@ export default function AIAssistantChat() {
 
   return (
     <>
-      {/* دکمه شناور کوچک */}
+      {/* ─── دکمه شناور: class + inline style برای اطمینان کامل ─── */}
       <button
         className="ai-chat-float-btn"
-        style={{ position: "fixed", bottom: "136px", right: "16px", zIndex: 45 }}
+        style={{
+          position: "fixed",
+          bottom:   "80px",
+          right:    "16px",
+          zIndex:   45,
+        }}
         onClick={() => { soundEngine.playClick(); setIsOpen(!isOpen); }}
         aria-label="دستیار هوشمند آکسون"
         title="دستیار هوشمند"
       >
-        <span className="text-white text-base select-text">
+        <span style={{ color: "#fff", fontSize: "18px", lineHeight: 1 }}>
           {isOpen ? "✕" : "🤖"}
         </span>
       </button>
 
-      {/* پنل چت */}
+      {/* ─── پنل چت ─── */}
       {isOpen && (
         <>
-          {/* overlay موبایل */}
           <div
             className="fixed inset-0 z-40 bg-black/20 md:hidden"
             onClick={() => setIsOpen(false)}
           />
-
           <div
-            className={[
-              "fixed z-50 bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl rounded-3xl",
-              "flex flex-col overflow-hidden",
-              // موبایل: bottom sheet
-              "bottom-[120px] right-3 left-3 md:left-auto",
-              // دسکتاپ
-              "md:bottom-[80px] md:right-20 md:w-80 md:h-[420px]",
-              // ارتفاع موبایل
-              "h-[60vh] md:h-[420px]",
-            ].join(" ")}
+            style={{
+              position: "fixed",
+              bottom:   "140px",
+              right:    "12px",
+              left:     "12px",
+              zIndex:   50,
+              height:   "58vh",
+              maxHeight: "480px",
+              borderRadius: "1.5rem",
+              display:  "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              background: "var(--modal-bg)",
+              border:   "1px solid var(--card-border)",
+              boxShadow: "0 8px 40px rgba(0,0,0,0.25)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+            }}
+            className="md:left-auto md:right-20 md:w-80 md:h-[420px] md:bottom-20"
             dir="rtl"
           >
             {/* هدر */}
-            <div className="p-4 border-b border-[var(--card-border)] flex items-center justify-between bg-[var(--accent-blue)] rounded-t-3xl">
-              <div className="flex items-center gap-2 text-white">
-                <span className="text-lg">🤖</span>
+            <div style={{
+              padding: "14px 16px",
+              borderBottom: "1px solid var(--card-border)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: "linear-gradient(135deg,#0066ff,#7c3aed)",
+              borderRadius: "1.5rem 1.5rem 0 0",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#fff" }}>
+                <span style={{ fontSize: "18px" }}>🤖</span>
                 <div>
-                  <p className="text-xs font-black">دستیار هوشمند آکسون</p>
-                  <p className="text-[10px] opacity-80">آنلاین و آماده پاسخگویی</p>
+                  <p style={{ fontSize: "12px", fontWeight: 900, margin: 0 }}>دستیار هوشمند آکسون</p>
+                  <p style={{ fontSize: "10px", opacity: 0.8, margin: 0 }}>آنلاین و آماده پاسخگویی</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="text-white/80 hover:text-white font-black cursor-pointer text-lg"
-              >
-                ✕
-              </button>
+                style={{ color: "rgba(255,255,255,0.8)", cursor: "pointer", fontSize: "18px", fontWeight: 900, background: "none", border: "none", lineHeight: 1 }}
+              >✕</button>
             </div>
 
             {/* پیام‌ها */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-2 text-xs">
+            <div style={{ flex: 1, overflowY: "auto", padding: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
               {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={`flex ${m.role === "user" ? "justify-start" : "justify-end"}`}
-                >
-                  <div className={`max-w-[80%] px-3 py-2 rounded-2xl font-medium leading-relaxed ${
-                    m.role === "user"
-                      ? "bg-[var(--accent-blue)] text-white"
-                      : "bg-[var(--input-bg)] text-[var(--text-primary)]"
-                  }`}>
+                <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-start" : "flex-end" }}>
+                  <div style={{
+                    maxWidth: "80%",
+                    padding: "8px 12px",
+                    borderRadius: "16px",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    lineHeight: 1.5,
+                    background: m.role === "user" ? "#0066ff" : "var(--input-bg)",
+                    color:      m.role === "user" ? "#fff"    : "var(--text-primary)",
+                  }}>
                     {m.text}
                   </div>
                 </div>
               ))}
               {loading && (
-                <div className="flex justify-end">
-                  <div className="bg-[var(--input-bg)] px-4 py-2 rounded-2xl">
-                    <span className="inline-flex gap-1">
-                      {[0,1,2].map(i => (
-                        <span
-                          key={i}
-                          className="w-1.5 h-1.5 rounded-full bg-[var(--accent-blue)] animate-bounce"
-                          style={{ animationDelay: i * 150 + "ms" }}
-                        />
-                      ))}
-                    </span>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <div style={{ background: "var(--input-bg)", padding: "8px 14px", borderRadius: "16px", display: "flex", gap: "4px" }}>
+                    {[0,1,2].map(i => (
+                      <span key={i} style={{
+                        width: "6px", height: "6px", borderRadius: "50%",
+                        background: "#0066ff", display: "inline-block",
+                        animation: "bounce 1s infinite",
+                        animationDelay: i * 150 + "ms",
+                      }} />
+                    ))}
                   </div>
                 </div>
               )}
@@ -133,22 +151,47 @@ export default function AIAssistantChat() {
             </div>
 
             {/* ورودی */}
-            <form onSubmit={handleSend} className="p-3 border-t border-[var(--card-border)] flex gap-2">
+            <form onSubmit={handleSend} style={{
+              padding: "10px 12px",
+              borderTop: "1px solid var(--card-border)",
+              display: "flex",
+              gap: "8px",
+            }}>
               <input
                 type="text"
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 placeholder="سؤال یا درخواست خود را بنویسید..."
-                className="flex-1 px-3 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
-                style={{ fontSize: "16px" }}
+                style={{
+                  flex: 1,
+                  padding: "8px 12px",
+                  borderRadius: "9999px",
+                  background: "var(--input-bg)",
+                  border: "1px solid var(--card-border)",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  outline: "none",
+                  color: "var(--text-primary)",
+                  minHeight: "unset",
+                  height: "36px",
+                }}
               />
               <button
                 type="submit"
                 disabled={loading || !input.trim()}
-                className="px-3 py-2 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs disabled:opacity-50 cursor-pointer"
-              >
-                ←
-              </button>
+                style={{
+                  padding: "0 14px",
+                  borderRadius: "9999px",
+                  background: "linear-gradient(135deg,#0066ff,#7c3aed)",
+                  color: "#fff",
+                  fontWeight: 900,
+                  fontSize: "16px",
+                  cursor: "pointer",
+                  border: "none",
+                  height: "36px",
+                  opacity: (loading || !input.trim()) ? 0.5 : 1,
+                }}
+              >←</button>
             </form>
           </div>
         </>

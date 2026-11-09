@@ -3,40 +3,7 @@
 
 import React, { useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
-
-const IRAN_PROVINCES_MAP: Record<string, string[]> = {
-  "تهران": ["تهران", "شهریار", "اسلامشهر", "قدس", "ملارد", "پاکدشت", "ری", "ورامین", "پردیس", "دماوند", "رباط‌کریم", "شمیرانات"],
-  "فارس": ["شیراز", "مرودشت", "جهرم", "فسا", "کازرون", "داراب", "لار", "آباده", "نورآباد", "اقلید", "صدرا"],
-  "اصفهان": ["اصفهان", "کاشان", "خمینی‌شهر", "نجف‌آباد", "شاهین‌شهر", "شهرضا", "فولادشهر", "بهارستان", "مبارکه", "زرین‌شهر"],
-  "خراسان رضوی": ["مشهد", "نیشابور", "سبزوار", "تربت حیدریه", "کاشمر", "قوچان", "تربت جام", "تایباد", "چناران", "گلبهار"],
-  "آذربایجان شرقی": ["تبریز", "مراغه", "مرند", "میانه", "اهر", "بناب", "سراب", "آذرشهر", "سهند", "شبستر"],
-  "مازندران": ["ساری", "بابل", "آمل", "قائم‌شهر", "بهشهر", "چالوس", "نکا", "بابلسر", "تنکابن", "رامسر", "نوشهر"],
-  "البرز": ["کرج", "فردیس", "کمال‌شهر", "نظرآباد", "محمدشهر", "ماهدشت", "هشتگرد", "طالقان"],
-  "خوزستان": ["اهواز", "دزفول", "آبادان", "بندر ماهشهر", "خرمشهر", "اندیمشک", "ایذه", "بهبهان", "شوشتر", "امیدیه"],
-  "گیلان": ["رشت", "بندر انزلی", "لاهیجان", "لنگرود", "تالش", "آستارا", "صومعه‌سرا", "آستانه اشرفیه", "رودسر", "فومن"],
-  "کرمان": ["کرمان", "سیرجان", "رفسنجان", "جیرفت", "بم", "زرند", "کهنوج", "شهربابک", "بافت"],
-  "آذربایجان غربی": ["ارومیه", "خوی", "بوکان", "مهاباد", "میاندوآب", "سلماس", "پیرانشهر", "نقده", "ماکو"],
-  "هرمزگان": ["بندرعباس", "میناب", "قشم", "کیش", "بندر لنگه", "رودان", "حاجی‌آباد", "جاسک"],
-  "مرکزی": ["اراک", "ساوه", "خمین", "محلات", "دلیجان", "شازند", "تفرش"],
-  "همدان": ["همدان", "ملایر", "نهاوند", "اسدآباد", "تویسرکان", "بهار", "کبودرآهنگ"],
-  "یزد": ["یزد", "میبد", "اردکان", "بافق", "مهریز", "ابرکوه", "طبس"],
-  "کرمانشاه": ["کرمانشاه", "اسلام‌آباد غرب", "جوانرود", "کنگاور", "سرپل ذهاب", "سنقر", "هرسین"],
-  "قزوین": ["قزوین", "الوند", "تاکستان", "بوئین‌زهرا", "آبیک", "محمدیه"],
-  "سیستان و بلوچستان": ["زاهدان", "زابل", "ایرانشهر", "چابهار", "سراوان", "خاش", "کنارک"],
-  "قم": ["قم", "قنوات", "جعفریه", "کهک", "دستجرد"],
-  "گلستان": ["گرگان", "گنبد کاووس", "بندر ترکمن", "علی‌آباد کتول", "آق‌قلا", "کردکوی", "کلاله"],
-  "کردستان": ["سنندج", "سقز", "مریوان", "بانه", "قروه", "کامیاران", "بیجار"],
-  "لرستان": ["خرم‌آباد", "بروجرد", "دورود", "کوهدشت", "الیگودرز", "نورآباد", "ازنا"],
-  "بوشهر": ["بوشهر", "برازجان", "بندر گناوه", "بندر کنگان", "عسلویه", "خورموج", "جم"],
-  "زنجان": ["زنجان", "ابهر", "خرمدره", "قیدار", "ماه‌نشان"],
-  "اردبیل": ["اردبیل", "پارس‌آباد", "مشگین‌شهر", "خلخال", "گرمی"],
-  "سمنان": ["سمنان", "شاهرود", "دامغان", "گرمسار", "مهدی‌شهر"],
-  "چهارمحال و بختیاری": ["شهرکرد", "بروجن", "فرخ‌شهر", "فارسان", "لردگان"],
-  "ایلام": ["ایلام", "دهلران", "ایوان", "آبدانان", "دره‌شهر"],
-  "کهگیلویه و بویراحمد": ["یاسوج", "دوگنبدان", "دهدشت", "سی‌سخت"],
-  "خراسان شمالی": ["بجنورد", "شیروان", "اسفراین", "آشخانه"],
-  "خراسان جنوبی": ["بیرجند", "قائن", "فردوس", "نهبندان", "طبس"],
-};
+import { IRAN_PROVINCES_CITIES } from "@/lib/iranLocations";
 
 interface ShippingProps {
   formData: {
@@ -54,17 +21,17 @@ interface ShippingProps {
 
 export default function CheckoutShipping({ formData, onChange }: ShippingProps) {
   const isPostalValid = /^\d{10}$/.test((formData.postalCode || "").trim());
-  const provinces = Object.keys(IRAN_PROVINCES_MAP);
+  const provinces = Object.keys(IRAN_PROVINCES_CITIES);
   const activeProvince =
-    formData.province && IRAN_PROVINCES_MAP[formData.province] ? formData.province : "تهران";
-  const cities = IRAN_PROVINCES_MAP[activeProvince] || ["تهران"];
+    formData.province && IRAN_PROVINCES_CITIES[formData.province] ? formData.province : "تهران";
+  const cities = IRAN_PROVINCES_CITIES[activeProvince] || ["تهران"];
 
   useEffect(() => {
-    if (!formData.province || !IRAN_PROVINCES_MAP[formData.province]) {
+    if (!formData.province || !IRAN_PROVINCES_CITIES[formData.province]) {
       onChange("province", "تهران");
       onChange("city", "تهران");
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleMethodChange = (method: "express" | "regular") => {
     soundEngine.playClick();
@@ -86,7 +53,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-1 xl:grid-cols-3 lg:grid-cols-3 lg:grid-cols-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2 md:gap-4 text-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 text-xs">
         <div>
           <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
             نام و نام خانوادگی تحویل‌گیرنده *
@@ -128,7 +95,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
               soundEngine.playClick();
               const nextProv = e.target.value;
               onChange("province", nextProv);
-              const nextCities = IRAN_PROVINCES_MAP[nextProv] || [];
+              const nextCities = IRAN_PROVINCES_CITIES[nextProv] || [];
               onChange("city", nextCities[0] || "");
             }}
             className="w-full p-3.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)] cursor-pointer transition"
@@ -193,7 +160,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
             value={formData.address}
             onChange={(e) => onChange("address", e.target.value)}
             placeholder="نشانی کامل جهت تحویل مرسوله..."
-            className="w-full p-3.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-[var(--text-primary)] focus:border-[var(--accent-blue)] transition leading-relaxed"
+            className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-[var(--text-primary)] focus:border-[var(--accent-blue)] transition leading-relaxed"
           />
         </div>
 
@@ -215,7 +182,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
       <div className="space-y-3 pt-4 border-t border-[var(--card-border)]">
         <label className="block font-black text-xs text-[var(--text-secondary)]">روش ارسال مرسوله:</label>
 
-        <div className="grid grid-cols-2 md:grid-cols-1 xl:grid-cols-3 lg:grid-cols-3 lg:grid-cols-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div
             onClick={() => handleMethodChange("regular")}
             className={
@@ -231,7 +198,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
               </span>
               <span className="text-[10px] opacity-80"></span>
             </div>
-            <span className="font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400">
+            <span className="font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
               رایگان
             </span>
           </div>
@@ -251,7 +218,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
               </span>
               <span className="text-[10px] opacity-80">تحویل ویژه و سریع</span>
             </div>
-            <span className="font-mono font-bold text-xs">۸۵,۰۰۰ تومان</span>
+            <span className="font-mono font-bold text-xs whitespace-nowrap">پس‌کرایه</span>
           </div>
         </div>
       </div>

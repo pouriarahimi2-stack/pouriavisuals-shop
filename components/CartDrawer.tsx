@@ -97,8 +97,7 @@ export default function CartDrawer() {
         {/* فوتر — با پدینگ کافی برای نمایش روی موبایل */}
         {cartItems.length > 0 && (
           <div
-            className="bg-white border-t border-slate-100 p-5"
-            style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom, 0px))" }}
+            className="bg-white border-t border-slate-100 p-5 pb-20 md:pb-5"
           >
             <div className="flex justify-between items-center mb-4">
               <span className="text-slate-500 font-bold text-sm">مبلغ قابل پرداخت:</span>

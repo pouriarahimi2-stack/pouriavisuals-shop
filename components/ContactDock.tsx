@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
+import { useCart } from "@/context/CartContext";
 
 export default function ContactDock() {
   const [isOpen, setIsOpen] = useState(false);
@@ -10,9 +11,10 @@ export default function ContactDock() {
     sizeMob: 44,
     sizeDesk: 60,
     side: "left",
-    bottomPx: 24
+    bottomPx: 96
   });
   const [isMobile, setIsMobile] = useState(false);
+  const { isCartOpen } = useCart() as any;
 
   useEffect(() => {
     const checkMob = () => setIsMobile(window.innerWidth < 768);
@@ -29,7 +31,7 @@ export default function ContactDock() {
           sizeMob: Number(bg.chatSizeMobile ?? 40),
           sizeDesk: Number(bg.chatSizeDesktop ?? 60),
           side: bg.chatButtonSide === "right" ? "right" : "left",
-          bottomPx: Number(bg.chatButtonBottomPx ?? 24)
+          bottomPx: Number(bg.chatButtonBottomPx ?? 96)
         });
       } catch {}
     };
@@ -43,6 +45,9 @@ export default function ContactDock() {
   }, []);
 
   const currentSize = isMobile ? chatConfig.sizeMob : chatConfig.sizeDesk;
+
+  // مخفی شدن دکمه چت هنگام باز بودن سبد خرید
+  if (isCartOpen) return null;
 
   return (
     <>

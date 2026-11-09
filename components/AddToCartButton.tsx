@@ -35,7 +35,9 @@ export default function AddToCartButton({
   const hasColors =
     Array.isArray(product.color_options) && product.color_options.length > 0;
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const cartItem = cartItems.find(
     (i) => String(i.id) === String(product.id)
@@ -168,12 +170,12 @@ export default function AddToCartButton({
         </div>
       )}
 
-      {/* Main Button — گرادیان آبی‌بنفش کپسولی */}
+      {/* Main Button — گرادیان کپسولی با چیدمان استاندارد RTL و پدینگ ریسپانسیو */}
       <button
         type="button"
         disabled={!isAvailable || isMaxReached}
         onClick={handleAddToCart}
-        className="relative w-full h-[50px] rounded-full overflow-hidden transition-all duration-300 flex items-center justify-center cursor-pointer active:scale-[0.98]"
+        className="relative w-full h-[42px] sm:h-[44px] rounded-xl overflow-hidden transition-all duration-300 flex items-center justify-center cursor-pointer active:scale-[0.98] px-2 sm:px-3"
         style={
           !isAvailable || isMaxReached
             ? {
@@ -193,14 +195,14 @@ export default function AddToCartButton({
               }
         }
       >
-        <div className="relative w-full h-full flex items-center justify-center px-4 overflow-hidden">
-          {/* Cart icon */}
+        <div className="relative w-full h-full flex items-center justify-center gap-1.5 sm:gap-2 px-0 overflow-hidden">
+          {/* Cart icon — در جهت RTL اولین المان در سمت راست متن قرار می‌گیرد */}
           <div
             className={
-              "flex items-center justify-center transition-all duration-300 " +
+              "flex items-center justify-center transition-all duration-300 shrink-0 " +
               (isAnimating
                 ? "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 animate-kinetic-cart-left z-20"
-                : "translate-x-0")
+                : "")
             }
           >
             {isAnimating && (
@@ -212,7 +214,7 @@ export default function AddToCartButton({
               </div>
             )}
             <svg
-              className="w-5 h-5 shrink-0"
+              className="w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -229,13 +231,13 @@ export default function AddToCartButton({
             </svg>
           </div>
 
-          {/* Label */}
+          {/* Label — متن دکمه با سایز ریسپانسیو و بدون برش یا شکستگی */}
           <span
             className={
-              "font-black text-xs tracking-wider mr-2.5 transition-all duration-300 whitespace-nowrap " +
+              "font-black text-[11px] sm:text-xs tracking-tight transition-all duration-300 whitespace-nowrap " +
               (isAnimating
-                ? "opacity-0 scale-75 -translate-x-6 pointer-events-none w-0 overflow-hidden"
-                : "opacity-100 scale-100 translate-x-0")
+                ? "opacity-0 scale-75 pointer-events-none w-0 overflow-hidden"
+                : "opacity-100 scale-100")
             }
           >
             {isMaxReached

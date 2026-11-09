@@ -50,10 +50,10 @@ export default function ProductList({
   return (
     <section className="py-6 space-y-8 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       <div className="border-b border-[var(--card-border)] pb-5 text-right">
-        <h2 className="text-2xl sm:text-3xl font-black">
+        <h2 className="text-2xl sm:text-3xl font-black"suppressHydrationWarning>
           {customHeading || "کاتالوگ تجهیزات و محصولات"}
         </h2>
-        <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium mt-1">
+        <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium mt-1"suppressHydrationWarning>
           {customSubtitle ||
             "تمامی کالاها با گارانتی اصالت طلایی، تست سلامت فیزیکی و ارسال پیشتاز عرضه می‌شوند"}
         </p>

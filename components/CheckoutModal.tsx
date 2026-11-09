@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import SecurityCaptchaBox from "@/components/SecurityCaptchaBox";
 // File Path: components/CheckoutModal.tsx
 
@@ -11,37 +11,37 @@ import { soundEngine } from "@/lib/soundEngine";
 const MODAL_DRAFT_KEY = "axon_checkout_modal_draft_v2026";
 
 const IRAN_PROVINCES_MAP: Record<string, string[]> = {
-  "تهران": ["تهران", "شهریار", "اسلامشهر", "قدس", "ملارد", "پاکدشت", "ری", "ورامین", "پردیس", "دماوند"],
-  "فارس": ["شیراز", "مرودشت", "جهرم", "فسا", "کازرون", "داراب", "لار", "آباده", "صدرا"],
-  "اصفهان": ["اصفهان", "کاشان", "خمینی‌شهر", "نجف‌آباد", "شاهین‌‌شهر", "شهرضا", "فولادشهر"],
-  "خراسان رضوی": ["مشهد", "نیشابور", "سبزوار", "تربت حیدریه", "کاشمر", "قوچان"],
-  "آذربایجان شرقی": ["تبریز", "مراغه", "مرند", "میانه", "اهر", "بناب"],
-  "مازندران": ["ساری", "بابل", "آمل", "قائم‌شهر", "بهشهر", "چالوس", "بابلسر", "تنکابن", "رامسر"],
-  "البرز": ["کرج", "فردیس", "کمال‌شهر", "نظرآباد", "محمدشهر", "ماهدشت", "هشتگرد"],
-  "خوزستان": ["اهواز", "دزفول", "آبادان", "بندر ماهشهر", "خرمشهر", "اندیمشک", "بهبهان"],
-  "گیلان": ["رشت", "بندر انزلی", "لاهیجان", "لنگرود", "تالش", "آستارا", "رودسر"],
-  "کرمان": ["کرمان", "سیرجان", "رفسنجان", "جیرفت", "بم", "زرند"],
-  "آذربایجان غربی": ["ارومیه", "خوی", "بوکان", "مهاباد", "میاندوآب", "سلماس"],
-  "هرمزگان": ["بندرعباس", "میناب", "قشم", "کیش", "بندر لنگه"],
-  "مرکزی": ["اراک", "ساوه", "خمین", "محلات", "دلیجان"],
-  "همدان": ["همدان", "ملایر", "نهاوند", "اسدآباد", "تویسرکان"],
-  "یزد": ["یزد", "میبد", "اردکان", "بافق", "مهریز"],
-  "کرمانشاه": ["کرمانشاه", "اسلام‌آباد غرب", "جوانرود", "کنگاور", "سرپل ذهاب"],
-  "قزوین": ["قزوین", "الوند", "تاکستان", "بوئین‌زهرا", "آبیک"],
-  "سیستان و بلوچستان": ["زاهدان", "زابل", "ایرانشهر", "چابهار", "سراوان"],
-  "قم": ["قم", "قنوات", "جعفریه", "کهک"],
-  "گلستان": ["گرگان", "گنبد کاووس", "بندر ترکمن", "علی‌آباد کتول"],
-  "کردستان": ["سنندج", "سقز", "مریوان", "بانه", "قروه"],
-  "لرستان": ["خرم‌آباد", "بروجرد", "دورود", "کوهدشت", "الیگودرز"],
-  "بوشهر": ["بوشهر", "برازجان", "بندر گناوه", "بندر کنگان", "عسلویه"],
-  "زنجان": ["زنجان", "ابهر", "خرمدره", "قیدار"],
-  "اردبیل": ["اردبیل", "پارس‌آباد", "مشگین‌شهر", "خلخال"],
-  "سمنان": ["سمنان", "شاهرود", "دامغان", "گرمسار"],
-  "چهارمحال و بختیاری": ["شهرکرد", "بروجن", "فرخ‌شهر", "فارسان"],
-  "ایلام": ["ایلام", "دهلران", "ایوان", "آبدانان"],
-  "کهگیلویه و بویراحمد": ["یاسوج", "دوگنبدان", "دهدشت"],
-  "خراسان شمالی": ["بجنورد", "شیروان", "اسفراین"],
-  "خراسان جنوبی": ["بیرجند", "قائن", "فردوس", "طبس"],
+  "ØªÙ‡Ø±Ø§Ù†": ["ØªÙ‡Ø±Ø§Ù†", "Ø´Ù‡Ø±ÛŒØ§Ø±", "Ø§Ø³Ù„Ø§Ù…Ø´Ù‡Ø±", "Ù‚Ø¯Ø³", "Ù…Ù„Ø§Ø±Ø¯", "Ù¾Ø§Ú©Ø¯Ø´Øª", "Ø±ÛŒ", "ÙˆØ±Ø§Ù…ÛŒÙ†", "Ù¾Ø±Ø¯ÛŒØ³", "Ø¯Ù…Ø§ÙˆÙ†Ø¯"],
+  "ÙØ§Ø±Ø³": ["Ø´ÛŒØ±Ø§Ø²", "Ù…Ø±ÙˆØ¯Ø´Øª", "Ø¬Ù‡Ø±Ù…", "ÙØ³Ø§", "Ú©Ø§Ø²Ø±ÙˆÙ†", "Ø¯Ø§Ø±Ø§Ø¨", "Ù„Ø§Ø±", "Ø¢Ø¨Ø§Ø¯Ù‡", "ØµØ¯Ø±Ø§"],
+  "Ø§ØµÙÙ‡Ø§Ù†": ["Ø§ØµÙÙ‡Ø§Ù†", "Ú©Ø§Ø´Ø§Ù†", "Ø®Ù…ÛŒÙ†ÛŒâ€ŒØ´Ù‡Ø±", "Ù†Ø¬Ùâ€ŒØ¢Ø¨Ø§Ø¯", "Ø´Ø§Ù‡ÛŒÙ†â€Œâ€ŒØ´Ù‡Ø±", "Ø´Ù‡Ø±Ø¶Ø§", "ÙÙˆÙ„Ø§Ø¯Ø´Ù‡Ø±"],
+  "Ø®Ø±Ø§Ø³Ø§Ù† Ø±Ø¶ÙˆÛŒ": ["Ù…Ø´Ù‡Ø¯", "Ù†ÛŒØ´Ø§Ø¨ÙˆØ±", "Ø³Ø¨Ø²ÙˆØ§Ø±", "ØªØ±Ø¨Øª Ø­ÛŒØ¯Ø±ÛŒÙ‡", "Ú©Ø§Ø´Ù…Ø±", "Ù‚ÙˆÚ†Ø§Ù†"],
+  "Ø¢Ø°Ø±Ø¨Ø§ÛŒØ¬Ø§Ù† Ø´Ø±Ù‚ÛŒ": ["ØªØ¨Ø±ÛŒØ²", "Ù…Ø±Ø§ØºÙ‡", "Ù…Ø±Ù†Ø¯", "Ù…ÛŒØ§Ù†Ù‡", "Ø§Ù‡Ø±", "Ø¨Ù†Ø§Ø¨"],
+  "Ù…Ø§Ø²Ù†Ø¯Ø±Ø§Ù†": ["Ø³Ø§Ø±ÛŒ", "Ø¨Ø§Ø¨Ù„", "Ø¢Ù…Ù„", "Ù‚Ø§Ø¦Ù…â€ŒØ´Ù‡Ø±", "Ø¨Ù‡Ø´Ù‡Ø±", "Ú†Ø§Ù„ÙˆØ³", "Ø¨Ø§Ø¨Ù„Ø³Ø±", "ØªÙ†Ú©Ø§Ø¨Ù†", "Ø±Ø§Ù…Ø³Ø±"],
+  "Ø§Ù„Ø¨Ø±Ø²": ["Ú©Ø±Ø¬", "ÙØ±Ø¯ÛŒØ³", "Ú©Ù…Ø§Ù„â€ŒØ´Ù‡Ø±", "Ù†Ø¸Ø±Ø¢Ø¨Ø§Ø¯", "Ù…Ø­Ù…Ø¯Ø´Ù‡Ø±", "Ù…Ø§Ù‡Ø¯Ø´Øª", "Ù‡Ø´ØªÚ¯Ø±Ø¯"],
+  "Ø®ÙˆØ²Ø³ØªØ§Ù†": ["Ø§Ù‡ÙˆØ§Ø²", "Ø¯Ø²ÙÙˆÙ„", "Ø¢Ø¨Ø§Ø¯Ø§Ù†", "Ø¨Ù†Ø¯Ø± Ù…Ø§Ù‡Ø´Ù‡Ø±", "Ø®Ø±Ù…Ø´Ù‡Ø±", "Ø§Ù†Ø¯ÛŒÙ…Ø´Ú©", "Ø¨Ù‡Ø¨Ù‡Ø§Ù†"],
+  "Ú¯ÛŒÙ„Ø§Ù†": ["Ø±Ø´Øª", "Ø¨Ù†Ø¯Ø± Ø§Ù†Ø²Ù„ÛŒ", "Ù„Ø§Ù‡ÛŒØ¬Ø§Ù†", "Ù„Ù†Ú¯Ø±ÙˆØ¯", "ØªØ§Ù„Ø´", "Ø¢Ø³ØªØ§Ø±Ø§", "Ø±ÙˆØ¯Ø³Ø±"],
+  "Ú©Ø±Ù…Ø§Ù†": ["Ú©Ø±Ù…Ø§Ù†", "Ø³ÛŒØ±Ø¬Ø§Ù†", "Ø±ÙØ³Ù†Ø¬Ø§Ù†", "Ø¬ÛŒØ±ÙØª", "Ø¨Ù…", "Ø²Ø±Ù†Ø¯"],
+  "Ø¢Ø°Ø±Ø¨Ø§ÛŒØ¬Ø§Ù† ØºØ±Ø¨ÛŒ": ["Ø§Ø±ÙˆÙ…ÛŒÙ‡", "Ø®ÙˆÛŒ", "Ø¨ÙˆÚ©Ø§Ù†", "Ù…Ù‡Ø§Ø¨Ø§Ø¯", "Ù…ÛŒØ§Ù†Ø¯ÙˆØ¢Ø¨", "Ø³Ù„Ù…Ø§Ø³"],
+  "Ù‡Ø±Ù…Ø²Ú¯Ø§Ù†": ["Ø¨Ù†Ø¯Ø±Ø¹Ø¨Ø§Ø³", "Ù…ÛŒÙ†Ø§Ø¨", "Ù‚Ø´Ù…", "Ú©ÛŒØ´", "Ø¨Ù†Ø¯Ø± Ù„Ù†Ú¯Ù‡"],
+  "Ù…Ø±Ú©Ø²ÛŒ": ["Ø§Ø±Ø§Ú©", "Ø³Ø§ÙˆÙ‡", "Ø®Ù…ÛŒÙ†", "Ù…Ø­Ù„Ø§Øª", "Ø¯Ù„ÛŒØ¬Ø§Ù†"],
+  "Ù‡Ù…Ø¯Ø§Ù†": ["Ù‡Ù…Ø¯Ø§Ù†", "Ù…Ù„Ø§ÛŒØ±", "Ù†Ù‡Ø§ÙˆÙ†Ø¯", "Ø§Ø³Ø¯Ø¢Ø¨Ø§Ø¯", "ØªÙˆÛŒØ³Ø±Ú©Ø§Ù†"],
+  "ÛŒØ²Ø¯": ["ÛŒØ²Ø¯", "Ù…ÛŒØ¨Ø¯", "Ø§Ø±Ø¯Ú©Ø§Ù†", "Ø¨Ø§ÙÙ‚", "Ù…Ù‡Ø±ÛŒØ²"],
+  "Ú©Ø±Ù…Ø§Ù†Ø´Ø§Ù‡": ["Ú©Ø±Ù…Ø§Ù†Ø´Ø§Ù‡", "Ø§Ø³Ù„Ø§Ù…â€ŒØ¢Ø¨Ø§Ø¯ ØºØ±Ø¨", "Ø¬ÙˆØ§Ù†Ø±ÙˆØ¯", "Ú©Ù†Ú¯Ø§ÙˆØ±", "Ø³Ø±Ù¾Ù„ Ø°Ù‡Ø§Ø¨"],
+  "Ù‚Ø²ÙˆÛŒÙ†": ["Ù‚Ø²ÙˆÛŒÙ†", "Ø§Ù„ÙˆÙ†Ø¯", "ØªØ§Ú©Ø³ØªØ§Ù†", "Ø¨ÙˆØ¦ÛŒÙ†â€ŒØ²Ù‡Ø±Ø§", "Ø¢Ø¨ÛŒÚ©"],
+  "Ø³ÛŒØ³ØªØ§Ù† Ùˆ Ø¨Ù„ÙˆÚ†Ø³ØªØ§Ù†": ["Ø²Ø§Ù‡Ø¯Ø§Ù†", "Ø²Ø§Ø¨Ù„", "Ø§ÛŒØ±Ø§Ù†Ø´Ù‡Ø±", "Ú†Ø§Ø¨Ù‡Ø§Ø±", "Ø³Ø±Ø§ÙˆØ§Ù†"],
+  "Ù‚Ù…": ["Ù‚Ù…", "Ù‚Ù†ÙˆØ§Øª", "Ø¬Ø¹ÙØ±ÛŒÙ‡", "Ú©Ù‡Ú©"],
+  "Ú¯Ù„Ø³ØªØ§Ù†": ["Ú¯Ø±Ú¯Ø§Ù†", "Ú¯Ù†Ø¨Ø¯ Ú©Ø§ÙˆÙˆØ³", "Ø¨Ù†Ø¯Ø± ØªØ±Ú©Ù…Ù†", "Ø¹Ù„ÛŒâ€ŒØ¢Ø¨Ø§Ø¯ Ú©ØªÙˆÙ„"],
+  "Ú©Ø±Ø¯Ø³ØªØ§Ù†": ["Ø³Ù†Ù†Ø¯Ø¬", "Ø³Ù‚Ø²", "Ù…Ø±ÛŒÙˆØ§Ù†", "Ø¨Ø§Ù†Ù‡", "Ù‚Ø±ÙˆÙ‡"],
+  "Ù„Ø±Ø³ØªØ§Ù†": ["Ø®Ø±Ù…â€ŒØ¢Ø¨Ø§Ø¯", "Ø¨Ø±ÙˆØ¬Ø±Ø¯", "Ø¯ÙˆØ±ÙˆØ¯", "Ú©ÙˆÙ‡Ø¯Ø´Øª", "Ø§Ù„ÛŒÚ¯ÙˆØ¯Ø±Ø²"],
+  "Ø¨ÙˆØ´Ù‡Ø±": ["Ø¨ÙˆØ´Ù‡Ø±", "Ø¨Ø±Ø§Ø²Ø¬Ø§Ù†", "Ø¨Ù†Ø¯Ø± Ú¯Ù†Ø§ÙˆÙ‡", "Ø¨Ù†Ø¯Ø± Ú©Ù†Ú¯Ø§Ù†", "Ø¹Ø³Ù„ÙˆÛŒÙ‡"],
+  "Ø²Ù†Ø¬Ø§Ù†": ["Ø²Ù†Ø¬Ø§Ù†", "Ø§Ø¨Ù‡Ø±", "Ø®Ø±Ù…Ø¯Ø±Ù‡", "Ù‚ÛŒØ¯Ø§Ø±"],
+  "Ø§Ø±Ø¯Ø¨ÛŒÙ„": ["Ø§Ø±Ø¯Ø¨ÛŒÙ„", "Ù¾Ø§Ø±Ø³â€ŒØ¢Ø¨Ø§Ø¯", "Ù…Ø´Ú¯ÛŒÙ†â€ŒØ´Ù‡Ø±", "Ø®Ù„Ø®Ø§Ù„"],
+  "Ø³Ù…Ù†Ø§Ù†": ["Ø³Ù…Ù†Ø§Ù†", "Ø´Ø§Ù‡Ø±ÙˆØ¯", "Ø¯Ø§Ù…ØºØ§Ù†", "Ú¯Ø±Ù…Ø³Ø§Ø±"],
+  "Ú†Ù‡Ø§Ø±Ù…Ø­Ø§Ù„ Ùˆ Ø¨Ø®ØªÛŒØ§Ø±ÛŒ": ["Ø´Ù‡Ø±Ú©Ø±Ø¯", "Ø¨Ø±ÙˆØ¬Ù†", "ÙØ±Ø®â€ŒØ´Ù‡Ø±", "ÙØ§Ø±Ø³Ø§Ù†"],
+  "Ø§ÛŒÙ„Ø§Ù…": ["Ø§ÛŒÙ„Ø§Ù…", "Ø¯Ù‡Ù„Ø±Ø§Ù†", "Ø§ÛŒÙˆØ§Ù†", "Ø¢Ø¨Ø¯Ø§Ù†Ø§Ù†"],
+  "Ú©Ù‡Ú¯ÛŒÙ„ÙˆÛŒÙ‡ Ùˆ Ø¨ÙˆÛŒØ±Ø§Ø­Ù…Ø¯": ["ÛŒØ§Ø³ÙˆØ¬", "Ø¯ÙˆÚ¯Ù†Ø¨Ø¯Ø§Ù†", "Ø¯Ù‡Ø¯Ø´Øª"],
+  "Ø®Ø±Ø§Ø³Ø§Ù† Ø´Ù…Ø§Ù„ÛŒ": ["Ø¨Ø¬Ù†ÙˆØ±Ø¯", "Ø´ÛŒØ±ÙˆØ§Ù†", "Ø§Ø³ÙØ±Ø§ÛŒÙ†"],
+  "Ø®Ø±Ø§Ø³Ø§Ù† Ø¬Ù†ÙˆØ¨ÛŒ": ["Ø¨ÛŒØ±Ø¬Ù†Ø¯", "Ù‚Ø§Ø¦Ù†", "ÙØ±Ø¯ÙˆØ³", "Ø·Ø¨Ø³"],
 };
 
 interface CheckoutModalProps {
@@ -58,8 +58,8 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
-  const [province, setProvince] = useState("تهران");
-  const [city, setCity] = useState("تهران");
+  const [province, setProvince] = useState("ØªÙ‡Ø±Ø§Ù†");
+  const [city, setCity] = useState("ØªÙ‡Ø±Ø§Ù†");
   const [postalCode, setPostalCode] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
@@ -79,7 +79,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const [captchaVerified, setCaptchaVerified] = useState(false);
   const [formError, setFormError] = useState("");
 
-  // بازیابی از حافظه ضد رفرش
+  // Ø¨Ø§Ø²ÛŒØ§Ø¨ÛŒ Ø§Ø² Ø­Ø§ÙØ¸Ù‡ Ø¶Ø¯ Ø±ÙØ±Ø´
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -110,7 +110,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     } catch {}
   }, []);
 
-  // ذخیره آنی در حافظه ضد رفرش
+  // Ø°Ø®ÛŒØ±Ù‡ Ø¢Ù†ÛŒ Ø¯Ø± Ø­Ø§ÙØ¸Ù‡ Ø¶Ø¯ Ø±ÙØ±Ø´
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -124,7 +124,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   if (!isOpen) return null;
 
   const provincesList = Object.keys(IRAN_PROVINCES_MAP);
-  const citiesList = IRAN_PROVINCES_MAP[province] || ["تهران"];
+  const citiesList = IRAN_PROVINCES_MAP[province] || ["ØªÙ‡Ø±Ø§Ù†"];
 
   const basePrice =
     typeof totalPrice === "number"
@@ -139,7 +139,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
-      setCouponMessage({ type: "error", text: "لطفاً کد تخفیف را وارد کنید." });
+      setCouponMessage({ type: "error", text: "Ù„Ø·ÙØ§Ù‹ Ú©Ø¯ ØªØ®ÙÛŒÙ Ø±Ø§ ÙˆØ§Ø±Ø¯ Ú©Ù†ÛŒØ¯." });
       return;
     }
 
@@ -160,7 +160,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         setAppliedCoupon(null);
       }
     } catch {
-      setCouponMessage({ type: "error", text: "خطا در بررسی کد تخفیف." });
+      setCouponMessage({ type: "error", text: "Ø®Ø·Ø§ Ø¯Ø± Ø¨Ø±Ø±Ø³ÛŒ Ú©Ø¯ ØªØ®ÙÛŒÙ." });
     } finally {
       setCouponLoading(false);
     }
@@ -176,7 +176,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
   const finalizeModalOrder = async (cleanPhone: string, cleanPostal: string) => {
     setSubmitting(true);
-    const fullName = (firstName.trim() + " " + lastName.trim()).trim() || "خریدار محترم";
+    const fullName = (firstName.trim() + " " + lastName.trim()).trim() || "Ø®Ø±ÛŒØ¯Ø§Ø± Ù…Ø­ØªØ±Ù…";
 
     try {
       const res = await fetch("/api/checkout", {
@@ -216,10 +216,10 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             encodeURIComponent(cleanPhone)
         );
       } else {
-        setFormError(json.message || "خطا در ثبت اطلاعات سفارش.");
+        setFormError(json.message || "Ø®Ø·Ø§ Ø¯Ø± Ø«Ø¨Øª Ø§Ø·Ù„Ø§Ø¹Ø§Øª Ø³ÙØ§Ø±Ø´.");
       }
     } catch {
-      setFormError("خطا در ثبت اطلاعات سفارش در سیستم.");
+      setFormError("Ø®Ø·Ø§ Ø¯Ø± Ø«Ø¨Øª Ø§Ø·Ù„Ø§Ø¹Ø§Øª Ø³ÙØ§Ø±Ø´ Ø¯Ø± Ø³ÛŒØ³ØªÙ….");
     } finally {
       setSubmitting(false);
     }
@@ -232,25 +232,25 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
     const cleanPhone = phone
       .trim()
-      .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+      .replace(/[Û°-Û¹]/g, (d) => String(d.charCodeAt(0) - 1776))
       .replace(/\D/g, "");
     if (cleanPhone.length !== 11 || !cleanPhone.startsWith("09")) {
-      setFormError("شماره همراه باید ۱۱ رقم و با ۰۹ شروع شود.");
+      setFormError("Ø´Ù…Ø§Ø±Ù‡ Ù‡Ù…Ø±Ø§Ù‡ Ø¨Ø§ÛŒØ¯ Û±Û± Ø±Ù‚Ù… Ùˆ Ø¨Ø§ Û°Û¹ Ø´Ø±ÙˆØ¹ Ø´ÙˆØ¯.");
       return;
     }
 
     const cleanPostal = postalCode.trim().replace(/\D/g, "");
     if (cleanPostal && cleanPostal.length !== 10) {
-      setFormError("کد پستی ۱۰ رقمی ایران باید دقیقاً ۱۰ رقم عددی باشد.");
+      setFormError("Ú©Ø¯ Ù¾Ø³ØªÛŒ Û±Û° Ø±Ù‚Ù…ÛŒ Ø§ÛŒØ±Ø§Ù† Ø¨Ø§ÛŒØ¯ Ø¯Ù‚ÛŒÙ‚Ø§Ù‹ Û±Û° Ø±Ù‚Ù… Ø¹Ø¯Ø¯ÛŒ Ø¨Ø§Ø´Ø¯.");
       return;
     }
 
     if (!captchaVerified) {
-      setFormError("لطفاً ابتدا کد امنیتی ضد ربات را وارد نمایید.");
+      setFormError("Ù„Ø·ÙØ§Ù‹ Ø§Ø¨ØªØ¯Ø§ Ú©Ø¯ Ø§Ù…Ù†ÛŒØªÛŒ Ø¶Ø¯ Ø±Ø¨Ø§Øª Ø±Ø§ ÙˆØ§Ø±Ø¯ Ù†Ù…Ø§ÛŒÛŒØ¯.");
       return;
     }
     if (!address.trim() || address.trim().length < 8) {
-      setFormError("لطفاً نشانی پستی دقیق خود را وارد نمایید.");
+      setFormError("Ù„Ø·ÙØ§Ù‹ Ù†Ø´Ø§Ù†ÛŒ Ù¾Ø³ØªÛŒ Ø¯Ù‚ÛŒÙ‚ Ø®ÙˆØ¯ Ø±Ø§ ÙˆØ§Ø±Ø¯ Ù†Ù…Ø§ÛŒÛŒØ¯.");
       return;
     }
 
@@ -271,17 +271,17 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         if (otpRes.ok && otpJson.success !== false) {
           setOtpStep(true);
         } else {
-          setFormError(otpJson.message || "خطا در ارسال کد تایید پیامکی.");
+          setFormError(otpJson.message || "Ø®Ø·Ø§ Ø¯Ø± Ø§Ø±Ø³Ø§Ù„ Ú©Ø¯ ØªØ§ÛŒÛŒØ¯ Ù¾ÛŒØ§Ù…Ú©ÛŒ.");
         }
       } catch {
-        setFormError("خطا در ارتباط با سامانه پیامک.");
+        setFormError("Ø®Ø·Ø§ Ø¯Ø± Ø§Ø±ØªØ¨Ø§Ø· Ø¨Ø§ Ø³Ø§Ù…Ø§Ù†Ù‡ Ù¾ÛŒØ§Ù…Ú©.");
       } finally {
         setSubmitting(false);
       }
       return;
     }
 
-    // تایید کد OTP و انتقال به درگاه پرداخت
+    // ØªØ§ÛŒÛŒØ¯ Ú©Ø¯ OTP Ùˆ Ø§Ù†ØªÙ‚Ø§Ù„ Ø¨Ù‡ Ø¯Ø±Ú¯Ø§Ù‡ Ù¾Ø±Ø¯Ø§Ø®Øª
     setSubmitting(true);
     try {
       const vRes = await fetch("/api/send-otp", {
@@ -299,11 +299,11 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         setVerifiedPhone(cleanPhone);
         await finalizeModalOrder(cleanPhone, cleanPostal);
       } else {
-        setFormError(vJson.message || "کد تایید وارد شده نادرست است.");
+        setFormError(vJson.message || "Ú©Ø¯ ØªØ§ÛŒÛŒØ¯ ÙˆØ§Ø±Ø¯ Ø´Ø¯Ù‡ Ù†Ø§Ø¯Ø±Ø³Øª Ø§Ø³Øª.");
         setSubmitting(false);
       }
     } catch {
-      setFormError("خطا در بررسی کد تایید.");
+      setFormError("Ø®Ø·Ø§ Ø¯Ø± Ø¨Ø±Ø±Ø³ÛŒ Ú©Ø¯ ØªØ§ÛŒÛŒØ¯.");
       setSubmitting(false);
     }
   };
@@ -319,17 +319,17 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
           type="button"
           className="absolute top-4 left-4 w-8 h-8 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent-blue)] transition cursor-pointer"
         >
-          ✕
+          âœ•
         </button>
 
         <div className="flex items-center gap-2 mb-5 border-b border-[var(--card-border)] pb-4 text-right">
-          <span className="text-sm md:text-xl">🛡️</span>
+          <span className="text-sm md:text-xl">ðŸ›¡ï¸</span>
           <div>
             <h2 className="text-sm sm:text-base font-black text-[var(--text-primary)]">
-              تکمیل مشخصات تحویل و انتقال به درگاه پرداخت
+              ØªÚ©Ù…ÛŒÙ„ Ù…Ø´Ø®ØµØ§Øª ØªØ­ÙˆÛŒÙ„ Ùˆ Ø§Ù†ØªÙ‚Ø§Ù„ Ø¨Ù‡ Ø¯Ø±Ú¯Ø§Ù‡ Ù¾Ø±Ø¯Ø§Ø®Øª
             </h2>
             <p className="text-[11px] text-[var(--text-secondary)] font-medium">
-              دارای حافظه هوشمند فرم (اطلاعات با رفرش شدن پاک نمی‌شود)
+              Ø¯Ø§Ø±Ø§ÛŒ Ø­Ø§ÙØ¸Ù‡ Ù‡ÙˆØ´Ù…Ù†Ø¯ ÙØ±Ù… (Ø§Ø·Ù„Ø§Ø¹Ø§Øª Ø¨Ø§ Ø±ÙØ±Ø´ Ø´Ø¯Ù† Ù¾Ø§Ú© Ù†Ù…ÛŒâ€ŒØ´ÙˆØ¯)
             </p>
           </div>
         </div>
@@ -337,38 +337,38 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] mb-5 space-y-2 text-xs">
           <div className="flex justify-between items-center">
             <span className="text-[var(--text-secondary)] font-bold">
-              اقلام سفارش ({items.length} قلم):
+              Ø§Ù‚Ù„Ø§Ù… Ø³ÙØ§Ø±Ø´ ({items.length} Ù‚Ù„Ù…):
             </span>
             <span className="font-mono font-bold">
-              {Number(basePrice).toLocaleString("fa-IR")} تومان
+              {Number(basePrice).toLocaleString("fa-IR")} ØªÙˆÙ…Ø§Ù†
             </span>
           </div>
 
           {discountAmount > 0 && (
             <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400 font-bold border-t border-[var(--card-border)] pt-2">
-              <span>تخفیف اعمال شده:</span>
+              <span>ØªØ®ÙÛŒÙ Ø§Ø¹Ù…Ø§Ù„ Ø´Ø¯Ù‡:</span>
               <span className="font-mono">
-                - {Number(discountAmount).toLocaleString("fa-IR")} تومان
+                - {Number(discountAmount).toLocaleString("fa-IR")} ØªÙˆÙ…Ø§Ù†
               </span>
             </div>
           )}
 
           <div className="flex justify-between items-center text-sm font-black text-[var(--accent-blue)] border-t border-[var(--card-border)] pt-2">
-            <span>مبلغ نهایی قابل پرداخت:</span>
+            <span>Ù…Ø¨Ù„Øº Ù†Ù‡Ø§ÛŒÛŒ Ù‚Ø§Ø¨Ù„ Ù¾Ø±Ø¯Ø§Ø®Øª:</span>
             <span className="font-mono text-base">
-              {Number(finalPrice).toLocaleString("fa-IR")} تومان
+              {Number(finalPrice).toLocaleString("fa-IR")} ØªÙˆÙ…Ø§Ù†
             </span>
           </div>
         </div>
 
         <div className="mb-5 p-4 rounded-2xl border border-[var(--card-border)] bg-[var(--modal-bg)] space-y-2 text-xs">
           <label className="block font-bold text-[var(--text-secondary)] text-right">
-            کد تخفیف دارید؟
+            Ú©Ø¯ ØªØ®ÙÛŒÙ Ø¯Ø§Ø±ÛŒØ¯ØŸ
           </label>
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder="کد تخفیف..."
+              placeholder="Ú©Ø¯ ØªØ®ÙÛŒÙ..."
               value={couponCode}
               disabled={!!appliedCoupon}
               onChange={(e) => setCouponCode(e.target.value)}
@@ -380,7 +380,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 onClick={handleRemoveCoupon}
                 className="px-4 py-2.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 text-xs font-bold hover:bg-rose-500/25 transition cursor-pointer"
               >
-                حذف
+                Ø­Ø°Ù
               </button>
             ) : (
               <button
@@ -389,7 +389,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 disabled={couponLoading}
                 className="px-5 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold hover:opacity-90 transition cursor-pointer shadow-md disabled:opacity-50"
               >
-                {couponLoading ? "بررسی..." : "اعمال تخفیف"}
+                {couponLoading ? "Ø¨Ø±Ø±Ø³ÛŒ..." : "Ø§Ø¹Ù…Ø§Ù„ ØªØ®ÙÛŒÙ"}
               </button>
             )}
           </div>
@@ -410,29 +410,29 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
         {formError && (
           <div className="mb-4 p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-bold text-right">
-            ⚠️ {formError}
+            âš ï¸ {formError}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs text-right">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام گیرنده *</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">Ù†Ø§Ù… Ú¯ÛŒØ±Ù†Ø¯Ù‡ *</label>
               <input
                 type="text"
                 required
-                placeholder="مثلاً: پوریا"
+                placeholder="Ù…Ø«Ù„Ø§Ù‹: Ù¾ÙˆØ±ÛŒØ§"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold focus:border-[var(--accent-blue)] transition text-right"
               />
             </div>
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام خانوادگی *</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">Ù†Ø§Ù… Ø®Ø§Ù†ÙˆØ§Ø¯Ú¯ÛŒ *</label>
               <input
                 type="text"
                 required
-                placeholder="مثلاً: رحیمی"
+                placeholder="Ù…Ø«Ù„Ø§Ù‹: Ø±Ø­ÛŒÙ…ÛŒ"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold focus:border-[var(--accent-blue)] transition text-right"
@@ -440,9 +440,9 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">انتخاب استان *</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">Ø§Ù†ØªØ®Ø§Ø¨ Ø§Ø³ØªØ§Ù† *</label>
               <select
                 value={province}
                 onChange={(e) => {
@@ -454,13 +454,13 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
               >
                 {provincesList.map((prov) => (
                   <option key={prov} value={prov}>
-                    📍 استان {prov}
+                    ðŸ“ Ø§Ø³ØªØ§Ù† {prov}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">انتخاب شهر *</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">Ø§Ù†ØªØ®Ø§Ø¨ Ø´Ù‡Ø± *</label>
               <select
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
@@ -468,17 +468,17 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
               >
                 {citiesList.map((c) => (
                   <option key={c} value={c}>
-                    🏙️ {c}
+                    ðŸ™ï¸ {c}
                   </option>
                 ))}
               </select>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             <div>
               <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                شماره تلفن همراه (۱۱ رقم) *
+                Ø´Ù…Ø§Ø±Ù‡ ØªÙ„ÙÙ† Ù‡Ù…Ø±Ø§Ù‡ (Û±Û± Ø±Ù‚Ù…) *
               </label>
               <input
                 type="tel"
@@ -495,12 +495,12 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             </div>
             <div>
               <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                کد پستی ۱۰ رقمی ایران (اختیاری)
+                Ú©Ø¯ Ù¾Ø³ØªÛŒ Û±Û° Ø±Ù‚Ù…ÛŒ Ø§ÛŒØ±Ø§Ù† (Ø§Ø®ØªÛŒØ§Ø±ÛŒ)
               </label>
               <input
                 type="text"
                 maxLength={10}
-                placeholder="کد ۱۰ رقمی بدون خط تیره"
+                placeholder="Ú©Ø¯ Û±Û° Ø±Ù‚Ù…ÛŒ Ø¨Ø¯ÙˆÙ† Ø®Ø· ØªÛŒØ±Ù‡"
                 value={postalCode}
                 onChange={(e) => setPostalCode(e.target.value)}
                 className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold focus:border-[var(--accent-blue)] transition text-center"
@@ -510,12 +510,12 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
           <div>
             <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-              نشانی دقیق پستی تحویل *
+              Ù†Ø´Ø§Ù†ÛŒ Ø¯Ù‚ÛŒÙ‚ Ù¾Ø³ØªÛŒ ØªØ­ÙˆÛŒÙ„ *
             </label>
             <textarea
               rows={2}
               required
-              placeholder="خیابان، کوچه، پلاک، واحد..."
+              placeholder="Ø®ÛŒØ§Ø¨Ø§Ù†ØŒ Ú©ÙˆÚ†Ù‡ØŒ Ù¾Ù„Ø§Ú©ØŒ ÙˆØ§Ø­Ø¯..."
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium leading-relaxed focus:border-[var(--accent-blue)] transition text-right"
@@ -525,7 +525,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
           {otpStep && (
             <div className="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/30 space-y-2 animate-fadeIn">
               <label className="block font-black text-sky-400">
-                📲 کد تایید پیامک‌شده به شماره {phone} را وارد کنید:
+                ðŸ“² Ú©Ø¯ ØªØ§ÛŒÛŒØ¯ Ù¾ÛŒØ§Ù…Ú©â€ŒØ´Ø¯Ù‡ Ø¨Ù‡ Ø´Ù…Ø§Ø±Ù‡ {phone} Ø±Ø§ ÙˆØ§Ø±Ø¯ Ú©Ù†ÛŒØ¯:
               </label>
               <input
                 type="text"
@@ -535,7 +535,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 maxLength={8}
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                placeholder="کد تایید پیامکی"
+                placeholder="Ú©Ø¯ ØªØ§ÛŒÛŒØ¯ Ù¾ÛŒØ§Ù…Ú©ÛŒ"
                 className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-sky-500 font-mono font-black text-lg text-center tracking-widest outline-none"
               />
             </div>
@@ -549,10 +549,10 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
               className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs transition cursor-pointer shadow-xl shadow-blue-500/25 hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {submitting
-                ? "در حال پردازش..."
+                ? "Ø¯Ø± Ø­Ø§Ù„ Ù¾Ø±Ø¯Ø§Ø²Ø´..."
                 : otpStep
-                ? "✓ تایید کد پیامکی و ورود به درگاه پرداخت 💳"
-                : "تایید نهایی و پرداخت آنلاین 💳"}
+                ? "âœ“ ØªØ§ÛŒÛŒØ¯ Ú©Ø¯ Ù¾ÛŒØ§Ù…Ú©ÛŒ Ùˆ ÙˆØ±ÙˆØ¯ Ø¨Ù‡ Ø¯Ø±Ú¯Ø§Ù‡ Ù¾Ø±Ø¯Ø§Ø®Øª ðŸ’³"
+                : "ØªØ§ÛŒÛŒØ¯ Ù†Ù‡Ø§ÛŒÛŒ Ùˆ Ù¾Ø±Ø¯Ø§Ø®Øª Ø¢Ù†Ù„Ø§ÛŒÙ† ðŸ’³"}
             </button>
           </div>
         </form>

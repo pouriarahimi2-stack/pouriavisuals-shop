@@ -181,7 +181,7 @@ export default function DynamicHomeSections({
         cta:      "مشاهده و خرید محصول",
       }));
 
-  // آتو‌پلی دسکتاپ اسلایدر
+  // آتو‌پلی اسلایدر
   useEffect(() => {
     if (effectiveSlides.length <= 1) return;
     const t = setInterval(() => setActiveSlide(prev => (prev + 1) % effectiveSlides.length), 5000);
@@ -196,81 +196,20 @@ export default function DynamicHomeSections({
   const renderSection = (sec: ResponsiveSectionItem) => {
     if (sec.enabled === false) return null;
 
-    // ─── اسلایدر بنر ───────────────────────────────────────
+    // ─── اسلایدر بنر (فقط در موبایل و تبلت فعال است؛ اسلایدر تکراری دسکتاپ حذف شد) ───
     if (sec.type === "banners_slider") {
       if (effectiveSlides.length === 0) return null;
       return (
-        <div key={sec.id}>
-          {/* موبایل و تبلت: MobileSlider جدید */}
-          <div className="block lg:hidden">
-            <MobileSlider
-              slides={effectiveSlides}
-              config={{ height: bannerSizing.mobileHeight || 220, autoPlay: true, interval: 4500, showDots: true }}
-            />
-          </div>
-
-          {/* دسکتاپ: اسلایدر کلاسیک با کارت glass */}
-          <div className="hidden lg:block">
-            <section className="relative w-full rounded-[2.5rem] overflow-hidden border border-[var(--card-border)] shadow-xl bg-[var(--modal-bg)] flex items-center"
-              style={{ minHeight: bannerSizing.desktopHeight + "px" }}
-            >
-              {effectiveSlides.map((slide, idx) => {
-                const isActive = idx === activeSlide;
-                return (
-                  <Link
-                    key={slide.id + "_" + idx}
-                    href={slide.link}
-                    onClick={() => soundEngine.playClick()}
-                    className={"w-full h-full transition-all duration-700 " + (isActive ? "opacity-100 relative z-10 block" : "opacity-0 absolute inset-0 z-0 pointer-events-none")}
-                  >
-                    <div className="flex flex-row items-center justify-between gap-8 p-10">
-                      <div className="flex-1 min-w-0 space-y-3 text-right">
-                        <span className="inline-block px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 text-[var(--accent-blue)] text-xs font-black">
-                          🔥 {slide.badge}
-                        </span>
-                        <h2 className="text-3xl lg:text-4xl font-black leading-snug text-[var(--text-primary)] line-clamp-2">
-                          {slide.title}
-                        </h2>
-                        {slide.subtitle && (
-                          <p className="text-sm text-[var(--text-secondary)] line-clamp-2 max-w-xl">{slide.subtitle}</p>
-                        )}
-                        <div className="pt-2 flex items-center gap-4">
-                          <span className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-sm shadow-md hover:opacity-90 transition inline-flex items-center gap-2">
-                            <span>{slide.cta}</span><span>←</span>
-                          </span>
-                          {slide.price ? (
-                            <span className="font-mono font-black text-lg text-emerald-500">{formatPrice(slide.price)} تومان</span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="shrink-0 flex items-center justify-center">
-                        <div style={{ width: bannerSizing.desktopImageSize + "px", height: bannerSizing.desktopImageSize + "px" }}
-                          className="rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] p-4 flex items-center justify-center overflow-hidden shadow-inner"
-                        >
-                          <img src={slide.image} alt={slide.title} className="w-full h-full object-contain hover:scale-105 transition-transform duration-500" />
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-              {effectiveSlides.length > 1 && (
-                <div className="absolute bottom-3.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
-                  {effectiveSlides.map((_, idx) => (
-                    <button key={idx} type="button"
-                      onClick={(e) => { e.preventDefault(); soundEngine.playClick(); setActiveSlide(idx); }}
-                      className={"h-2 rounded-full transition-all cursor-pointer " + (idx === activeSlide ? "w-6 bg-[var(--accent-blue)]" : "w-2 bg-white/50")}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
+        <div key={sec.id} className="block lg:hidden">
+          <MobileSlider
+            slides={effectiveSlides}
+            config={{ height: bannerSizing.mobileHeight || 220, autoPlay: true, interval: 4500, showDots: true }}
+          />
         </div>
       );
     }
 
-    // ─── اسلایدر سه‌بعدی (فقط دسکتاپ) ───────────────────
+    // ─── اسلایدر سه‌بعدی و اصلی صفحه اصلی (فقط دسکتاپ) ───────────────────
     if (sec.type === "NativePerspectiveSlider") {
       if (products.length === 0) return null;
       return (

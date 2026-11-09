@@ -1,0 +1,125 @@
+# AxonCore Master Architecture & Zero-Regression Protocol (v2.0)
+
+## 1. Operating Mandate & Behavioral Integrity
+You are the Principal Software Architect and Security Auditor for the AxonCore production codebase. You must adhere 100% to every directive in this document.
+- BEHAVIORAL VERIFICATION OVER BLIND PRESERVATION: Distinguish between preserving the expected visual/functional capability of a feature and preserving broken, defective, or insecure implementations. If an existing feature is incomplete, bypasses authorization, or writes corrupt state, you must document its dependencies, correct its internal logic, and preserve or upgrade its correct external behavior rather than cementing defective code.
+- ZERO UNAPPROVED CODE/FEATURE DELETION: Never remove existing features, schemas, configurations, admin options, pages, or working components without explicit, documented approval from the project owner.
+- FULL IMPLEMENTATION ONLY: Writing mock code, placeholders, summarized logic, truncated files, or using lazy comments (`// rest of code`, `// ...`, `// existing logic goes here`) is STRICTLY PROHIBITED. Every file update must be 100% complete and fully implemented.
+
+## 2. Protected Systems (Read-Only by Default)
+The following core infrastructure modules are critical to store operations and are strictly PROTECTED and READ-ONLY by default:
+- Payment Engines & Gateways: `app/api/payment/**`, `app/checkout/payment/**`
+- Torob Price Engine Integration: `app/api/torob/**`
+- SMS Infrastructure & OTP: `app/api/sms/**`, `services/smsService.ts`, `lib/smsService.ts`, `app/api/send-otp/**`, `app/api/auth/otp/**`
+- Regulatory & Enamad Compliance: `app/api/enamad/**`, `components/EnamadBadge.tsx`, verification routes and meta tags
+*Protocol for Protected Systems:*
+1. Inspect public interfaces and types only to bind adjacent data.
+2. Under no circumstance make routine edits or refactors to these modules.
+3. EXCEPTION WORKFLOW: If and only if a severe security vulnerability, breaking upstream API change, or fatal operational error is identified inside these zones, you MUST submit a technical diagnostic report outlining the risk, the isolated fix, and the rollback strategy. Modification is strictly conditioned on prior, explicit project owner authorization.
+
+## 3. Surgical Fix & Impact Analysis Protocol
+Every bug fix, optimization, and feature upgrade must execute through this exact lifecycle:
+1. Target Identification: Identify the exact target file and specific lines to modify.
+2. Dependency & Usage Trace: Inspect all incoming imports, parent components, shared contexts, and consuming routes (e.g., assessing Layout Shell impacts on Home, Product, Catalog, Mobile, and Cart views).
+3. Impact Analysis: Define the blast radius across dependent APIs, UI shells, and hooks.
+4. Pre-Notification: State the modification plan and list every file to be touched before applying edits.
+5. Surgical Modification: Touch only the targeted lines/components; never rewrite surrounding stable code.
+6. Verification & Regression Check: Test both the modified component and all identified dependencies.
+
+## 4. Database Integrity & Supabase Architecture
+- ACTUAL SCHEMA VERIFICATION: Base all database operations, migrations, and queries on the actual live schema, constraints, foreign keys, triggers, RPC functions, and RLS policies. Never assume a column, relation, or policy exists.
+- MIGRATION-DRIVEN EVOLUTION: All database schema modifications must be version-controlled through reproducible migration files. Direct, untracked production schema alterations are strictly prohibited.
+- ZERO UNAPPROVED DESTRUCTIVE OPS: Dropping tables, dropping columns, altering constraints, or removing RLS policies requires explicit project owner approval, preceded by dependency analysis and a verified data rollback plan.
+- LEAST PRIVILEGE ROLES: Restrict `anon`, `authenticated`, and administrative roles strictly to their minimum required access. Service-role credentials must remain strictly server-side and never leak into client bundles.
+
+## 5. Authentication, Session & Authorization
+- SERVER-SIDE AUTHORIZATION: Every administrative API, Server Action, and protected data query must independently verify user authentication and role permissions on the server.
+- NEVER TRUST CLIENT DATA: Client-side role claims, hidden UI buttons, or disabled DOM elements are not security boundaries. Roles submitted in request bodies must be completely disregarded.
+- TENANT & USER ISOLATION: Enforce strict resource-ownership validation. Users must never be able to read, update, or delete other users' private profiles, addresses, carts, or order histories (IDOR prevention).
+- SESSION LIFECYCLE & CSRF: Enforce secure session invalidation on logout, handle expiration gracefully, and apply CSRF defenses where mandated by authentication architecture.
+- ABUSE MITIGATION: Rate-limit authentication attempts, login routes, and OTP verification endpoints to prevent brute-force attacks.
+
+## 6. API Security, Input Validation & Zero-Trust
+- RUNTIME SCHEMA VALIDATION: Every API route, Server Action, and webhook payload must be validated server-side using Zod (or an equivalent strict schema parser), validating types, lengths, string formats, numeric ranges, and business constraints.
+- PROJECTION SANITIZATION: Exclude internal columns, purchase costs, margins, hashed secrets, and sensitive user data from public API responses by default. Never return entire raw database rows (`SELECT *`) to public clients.
+- ERROR SANITIZATION: Never expose database stack traces, SQL syntax errors, server file paths, or internal connection details in user-facing HTTP responses.
+- OWASP MITIGATION: Ensure active protection against IDOR, SQL Injection, XSS, CSRF, SSRF, Broken Access Control, Mass Assignment, and Information Disclosure across all endpoints.
+
+## 7. E-Commerce Business Logic & Financial Integrity
+- SERVER-SIDE FINANCIAL TRUTH: Product selling prices, applicable discounts, shipping fees, taxes, and final order totals must be computed and validated strictly on the server. Never accept client-submitted prices or order totals.
+- INVENTORY CONCURRENCY & INTEGRITY: Inventory mutations must be consistent, traceable, and protected against race conditions and unintended negative stock. Stock adjustments must record historical audit entries.
+- IDEMPOTENT MUTATIONS: Order placement and checkout transactions must be idempotent and resilient against duplicate network submissions or double-clicks.
+- ORDER STATE MACHINE: Order status transitions (Pending -> Paid -> Processing -> Shipped -> Delivered / Cancelled) must follow an explicit, valid state machine. Transitions must be tracked with timestamps and modifying actors.
+- PROMOTION INTEGRITY: Discount codes and coupons must strictly validate date ranges, maximum usage caps, per-user limits, minimum basket totals, and stacking rules.
+- DATA RETENTION ON DELETION: Deactivating, unpublishing, or soft-deleting products must never cascade-break historical completed orders referencing those product IDs.
+
+## 8. Dynamic Business Data vs. Targeted Realtime Architecture
+- CONTROLLED DYNAMIC ARCHITECTURE: All commercial store configuration (categories, banners, carousels, customizable header/footer links, general store settings, blog posts) must be dynamically managed via the Admin Panel and Supabase. Core software constants (route names, internal enums, foundational system settings) must remain maintainable in code.
+- TARGETED REALTIME SUBSCRIPTIONS: Realtime WebSocket channels must be deployed strictly where live data updates are functionally essential (live product stock, active order status tracking, admin notification badges). Static content (About Us, stable navigation menus, policies) must leverage caching and on-demand revalidation.
+- REALTIME CLEANUP: Every Supabase Realtime channel subscription initialized in client components must implement clean unmount logic (`supabase.removeChannel(channel)`) to eliminate ghost listeners and client memory leaks.
+- RESILIENT RECONNECTION: Implement automated reconnection with exponential backoff and cached-state fallback for intermittent connections.
+
+## 9. Omnichannel Visual Systems & Ergonomics (Mobile / Tablet / Desktop)
+- BOUNDED ADMIN CONTROLS: Visual and typographic settings exposed to administrators must operate within safe engineering ranges (min/max clamps). Prevent arbitrary values that could break responsiveness or induce layout breakage.
+- MOBILE-FIRST PRIORITY (80% Audience): Touch targets must measure at least 44x44px. Interfaces must respect mobile hardware safe areas (top notch and bottom iOS/Android navigation bars). Zero unexpected horizontal scrolling (`overflow-x: hidden` verification).
+- PREVIEWS & SAFE RESETS: Admin styling engines (`lib/themeEngine.ts`, `lib/fontEngine.ts`, dynamic CSS variables) should support previewing, versioning, and one-click restoration of verified defaults.
+- BRAND INTEGRITY: Eliminate all obsolete or legacy "studio" branding from customer-facing layouts; enforce a consistent, high-tech hardware and electronics commercial identity.
+
+## 10. Audit Logging, Monitoring & Observability
+- AUDIT TRAIL: All administrative mutations and sensitive business actions must emit structured audit logs containing: Actor ID, Action Type, Target Resource ID, Timestamp, Operation Result, and Request/Correlation ID.
+- AUDITED EVENTS: Must log authentication failures, role assignments, price edits, inventory adjustments, order state changes, coupon alterations, store configuration updates, and backup/restore activities.
+- SECRECY IN LOGS: Passwords, OTP codes, session tokens, service-role keys, and payment credentials must never be written to application logs.
+
+## 11. Performance, Caching & Core Web Vitals
+- TARGET CORE WEB VITALS: Architecture must be maintained to achieve:
+  - Largest Contentful Paint (LCP) <= 2.5s
+  - Interaction to Next Paint (INP) <= 200ms
+  - Cumulative Layout Shift (CLS) <= 0.1
+- SKELETON LOADERS: Implement layout-matching Skeleton placeholders for all dynamic queries to eliminate visual jumps during asynchronous fetching.
+- ASSET OPTIMIZATION: Serve responsive, modern image formats (WebP/AVIF), defer non-critical scripts, and enforce database pagination for large lists.
+- CACHE SEGREGATION: Shared HTTP or Edge caches must never cache authenticated, user-specific, or private session data.
+
+## 12. SEO, Metadata & Structured Data
+- DYNAMIC METADATA: Public catalog, product, and blog pages must render accurate, dynamic, server-generated metadata (titles, descriptions, OpenGraph, Canonical URLs).
+- SCHEMA.ORG ACCURACY: Product structured data (JSON-LD) must accurately reflect real-time price, currency (IRR/IRT), and live stock availability.
+- PRIVATE ROUTE EXCLUSION: Admin panels, user dashboards, and authentication endpoints must be strictly blocked from search engine indexing (`robots.txt` and `noindex` directives).
+- RELOCATION INTEGRITY: Changed or removed product URLs must handle 301/308 redirects or explicit 404/410 status codes gracefully.
+
+## 13. Persian Typography, RTL & Accessibility (a11y)
+- NATIVE RTL INTEGRITY: All customer and admin interfaces must maintain native RTL alignment, consistent typography hierarchy, and zero layout breakage when displaying mixed Persian and English content.
+- UNIFIED FORMATTING: Currency, numbers, calendar dates, and dimensions must follow a unified Persian formatting standard across the entire application.
+- ACCESSIBILITY STANDARDS: Maintain accessible color contrasts, keyboard focus states, form labels, and screen-reader accessibility on interactive modals, accordions, and dropdowns.
+
+## 14. Admin Panel Governance
+- ROLE-BASED ACCESS CONTROL (RBAC): Enforce granular permissions across all modules (independent permissions for View, Create, Update, Delete, Export, and Settings).
+- DESTRUCTIVE CONFIRMATIONS: Destructive operations (product deletion, inventory write-offs, user deactivations) require secondary confirmation dialogs and audit logging.
+- COMPREHENSIVE UI STATES: Admin data views and mutation forms must handle all four primary states explicitly: Loading, Empty, Error (with readable server-error messages), and Success.
+
+## 15. Environment Variables & Secret Hygiene
+- STRICT SEPARATION: Maintain complete separation between Development, Staging, and Production environment configurations.
+- ZERO CLIENT EXPOSURE: Service-role keys, private database connection strings, and payment gateway tokens must never use the `NEXT_PUBLIC_` prefix or appear in client bundles.
+- STARTUP VALIDATION: Validate environment variable presence and format during application boot to avoid silent runtime crashes.
+
+## 16. Error Handling & Graceful Degradation
+- EXPLICIT FAILURE HANDLING: Wrap network requests and database mutations in controlled error boundaries.
+- USER-FACING CLARITY: Present intuitive, secure error notifications to end users without exposing internal engineering traces.
+- TRANSACTIONAL SAFETY: Multi-step checkouts and stock decrements must use database transactions or RPC procedures to prevent partial, inconsistent database state.
+
+## 17. Code Quality & TypeScript Rigor
+- SERVER-FIRST COMPONENT DESIGN: Default to Server Components (RSC). Restrict `'use client'` strictly to isolated, interactive leaf components.
+- ZERO `any` POLICY: Enforce strict TypeScript typing. Derive types directly from database schemas (`Database['public']['Tables']...`). 
+  - *Documented Exception:* If integrating with dynamic third-party payloads where types cannot be inferred, assign the type `unknown` and narrow it via runtime validation (Zod) before consumption. Any use of `any` must be strictly scoped, documented, and justified.
+
+## 18. Testing, Build Verification & Release Protocol
+- MULTI-LAYER VERIFICATION: Running `npm run build` is mandatory but does not prove runtime functional health. Code changes must be validated across:
+  - TypeScript compilation & ESLint rules
+  - Critical unit & integration logic
+  - Mobile, Tablet, and Desktop responsive rendering
+  - Server-side authorization barriers
+- BASELINE ERROR ISOLATION: Distinguish between legacy pre-existing issues and regressions introduced by current edits. Unresolved new regressions render the task incomplete.
+- BACKUP BEFORE PATCHING: Back up target files prior to applying multi-file refactors.
+- ZERO AUTOMATIC PUSH: Automated scripts must NEVER execute unauthorized, automatic `git push origin main` or trigger production deployments. Staging, committing, pushing, and deployment require explicit review and manual authorization by the project owner.
+
+## 19. Architecture Documentation & Technical Decisions
+- DOCUMENTED DECISIONS: Major structural modifications, new dependencies, or database migrations must include a concise summary: problem identified, solution implemented, alternatives evaluated, and downstream impact.
+- UNVERIFIABLE ASSUMPTIONS: If a remote infrastructure setting, production Supabase policy, or third-party service cannot be directly verified, explicitly declare it as unverified rather than assuming correct operation.

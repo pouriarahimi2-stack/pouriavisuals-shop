@@ -1,0 +1,42 @@
+{
+  "output": {
+    "filePath": "repomix-full-project.md",
+    "style": "markdown",
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "topFilesLength": 20,
+    "showLineNumbers": false
+  },
+  "include": [
+    "app/**",
+    "components/**",
+    "lib/**",
+    "services/**",
+    "context/**",
+    ".clinerules",
+    "package.json",
+    "middleware.ts",
+    "tailwind.config.js",
+    "tsconfig.json"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "customPatterns": [
+      "**/.git/**",
+      "**/node_modules/**",
+      "**/.next/**",
+      "**/.vercel/**",
+      "**/public/**",
+      "**/*.png",
+      "**/*.jpg",
+      "**/*.svg",
+      "**/*.ico",
+      "**/*.zip",
+      "package-lock.json",
+      "tsconfig.tsbuildinfo",
+      "axoncore*.txt",
+      "axon-core*.txt",
+      "repomix-output*.md"
+    ]
+  }
+}

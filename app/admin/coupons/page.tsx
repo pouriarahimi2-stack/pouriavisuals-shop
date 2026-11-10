@@ -357,6 +357,10 @@ export default function AdminCouponsPage() {
   const [smsModal, setSmsModal] = useState<{ isOpen: boolean; coupon: Coupon | null }>({ isOpen: false, coupon: null });
   const [smsFilter, setSmsFilter] = useState<"all" | "mci" | "irancell" | "rightel" | "custom">("all");
   const [customPhones, setCustomPhones] = useState<string>("");
+  
+  // استیت‌های جدید برای مدیریت لیست شماره‌ها پیش از ارسال
+  const [activePhoneList, setActivePhoneList] = useState<string[]>([]);
+  const [phoneSearchQuery, setPhoneSearchQuery] = useState("");
 
   const [form, setForm] = useState<{
     id?: string;
@@ -457,6 +461,30 @@ export default function AdminCouponsPage() {
       supabase.removeChannel(channel);
     };
   }, [fetchCouponsAndCatalog]);
+
+  // منطق پر کردن لیست نهایی شماره‌ها بر اساس فیلتر
+  useEffect(() => {
+    if (smsFilter === "custom") {
+      const parsed = customPhones
+        .split("\n")
+        .map((p) => p.trim().replace(/\D/g, ""))
+        .filter((p) => p.length === 11 && p.startsWith("09"));
+      setActivePhoneList(parsed);
+    } else {
+      const filtered = crmPhones.filter((phone) => {
+        if (smsFilter === "mci") return /^09(1[0-9]|9[0-4])[0-9]{7}$/.test(phone);
+        if (smsFilter === "irancell") return /^09(3[0-9]|0[1-5])[0-9]{7}$/.test(phone);
+        if (smsFilter === "rightel") return /^09(2[0-2])[0-9]{7}$/.test(phone);
+        return true; 
+      });
+      setActivePhoneList(filtered);
+    }
+  }, [smsFilter, crmPhones, customPhones]);
+
+  const handleRemoveSinglePhone = (phoneToRemove: string) => {
+    soundEngine.playClick();
+    setActivePhoneList((prev) => prev.filter(p => p !== phoneToRemove));
+  };
 
   const generateRandomCouponCode = () => {
     soundEngine.playClick();
@@ -561,37 +589,21 @@ export default function AdminCouponsPage() {
     }
   };
 
-  // دریافت لیست فیلتر شده بر اساس انتخاب مدیر
-  const getFilteredPhones = () => {
-    if (smsFilter === "custom") {
-      return customPhones
-        .split("\n")
-        .map((p) => p.trim().replace(/\D/g, ""))
-        .filter((p) => p.length === 11 && p.startsWith("09"));
-    }
-    return crmPhones.filter((phone) => {
-      if (smsFilter === "mci") return /^09(1[0-9]|9[0-4])[0-9]{7}$/.test(phone);
-      if (smsFilter === "irancell") return /^09(3[0-9]|0[1-5])[0-9]{7}$/.test(phone);
-      if (smsFilter === "rightel") return /^09(2[0-2])[0-9]{7}$/.test(phone);
-      return true; // "all"
-    });
-  };
-
   const handleSendCampaignSmsFinal = async () => {
     const c = smsModal.coupon;
     if (!c) return;
 
     soundEngine.playClick();
-    const targetPhones = getFilteredPhones();
+    const targetPhones = activePhoneList;
 
     if (targetPhones.length === 0) {
-      alert("هیچ شماره موبایلی برای ارسال یافت نشد. لطفاً فیلتر را تغییر دهید.");
+      alert("هیچ شماره موبایلی برای ارسال در لیست وجود ندارد. لطفاً فیلتر را تغییر دهید.");
       return;
     }
 
     if (
       !confirm(
-        `آیا مایلید کد تخفیف «${c.code}» به صورت کمپین پیامکی به ${targetPhones.length} شماره ارسال شود؟`
+        `آیا مایلید کد تخفیف «${c.code}» به صورت کمپین پیامکی به ${targetPhones.length} شماره‌ی تایید شده در لیست ارسال شود؟`
       )
     ) {
       return;
@@ -888,10 +900,10 @@ export default function AdminCouponsPage() {
 
       {smsModal.isOpen && smsModal.coupon && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn">
-          <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-5 text-xs">
-            <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
-              <h3 className="text-sm font-black text-[var(--accent-blue)]">
-                📲 ارسال هوشمند پیامک کمپین
+          <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 w-full max-w-4xl shadow-2xl flex flex-col text-xs max-h-[90vh]">
+            <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3 shrink-0 mb-5">
+              <h3 className="text-sm sm:text-base font-black text-[var(--accent-blue)]">
+                📲 مدیریت و ارسال هوشمند پیامک کمپین
               </h3>
               <button
                 type="button"
@@ -902,61 +914,109 @@ export default function AdminCouponsPage() {
               </button>
             </div>
             
-            <p className="font-medium text-[var(--text-secondary)]">
-              کد تخفیف <strong className="text-[var(--text-primary)] font-mono">{smsModal.coupon.code}</strong> را برای کدام دسته از مشتریان (باشگاه مشتریان) ارسال می‌کنید؟
-            </p>
+            <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
+              {/* ستون راست: انتخاب فیلترها */}
+              <div className="flex flex-col space-y-4 overflow-y-auto pr-2 scrollbar-thin">
+                <p className="font-medium text-[var(--text-secondary)] leading-relaxed">
+                  کد تخفیف <strong className="text-[var(--text-primary)] font-mono">{smsModal.coupon.code}</strong> را برای کدام دسته از مشتریان (باشگاه مشتریان) ارسال می‌کنید؟
+                </p>
 
-            <div className="space-y-2.5">
-              {[
-                { id: "all", label: "🌟 تمامی مشتریان CRM" },
-                { id: "mci", label: "🔵 فقط مشترکین همراه اول" },
-                { id: "irancell", label: "🟡 فقط مشترکین ایرانسل" },
-                { id: "rightel", label: "🟣 فقط مشترکین رایتل" },
-                { id: "custom", label: "✍️ وارد کردن دستی شماره‌ها" }
-              ].map((opt) => (
-                <label key={opt.id} className="flex items-center gap-2 cursor-pointer bg-[var(--input-bg)] p-3 rounded-xl border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition">
-                  <input 
-                    type="radio" 
-                    name="smsTarget" 
-                    value={opt.id} 
-                    checked={smsFilter === opt.id}
-                    onChange={(e) => setSmsFilter(e.target.value as any)}
-                    className="accent-[var(--accent-blue)] w-4 h-4"
-                  />
-                  <span className="font-bold">{opt.label}</span>
-                </label>
-              ))}
+                <div className="space-y-2.5">
+                  {[
+                    { id: "all", label: "🌟 تمامی مشتریان CRM" },
+                    { id: "mci", label: "🔵 فقط مشترکین همراه اول" },
+                    { id: "irancell", label: "🟡 فقط مشترکین ایرانسل" },
+                    { id: "rightel", label: "🟣 فقط مشترکین رایتل" },
+                    { id: "custom", label: "✍️ وارد کردن دستی شماره‌ها" }
+                  ].map((opt) => (
+                    <label key={opt.id} className="flex items-center gap-2 cursor-pointer bg-[var(--input-bg)] p-3.5 rounded-xl border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition">
+                      <input 
+                        type="radio" 
+                        name="smsTarget" 
+                        value={opt.id} 
+                        checked={smsFilter === opt.id}
+                        onChange={(e) => setSmsFilter(e.target.value as any)}
+                        className="accent-[var(--accent-blue)] w-4 h-4 cursor-pointer"
+                      />
+                      <span className="font-bold text-[13px]">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {smsFilter === "custom" && (
+                  <div className="pt-2">
+                    <label className="block font-bold text-[var(--text-secondary)] mb-2">
+                      لیست شماره‌ها (هر خط یک شماره ۱۱ رقمی):
+                    </label>
+                    <textarea
+                      dir="ltr"
+                      rows={5}
+                      placeholder="09123456789&#10;09376110200"
+                      value={customPhones}
+                      onChange={(e) => setCustomPhones(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none focus:border-[var(--accent-blue)] text-xs"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* ستون چپ: لیست نهایی گیرندگان */}
+              <div className="flex flex-col bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl p-4 overflow-hidden h-full max-h-[500px]">
+                <div className="flex justify-between items-center mb-3 shrink-0">
+                  <span className="font-bold text-sm text-[var(--text-primary)]">لیست گیرندگان نهایی</span>
+                  <span className="px-2 py-1 rounded-lg bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] font-mono font-black">
+                    {activePhoneList.length} نفر
+                  </span>
+                </div>
+                
+                <input 
+                  type="text" 
+                  placeholder="🔍 جستجوی شماره در لیست..." 
+                  value={phoneSearchQuery} 
+                  onChange={e => setPhoneSearchQuery(e.target.value)} 
+                  className="w-full px-3 py-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none focus:border-[var(--accent-blue)] mb-3 shrink-0" 
+                  dir="ltr"
+                />
+                
+                <div className="flex-1 overflow-y-auto space-y-1.5 pr-2 scrollbar-thin">
+                  {activePhoneList.filter(p => p.includes(phoneSearchQuery)).length === 0 ? (
+                    <div className="text-center text-slate-400 py-10 font-bold">
+                      شماره‌ای یافت نشد.
+                    </div>
+                  ) : (
+                    activePhoneList
+                      .filter(p => p.includes(phoneSearchQuery))
+                      .map((p, index) => (
+                        <div key={p} className="flex justify-between items-center px-3 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition">
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] text-slate-500 font-mono w-4">{index + 1}</span>
+                            <span className="font-mono text-[13px] font-bold tracking-wider">{p}</span>
+                          </div>
+                          <button 
+                            onClick={() => handleRemoveSinglePhone(p)} 
+                            className="text-rose-500 hover:bg-rose-500 hover:text-white px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer"
+                          >
+                            حذف
+                          </button>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
             </div>
 
-            {smsFilter === "custom" && (
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">
-                  لیست شماره‌ها (هر خط یک شماره):
-                </label>
-                <textarea
-                  dir="ltr"
-                  rows={4}
-                  placeholder="09123456789&#10;09376110200"
-                  value={customPhones}
-                  onChange={(e) => setCustomPhones(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none focus:border-[var(--accent-blue)] text-xs"
-                />
-              </div>
-            )}
-
-            <div className="flex justify-between items-center pt-3 border-t border-[var(--card-border)]">
+            <div className="flex justify-between items-center pt-4 mt-2 border-t border-[var(--card-border)] shrink-0">
               <span className="font-bold text-[var(--text-secondary)]">
-                تعداد گیرندگان: <strong className="text-emerald-500 font-mono text-sm">{getFilteredPhones().length}</strong> نفر
+                تعداد نهایی برای ارسال: <strong className="text-emerald-500 font-mono text-sm mx-1">{activePhoneList.length}</strong> نفر
               </span>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleSendCampaignSmsFinal}
-                  className="px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-black shadow-lg hover:opacity-90 transition cursor-pointer"
-                >
-                  🚀 ارسال کمپین
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleSendCampaignSmsFinal}
+                disabled={activePhoneList.length === 0}
+                className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black shadow-lg hover:opacity-90 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                🚀 ارسال کمپین پیامکی
+              </button>
             </div>
           </div>
         </div>

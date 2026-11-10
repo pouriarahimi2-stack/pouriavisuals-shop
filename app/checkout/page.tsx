@@ -192,7 +192,9 @@ export default function CheckoutPage() {
 
   const invoice = PricingEngine.calculateInvoiceBreakdown(cartItems);
   const vatAmount = invoice.totalVatAmount;
-  const grandTotal = Math.max(0, finalPayable + shippingCost);
+  // --- اصلاح مهم برای رفع مشکل محاسبات صورتحساب ---
+  // مالیات به طور صریح به مبلغ پرداختی (که خود قبلاً منهای تخفیف شده است) اضافه می‌شود.
+  const grandTotal = Math.max(0, finalPayable + vatAmount + shippingCost);
 
   const provinceList = Object.keys(IRAN_PROVINCES_CITIES).sort();
   const cityList: string[] =
@@ -257,7 +259,11 @@ export default function CheckoutPage() {
     setCouponLoading(true);
     setCouponMsg(null);
     try {
-      const res = await applyCoupon(couponInput.trim().toUpperCase());
+      const cleanPhone = phone
+        .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 1776))
+        .replace(/\D/g, "");
+        
+      const res = await applyCoupon(couponInput.trim().toUpperCase(), cleanPhone);
       if (res?.success) {
         soundEngine.playSuccess();
         setCouponMsg({ type: "ok", text: res.message || "کد تخفیف با موفقیت اعمال شد." });
@@ -678,7 +684,7 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {/* کادر ثبت کد تخفیف اختصاصی و سراسری */}
+          {/* کادر ثبت کد تخفیف اختصاصی و سراسری - اصلاح بیرون‌زدگی در موبایل */}
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
             <div className="flex items-center justify-between">
               <span className="font-black text-xs text-[var(--text-primary)]">🏷️ کد تخفیف دارید؟</span>
@@ -690,19 +696,19 @@ export default function CheckoutPage() {
             </div>
 
             {appliedCoupon ? (
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-black text-emerald-500 tracking-wider">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 overflow-hidden">
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  <span className="font-mono font-black text-emerald-500 tracking-wider truncate shrink-0 max-w-[40%]">
                     {appliedCoupon.code}
                   </span>
-                  <span className="text-[11px] text-emerald-600 font-bold">
-                    ({formatPrice(discountAmount)} تومان کسر شد)
+                  <span className="text-[10px] sm:text-[11px] text-emerald-600 font-bold truncate min-w-0">
+                    ({formatPrice(discountAmount)} ت کسر شد)
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={handleRemoveCoupon}
-                  className="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-500 hover:bg-rose-500 hover:text-white font-bold text-[11px] transition cursor-pointer"
+                  className="ml-1 px-2 py-1 rounded-lg bg-rose-500/15 text-rose-500 hover:bg-rose-500 hover:text-white font-bold text-[10px] transition cursor-pointer shrink-0"
                 >
                   حذف کوپن
                 </button>
@@ -716,13 +722,13 @@ export default function CheckoutPage() {
                     value={couponInput}
                     onChange={(e) => setCouponInput(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ""))}
                     placeholder="AXON-CJZU"
-                    className="flex-1 px-3.5 py-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-black uppercase outline-none focus:border-[var(--accent-blue)] text-xs"
+                    className="flex-1 min-w-[80px] px-3.5 py-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-black uppercase outline-none focus:border-[var(--accent-blue)] text-xs"
                   />
                   <button
                     type="button"
                     onClick={handleApplyCoupon}
                     disabled={couponLoading || !couponInput.trim()}
-                    className="px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] hover:opacity-90 disabled:opacity-50 text-white font-black text-xs transition cursor-pointer shrink-0"
+                    className="shrink-0 px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] hover:opacity-90 disabled:opacity-50 text-white font-black text-xs transition cursor-pointer"
                   >
                     {couponLoading ? "بررسی..." : "اعمال"}
                   </button>
@@ -743,6 +749,7 @@ export default function CheckoutPage() {
             )}
           </div>
 
+          {/* اصلاح جمع‌بندی مالی (افزودن مالیات به مبلغ نهایی) */}
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
             <div className="flex justify-between">
               <span>مجموع اقلام:</span>
@@ -789,7 +796,9 @@ export default function CheckoutPage() {
               </span>
             </div>
           </div>
+          
           <SecurityCaptchaBox onVerifyChange={setCaptchaVerified} />
+          
           <button
             type="submit"
             disabled={submitting || !captchaVerified}
@@ -821,6 +830,7 @@ export default function CheckoutPage() {
               required
               dir="ltr"
               maxLength={8}
+              autoComplete="one-time-code" // <--- راه‌حل مشکل خوانده نشدن کد پیامکی موبایل در فایلی که اینپوت دارد
               value={otpCode}
               onChange={(e) => setOtpCode(e.target.value)}
               placeholder="کد تایید را وارد کنید"

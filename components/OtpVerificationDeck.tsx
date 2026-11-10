@@ -51,17 +51,38 @@ export default function OtpVerificationDeck({
   }, []);
 
   const handleDigitChange = (index: number, val: string) => {
+    // در صورتی که کاربر روی کیبورد موبایل کد را Auto-fill کند، ممکن است رشته‌ای چند کاراکتری وارد یک اینپوت شود
     const clean = val
       .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
-      .replace(/\D/g, "")
-      .slice(-1);
-    const newDigits = [...digits];
-    newDigits[index] = clean;
-    setDigits(newDigits);
-    soundEngine.playClick();
-    setErrorMsg("");
+      .replace(/\D/g, "");
 
-    if (clean && index < otpLength - 1) {
+    setErrorMsg("");
+    soundEngine.playClick();
+
+    // هندل کردن Auto-fill پیامک کامل
+    if (clean.length > 1) {
+      const newDigits = [...digits];
+      for (let i = 0; i < clean.length && i + index < otpLength; i++) {
+        newDigits[i + index] = clean[i];
+      }
+      setDigits(newDigits);
+      
+      const nextEmpty = newDigits.findIndex(d => d === "");
+      if (nextEmpty !== -1) {
+        inputRefs.current[nextEmpty]?.focus();
+      } else {
+        inputRefs.current[otpLength - 1]?.focus();
+        triggerVerification(newDigits.join(""));
+      }
+      return;
+    }
+
+    const singleClean = clean.slice(-1);
+    const newDigits = [...digits];
+    newDigits[index] = singleClean;
+    setDigits(newDigits);
+
+    if (singleClean && index < otpLength - 1) {
       inputRefs.current[index + 1]?.focus();
     }
 
@@ -146,7 +167,8 @@ export default function OtpVerificationDeck({
                   }}
                   type="text"
                   inputMode="numeric"
-                  maxLength={1}
+                  maxLength={1} // برای auto-fill طولانی‌تر ما در هندلر تغییرات را گرفتیم
+                  autoComplete="one-time-code" // <--- راه‌حل مشکل خوانده نشدن کد پیامکی موبایل
                   disabled={isVerifying}
                   value={digit}
                   onChange={(e) => handleDigitChange(idx, e.target.value)}

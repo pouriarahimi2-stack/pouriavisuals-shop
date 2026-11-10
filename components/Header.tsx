@@ -1,6 +1,6 @@
 "use client";
 // File Path: components/Header.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart } from "@/context/CartContext";
@@ -8,6 +8,7 @@ import { useSiteInfo } from "@/context/SiteInfoContext";
 import { soundEngine } from "@/lib/soundEngine";
 import { themeEngine } from "@/lib/themeEngine";
 import { DEFAULT_HEADER_CONFIG } from "@/services/siteInfoService";
+import { supabase } from "@/lib/supabase";
 
 function resolveSafeUrl(val: any): string {
   if (typeof val !== "string") return "";
@@ -17,6 +18,13 @@ function resolveSafeUrl(val: any): string {
     return "/api/media-proxy?url=" + encodeURIComponent(clean);
   }
   return clean;
+}
+
+interface ActiveAnnouncement {
+  id: string;
+  code: string;
+  text: string;
+  targetType: string;
 }
 
 export default function Header() {
@@ -39,10 +47,12 @@ export default function Header() {
   const [logoError, setLogoError] = useState(false);
   const [annDismissed, setAnnDismissed] = useState(false);
   const [offerDismissed, setOfferDismissed] = useState(false);
-  const [copiedCoupon, setCopiedCoupon] = useState(false);
+  const [copiedCoupon, setCopiedCoupon] = useState<string | null>(null);
   const [currentDevice, setCurrentDevice] = useState<"mobile" | "tablet" | "desktop">("desktop");
 
-  // خواندن مستقیم لوگوی هدر از تنظیمات ادمین (اگر ادمین حذف کرد، دقیقاً خالی بماند و لوگوی مثلثی هاردکد نشان ندهد)
+  const [announcements, setAnnouncements] = useState<ActiveAnnouncement[]>([]);
+  const [activeAnnIndex, setActiveAnnIndex] = useState(0);
+
   const rawHeaderLogo =
     themeHeader.logoUrl !== undefined
       ? String(themeHeader.logoUrl)
@@ -51,24 +61,87 @@ export default function Header() {
       : String(siteInfo?.logo_url || "");
   const logoSrc = resolveSafeUrl(rawHeaderLogo);
 
-  const announcementEnabled = Boolean(
-    themeHeader.announcementEnabled !== undefined
-      ? themeHeader.announcementEnabled
-      : annCfg.show
-  );
+  // واکشی بلادرنگ با فیلتر کردن کدهایی که همین کاربر (در صورت موفقیت‌آمیز بودن سفارش) استفاده کرده است
+  const syncAnnouncements = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/public/coupons?t=${Date.now()}`, { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        const activeCoupons = json.coupons || [];
+        
+        let usedLocal: string[] = [];
+        try { 
+            usedLocal = JSON.parse(localStorage.getItem("axon_used_coupons") || "[]"); 
+        } catch {}
 
-  const announcementText =
-    themeHeader.announcementText !== undefined
-      ? String(themeHeader.announcementText).trim()
-      : String(persisted.header_announcement || annCfg.text || siteInfo?.header_announcement || "").trim();
+        const validList: ActiveAnnouncement[] = activeCoupons
+          .filter((c: any) => c.publish_to_header !== false && !usedLocal.includes(c.code))
+          .map((c: any) => {
+            const isPct = (c.discount_type || c.type || "percent") === "percent";
+            const val = Number(c.discount_percent ?? c.value ?? c.discount_value ?? c.discount_amount ?? 0);
+            const valStr = isPct ? `${val}٪ تخفیف` : `${val.toLocaleString("fa-IR")} تومان تخفیف`;
+            let targetLabel = "روی کل سبد خرید";
+            if (c.target_type === "product") targetLabel = "روی کالای منتخب";
+            if (c.target_type === "category") targetLabel = `روی محصولات دسته‌بندی ${c.target_id || ""}`;
+
+            return {
+              id: c.id,
+              code: c.code,
+              text: `🔥 جشنواره ویژه! با وارد کردن کد «${c.code}» ${valStr} ${targetLabel} دریافت کنید`,
+              targetType: c.target_type,
+            };
+          });
+
+        setAnnouncements(validList);
+        if (validList.length === 0) {
+          setActiveAnnIndex(0);
+        }
+      }
+    } catch {}
+  }, []);
+
+  // وب‌سوکت زنده و بلادرنگ برای دریافت تغییرات بلافاصله
+  useEffect(() => {
+    syncAnnouncements();
+
+    const channel = supabase
+      .channel("realtime-header-coupons")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "coupons" },
+        () => {
+          syncAnnouncements();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "site_info" },
+        () => {
+          syncAnnouncements();
+        }
+      )
+      .subscribe();
+
+    window.addEventListener("coupons_updated", syncAnnouncements);
+
+    return () => {
+      window.removeEventListener("coupons_updated", syncAnnouncements);
+      supabase.removeChannel(channel);
+    };
+  }, [syncAnnouncements]);
+
+  // چرخش اسلایدر هر ۴ ثانیه بین کدهای فعال
+  useEffect(() => {
+    if (announcements.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveAnnIndex((prev) => (prev + 1) % announcements.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [announcements.length]);
 
   useEffect(() => {
     setLogoError(false);
   }, [logoSrc]);
-
-  useEffect(() => {
-    setAnnDismissed(false);
-  }, [announcementText, announcementEnabled]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -80,18 +153,6 @@ export default function Header() {
     };
     detectViewportDevice();
     window.addEventListener("resize", detectViewportDevice, { passive: true });
-
-    if (!sessionStorage.getItem("axon_device_tracked")) {
-      sessionStorage.setItem("axon_device_tracked", "1");
-      const w = window.innerWidth;
-      const dev = w < 768 ? "mobile" : w < 1024 ? "tablet" : "desktop";
-      fetch("/api/analytics/device", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device: dev, event: "view" }),
-      }).catch(() => {});
-    }
-
     return () => window.removeEventListener("resize", detectViewportDevice);
   }, []);
 
@@ -160,6 +221,14 @@ export default function Header() {
     themeEngine.applyTheme(next ? "dark" : "light", true);
   };
 
+  const copyHeaderCoupon = (code: string) => {
+    if (!code) return;
+    soundEngine.playSuccess();
+    navigator.clipboard?.writeText(code);
+    setCopiedCoupon(code);
+    setTimeout(() => setCopiedCoupon(null), 2500);
+  };
+
   if (headerCfg.show === false) return null;
 
   const variantMode = themeHeader.variant || headerCfg.variant || "capsule";
@@ -193,7 +262,8 @@ export default function Header() {
         );
 
   const isPhoneLabel = Boolean(userLabel && /^0?9\d{9}$/.test(userLabel));
-  const showAnnouncement = announcementEnabled && announcementText.length > 0 && !annDismissed;
+  const currentAnnouncement = announcements[activeAnnIndex];
+  const showAnnouncement = Boolean(currentAnnouncement && !annDismissed);
 
   const activeDeviceOffer = deviceOffers?.[currentDevice];
   const showDeviceOffer =
@@ -212,9 +282,29 @@ export default function Header() {
               backgroundColor: annCfg.backgroundColor || "#0284c7",
               color: annCfg.textColor || "#ffffff",
             }}
-            className="w-full px-4 py-1.5 text-[11px] sm:text-xs font-black text-center flex items-center justify-center gap-3 shadow-md pointer-events-auto font-sans select-text"
+            className="w-full px-4 py-1.5 text-[11px] sm:text-xs font-black text-center flex items-center justify-center gap-3 shadow-md pointer-events-auto font-sans select-text transition-all duration-300"
           >
-            <span className="truncate max-w-4xl">{announcementText}</span>
+            <span className="truncate max-w-3xl">
+              {currentAnnouncement.text}
+            </span>
+
+            {currentAnnouncement.code && (
+              <button
+                type="button"
+                onClick={() => copyHeaderCoupon(currentAnnouncement.code)}
+                className="px-2 py-0.5 rounded-lg bg-white/20 hover:bg-white/30 text-white font-mono text-[10px] font-black cursor-pointer transition shrink-0"
+                title="برای کپی کد تخفیف کلیک کنید"
+              >
+                {copiedCoupon === currentAnnouncement.code ? "کپی شد ✓" : "📋 کپی کد"}
+              </button>
+            )}
+
+            {announcements.length > 1 && (
+              <span className="text-[9px] opacity-75 font-mono">
+                ({activeAnnIndex + 1}/{announcements.length})
+              </span>
+            )}
+
             <button
               type="button"
               onClick={() => setAnnDismissed(true)}
@@ -246,12 +336,12 @@ export default function Header() {
                 onClick={() => {
                   navigator.clipboard?.writeText(activeDeviceOffer.couponCode);
                   soundEngine.playSuccess();
-                  setCopiedCoupon(true);
-                  setTimeout(() => setCopiedCoupon(false), 2500);
+                  setCopiedCoupon(activeDeviceOffer.couponCode);
+                  setTimeout(() => setCopiedCoupon(null), 2500);
                 }}
                 className="px-2.5 py-0.5 rounded-lg bg-emerald-500 text-slate-950 font-mono text-[10px] font-black cursor-pointer hover:opacity-90 transition"
               >
-                {copiedCoupon ? "کپی شد ✓" : "کد: " + activeDeviceOffer.couponCode}
+                {copiedCoupon === activeDeviceOffer.couponCode ? "کپی شد ✓" : "کد: " + activeDeviceOffer.couponCode}
               </button>
             )}
             {activeDeviceOffer.ctaText && (

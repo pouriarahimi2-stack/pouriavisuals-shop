@@ -1,5 +1,5 @@
-// File Path: components/ProductList.tsx
 "use client";
+// File Path: components/ProductList.tsx
 
 import React, { useState, useEffect } from "react";
 import { productService, Product } from "@/services/productService";
@@ -49,15 +49,25 @@ export default function ProductList({
 
   return (
     <section className="py-6 space-y-8 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="border-b border-[var(--card-border)] pb-5 text-right">
-        <h2 className="text-2xl sm:text-3xl font-black"suppressHydrationWarning>
-          {customHeading || "کاتالوگ تجهیزات و محصولات"}
-        </h2>
-        <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium mt-1"suppressHydrationWarning>
-          {customSubtitle ||
-            "تمامی کالاها با گارانتی اصالت طلایی، تست سلامت فیزیکی و ارسال پیشتاز عرضه می‌شوند"}
-        </p>
-      </div>
+      {/* 
+        منطق نمایش هدینگ اصلاح شد: 
+        متن ثابت «تمامی کالاها با گارانتی اصالت...» برداشته شد تا فقط در صورتی که 
+        از بیرون به صورت صریح (prop) ارسال شده باشد نمایش داده شود.
+      */}
+      {(customHeading || customSubtitle) && (
+        <div className="border-b border-[var(--card-border)] pb-5 text-right">
+          {customHeading && (
+            <h2 className="text-2xl sm:text-3xl font-black" suppressHydrationWarning>
+              {customHeading}
+            </h2>
+          )}
+          {customSubtitle && (
+            <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium mt-1" suppressHydrationWarning>
+              {customSubtitle}
+            </p>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 animate-pulse">

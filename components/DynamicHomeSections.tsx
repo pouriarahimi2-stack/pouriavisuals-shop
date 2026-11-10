@@ -46,12 +46,13 @@ export const DEFAULT_BANNER_SIZING: BannerSizingConfig = {
   mobileLayout: "horizontal",
 };
 
+// پاکسازی ریشه‌ای متون سرگردان و هاردکدشده از پیش‌فرض‌های سکشن‌ها
 export const DEFAULT_SECTIONS_ORDER: ResponsiveSectionItem[] = [
   {
     id: "sec_banners",
     type: "banners_slider",
-    title: "اسلایدر بنرهای تبلیغاتی",
-    subtitle: "نمایش بنرهای کلیک‌پذیر متصل به محصولات",
+    title: "",
+    subtitle: "",
     enabled: true,
     showOnMobile: true,
     showOnTablet: true,
@@ -60,8 +61,8 @@ export const DEFAULT_SECTIONS_ORDER: ResponsiveSectionItem[] = [
   {
     id: "sec_perspective",
     type: "NativePerspectiveSlider",
-    title: "نمایشگاه تعاملی سه‌بعدی محصولات",
-    subtitle: "پیمایش لمسی جهت بررسی مشخصات و گارانتی",
+    title: "",
+    subtitle: "",
     enabled: true,
     showOnMobile: false,
     showOnTablet: false,
@@ -70,8 +71,8 @@ export const DEFAULT_SECTIONS_ORDER: ResponsiveSectionItem[] = [
   {
     id: "sec_catalog",
     type: "NativeProductCatalog",
-    title: "محصولات ویژه آکسون کور",
-    subtitle: "با گارانتی اصالت طلایی و ارسال سریع",
+    title: "کاتالوگ تجهیزات تخصصی و کالای دیجیتال",
+    subtitle: "",
     enabled: true,
     showOnMobile: true,
     showOnTablet: true,
@@ -85,11 +86,14 @@ function normalizeProductRow(p: any) {
   let meta: Record<string, any> = {};
   const match = rawDesc.match(/<!--MEDIA_METADATA:([\s\S]*?)-->/);
   if (match && match[1]) {
-    try { meta = JSON.parse(match[1]); } catch {}
+    try {
+      meta = JSON.parse(match[1]);
+    } catch {}
     rawDesc = rawDesc.replace(/<!--MEDIA_METADATA:[\s\S]*?-->/g, "").trim();
   }
   const primaryImg =
-    p.image || p.image_url ||
+    p.image ||
+    p.image_url ||
     (Array.isArray(p.images) && p.images[0]) ||
     (Array.isArray(meta.images) && meta.images[0]) ||
     "/placeholder.png";
@@ -99,35 +103,42 @@ function normalizeProductRow(p: any) {
     title: p.title || p.name || "کالای دیجیتال",
     image: primaryImg,
     image_url: primaryImg,
-    images: Array.isArray(p.images) && p.images.length > 0
-      ? p.images
-      : Array.isArray(meta.images) && meta.images.length > 0
-      ? meta.images
-      : [primaryImg],
+    images:
+      Array.isArray(p.images) && p.images.length > 0
+        ? p.images
+        : Array.isArray(meta.images) && meta.images.length > 0
+        ? meta.images
+        : [primaryImg],
     description: rawDesc,
   };
 }
 
 export default function DynamicHomeSections({
   initialProducts = [],
-  initialBanners  = [],
+  initialBanners = [],
   initialSiteInfo = null,
 }: Props) {
   const { siteInfo: ctxSiteInfo } = useSiteInfo();
-  const activeSiteInfo = ctxSiteInfo && Object.keys(ctxSiteInfo).length > 0 ? ctxSiteInfo : initialSiteInfo;
+  const activeSiteInfo =
+    ctxSiteInfo && Object.keys(ctxSiteInfo).length > 0 ? ctxSiteInfo : initialSiteInfo;
   const layoutCfg = activeSiteInfo?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
-  const tbCfg     = activeSiteInfo?.theme_builder_config   || layoutCfg?.theme_builder_config || {};
+  const tbCfg = activeSiteInfo?.theme_builder_config || layoutCfg?.theme_builder_config || {};
 
-  const bannerSizing: BannerSizingConfig = { ...DEFAULT_BANNER_SIZING, ...(tbCfg?.bannerSizing || layoutCfg?.bannerSizing || {}) };
+  const bannerSizing: BannerSizingConfig = {
+    ...DEFAULT_BANNER_SIZING,
+    ...(tbCfg?.bannerSizing || layoutCfg?.bannerSizing || {}),
+  };
 
-  const [products, setProducts] = useState<any[]>(() => (initialProducts || []).map(normalizeProductRow));
-  const [banners,  setBanners]  = useState<any[]>(initialBanners);
+  const [products, setProducts] = useState<any[]>(() =>
+    (initialProducts || []).map(normalizeProductRow)
+  );
+  const [banners, setBanners] = useState<any[]>(initialBanners);
   const [activeSlide, setActiveSlide] = useState(0);
 
   const fetchLiveHomeData = useCallback(async () => {
     try {
       const [pRes, bRes] = await Promise.all([
-        fetch("/api/products",       { cache: "no-store" }).catch(() => null),
+        fetch("/api/products", { cache: "no-store" }).catch(() => null),
         fetch("/api/public/banners", { cache: "no-store" }).catch(() => null),
       ]);
       if (pRes?.ok) {
@@ -145,85 +156,95 @@ export default function DynamicHomeSections({
 
   useEffect(() => {
     if (initialProducts.length === 0) fetchLiveHomeData();
-    window.addEventListener("banners_updated",  fetchLiveHomeData);
+    window.addEventListener("banners_updated", fetchLiveHomeData);
     window.addEventListener("products_updated", fetchLiveHomeData);
     const ch = supabase
       .channel("realtime-home-unified")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, fetchLiveHomeData)
-      .on("postgres_changes", { event: "*", schema: "public", table: "banners"  }, fetchLiveHomeData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, fetchLiveHomeData)
       .subscribe();
     return () => {
-      window.removeEventListener("banners_updated",  fetchLiveHomeData);
+      window.removeEventListener("banners_updated", fetchLiveHomeData);
       window.removeEventListener("products_updated", fetchLiveHomeData);
       supabase.removeChannel(ch);
     };
   }, [fetchLiveHomeData, initialProducts.length]);
 
-  const effectiveSlides = banners.length > 0
-    ? banners.map((b: any) => ({
-        id:       String(b.id),
-        title:    b.title    || "پیشنهاد ویژه آکسون",
-        subtitle: b.subtitle || "مشاهده مشخصات و خرید آنلاین با گارانتی اصالت",
-        image:    b.image_url || b.image || "/placeholder.png",
-        link:     b.link_url  || b.link  || "/products",
-        price:    b.price ? Number(b.price) : null,
-        badge:    b.badge_text || b.badge || "پیشنهاد ویژه",
-        cta:      b.cta_text  || "مشاهده و خرید",
-      }))
-    : products.slice(0, 5).map((p: any) => ({
-        id:       String(p.id),
-        title:    p.title || p.name || "محصول ویژه",
-        subtitle: p.short_description || (p.description ? String(p.description).slice(0, 110) : "خرید مستقیم با گارانتی اصالت"),
-        image:    p.image || p.image_url || "/placeholder.png",
-        link:     "/products/" + p.id,
-        price:    Number(p.discount_price || p.discountPrice || p.price || 0),
-        badge:    p.category || "ویژه",
-        cta:      "مشاهده و خرید محصول",
-      }));
+  const effectiveSlides =
+    banners.length > 0
+      ? banners.map((b: any) => ({
+          id: String(b.id),
+          title: b.title || "پیشنهاد ویژه آکسون",
+          subtitle: b.subtitle || "مشاهده مشخصات و خرید آنلاین با گارانتی اصالت",
+          image: b.image_url || b.image || "/placeholder.png",
+          link: b.link_url || b.link || "/products",
+          price: b.price ? Number(b.price) : null,
+          badge: b.badge_text || b.badge || "پیشنهاد ویژه",
+          cta: b.cta_text || "مشاهده و خرید",
+        }))
+      : products.slice(0, 5).map((p: any) => ({
+          id: String(p.id),
+          title: p.title || p.name || "محصول ویژه",
+          subtitle:
+            p.short_description ||
+            (p.description ? String(p.description).slice(0, 110) : "خرید مستقیم با گارانتی اصالت"),
+          image: p.image || p.image_url || "/placeholder.png",
+          link: "/products/" + p.id,
+          price: Number(p.discount_price || p.discountPrice || p.price || 0),
+          badge: p.category || "ویژه",
+          cta: "مشاهده و خرید محصول",
+        }));
 
-  // آتو‌پلی اسلایدر
   useEffect(() => {
     if (effectiveSlides.length <= 1) return;
-    const t = setInterval(() => setActiveSlide(prev => (prev + 1) % effectiveSlides.length), 5000);
+    const t = setInterval(() => setActiveSlide((prev) => (prev + 1) % effectiveSlides.length), 5000);
     return () => clearInterval(t);
   }, [effectiveSlides.length]);
 
   const rawSections: ResponsiveSectionItem[] =
-    Array.isArray(tbCfg?.homeSections)    && tbCfg.homeSections.length > 0    ? tbCfg.homeSections    :
-    Array.isArray(layoutCfg?.homeSections) && layoutCfg.homeSections.length > 0 ? layoutCfg.homeSections :
-    DEFAULT_SECTIONS_ORDER;
+    Array.isArray(tbCfg?.homeSections) && tbCfg.homeSections.length > 0
+      ? tbCfg.homeSections
+      : Array.isArray(layoutCfg?.homeSections) && layoutCfg.homeSections.length > 0
+      ? layoutCfg.homeSections
+      : DEFAULT_SECTIONS_ORDER;
 
   const renderSection = (sec: ResponsiveSectionItem) => {
     if (sec.enabled === false) return null;
 
-    // ─── اسلایدر بنر (فقط در موبایل و تبلت فعال است؛ اسلایدر تکراری دسکتاپ حذف شد) ───
     if (sec.type === "banners_slider") {
       if (effectiveSlides.length === 0) return null;
       return (
         <div key={sec.id} className="block lg:hidden">
           <MobileSlider
             slides={effectiveSlides}
-            config={{ height: bannerSizing.mobileHeight || 220, autoPlay: true, interval: 4500, showDots: true }}
+            config={{
+              height: bannerSizing.mobileHeight || 220,
+              autoPlay: true,
+              interval: 4500,
+              showDots: true,
+            }}
           />
         </div>
       );
     }
 
-    // ─── اسلایدر سه‌بعدی و اصلی صفحه اصلی (فقط دسکتاپ) ───────────────────
     if (sec.type === "NativePerspectiveSlider") {
       if (products.length === 0) return null;
       return (
         <div key={sec.id} className="hidden lg:block">
-          <ProductPerspectiveSlider products={products} customTitle={sec.title} customSubtitle={sec.subtitle} />
+          <ProductPerspectiveSlider products={products} customTitle="" customSubtitle="" />
         </div>
       );
     }
 
-    // ─── کاتالوگ محصولات ───────────────────────────────────
     if (sec.type === "NativeProductCatalog") {
       return (
         <div key={sec.id}>
-          <ProductList initialProducts={products} customHeading={sec.title} customSubtitle={sec.subtitle} />
+          <ProductList
+            initialProducts={products}
+            customHeading="کاتالوگ تجهیزات تخصصی و کالای دیجیتال"
+            customSubtitle=""
+          />
         </div>
       );
     }

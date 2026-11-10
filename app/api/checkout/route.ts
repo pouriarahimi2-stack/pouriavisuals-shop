@@ -9,6 +9,11 @@ import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
 
+function getClientIp(req: NextRequest) {
+  const forwarded = req.headers.get("x-forwarded-for");
+  return forwarded ? forwarded.split(",")[0] : req.headers.get("x-real-ip") || "unknown-ip";
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -85,7 +90,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // استعلام یکجای تمام اقلام سفارش از دیتابیس جهت سرعت بالا و جلوگیری از Overselling در خریدهای هم‌زمان
+    const couponCode = body.couponCode ? String(body.couponCode).trim().toUpperCase() : null;
+    const userIdentifier = cleanPhone || getClientIp(req);
+
+    if (couponCode) {
+      const { data: previousOrders, error: orderCheckError } = await supabaseAdmin
+        .from("orders")
+        .select("id")
+        .eq("coupon_code", couponCode)
+        .eq("phone", cleanPhone) 
+        .neq("status", "cancelled")
+        .limit(1);
+
+      if (!orderCheckError && previousOrders && previousOrders.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "شما با این شماره موبایل پیش از این از کد تخفیف وارد شده استفاده کرده‌اید.",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     const productIds = Array.from(
       new Set(
         items
@@ -96,7 +123,7 @@ export async function POST(req: NextRequest) {
 
     const { data: dbProducts } = await supabaseAdmin
       .from("products")
-      .select("id, title, name, price, discount_price, purchase_price, stock, is_available")
+      .select("id, title, name, price, discount_price, purchase_price, stock, is_available, category")
       .in("id", productIds);
 
     const dbProdMap = new Map<string, any>();
@@ -140,6 +167,7 @@ export async function POST(req: NextRequest) {
           title: dbProd.title || dbProd.name || item.title,
           quantity: qty,
           price: unitPrice,
+          category: dbProd.category,
         });
       } else {
         const fallbackPrice = Number(item.discountPrice ?? item.discount_price ?? item.price ?? 0);
@@ -152,10 +180,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // اعتبارسنجی دقیق کوپن در سمت سرور (تاریخ شروع/انقضا، سقف مصرف، محصول هدف و سقف مبلغ تخفیف)
     let verifiedDiscount = 0;
     let validCouponRow: any = null;
-    const couponCode = body.couponCode ? String(body.couponCode).trim().toUpperCase() : null;
 
     if (couponCode) {
       const { data: couponRow } = await supabaseAdmin
@@ -176,7 +202,12 @@ export async function POST(req: NextRequest) {
 
       if (couponRow && !notStarted && !isExpired && !limitReached && verifiedSubtotal >= minSpend) {
         let targetSubtotal = verifiedSubtotal;
-        if (couponRow.target_type === "product" && couponRow.target_id) {
+        if (couponRow.target_type === "category" && couponRow.target_id) {
+          const matching = verifiedItems.filter(
+            (vi) => String(vi.category) === String(couponRow.target_id)
+          );
+          targetSubtotal = matching.reduce((acc, vi) => acc + vi.price * vi.quantity, 0);
+        } else if (couponRow.target_type === "product" && couponRow.target_id) {
           const matching = verifiedItems.filter(
             (vi) => String(vi.id || vi.productId) === String(couponRow.target_id)
           );
@@ -223,7 +254,10 @@ export async function POST(req: NextRequest) {
         ? Math.round((afterDiscount * vatPercent) / 100)
         : 0;
 
-    const finalAmount = Math.max(0, afterDiscount + vatAmount + shippingCost);
+    let finalAmount = Math.max(0, afterDiscount + vatAmount + shippingCost);
+    if (finalAmount > 0 && finalAmount < 1000) {
+      finalAmount = 1000;
+    }
 
     const shortCode = Math.floor(100000 + Math.random() * 900000).toString();
     const orderNumber = "AXN-" + shortCode;
@@ -236,8 +270,6 @@ export async function POST(req: NextRequest) {
       address +
       (notes ? " (" + notes + ")" : "");
 
-    
-    // [IDEMPOTENCY_GUARD] جلوگیری از ثبت سفارش تکراری در اثر دوبار کلیک
     const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     const { data: recentDuplicate } = await supabaseAdmin
       .from("orders")
@@ -249,10 +281,7 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .maybeSingle();
 
-    // اگر سفارشی با مبلغ یکسان در 2 دقیقه گذشته ثبت شده باشد، همان را برمی‌گردانیم
     if (recentDuplicate) {
-      // بررسی تطابق مبلغ برای اطمینان از اینکه همان سبد خرید است
-      // محاسبه مبلغ فعلی به صورت حدودی برای مقایسه سریع
       let estimatedCurrentTotal = items.reduce((acc: number, it: any) => acc + Number(it.price || 0) * Number(it.quantity || 1), 0);
       if (Math.abs(Number(recentDuplicate.final_amount) - estimatedCurrentTotal) < 500000) {
          return NextResponse.json({
@@ -262,7 +291,6 @@ export async function POST(req: NextRequest) {
         });
       }
     }
-    // پایان گارد
     
     const generatedUuid = randomUUID();
     const orderPayload: Record<string, any> = {
@@ -279,6 +307,7 @@ export async function POST(req: NextRequest) {
       discount_amount: verifiedDiscount,
       final_amount: finalAmount,
       coupon_code: validCouponRow ? validCouponRow.code : null,
+      user_identifier: userIdentifier,
       status: "pending",
       payment_status: "pending",
       tracking_code: trackingCode,
@@ -316,7 +345,24 @@ export async function POST(req: NextRequest) {
       if (minInserted) savedOrder = minInserted;
     }
 
-    // کسر اتمیک موجودی انبار و ثبت لاگ حسابداری
+    // --- افزودن مصرف کوپن بلافاصله پس از ثبت موفق سفارش ---
+    if (savedOrder && validCouponRow) {
+      try {
+        const currentUsed = Number(validCouponRow.times_used ?? validCouponRow.used_count ?? 0);
+        await supabaseAdmin
+          .from("coupons")
+          .update({ 
+             times_used: currentUsed + 1, 
+             used_count: currentUsed + 1,
+             updated_at: new Date().toISOString()
+          })
+          .eq("id", validCouponRow.id);
+      } catch (e) {
+        console.error("Failed to update coupon usage:", e);
+      }
+    }
+    // ----------------------------------------------------
+
     for (const item of verifiedItems) {
       const prodId = String(item.id || item.productId || "");
       const qty = Math.max(1, Number(item.quantity || 1));
@@ -353,17 +399,6 @@ export async function POST(req: NextRequest) {
       } catch {}
     }
 
-    // افزایش شمارنده مصرف کوپن در صورت استفاده
-    if (validCouponRow?.id) {
-      try {
-        const nextUsed = Number(validCouponRow.times_used ?? validCouponRow.used_count ?? 0) + 1;
-        await supabaseAdmin
-          .from("coupons")
-          .update({ times_used: nextUsed, used_count: nextUsed })
-          .eq("id", validCouponRow.id);
-      } catch {}
-    }
-
     try {
       await supabaseAdmin.from("crm_customers").upsert([
         {
@@ -386,6 +421,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      message: "سفارش با موفقیت ثبت گردید.",
       order: {
         ...savedOrder,
         order_number: orderNumber,
@@ -397,7 +433,8 @@ export async function POST(req: NextRequest) {
         final_amount: finalAmount,
         tracking_code: savedOrder.tracking_code || trackingCode,
       },
-      message: "✓ سفارش ثبت شد و در حال انتقال به درگاه پرداخت است.",
+      orderId: savedOrder.id,
+      orderNumber: savedOrder.order_number,
     });
   } catch (err: any) {
     return NextResponse.json(

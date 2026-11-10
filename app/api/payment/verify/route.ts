@@ -1,4 +1,3 @@
-// File Path: app/api/payment/verify/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { postViaNetafrazRelay } from "@/lib/netafrazRelay";
@@ -8,7 +7,7 @@ import { sendOtpPattern } from "@/lib/otpService";
 export const dynamic = "force-dynamic";
 
 const ZARINPAL_MERCHANT_ID =
-  process.env.ZARINPAL_MERCHANT_ID ;
+  process.env.ZARINPAL_MERCHANT_ID || "";
 
 async function handleVerify(params: {
   authority: string;
@@ -26,7 +25,6 @@ async function handleVerify(params: {
     );
   }
 
-  // ۱. استعلام مبلغ واقعی سفارش از دیتابیس در سمت سرور (شامل ۱۰٪ مالیات و هزینه ارسال) جهت جلوگیری از دستکاری مبلغ در URL
   let orderRow: any = null;
   if (orderId) {
     const { data: byId } = await supabaseAdmin
@@ -54,10 +52,8 @@ async function handleVerify(params: {
     )
   );
 
-  // اگر کاربر در صفحه بانک دکمه انصراف را زده باشد
   if (status && status.toUpperCase() !== "OK") {
     if (orderRow?.id) {
-      // [AUTO_RESTORE_STOCK_ON_CANCEL] بازگردانی خودکار موجودی کالا به انبار در صورت انصراف از پرداخت بانکی
       if (orderRow.status !== "cancelled" && Array.isArray(orderRow.items)) {
         for (const it of orderRow.items) {
           const pId = String(it.id || it.productId || it.product_id || "");
@@ -105,7 +101,6 @@ async function handleVerify(params: {
   let cardPan = "";
   const attemptsLog: Array<Record<string, any>> = [];
 
-  // ۲. ارسال درخواست Verify از طریق پل رمزنگاری‌شده نت‌افراز (با آی‌پی ثابت ایران)
   const relayVerify = await postViaNetafrazRelay(
     "https://payment.zarinpal.com/pg/v4/payment/verify.json",
     {},
@@ -126,7 +121,6 @@ async function handleVerify(params: {
     }
   }
 
-  // ۳. فال‌بک مستقیم در صورت عدم پاسخ پل
   if (!refId) {
     for (const ep of [
       "https://payment.zarinpal.com/pg/v4/payment/verify.json",
@@ -198,7 +192,6 @@ async function handleVerify(params: {
     );
   }
 
-  // ۴. ثبت پرداخت موفق در جدول سفارشات
   const trackingCode =
     orderRow?.tracking_code || "TRK-" + String(refId).slice(-6);
 
@@ -212,9 +205,27 @@ async function handleVerify(params: {
         updated_at: new Date().toISOString(),
       })
       .eq("id", orderRow.id);
+
+    if (orderRow.coupon_code) {
+      try {
+        const { data: cpn } = await supabaseAdmin
+          .from("coupons")
+          .select("id, used_count, times_used")
+          .eq("code", orderRow.coupon_code)
+          .maybeSingle();
+        if (cpn) {
+          const nextUsed = Number(cpn.used_count ?? cpn.times_used ?? 0) + 1;
+          await supabaseAdmin
+            .from("coupons")
+            .update({ used_count: nextUsed, times_used: nextUsed })
+            .eq("id", cpn.id);
+        }
+      } catch (err) {
+        console.error("Error incrementing coupon usage:", err);
+      }
+    }
   }
 
-  // ۵. ارسال خودکار پیامک کد پیگیری بانکی در صورت فعال بودن در تنظیمات کلان ادمین
   try {
     const { data: siteRow } = await supabaseAdmin
       .from("site_info")

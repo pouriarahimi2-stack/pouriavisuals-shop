@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "127.0.0.1";
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1";
     const rateCheck = await rateLimiter.checkLimit(clientIp, "create_order", 10, 15);
     if (!rateCheck.allowed) {
       return NextResponse.json({ success: false, message: "تعداد ثبت سفارشات از این IP بیش از حد مجاز است." }, { status: 429 });
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     const productIds = items.map((i: any) => String(i.productId || i.product_id || i.id)).filter(Boolean);
     const { data: dbProducts, error: prodErr } = await supabaseAdmin
       .from("products")
-      .select("id, title, name, price, discount_price, stock, is_available")
+      .select("id, title, name, price, discount_price, stock, is_available, category")
       .in("id", productIds);
 
     if (prodErr || !dbProducts) {
@@ -111,12 +111,12 @@ export async function POST(req: NextRequest) {
         image: it.image || it.image_url || null,
         selectedColor: it.selectedColor || it.selected_color || null,
         shipping_type: it.shipping_type || null,
+        category: realProd.category,
       });
     }
 
     let finalDiscount = 0;
     let appliedCoupon: string | null = null;
-    let couponRecordToUpdate: any = null;
 
     if (coupon_code) {
       const cleanCoupon = String(coupon_code).trim().toUpperCase();
@@ -128,16 +128,19 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (couponRecord) {
-        const validation = calculateOrderDiscount(couponRecord, calculatedRawTotal);
+        const validation = calculateOrderDiscount(couponRecord, calculatedRawTotal, verifiedItems);
         if (validation.valid) {
           finalDiscount = validation.discountAmount;
           appliedCoupon = cleanCoupon;
-          couponRecordToUpdate = couponRecord;
         }
       }
     }
 
-    const payableAmount = Math.max(0, calculatedRawTotal - finalDiscount);
+    let payableAmount = Math.max(0, calculatedRawTotal - finalDiscount);
+    if (payableAmount > 0 && payableAmount < 1000) {
+      payableAmount = 1000;
+    }
+    
     const orderNumber = "AXON-" + Date.now().toString().slice(-6) + "-" + Math.random().toString(36).substring(2, 5).toUpperCase();
     const orderId = "ord_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
 
@@ -187,15 +190,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (couponRecordToUpdate) {
-      const currentUsed = Number(couponRecordToUpdate.used_count || couponRecordToUpdate.times_used || 0);
-      await supabaseAdmin
-        .from("coupons")
-        .update({ used_count: currentUsed + 1, times_used: currentUsed + 1 })
-        .eq("id", couponRecordToUpdate.id);
-    }
-
-    // ── پیام SMS کامل سفارش ──
     (() => {
       try {
         const persianDate = new Date(createdOrder.created_at).toLocaleDateString("fa-IR", {

@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+export const revalidate = 0;
 
 function toEnglishText(str: string): string {
   return String(str || "")
@@ -12,12 +14,20 @@ function toEnglishText(str: string): string {
     .toUpperCase();
 }
 
+// تابع کمکی برای استخراج IP در صورت نبود سشن معتبر
+function getClientIp(req: NextRequest) {
+  const forwarded = req.headers.get("x-forwarded-for");
+  const ip = forwarded ? forwarded.split(",")[0] : req.headers.get("x-real-ip");
+  return ip || "unknown-ip";
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const code = toEnglishText(body.code || body.couponCode || "");
     const cartTotal = Number(body.cartTotal || body.subtotal || body.total || 0);
     const items: any[] = Array.isArray(body.items) ? body.items : [];
+    const customerPhone = body.customerPhone ? toEnglishText(String(body.customerPhone)) : null;
 
     if (!code) {
       return NextResponse.json(
@@ -26,6 +36,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // --- بخش امنیتی ۱: تعیین هویت کاربر (موبایل یا IP) ---
+    // اگر از سمت کلاینت شماره موبایل ارسال شده بود (مثلا در مرحله نهایی تسویه حساب) از آن استفاده میکنیم
+    // در غیر این صورت IP کلاینت را به عنوان شناسه یکتای دستگاه در نظر میگیریم.
+    const userIdentifier = customerPhone || getClientIp(req);
+
+    // --- بخش امنیتی ۲: بررسی استفاده قبلی در دیتابیس (سفارشات موفق) ---
+    // بررسی میکنیم آیا سفارشی با این شماره موبایل/IP و این کد تخفیف ثبت شده که وضعیت آن لغو شده (cancelled) نباشد
+    const { data: previousOrders, error: orderCheckError } = await supabaseAdmin
+      .from("orders")
+      .select("id")
+      .eq("coupon_code", code)
+      .eq("user_identifier", userIdentifier)
+      .neq("status", "cancelled")
+      .limit(1);
+
+    if (!orderCheckError && previousOrders && previousOrders.length > 0) {
+      return NextResponse.json(
+        { success: false, valid: false, message: "شما پیش از این از این کد تخفیف استفاده کرده‌اید." },
+        { status: 403 }
+      );
+    }
+
+    // --- ادامه منطق اعتبارسنجی استاندارد کوپن ---
     const { data: coupon } = await supabaseAdmin
       .from("coupons")
       .select("*")
@@ -63,7 +96,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const minOrder = Number(coupon.min_order_amount || coupon.min_purchase || 0);
+    const minOrder = Number(coupon.min_order_amount ?? coupon.min_purchase ?? 0);
     if (minOrder > 0 && cartTotal > 0 && cartTotal < minOrder) {
       return NextResponse.json(
         {
@@ -79,7 +112,28 @@ export async function POST(req: NextRequest) {
     }
 
     let applicableTotal = cartTotal;
-    if (coupon.target_type === "product" && coupon.target_id && items.length > 0) {
+    if (coupon.target_type === "category" && coupon.target_id && items.length > 0) {
+      const targetItems = items.filter(
+        (it) => String(it.category) === String(coupon.target_id)
+      );
+      if (targetItems.length === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            valid: false,
+            message: "این کد تخفیف مختص دسته‌بندی دیگری است و شامل اقلام فعلی سبد شما نمی‌شود.",
+          },
+          { status: 400 }
+        );
+      }
+      applicableTotal = targetItems.reduce(
+        (acc, it) =>
+          acc +
+          Number(it.discountPrice ?? it.discount_price ?? it.price ?? 0) *
+            Math.max(1, Number(it.quantity || 1)),
+        0
+      );
+    } else if (coupon.target_type === "product" && coupon.target_id && items.length > 0) {
       const targetItems = items.filter(
         (it) => String(it.id || it.productId || it.product_id) === String(coupon.target_id)
       );

@@ -1,7 +1,7 @@
+// File Path: context/CartContext.tsx
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
-import { couponService } from "@/services/couponService";
 
 export interface CartItem {
   id: string | number;
@@ -40,7 +40,8 @@ interface CartContextType {
   updateQuantity: (id: string | number, deltaOrQty: number) => void;
   clearCart: () => void;
   appliedCoupon: AppliedCoupon | null;
-  applyCoupon: (code: string) => Promise<{ success: boolean; message: string }>;
+  // پشتیبانی از دریافت شماره موبایل برای سد امنیتی لایه اول
+  applyCoupon: (code: string, customerPhone?: string) => Promise<{ success: boolean; message: string }>;
   removeCoupon: () => void;
   totalPrice: number;
   totalAmount: number;
@@ -140,7 +141,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           },
         ];
       }
-
       try {
         localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updated));
         localStorage.setItem(LEGACY_CART_KEY, JSON.stringify(updated));
@@ -198,6 +198,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.removeItem(COUPON_STORAGE_KEY);
     } catch {}
+    
+    // وقتی سبد خرید پس از پرداخت پاک می‌شود، یک رویداد کلی به سیستم می‌فرستیم
+    // تا هدر و کارت محصولات در صورت تمام شدن ظرفیت کوپن، بلافاصله از نو با بک‌اند سینک شوند.
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("coupons_updated"));
+    }
   }, [persistCart]);
 
   const openCart = () => setIsCartOpen(true);
@@ -228,33 +234,50 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
   }, [cartItems]);
 
-  const applyCoupon = async (code: string) => {
+  // درخواست امن به سمت سرور برای اعتبارسنجی
+  const applyCoupon = async (code: string, customerPhone?: string) => {
     const clean = code.trim().toUpperCase();
-    const res = await couponService.validateCoupon(clean, totalPrice, cartItems);
-    if (res.valid && res.coupon) {
-      const cpn: any = res.coupon;
-      const isFixed = cpn.type === "fixed" || cpn.discount_type === "fixed";
-      const rawVal = Number(
-        cpn.value ??
-          cpn.discount_value ??
-          cpn.discount_percent ??
-          cpn.discount_amount ??
-          0
-      );
+    try {
+      const response = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: clean,
+          cartTotal: totalPrice,
+          items: cartItems,
+          customerPhone: customerPhone || "",
+        }),
+      });
+      
+      const res = await response.json();
+      
+      if (res.valid && res.coupon) {
+        const cpn: any = res.coupon;
+        const isFixed = cpn.type === "fixed" || cpn.discount_type === "fixed";
+        const rawVal = Number(
+          cpn.value ??
+            cpn.discount_value ??
+            cpn.discount_percent ??
+            cpn.discount_amount ??
+            0
+        );
 
-      const newCoupon: AppliedCoupon = {
-        code: clean,
-        discountType: isFixed ? "fixed" : "percent",
-        discountPercent: isFixed ? 0 : rawVal,
-        fixedAmount: isFixed ? rawVal : undefined,
-        maxDiscount: Number(cpn.max_discount || cpn.max_discount_amount || 0) || undefined,
-      };
+        const newCoupon: AppliedCoupon = {
+          code: clean,
+          discountType: isFixed ? "fixed" : "percent",
+          discountPercent: isFixed ? 0 : rawVal,
+          fixedAmount: isFixed ? rawVal : undefined,
+          maxDiscount: Number(cpn.max_discount || cpn.max_discount_amount || 0) || undefined,
+        };
 
-      setAppliedCoupon(newCoupon);
-      localStorage.setItem(COUPON_STORAGE_KEY, JSON.stringify(newCoupon));
-      return { success: true, message: res.message || "✓ کد تخفیف با موفقیت اعمال شد." };
+        setAppliedCoupon(newCoupon);
+        localStorage.setItem(COUPON_STORAGE_KEY, JSON.stringify(newCoupon));
+        return { success: true, message: res.message || "✓ کد تخفیف با موفقیت اعمال شد." };
+      }
+      return { success: false, message: res.message || "کد تخفیف نامعتبر است." };
+    } catch (err) {
+      return { success: false, message: "خطا در ارتباط با سرور جهت بررسی کد تخفیف." };
     }
-    return { success: false, message: res.message || "کد تخفیف نامعتبر است." };
   };
 
   const removeCoupon = () => {

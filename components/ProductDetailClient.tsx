@@ -1,10 +1,12 @@
 "use client";
-import React, { useState } from "react";
+// File Path: components/ProductDetailClient.tsx
+import React, { useState, useEffect, useCallback } from "react";
 import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
 import { ShieldCheck, Truck } from "lucide-react";
 import { ProductReviews } from "@/components/ProductReviews";
 import AddToCartButton from "@/components/AddToCartButton";
+import { supabase } from "@/lib/supabase";
 
 export default function ProductDetailClient({
   initialProduct,
@@ -16,6 +18,108 @@ export default function ProductDetailClient({
   const { addToCart, setIsCartOpen } = useCart() as any;
   const [product] = useState(initialProduct || {});
   const [selectedImg, setSelectedImg] = useState(0);
+
+  // استیت‌های مربوط به نمایش هوشمند برچسب تخفیف
+  const [targetedCoupon, setTargetedCoupon] = useState<{
+    code: string;
+    label: string;
+    isProductSpecific: boolean;
+  } | null>(null);
+  const [copiedCoupon, setCopiedCoupon] = useState(false);
+
+  const fetchApplicableCoupons = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/public/coupons?t=${Date.now()}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const json = await res.json();
+      const allActive = json.coupons || [];
+
+      // پنهان‌سازی کوپن‌ها برای کاربری که قبلا از آن‌ها استفاده کرده است (UX Hide)
+      let usedLocal: string[] = [];
+      try { usedLocal = JSON.parse(localStorage.getItem("axon_used_coupons") || "[]"); } catch {}
+      
+      const list = allActive.filter((c: any) => !usedLocal.includes(c.code));
+      
+      const prodId = String(product.id || productId);
+      const prodCategory = String(product.category || "").trim();
+
+      const specific = list.find(
+        (c: any) => c.target_type === "product" && String(c.target_id) === prodId
+      );
+
+      if (specific) {
+        const isPct = (specific.discount_type || specific.type) === "percent";
+        const val = Number(specific.discount_percent ?? specific.value ?? specific.discount_value ?? 0);
+        setTargetedCoupon({
+          code: specific.code,
+          label: isPct ? `${val}٪ اختصاصی` : `${val.toLocaleString("fa-IR")} ت اختصاصی`,
+          isProductSpecific: true,
+        });
+        return;
+      }
+
+      const catCoupon = list.find(
+        (c: any) => c.target_type === "category" && String(c.target_id).trim() === prodCategory
+      );
+
+      if (catCoupon) {
+        const isPct = (catCoupon.discount_type || catCoupon.type) === "percent";
+        const val = Number(catCoupon.discount_percent ?? catCoupon.value ?? catCoupon.discount_value ?? 0);
+        setTargetedCoupon({
+          code: catCoupon.code,
+          label: isPct ? `${val}٪ دسته‌بندی` : `${val.toLocaleString("fa-IR")} ت دسته‌بندی`,
+          isProductSpecific: false,
+        });
+        return;
+      }
+
+      const globalCoupon = list.find((c: any) => c.target_type === "all");
+      if (globalCoupon) {
+        const isPct = (globalCoupon.discount_type || globalCoupon.type) === "percent";
+        const val = Number(globalCoupon.discount_percent ?? globalCoupon.value ?? globalCoupon.discount_value ?? 0);
+        setTargetedCoupon({
+          code: globalCoupon.code,
+          label: isPct ? `${val}٪ با کد` : `${val.toLocaleString("fa-IR")} ت با کد`,
+          isProductSpecific: false,
+        });
+        return;
+      }
+
+      setTargetedCoupon(null);
+    } catch {
+      setTargetedCoupon(null);
+    }
+  }, [product.id, productId, product.category]);
+
+  useEffect(() => {
+    fetchApplicableCoupons();
+
+    const channel = supabase
+      .channel(`realtime-product-detail-${product.id || productId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "coupons" },
+        () => { fetchApplicableCoupons(); }
+      )
+      .subscribe();
+
+    window.addEventListener("coupons_updated", fetchApplicableCoupons);
+
+    return () => {
+      window.removeEventListener("coupons_updated", fetchApplicableCoupons);
+      supabase.removeChannel(channel);
+    };
+  }, [fetchApplicableCoupons, product.id, productId]);
+
+  const handleCopyCoupon = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!targetedCoupon) return;
+    soundEngine.playSuccess();
+    navigator.clipboard?.writeText(targetedCoupon.code);
+    setCopiedCoupon(true);
+    setTimeout(() => setCopiedCoupon(false), 2000);
+  };
 
   if (!product.id)
     return (
@@ -32,7 +136,7 @@ export default function ProductDetailClient({
     if (parts[1]) {
       try {
         const meta = JSON.parse(
-          parts[1].replace(/-->[sS]*$/g, "").trim()
+          parts[1].replace(/-->[\s\S]*$/g, "").trim()
         );
         if (Array.isArray(meta.images)) extractedImages = meta.images;
       } catch {}
@@ -83,7 +187,7 @@ export default function ProductDetailClient({
         <div className="flex flex-col lg:flex-row">
           {/* تصویر محصول */}
           <div
-            className="w-full lg:w-5/12 p-5 sm:p-6 flex flex-col gap-4"
+            className="w-full lg:w-5/12 p-5 sm:p-6 flex flex-col gap-4 relative"
             style={{
               borderBottom: "1px solid var(--glass-border)",
               borderLeft: "none",
@@ -95,12 +199,21 @@ export default function ProductDetailClient({
             />
             {hasDiscount && (
               <span
-                className="badge-capsule badge-discount self-start text-xs"
+                className="badge-capsule badge-discount self-start text-xs absolute top-8 right-8 z-10 shadow-lg"
               >
                 {discPct}٪ تخفیف ویژه
               </span>
             )}
-            <div className="w-full aspect-square flex items-center justify-center rounded-2xl overflow-hidden"
+            {/* برچسب موجودی در صفحه محصول (در صورت کم بودن) */}
+            {isAvailable && Number(product.stock) <= 3 && (
+               <span
+                 className="badge-capsule badge-warning self-start text-xs absolute top-8 left-8 z-10 shadow-lg"
+               >
+                 تنها {product.stock} عدد در انبار
+               </span>
+            )}
+            
+            <div className="w-full aspect-square flex items-center justify-center rounded-2xl overflow-hidden mt-6"
               style={{ background: "var(--input-bg)", border: "1px solid var(--glass-border)" }}
             >
               <img
@@ -115,7 +228,7 @@ export default function ProductDetailClient({
                   <button
                     key={idx}
                     onClick={() => setSelectedImg(idx)}
-                    className="flex-shrink-0 w-14 h-14 rounded-xl p-1 transition-all"
+                    className="flex-shrink-0 w-14 h-14 rounded-xl p-1 transition-all cursor-pointer"
                     style={{
                       border: idx === selectedImg
                         ? "2px solid var(--accent-blue)"
@@ -139,6 +252,27 @@ export default function ProductDetailClient({
           <div className="w-full lg:w-7/12 p-5 sm:p-8 flex flex-col"
             style={{ borderRight: "1px solid var(--glass-border)" }}
           >
+            {/* باکس کد تخفیف هوشمند */}
+            {targetedCoupon && (
+              <div className="mb-4 inline-flex">
+                 <button
+                   type="button"
+                   onClick={handleCopyCoupon}
+                   className={
+                     "inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-mono font-black transition cursor-pointer shadow-md " +
+                     (targetedCoupon.isProductSpecific
+                       ? "bg-amber-500 text-slate-950 hover:bg-amber-400"
+                       : "bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 hover:bg-emerald-500 hover:text-white")
+                   }
+                   title="کلیک برای کپی سریع کد تخفیف"
+                 >
+                   <span className="text-base">🏷️</span>
+                   <span>{copiedCoupon ? "کد کپی شد ✓" : targetedCoupon.code}</span>
+                   <span className="font-sans font-bold opacity-90">({targetedCoupon.label})</span>
+                 </button>
+              </div>
+            )}
+
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-black leading-snug"
               style={{ color: "var(--text-primary)" }}
             >

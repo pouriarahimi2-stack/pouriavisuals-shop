@@ -24,7 +24,11 @@ interface StoreFinancialRules {
 
 function parseExactNumber(val: any, fallback: number): number {
   if (val === undefined || val === null || val === "") return fallback;
-  const converted = String(val).replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 1776)).replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 1632)).replace(/,/g, "").trim();
+  const converted = String(val)
+    .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .replace(/,/g, "")
+    .trim();
   if (converted === "") return fallback;
   const num = Number(converted);
   return Number.isFinite(num) && num >= 0 ? num : fallback;
@@ -34,9 +38,15 @@ function extractFinancialRulesFromPayload(raw: any): StoreFinancialRules | null 
   if (!raw || typeof raw !== "object") return null;
 
   const candidates = [
-    raw.settings, raw.system_settings, raw.store_settings,
-    raw.homepage_layout_config?.system_settings, raw.homepage_layout_config?.settings,
-    raw.siteInfo?.homepage_layout_config?.system_settings, raw.siteInfo, raw.data, raw,
+    raw.settings,
+    raw.system_settings,
+    raw.store_settings,
+    raw.homepage_layout_config?.system_settings,
+    raw.homepage_layout_config?.settings,
+    raw.siteInfo?.homepage_layout_config?.system_settings,
+    raw.siteInfo,
+    raw.data,
+    raw,
   ].filter((c) => c && typeof c === "object");
 
   let foundPost: number | undefined;
@@ -44,9 +54,12 @@ function extractFinancialRulesFromPayload(raw: any): StoreFinancialRules | null 
   let foundVat: number | undefined;
 
   for (const obj of candidates) {
-    if (foundPost === undefined && obj.postShippingCost !== undefined) foundPost = parseExactNumber(obj.postShippingCost, 120000);
-    if (foundTipax === undefined && obj.tipaxShippingCost !== undefined) foundTipax = parseExactNumber(obj.tipaxShippingCost, 150000);
-    if (foundVat === undefined && obj.vatPercent !== undefined) foundVat = parseExactNumber(obj.vatPercent, 10);
+    if (foundPost === undefined && obj.postShippingCost !== undefined)
+      foundPost = parseExactNumber(obj.postShippingCost, 120000);
+    if (foundTipax === undefined && obj.tipaxShippingCost !== undefined)
+      foundTipax = parseExactNumber(obj.tipaxShippingCost, 150000);
+    if (foundVat === undefined && obj.vatPercent !== undefined)
+      foundVat = parseExactNumber(obj.vatPercent, 10);
   }
 
   return {
@@ -61,7 +74,15 @@ function extractFinancialRulesFromPayload(raw: any): StoreFinancialRules | null 
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cartItems, totalPrice, discountAmount, finalPayable, appliedCoupon, applyCoupon, removeCoupon } = useCart();
+  const {
+    cartItems,
+    totalPrice,
+    discountAmount,
+    finalPayable,
+    appliedCoupon,
+    applyCoupon,
+    removeCoupon,
+  } = useCart();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -73,38 +94,35 @@ export default function CheckoutPage() {
   const [notes, setNotes] = useState("");
   const [shippingMethod, setShippingMethod] = useState<"post" | "tipax" | null>(null);
 
-  // ─────────────────────────────────────────────────────────────────
-  // allowedShipping: بر اساس shipping_type آیتم‌های سبد خرید
-  // اگر محصول "tipax" باشه → فقط تیپاکس / اگر "post" باشه → فقط پست
-  // ─────────────────────────────────────────────────────────────────
   const allowedShipping = React.useMemo(() => {
     const items = (cartItems || []) as any[];
-    // shipping_type ممکنه مستقیم یا nested باشه
     const getShippingType = (item: any): string => {
       return String(
         item.shipping_type ||
-        item.product?.shipping_type ||
-        item.shippingType ||
-        ""
-      ).toLowerCase().trim();
+          item.product?.shipping_type ||
+          item.shippingType ||
+          ""
+      )
+        .toLowerCase()
+        .trim();
     };
     const hasTipaxOnly = items.some((item: any) => getShippingType(item) === "tipax");
-    const hasPostOnly  = items.some((item: any) => getShippingType(item) === "post");
+    const hasPostOnly = items.some((item: any) => getShippingType(item) === "post");
     if (hasTipaxOnly && !hasPostOnly) return "tipax_only" as const;
-    if (hasPostOnly  && !hasTipaxOnly) return "post_only"  as const;
+    if (hasPostOnly && !hasTipaxOnly) return "post_only" as const;
     return "both" as const;
   }, [cartItems]);
 
-  // اعمال خودکار روش ارسال اجباری
   React.useEffect(() => {
     if (allowedShipping === "tipax_only" && shippingMethod !== "tipax") {
       setShippingMethod("tipax");
     } else if (allowedShipping === "post_only" && shippingMethod !== "post") {
       setShippingMethod("post");
     }
-  }, [allowedShipping]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [allowedShipping]);
 
   const [couponInput, setCouponInput] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
   const [couponMsg, setCouponMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   const [financialRules, setFinancialRules] = useState<StoreFinancialRules>({
@@ -132,7 +150,10 @@ export default function CheckoutPage() {
       if (settingsRes.status === "fulfilled" && settingsRes.value.ok) {
         const sJson = await settingsRes.value.json();
         const extracted = extractFinancialRulesFromPayload(sJson);
-        if (extracted) { setFinancialRules(extracted); return; }
+        if (extracted) {
+          setFinancialRules(extracted);
+          return;
+        }
       }
       if (siteInfoRes.status === "fulfilled" && siteInfoRes.value.ok) {
         const infoJson = await siteInfoRes.value.json();
@@ -144,51 +165,39 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     fetchLiveStoreRules();
-    const channel = supabase.channel("realtime-checkout-store-settings").on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, (payload) => {
-      if (payload?.new) {
-        const updated = extractFinancialRulesFromPayload(payload.new);
-        if (updated) setFinancialRules(updated);
-      }
-      fetchLiveStoreRules();
-    }).subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const channel = supabase
+      .channel("realtime-checkout-store-settings")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "site_info" },
+        (payload) => {
+          if (payload?.new) {
+            const updated = extractFinancialRulesFromPayload(payload.new);
+            if (updated) setFinancialRules(updated);
+          }
+          fetchLiveStoreRules();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchLiveStoreRules]);
 
-  // ── فیلتر هوشمند روش ارسال بر اساس نوع محصولات سبد ─────────
-  const cartShipTypes = cartItems.map((i: any) => (i.shipping_type || "both") as string);
-  const allowPost  = cartShipTypes.every(t => t === "post"  || t === "both");
-  const allowTipax = cartShipTypes.every(t => t === "tipax" || t === "both");
-  // اگر همه محصولات یه نوع خاص دارن، auto-select کن
-  const forcedShipping: "post"|"tipax"|null =
-    (allowPost && !allowTipax) ? "post" :
-    (!allowPost && allowTipax) ? "tipax" : null;
-
-  // اگر نوع ارسال محدود شده و انتخاب کنونی اشتباهه، ریست کن
-  React.useEffect(() => {
-    if (forcedShipping && shippingMethod !== forcedShipping) {
-      setShippingMethod(forcedShipping);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [forcedShipping]);
-
-  // تیپاکس = پس‌کرایه: هزینه ارسال هنگام تحویل گرفته میشه
   let shippingCost = 0;
   if (finalPayable > 0) {
     if (shippingMethod === "post") shippingCost = financialRules.postShippingCost;
-    else if (shippingMethod === "tipax") shippingCost = 0; // پس‌کرایه
+    else if (shippingMethod === "tipax") shippingCost = 0;
   }
 
-  // استفاده از موتور مالی قانونی برای تفکیک مالیات بدون افزایش مبلغ پرداختی مشتری
   const invoice = PricingEngine.calculateInvoiceBreakdown(cartItems);
   const vatAmount = invoice.totalVatAmount;
-  // مبلغ کالاها شامل مالیات است، فقط هزینه ارسال اضافه می‌شود
   const grandTotal = Math.max(0, finalPayable + shippingCost);
 
-  // لیست شهرهای استان انتخاب‌شده
   const provinceList = Object.keys(IRAN_PROVINCES_CITIES).sort();
-  const cityList: string[] = (IRAN_PROVINCES_CITIES as Record<string, string[]>)[province] || [];
+  const cityList: string[] =
+    (IRAN_PROVINCES_CITIES as Record<string, string[]>)[province] || [];
 
-  // وقتی استان عوض میشه، شهر رو reset کن
   const handleProvinceChange = (val: string) => {
     setProvince(val);
     const cities: string[] = (IRAN_PROVINCES_CITIES as Record<string, string[]>)[val] || [];
@@ -203,14 +212,17 @@ export default function CheckoutPage() {
         const parsed = JSON.parse(savedDraft);
         if (parsed.firstName) setFirstName(parsed.firstName);
         if (parsed.lastName) setLastName(parsed.lastName);
-        // سازگاری با نسخه قدیم
         if (!parsed.firstName && parsed.fullName) {
           const parts = String(parsed.fullName).trim().split(" ");
           setFirstName(parts[0] || "");
           setLastName(parts.slice(1).join(" ") || "");
         }
         if (parsed.phone) setPhone(parsed.phone);
-        if (parsed.province && (IRAN_PROVINCES_CITIES as Record<string,string[]>)[parsed.province]) setProvince(parsed.province);
+        if (
+          parsed.province &&
+          (IRAN_PROVINCES_CITIES as Record<string, string[]>)[parsed.province]
+        )
+          setProvince(parsed.province);
         if (parsed.city) setCity(parsed.city);
         if (parsed.address) setAddress(parsed.address);
         if (parsed.postalCode) setPostalCode(parsed.postalCode);
@@ -221,21 +233,58 @@ export default function CheckoutPage() {
   }, []);
 
   useEffect(() => {
-    try { localStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify({ firstName, lastName, phone, province, city, address, postalCode, notes, shippingMethod })); } catch {}
+    try {
+      localStorage.setItem(
+        CHECKOUT_DRAFT_KEY,
+        JSON.stringify({
+          firstName,
+          lastName,
+          phone,
+          province,
+          city,
+          address,
+          postalCode,
+          notes,
+          shippingMethod,
+        })
+      );
+    } catch {}
   }, [firstName, lastName, phone, province, city, address, postalCode, notes, shippingMethod]);
 
   const handleApplyCoupon = async () => {
     if (!couponInput.trim()) return;
     soundEngine.playClick();
-    const res = await applyCoupon(couponInput.trim());
-    setCouponMsg({ type: res.success ? "ok" : "err", text: res.message });
+    setCouponLoading(true);
+    setCouponMsg(null);
+    try {
+      const res = await applyCoupon(couponInput.trim().toUpperCase());
+      if (res?.success) {
+        soundEngine.playSuccess();
+        setCouponMsg({ type: "ok", text: res.message || "کد تخفیف با موفقیت اعمال شد." });
+        setCouponInput("");
+      } else {
+        setCouponMsg({ type: "err", text: res?.message || "کد تخفیف معتبر نیست یا منقضی شده است." });
+      }
+    } catch {
+      setCouponMsg({ type: "err", text: "خطا در برقراری ارتباط و بررسی کد تخفیف." });
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    soundEngine.playClick();
+    removeCoupon();
+    setCouponMsg(null);
   };
 
   const finalizeOrderWithVerifiedToken = async (tokenToUse: string) => {
     setSubmitting(true);
     setErrorMsg(null);
     try {
-      const cleanPhone = phone.replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 1776)).replace(/\D/g, "");
+      const cleanPhone = phone
+        .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 1776))
+        .replace(/\D/g, "");
       const fullName = (firstName.trim() + " " + lastName.trim()).trim();
       const orderRes = await fetch("/api/checkout", {
         method: "POST",
@@ -247,7 +296,11 @@ export default function CheckoutPage() {
             phone: cleanPhone,
             province,
             city,
-            address: address.trim() + " [ارسال با " + (shippingMethod === "post" ? "پست" : "تیپاکس") + "]",
+            address:
+              address.trim() +
+              " [ارسال با " +
+              (shippingMethod === "post" ? "پست" : "تیپاکس") +
+              "]",
             postalCode: postalCode.trim(),
             notes: notes.trim(),
           },
@@ -263,11 +316,19 @@ export default function CheckoutPage() {
       });
 
       const orderData = await orderRes.json();
-      if (!orderRes.ok || !orderData.success) throw new Error(orderData.message || "خطا در ثبت سفارش");
+      if (!orderRes.ok || !orderData.success)
+        throw new Error(orderData.message || "خطا در ثبت سفارش");
 
       const orderId = orderData.order?.id || orderData.order?.order_number;
       soundEngine.playSuccess();
-      router.push("/checkout/payment?orderId=" + encodeURIComponent(String(orderId)) + "&amount=" + encodeURIComponent(String(grandTotal)) + "&phone=" + encodeURIComponent(cleanPhone));
+      router.push(
+        "/checkout/payment?orderId=" +
+          encodeURIComponent(String(orderId)) +
+          "&amount=" +
+          encodeURIComponent(String(grandTotal)) +
+          "&phone=" +
+          encodeURIComponent(cleanPhone)
+      );
     } catch (err: any) {
       setErrorMsg(err.message || "خطا در ثبت نهایی سفارش.");
       setSubmitting(false);
@@ -279,44 +340,62 @@ export default function CheckoutPage() {
     soundEngine.playClick();
     setErrorMsg(null);
 
-    const cleanPhone = phone.replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 1776)).replace(/\D/g, "");
+    const cleanPhone = phone
+      .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 1776))
+      .replace(/\D/g, "");
 
     if (!firstName.trim() || !lastName.trim()) {
-      setErrorMsg("لطفاً نام و نام خانوادگی گیرنده را به صورت جداگانه وارد نمایید."); return;
+      setErrorMsg("لطفاً نام و نام خانوادگی گیرنده را به صورت جداگانه وارد نمایید.");
+      return;
     }
     if (cleanPhone.length !== 11) {
-      setErrorMsg("شماره موبایل باید ۱۱ رقم باشد."); return;
+      setErrorMsg("شماره موبایل باید ۱۱ رقم باشد.");
+      return;
     }
     if (!address.trim()) {
-      setErrorMsg("لطفاً نشانی دقیق پستی را وارد نمایید."); return;
+      setErrorMsg("لطفاً نشانی دقیق پستی را وارد نمایید.");
+      return;
     }
     if (!postalCode.trim() || postalCode.replace(/\D/g, "").length < 10) {
-      setErrorMsg("لطفاً کد پستی ۱۰ رقمی را وارد نمایید."); return;
+      setErrorMsg("لطفاً کد پستی ۱۰ رقمی را وارد نمایید.");
+      return;
     }
     if (!shippingMethod) {
-      setErrorMsg("لطفاً نوع روش ارسال (پست پیشتاز یا تیپاکس) را انتخاب نمایید."); return;
+      setErrorMsg("لطفاً نوع روش ارسال (پست پیشتاز یا تیپاکس) را انتخاب نمایید.");
+      return;
     }
     if (!captchaVerified) {
-      setErrorMsg("لطفاً ابتدا کد امنیتی ضد ربات (کادر تصویر امنیتی) را به درستی وارد نمایید."); return;
+      setErrorMsg("لطفاً ابتدا کد امنیتی ضد ربات (کادر تصویر امنیتی) را به درستی وارد نمایید.");
+      return;
     }
-    if (cartItems.length === 0) { setErrorMsg("سبد خرید شما خالی است."); return; }
+    if (cartItems.length === 0) {
+      setErrorMsg("سبد خرید شما خالی است.");
+      return;
+    }
 
-    if (verifiedToken) { await finalizeOrderWithVerifiedToken(verifiedToken); return; }
+    if (verifiedToken) {
+      await finalizeOrderWithVerifiedToken(verifiedToken);
+      return;
+    }
 
     setSubmitting(true);
     try {
       const otpRes = await fetch("/api/send-otp", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: cleanPhone, action: "send" }),
       });
       const otpJson = await otpRes.json();
       if (otpRes.ok && otpJson.success) {
-        setOtpModalOpen(true); setSubmitting(false);
+        setOtpModalOpen(true);
+        setSubmitting(false);
       } else {
-        setErrorMsg(otpJson.message || "خطا در ارسال پیامک تایید."); setSubmitting(false);
+        setErrorMsg(otpJson.message || "خطا در ارسال پیامک تایید.");
+        setSubmitting(false);
       }
     } catch {
-      setErrorMsg("خطا در ارتباط با سرویس پیامک."); setSubmitting(false);
+      setErrorMsg("خطا در ارتباط با سرویس پیامک.");
+      setSubmitting(false);
     }
   };
 
@@ -326,9 +405,12 @@ export default function CheckoutPage() {
     setSubmitting(true);
     setErrorMsg(null);
     try {
-      const cleanPhone = phone.replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 1776)).replace(/\D/g, "");
+      const cleanPhone = phone
+        .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 1776))
+        .replace(/\D/g, "");
       const vRes = await fetch("/api/send-otp", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: cleanPhone, code: otpCode.trim(), action: "verify" }),
       });
       const vJson = await vRes.json();
@@ -338,97 +420,169 @@ export default function CheckoutPage() {
         setOtpModalOpen(false);
         await finalizeOrderWithVerifiedToken(vJson.otpVerificationToken);
       } else {
-        setErrorMsg(vJson.message || "کد تایید صحیح نیست."); setSubmitting(false);
+        setErrorMsg(vJson.message || "کد تایید صحیح نیست.");
+        setSubmitting(false);
       }
     } catch {
-      setErrorMsg("خطا در اعتبارسنجی."); setSubmitting(false);
+      setErrorMsg("خطا در اعتبارسنجی.");
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 font-sans select-text text-[var(--text-primary)] space-y-6" dir="rtl">
+    <div
+      className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 font-sans select-text text-[var(--text-primary)] space-y-6"
+      dir="rtl"
+    >
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4 border-b border-[var(--card-border)] pb-4">
         <div>
-          <h1 className="text-sm md:text-xl sm:text-2xl font-black text-[var(--accent-blue)]">🛡️ تکمیل مشخصات گیرنده و پرداخت امن</h1>
-
+          <h1 className="text-sm md:text-xl sm:text-2xl font-black text-[var(--accent-blue)]">
+            🛡️ تکمیل مشخصات گیرنده و پرداخت امن
+          </h1>
         </div>
       </div>
 
-      {errorMsg && <div className="p-4 rounded-2xl bg-rose-500/15 text-rose-500 text-xs font-bold animate-fadeIn">⚠️ {errorMsg}</div>}
+      {errorMsg && (
+        <div className="p-4 rounded-2xl bg-rose-500/15 text-rose-500 text-xs font-bold animate-fadeIn">
+          ⚠️ {errorMsg}
+        </div>
+      )}
 
       <form onSubmit={handlePrimaryCheckoutClick} className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
         <div className="space-y-5">
-          {/* بخش ۱: مشخصات گیرنده */}
           <div className="p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
-            <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">۱. مشخصات خریدار و نشانی دقیق تحویل مرسوله</h2>
+            <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
+              ۱. مشخصات خریدار و نشانی دقیق تحویل مرسوله
+            </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-              {/* نام */}
               <div>
                 <label className="block mb-1.5 font-bold">نام گیرنده *</label>
-                <input type="text" required value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="نام" className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)]" />
+                <input
+                  type="text"
+                  required
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="نام"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)]"
+                />
               </div>
-              {/* نام خانوادگی */}
               <div>
                 <label className="block mb-1.5 font-bold">نام خانوادگی گیرنده *</label>
-                <input type="text" required value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="نام خانوادگی" className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)]" />
+                <input
+                  type="text"
+                  required
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="نام خانوادگی"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)]"
+                />
               </div>
-              {/* موبایل */}
               <div>
                 <label className="block mb-1.5 font-bold">شماره تلفن همراه *</label>
-                <input type="tel" required dir="ltr" maxLength={11} value={phone} onChange={(e) => { setPhone(e.target.value); setVerifiedToken(""); }} className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-center outline-none focus:border-[var(--accent-blue)]" />
+                <input
+                  type="tel"
+                  required
+                  dir="ltr"
+                  maxLength={11}
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    setVerifiedToken("");
+                  }}
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-center outline-none focus:border-[var(--accent-blue)]"
+                />
               </div>
-              {/* کد پستی */}
               <div>
                 <label className="block mb-1.5 font-bold">کد پستی ۱۰ رقمی *</label>
-                <input type="text" required dir="ltr" maxLength={10} value={postalCode} onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, ""))} placeholder="0000000000" className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-center outline-none focus:border-[var(--accent-blue)]" />
+                <input
+                  type="text"
+                  required
+                  dir="ltr"
+                  maxLength={10}
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="0000000000"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-center outline-none focus:border-[var(--accent-blue)]"
+                />
               </div>
-              {/* استان */}
               <div>
                 <label className="block mb-1.5 font-bold">استان *</label>
-                <select value={province} onChange={(e) => handleProvinceChange(e.target.value)} className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] cursor-pointer">
+                <select
+                  value={province}
+                  onChange={(e) => handleProvinceChange(e.target.value)}
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] cursor-pointer"
+                >
                   {provinceList.map((p) => (
-                    <option key={p} value={p}>{p}</option>
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
                   ))}
                 </select>
               </div>
-              {/* شهر */}
               <div>
                 <label className="block mb-1.5 font-bold">شهر *</label>
-                <select value={city} onChange={(e) => setCity(e.target.value)} className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] cursor-pointer">
+                <select
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] cursor-pointer"
+                >
                   {cityList.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
                   ))}
                 </select>
               </div>
-              {/* آدرس کامل */}
               <div className="sm:col-span-2">
-                <label className="block mb-1.5 font-bold">نشانی کامل پستی (خیابان، کوچه، پلاک، واحد) *</label>
-                <textarea rows={3} required value={address} onChange={(e) => setAddress(e.target.value)} placeholder="مثال: خیابان امیرکبیر، کوچه بهار، پلاک ۱۲، واحد ۳" className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] leading-relaxed" />
+                <label className="block mb-1.5 font-bold">
+                  نشانی کامل پستی (خیابان، کوچه، پلاک، واحد) *
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="مثال: خیابان امیرکبیر، کوچه بهار، پلاک ۱۲، واحد ۳"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] leading-relaxed"
+                />
               </div>
-              {/* توضیحات اختیاری */}
               <div className="sm:col-span-2">
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">توضیحات سفارش (اختیاری)</label>
-                <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="هر توضیح خاصی برای سفارش..." className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)]" />
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                  توضیحات سفارش (اختیاری)
+                </label>
+                <input
+                  type="text"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="هر توضیح خاصی برای سفارش..."
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)]"
+                />
               </div>
             </div>
           </div>
 
-          {/* بخش ۲: روش ارسال */}
-          {/* smart_shipping_section */}
           <div className="p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
             <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
               ۲. انتخاب روش ارسال کالا (اجباری)
             </h2>
             {allowedShipping !== "both" && (
               <div className="text-[11px] px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 font-bold">
-                ⚠️ {allowedShipping === "tipax_only"
+                ⚠️{" "}
+                {allowedShipping === "tipax_only"
                   ? "این سفارش فقط از طریق تیپاکس (پس‌کرایه) ارسال می‌شود."
                   : "این سفارش فقط از طریق پست پیشتاز ارسال می‌شود."}
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 pt-1">
               {allowedShipping !== "tipax_only" && (
-                <label className={"p-4 rounded-2xl border-2 cursor-pointer transition flex flex-col gap-2 " + (shippingMethod === "post" ? "border-emerald-500 bg-emerald-500/10" : "border-[var(--card-border)] bg-[var(--input-bg)]")}>
+                <label
+                  className={
+                    "p-4 rounded-2xl border-2 cursor-pointer transition flex flex-col gap-2 " +
+                    (shippingMethod === "post"
+                      ? "border-emerald-500 bg-emerald-500/10"
+                      : "border-[var(--card-border)] bg-[var(--input-bg)]")
+                  }
+                >
                   <div className="flex items-center gap-3">
                     <input
                       type="radio"
@@ -446,7 +600,14 @@ export default function CheckoutPage() {
                 </label>
               )}
               {allowedShipping !== "post_only" && (
-                <label className={"p-4 rounded-2xl border-2 cursor-pointer transition flex flex-col gap-2 " + (shippingMethod === "tipax" ? "border-amber-500 bg-amber-500/10" : "border-[var(--card-border)] bg-[var(--input-bg)]")}>
+                <label
+                  className={
+                    "p-4 rounded-2xl border-2 cursor-pointer transition flex flex-col gap-2 " +
+                    (shippingMethod === "tipax"
+                      ? "border-amber-500 bg-amber-500/10"
+                      : "border-[var(--card-border)] bg-[var(--input-bg)]")
+                  }
+                >
                   <div className="flex items-center gap-3">
                     <input
                       type="radio"
@@ -467,38 +628,128 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* ستون راست: صورتحساب */}
+        {/* ستون چپ: صورتحساب و بخش ثبت کد تخفیف */}
         <div className="p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs h-fit">
-          <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">۳. صورتحساب و تایید نهایی</h2>
-          {/* خلاصه محصولات سبد */}
+          <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
+            ۳. صورتحساب و تایید نهایی
+          </h2>
+
           {cartItems.length > 0 && (
             <div className="space-y-2 text-[11px]">
               {cartItems.map((item: any, idx: number) => (
-                <div key={item.id || idx} className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+                <div
+                  key={item.id || idx}
+                  className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]"
+                >
                   {(item.image || item.image_url) && (
-                    <img src={item.image || item.image_url} alt={item.title||""} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" onError={(e)=>{(e.target as HTMLImageElement).style.display="none"}} />
+                    <img
+                      src={item.image || item.image_url}
+                      alt={item.title || ""}
+                      className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="font-bold text-[12px] truncate">{item.title || item.name}</div>
                     <div className="flex items-center gap-2 mt-0.5 text-[var(--text-secondary)]">
-                      <span>تعداد: <span className="font-mono font-bold">{item.quantity || 1}</span></span>
-                      {item.selectedColor && <span>رنگ: <span className="font-bold">{item.selectedColor}</span></span>}
+                      <span>
+                        تعداد: <span className="font-mono font-bold">{item.quantity || 1}</span>
+                      </span>
+                      {item.selectedColor && (
+                        <span>
+                          رنگ: <span className="font-bold">{item.selectedColor}</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="font-mono font-black text-[var(--accent-blue)] whitespace-nowrap text-[11px]">
-                    {typeof formatPrice === "function" ? formatPrice((item.discount_price||item.price||0)*(item.quantity||1)) : ((item.discount_price||item.price||0)*(item.quantity||1)).toLocaleString("fa-IR")} ت
+                    {typeof formatPrice === "function"
+                      ? formatPrice((item.discount_price || item.price || 0) * (item.quantity || 1))
+                      : (
+                          (item.discount_price || item.price || 0) *
+                          (item.quantity || 1)
+                        ).toLocaleString("fa-IR")}{" "}
+                    ت
                   </div>
                 </div>
               ))}
             </div>
           )}
+
+          {/* کادر ثبت کد تخفیف اختصاصی و سراسری */}
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-black text-xs text-[var(--text-primary)]">🏷️ کد تخفیف دارید؟</span>
+              {appliedCoupon && (
+                <span className="text-[10px] px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-500 font-bold">
+                  اعمال‌شده ✓
+                </span>
+              )}
+            </div>
+
+            {appliedCoupon ? (
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-black text-emerald-500 tracking-wider">
+                    {appliedCoupon.code}
+                  </span>
+                  <span className="text-[11px] text-emerald-600 font-bold">
+                    ({formatPrice(discountAmount)} تومان کسر شد)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemoveCoupon}
+                  className="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-500 hover:bg-rose-500 hover:text-white font-bold text-[11px] transition cursor-pointer"
+                >
+                  حذف کوپن
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    dir="ltr"
+                    value={couponInput}
+                    onChange={(e) => setCouponInput(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ""))}
+                    placeholder="AXON-CJZU"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-black uppercase outline-none focus:border-[var(--accent-blue)] text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    disabled={couponLoading || !couponInput.trim()}
+                    className="px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] hover:opacity-90 disabled:opacity-50 text-white font-black text-xs transition cursor-pointer shrink-0"
+                  >
+                    {couponLoading ? "بررسی..." : "اعمال"}
+                  </button>
+                </div>
+                {couponMsg && (
+                  <div
+                    className={
+                      "text-[11px] font-bold p-2 rounded-xl " +
+                      (couponMsg.type === "ok"
+                        ? "bg-emerald-500/15 text-emerald-500 border border-emerald-500/30"
+                        : "bg-rose-500/15 text-rose-500 border border-rose-500/30")
+                    }
+                  >
+                    {couponMsg.text}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
             <div className="flex justify-between">
               <span>مجموع اقلام:</span>
               <span className="font-mono">{formatPrice(totalPrice)} تومان</span>
             </div>
             {discountAmount > 0 && (
-              <div className="flex justify-between text-emerald-500">
+              <div className="flex justify-between text-emerald-500 font-bold">
                 <span>تخفیف کوپن:</span>
                 <span className="font-mono">- {formatPrice(discountAmount)} تومان</span>
               </div>
@@ -510,29 +761,76 @@ export default function CheckoutPage() {
               </div>
             )}
             <div className="flex justify-between">
-              <span>هزینه ارسال ({shippingMethod === "post" ? "پست" : shippingMethod === "tipax" ? "تیپاکس" : "انتخاب نشده"}):</span>
-              <span className={`font-mono ${shippingMethod==="tipax"?"text-amber-500":"text-emerald-500"}`}>
-                {!shippingMethod ? "---" : shippingMethod === "tipax" ? "پس‌کرایه 🚚" : formatPrice(shippingCost) + " تومان"}
+              <span>
+                هزینه ارسال (
+                {shippingMethod === "post"
+                  ? "پست"
+                  : shippingMethod === "tipax"
+                  ? "تیپاکس"
+                  : "انتخاب نشده"}
+                ):
+              </span>
+              <span
+                className={`font-mono ${
+                  shippingMethod === "tipax" ? "text-amber-500" : "text-emerald-500"
+                }`}
+              >
+                {!shippingMethod
+                  ? "---"
+                  : shippingMethod === "tipax"
+                  ? "پس‌کرایه 🚚"
+                  : formatPrice(shippingCost) + " تومان"}
               </span>
             </div>
             <div className="pt-2.5 border-t border-[var(--card-border)] flex justify-between items-center text-sm">
               <span className="font-black">مبلغ قابل پرداخت:</span>
-              <span className="font-mono font-black text-[var(--accent-blue)]">{formatPrice(grandTotal)} تومان</span>
+              <span className="font-mono font-black text-[var(--accent-blue)]">
+                {formatPrice(grandTotal)} تومان
+              </span>
             </div>
           </div>
           <SecurityCaptchaBox onVerifyChange={setCaptchaVerified} />
-          <button type="submit" disabled={submitting || !captchaVerified} className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs sm:text-sm shadow-xl cursor-pointer transition disabled:opacity-50">
-            {submitting ? "در حال پردازش..." : verifiedToken ? "💳 ورود به درگاه زرین‌پال ←" : "🔒 تایید شماره و پرداخت آنلاین ←"}
+          <button
+            type="submit"
+            disabled={submitting || !captchaVerified}
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs sm:text-sm shadow-xl cursor-pointer transition disabled:opacity-50"
+          >
+            {submitting
+              ? "در حال پردازش..."
+              : verifiedToken
+              ? "💳 ورود به درگاه زرین‌پال ←"
+              : "🔒 تایید شماره و پرداخت آنلاین ←"}
           </button>
         </div>
       </form>
 
       {otpModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn" onClick={() => setOtpModalOpen(false)}>
-          <form onSubmit={handleVerifyOtpAndPay} onClick={(e) => e.stopPropagation()} className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-5 text-center text-xs">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn"
+          onClick={() => setOtpModalOpen(false)}
+        >
+          <form
+            onSubmit={handleVerifyOtpAndPay}
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-5 text-center text-xs"
+          >
             <p className="font-bold text-sm">کد تایید ارسال‌شده به {phone} را وارد کنید</p>
-            <input type="text" inputMode="numeric" required dir="ltr" maxLength={8} value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder="کد تایید را وارد کنید" className="w-full p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black text-lg text-center outline-none focus:border-[var(--accent-blue)]" />
-            <button type="submit" disabled={submitting} className="w-full py-4 rounded-2xl bg-emerald-600 text-white font-black text-xs shadow-xl cursor-pointer">
+            <input
+              type="text"
+              inputMode="numeric"
+              required
+              dir="ltr"
+              maxLength={8}
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value)}
+              placeholder="کد تایید را وارد کنید"
+              className="w-full p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black text-lg text-center outline-none focus:border-[var(--accent-blue)]"
+            />
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full py-4 rounded-2xl bg-emerald-600 text-white font-black text-xs shadow-xl cursor-pointer"
+            >
               {submitting ? "در حال انتقال..." : "✓ تایید کد و پرداخت"}
             </button>
           </form>

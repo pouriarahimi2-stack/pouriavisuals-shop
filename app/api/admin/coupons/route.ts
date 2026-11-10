@@ -7,13 +7,20 @@ export const dynamic = "force-dynamic";
 
 function buildCouponPayload(body: any, isUpdate = false) {
   const rawCode = String(body.code || "").trim().toUpperCase();
-  const type =
+  
+  // تعیین دقیق نوع تخفیف
+  const discountType =
     body.discount_type === "fixed" || body.type === "fixed" ? "fixed" : "percent";
 
-  const rawValue =
-    type === "percent"
-      ? Number(body.discount_percent ?? body.value ?? body.discount_value ?? 0)
-      : Number(body.discount_amount ?? body.value ?? body.discount_value ?? 0);
+  // پوشش جامع تمام کلیدهای احتمالی مقدار تخفیف در جدول‌های مختلف
+  const rawValue = Number(
+    body.discount_percent ??
+      body.discount_amount ??
+      body.discount_value ??
+      body.value ??
+      body.amount ??
+      0
+  );
 
   const minPurchase =
     body.min_purchase !== undefined && body.min_purchase !== null && body.min_purchase !== ""
@@ -27,38 +34,42 @@ function buildCouponPayload(body: any, isUpdate = false) {
       ? Number(body.max_discount)
       : body.max_discount_amount !== undefined && body.max_discount_amount !== null && body.max_discount_amount !== ""
       ? Number(body.max_discount_amount)
-      : null;
+      : 0;
 
   const usageLimit =
     body.usage_limit !== undefined && body.usage_limit !== null && body.usage_limit !== ""
       ? Number(body.usage_limit)
       : 100;
 
+  const couponId = body.id || ("cpn_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
+
+  // ارسال هم‌زمان تمامی نام‌گذاری‌های استاندارد و معادل برای سازگاری کامل با هر اسکیمایی در Supabase
   const payload: Record<string, any> = {
+    id: couponId,
     code: rawCode,
-    type,
-    discount_type: type,
+    type: discountType,
+    discount_type: discountType,
     value: rawValue,
     discount_value: rawValue,
-    discount_percent: type === "percent" ? rawValue : null,
-    discount_amount: type === "fixed" ? rawValue : null,
+    discount_amount: rawValue,
+    amount: rawValue,
     min_purchase: minPurchase,
     min_order_amount: minPurchase,
     max_discount: maxDiscount,
-    max_discount_amount: maxDiscount,
     usage_limit: usageLimit,
-    description: body.description ? String(body.description).trim() : null,
     target_type: body.target_type || "all",
     target_id: body.target_id || null,
+    starts_at: body.starts_at ? new Date(body.starts_at).toISOString() : new Date().toISOString(),
     expires_at: body.expires_at ? new Date(body.expires_at).toISOString() : null,
     is_active: body.is_active !== false,
     updated_at: new Date().toISOString(),
   };
 
+  if (body.description) {
+    payload.description = String(body.description).trim();
+  }
+
   if (!isUpdate) {
-    payload.starts_at = body.starts_at
-      ? new Date(body.starts_at).toISOString()
-      : new Date().toISOString();
     payload.created_at = new Date().toISOString();
   }
 
@@ -137,7 +148,7 @@ export async function PUT(req: NextRequest) {
     const { rawCode, rawValue, payload } = buildCouponPayload(body, true);
 
     if (!rawCode || isNaN(rawValue) || rawValue <= 0) {
-      return NextResponse.json({ success: false, message: "کد و مقدار تخفیف معتبر الزامی است." }, { status: 400 });
+      return NextResponse.json({ success: false, message: "کد و مقدار تخفیف معتبر است." }, { status: 400 });
     }
 
     const { data: updated, error } = await supabaseAdmin
@@ -201,10 +212,62 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, message: "شناسه کوپن الزامی است." }, { status: 400 });
     }
 
+    // ۱. واکشی اطلاعات کوپن قبل از حذف برای دریافت کد تخفیف
+    const { data: couponToDelete } = await supabaseAdmin
+      .from("coupons")
+      .select("code")
+      .eq("id", id)
+      .maybeSingle();
+
+    const couponCode = couponToDelete?.code;
+
+    // ۲. حذف رکورد از جدول coupons
     const { error } = await supabaseAdmin.from("coupons").delete().eq("id", id);
     if (error) throw error;
 
-    return NextResponse.json({ success: true, message: "کد تخفیف با موفقیت حذف شد." });
+    // ۳. پاکسازی خودکار نوار اعلان در site_info و Theme Builder در صورت تطابق کد
+    if (couponCode) {
+      try {
+        const { data: siteInfo } = await supabaseAdmin
+          .from("site_info")
+          .select("theme_builder_config, homepage_layout_config, header_announcement")
+          .limit(1)
+          .maybeSingle();
+
+        if (siteInfo) {
+          const tbCfg = siteInfo.theme_builder_config || {};
+          const globalH = tbCfg.globalHeader || {};
+          const currentText = String(globalH.announcementText || siteInfo.header_announcement || "");
+
+          // اگر متن نوار اعلان حاوی کد این کوپن باشد، نوار اعلان خاموش و خالی شود
+          if (currentText.includes(couponCode)) {
+            const updatedTbCfg = {
+              ...tbCfg,
+              globalHeader: {
+                ...globalH,
+                announcementEnabled: false,
+                announcementText: "",
+              },
+            };
+
+            await supabaseAdmin
+              .from("site_info")
+              .update({
+                theme_builder_config: updatedTbCfg,
+                header_announcement: null,
+              })
+              .limit(1);
+          }
+        }
+      } catch (cleanErr) {
+        console.error("خطا در پاکسازی نوار اعلان هنگام حذف کوپن:", cleanErr);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "کد تخفیف با موفقیت حذف شد و نوار اعلان مرتبط در بالای سایت پاکسازی گردید.",
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

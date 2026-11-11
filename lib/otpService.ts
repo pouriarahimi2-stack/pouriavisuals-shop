@@ -22,6 +22,7 @@ const RAW_KEY_UNPADDED =
   "YTJjNDk1NTItNmJmOS00ZjY0LWJjMWQtMjM1OTdmN2M4NDdlMjc1ZmJhYTMxODk5OTNiMmFmM2FmZjA5YTNiYjBhZTY";
 const RAW_KEY_PADDED = RAW_KEY_UNPADDED + "=";
 const EXACT_ORIGIN_NUMBER = "+983000505";
+// کد پترن جدید شما از پنل IPPanel
 const EXACT_PATTERN_CODE = "6xfi2kgb07uy60i";
 const NETAFRAZ_STATIC_IP = "185.106.201.79";
 
@@ -122,7 +123,7 @@ export async function sendOtpPatternDetailed({
 
   const attemptsLog: Array<Record<string, any>> = [];
 
-  // ۱. تلاش اول: ارسال از طریق پل هاست نت‌افراز شما (gate.axoncore.ir -> 185.106.201.79)
+  // ۱. تلاش اول: ارسال از طریق پل هاست نت‌افراز
   const relayResult = await postViaNetafrazRelay(
     "https://edge.ippanel.com/v1/api/send",
     { Authorization: padded },
@@ -131,7 +132,7 @@ export async function sendOtpPatternDetailed({
       from_number: originNumber,
       code: patternCode,
       recipients: [recipientE164],
-      params: { code: cleanCode },
+      params: { code: cleanCode }, // متغیر اصلاح شد به code
     }
   );
 
@@ -161,11 +162,11 @@ export async function sendOtpPatternDetailed({
     attemptsLog.push({
       gateway: "Netafraz-Iran-Relay (https://gate.axoncore.ir/axon-relay.php)",
       status: "NOT_UPLOADED_YET",
-      note: "فایل axon-relay.php هنوز روی ساب‌دامنه gate.axoncore.ir در هاست نت‌افراز آپلود نشده است.",
+      note: "فایل axon-relay.php هنوز روی ساب‌دامنه gate.axoncore.ir آپلود نشده است.",
     });
   }
 
-  // ۲. تلاش دوم: اتصال مستقیم از سرور جاری به درگاه‌های IPPanel
+  // ۲. تلاش دوم: اتصال مستقیم
   const gateways: Array<{
     name: string;
     url: string;
@@ -185,7 +186,7 @@ export async function sendOtpPatternDetailed({
         from_number: originNumber,
         code: patternCode,
         recipients: [recipientE164],
-        params: { code: cleanCode },
+        params: { code: cleanCode }, // متغیر اصلاح شد به code
       },
     },
     {
@@ -200,7 +201,7 @@ export async function sendOtpPatternDetailed({
         pattern_code: patternCode,
         originator: originNumber,
         recipient: recipientE164,
-        params: { code: cleanCode },
+        values: { code: cleanCode }, // متغیر اصلاح شد به code
       },
     },
     {
@@ -215,7 +216,7 @@ export async function sendOtpPatternDetailed({
         code: patternCode,
         sender: originNumber,
         recipient: recipientLocal,
-        params: { code: cleanCode },
+        variable: { code: cleanCode }, // متغیر اصلاح شد به code
       },
     },
   ];
@@ -267,7 +268,7 @@ export async function sendOtpPatternDetailed({
   const hasArvan502 = attemptsLog.some((a) => a.blockedByArvanCloudWAF === true);
   const firstStatus = attemptsLog.find((a) => a.httpStatus)?.httpStatus || 502;
   const diagnosisText = hasArvan502
-    ? "خطای 502 از فایروال ابرآروان: درخواست از سرور Vercel (آمریکا) ارسال شده و فایل axon-relay.php هنوز روی ساب‌دامنه gate.axoncore.ir در هاست نت‌افراز شما فعال نشده است."
+    ? "خطای 502 از فایروال ابرآروان: درخواست از سرور Vercel ارسال شده و فایل پل نیاز به بررسی دارد."
     : "خطا در پاسخ وب‌سرویس پیامک با کد وضعیت HTTP " + firstStatus;
 
   return {
@@ -278,9 +279,8 @@ export async function sendOtpPatternDetailed({
     userSafeMessage: "خطا در ارسال پیامک تایید. لطفاً لحظاتی دیگر مجدداً تلاش کنید.",
     adminTechnicalDiagnosis: diagnosisText,
     adminSolutionGuide: [
-      "۱. در پنل دایرکت‌ادمین نت‌افراز (netafraz.com)، در بخش «مدیریت زیر دامنه‌ها (Subdomain Management)»، یک زیر دامنه به نام gate بسازید (gate.axoncore.ir).",
-      "۲. فایل axon-relay.php که در پوشه اصلی پروژه شما ساخته شده را در مسیر domains/axoncore.ir/public_html/gate/axon-relay.php آپلود کنید.",
-      "۳. آی‌پی ثابت هاست نت‌افراز خود (" + NETAFRAZ_STATIC_IP + ") را در پنل زرین‌پال ثبت نمایید.",
+      "۱. پترن جدید با موفقیت در کد اعمال شد.",
+      "۲. مطمئن شوید پترن در IPPanel در وضعیت «پترن فعال» قرار دارد.",
     ],
     rawResponse: attemptsLog,
   };

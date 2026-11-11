@@ -11,6 +11,7 @@ interface OtpRecord {
   expiresAt: number;
   createdAt: number;
   attempts: number;
+  status?: "pending" | "sent"; // این وضعیت برای قفل کردن درخواست‌های هم‌زمان اضافه شد
 }
 
 const memoryOtpStore = new Map<string, OtpRecord>();
@@ -252,31 +253,39 @@ export async function POST(req: NextRequest) {
       return res;
     }
 
-    // بررسی محدودیت زمانی ارسال مجدد (۵۵ ثانیه)
+    const now = Date.now();
     const existingActive = memoryOtpStore.get(rawPhone);
-    if (
-      existingActive &&
-      existingActive.createdAt &&
-      Date.now() - Number(existingActive.createdAt) < 55 * 1000
-    ) {
-      const waitSec = Math.ceil(
-        (55 * 1000 - (Date.now() - Number(existingActive.createdAt))) / 1000
-      );
-      return NextResponse.json(
-        {
-          success: false,
-          sent: false,
-          message: "لطفاً " + waitSec + " ثانیه دیگر مجدداً تلاش کنید.",
-        },
-        { status: 429 }
-      );
+
+    // ۱. بررسی قفل سخت‌افزاری و زمانی
+    if (existingActive) {
+      if (existingActive.status === "pending") {
+        return NextResponse.json(
+          { success: false, sent: false, message: "درخواست شما در حال پردازش است..." },
+          { status: 429 }
+        );
+      }
+      if (existingActive.createdAt && now - Number(existingActive.createdAt) < 55 * 1000) {
+        const waitSec = Math.ceil((55 * 1000 - (now - Number(existingActive.createdAt))) / 1000);
+        return NextResponse.json(
+          { success: false, sent: false, message: "لطفاً " + waitSec + " ثانیه دیگر مجدداً تلاش کنید." },
+          { status: 429 }
+        );
+      }
     }
+
+    // ۲. ایجاد قفل مسدودکننده (Mutex Lock) در صدم ثانیه اول، قبل از هرگونه پردازش
+    memoryOtpStore.set(rawPhone, {
+      hash: "pending_lock",
+      expiresAt: now + 60000,
+      createdAt: now,
+      attempts: 0,
+      status: "pending"
+    });
 
     const otpLength = await getOtpLengthFast();
     const minVal = Math.pow(10, Math.max(3, otpLength - 1));
     const maxVal = Math.pow(10, Math.max(4, otpLength)) - 1;
     const generatedCode = crypto.randomInt(minVal, maxVal).toString();
-    const now = Date.now();
     const expiresAt = now + 2 * 60 * 1000;
     const codeHash = hashOtp(rawPhone, generatedCode);
 
@@ -286,6 +295,9 @@ export async function POST(req: NextRequest) {
     });
 
     if (!smsResult.ok) {
+      // باز کردن قفل در صورت خطا
+      memoryOtpStore.delete(rawPhone);
+      
       try {
         await supabaseAdmin.from("admin_audit_logs").insert([
           {
@@ -315,18 +327,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // پاکسازی رکوردهای منقضی‌شده در حافظه برای جلوگیری از مصرف رم در ترافیک بالا
     if (memoryOtpStore.size > 500) {
       for (const [k, v] of memoryOtpStore.entries()) {
         if (now > v.expiresAt) memoryOtpStore.delete(k);
       }
     }
 
+    // ۳. آپدیت کردن حافظه با هش اصلی پس از ارسال موفق
     memoryOtpStore.set(rawPhone, {
       hash: codeHash,
       expiresAt,
       createdAt: now,
       attempts: 0,
+      status: "sent"
     });
 
     const signedChallenge = createSignedChallengeCookie(rawPhone, codeHash, expiresAt);

@@ -23,7 +23,7 @@ const RAW_KEY_UNPADDED =
 const RAW_KEY_PADDED = RAW_KEY_UNPADDED + "=";
 const EXACT_ORIGIN_NUMBER = "+983000505";
 const EXACT_PATTERN_CODE = "6xfi2kgb07uy60i";
-const LEGACY_PATTERN_CODE = "3d6fa1fAud3ma1w";
+const LEGACY_PATTERN_CODE = "3d6fa1f8ud3ma1w";
 const NETAFRAZ_STATIC_IP = "185.106.201.79";
 
 export function toE164(phone: string): string {
@@ -75,19 +75,13 @@ function getCleanCredentials() {
     .trim();
   const originE164 = rawOrigin.startsWith("+") ? rawOrigin : toE164(rawOrigin);
 
-  let patternCode = (process.env.IPPANEL_PATTERN_CODE || EXACT_PATTERN_CODE)
-    .replace(/["'\s]/g, "")
-    .trim();
-
-  // جلوگیری از بازنویسی کد پترن جدید توسط متغیر محیطی قدیمی در Vercel
-  if (!patternCode || patternCode === LEGACY_PATTERN_CODE) {
-    patternCode = EXACT_PATTERN_CODE;
-  }
+  // استفاده مستقیم از پترن جدید WebOTP و نادیده گرفتن متغیر محیطی قدیمی در Vercel
+  const patternCode = EXACT_PATTERN_CODE;
 
   return {
     padded,
     originNumber: originE164 || EXACT_ORIGIN_NUMBER,
-    patternCode: patternCode || EXACT_PATTERN_CODE,
+    patternCode,
   };
 }
 
@@ -128,7 +122,7 @@ export async function sendOtpPatternDetailed({
 
   const attemptsLog: Array<Record<string, any>> = [];
 
-  // لیست پترن‌های فعال (اول: پترن جدید WebOTP، دوم: پترن پشتیبان در صورت خطای درگاه)
+  // اولویت اول: پترن جدید WebOTP (6xfi2kgb07uy60i) | اولویت دوم: پترن پشتیبان (3d6fa1f8ud3ma1w)
   const patternCandidates: Array<{
     code: string;
     params: Record<string, string>;
@@ -143,7 +137,7 @@ export async function sendOtpPatternDetailed({
     },
   ];
 
-  // ۱. تلاش اول: ارسال از طریق پل هاست نت‌افراز شما (gate.axoncore.ir -> 185.106.201.79)
+  // ۱. ارسال از طریق پل هاست نت‌افراز (gate.axoncore.ir -> 185.106.201.79)
   for (const candidate of patternCandidates) {
     const relayResult = await postViaNetafrazRelay(
       "https://edge.ippanel.com/v1/api/send",
@@ -194,7 +188,7 @@ export async function sendOtpPatternDetailed({
     }
   }
 
-  // ۲. تلاش دوم: اتصال مستقیم از سرور جاری به درگاه‌های IPPanel
+  // ۲. تلاش دوم در صورت عدم پاسخ رله: اتصال مستقیم به درگاه‌های IPPanel
   const gateways: Array<{
     name: string;
     url: string;

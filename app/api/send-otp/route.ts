@@ -11,7 +11,7 @@ interface OtpRecord {
   expiresAt: number;
   createdAt: number;
   attempts: number;
-  status?: "pending" | "sent"; // این وضعیت برای قفل کردن درخواست‌های هم‌زمان اضافه شد
+  status?: "pending" | "sent";
 }
 
 const memoryOtpStore = new Map<string, OtpRecord>();
@@ -256,7 +256,6 @@ export async function POST(req: NextRequest) {
     const now = Date.now();
     const existingActive = memoryOtpStore.get(rawPhone);
 
-    // ۱. بررسی قفل سخت‌افزاری و زمانی
     if (existingActive) {
       if (existingActive.status === "pending") {
         return NextResponse.json(
@@ -264,8 +263,8 @@ export async function POST(req: NextRequest) {
           { status: 429 }
         );
       }
-      if (existingActive.createdAt && now - Number(existingActive.createdAt) < 55 * 1000) {
-        const waitSec = Math.ceil((55 * 1000 - (now - Number(existingActive.createdAt))) / 1000);
+      if (existingActive.createdAt && now - Number(existingActive.createdAt) < 30 * 1000) {
+        const waitSec = Math.ceil((30 * 1000 - (now - Number(existingActive.createdAt))) / 1000);
         return NextResponse.json(
           { success: false, sent: false, message: "لطفاً " + waitSec + " ثانیه دیگر مجدداً تلاش کنید." },
           { status: 429 }
@@ -273,7 +272,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ۲. ایجاد قفل مسدودکننده (Mutex Lock) در صدم ثانیه اول، قبل از هرگونه پردازش
     memoryOtpStore.set(rawPhone, {
       hash: "pending_lock",
       expiresAt: now + 60000,
@@ -295,45 +293,17 @@ export async function POST(req: NextRequest) {
     });
 
     if (!smsResult.ok) {
-      // باز کردن قفل در صورت خطا
       memoryOtpStore.delete(rawPhone);
-      
-      try {
-        await supabaseAdmin.from("admin_audit_logs").insert([
-          {
-            action: "SMS_GATEWAY_ERROR",
-            user_id: rawPhone,
-            details: {
-              resource: "ippanel:edge",
-              httpStatusCode: smsResult.status,
-              errorCode: smsResult.errorCode,
-              targetMobile: rawPhone,
-              rootCauseExplanation: smsResult.adminTechnicalDiagnosis,
-            },
-            ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
-            severity: "error",
-            created_at: new Date().toISOString(),
-          },
-        ]);
-      } catch {}
-
       return NextResponse.json(
         {
           success: false,
           sent: false,
-          message: "خطا در ارسال پیامک تایید. لطفاً لحظاتی دیگر مجدداً تلاش کنید.",
+          message: smsResult.userSafeMessage || "خطا در ارسال پیامک تایید. لطفاً لحظاتی دیگر مجدداً تلاش کنید.",
         },
         { status: 502 }
       );
     }
 
-    if (memoryOtpStore.size > 500) {
-      for (const [k, v] of memoryOtpStore.entries()) {
-        if (now > v.expiresAt) memoryOtpStore.delete(k);
-      }
-    }
-
-    // ۳. آپدیت کردن حافظه با هش اصلی پس از ارسال موفق
     memoryOtpStore.set(rawPhone, {
       hash: codeHash,
       expiresAt,

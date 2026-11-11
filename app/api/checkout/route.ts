@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyPhoneTokenSignature } from "@/app/api/send-otp/route";
 import { verifyCustomerToken, CUSTOMER_COOKIE_NAME } from "@/lib/customerSession";
 import { normalizeSystemSettings } from "@/lib/systemSettings";
-import { sendTextSMS } from "@/lib/otpService";
+import { sendOtpPatternDetailed } from "@/lib/otpService"; // اصلاح: استفاده از پترن رسمی
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -345,7 +345,6 @@ export async function POST(req: NextRequest) {
       if (minInserted) savedOrder = minInserted;
     }
 
-    // --- افزودن مصرف کوپن بلافاصله پس از ثبت موفق سفارش ---
     if (savedOrder && validCouponRow) {
       try {
         const currentUsed = Number(validCouponRow.times_used ?? validCouponRow.used_count ?? 0);
@@ -361,7 +360,6 @@ export async function POST(req: NextRequest) {
         console.error("Failed to update coupon usage:", e);
       }
     }
-    // ----------------------------------------------------
 
     for (const item of verifiedItems) {
       const prodId = String(item.id || item.productId || "");
@@ -415,8 +413,10 @@ export async function POST(req: NextRequest) {
       ]);
     } catch {}
 
+    // اصلاح: ارسال هوشمندانه پیامکِ شماره سفارش (فقط در صورتی که خطا ندهد)
     if (sysRules.autoSendOrderSms) {
-      sendTextSMS(cleanPhone, shortCode).catch(() => {});
+      // استفاده از الگو تا کد نامربوط ارسال نشود
+      sendOtpPatternDetailed({ mobile: cleanPhone, code: shortCode }).catch(() => {});
     }
 
     return NextResponse.json({

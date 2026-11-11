@@ -846,6 +846,8 @@ export default function CheckoutPage() {
               required
               dir="ltr"
               maxLength={8}
+              name="code"
+              id="code"
               autoComplete="one-time-code"
               value={otpCode}
               onChange={(e) => setOtpCode(e.target.value)}

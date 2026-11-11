@@ -21,15 +21,26 @@ function filterRealUrls(arr: unknown[]): string[] {
     });
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const isAdmin = await verifyAdminSession(req).catch(() => false);
+
     const { data, error } = await supabaseAdmin
       .from("products")
       .select("*")
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    const unpacked = (data || []).map(unpackProductRow);
+
+    const unpacked = (data || []).map((row) => {
+      const item = unpackProductRow(row);
+      if (!isAdmin) {
+        const { purchase_price: _pp, ...publicSafeItem } = item;
+        return publicSafeItem;
+      }
+      return item;
+    });
+
     return NextResponse.json(
       { success: true, data: unpacked, products: unpacked },
       { headers: { "Cache-Control": "no-store, max-age=0" } }
@@ -77,11 +88,16 @@ export async function POST(req: NextRequest) {
     const imagesList = Array.from(new Set([primaryImage, ...rawImages].filter(Boolean)));
 
     const basePrice = Math.max(0, Number(body.price || 0));
-    const discountPrice =
+    const rawDiscountPrice =
       body.discountPrice && Number(body.discountPrice) > 0
         ? Number(body.discountPrice)
         : body.discount_price && Number(body.discount_price) > 0
         ? Number(body.discount_price)
+        : null;
+
+    const discountPrice =
+      rawDiscountPrice !== null && (basePrice === 0 || rawDiscountPrice < basePrice)
+        ? rawDiscountPrice
         : null;
 
     const effectivePrice = discountPrice && discountPrice < basePrice ? discountPrice : basePrice;
@@ -92,19 +108,34 @@ export async function POST(req: NextRequest) {
 
     const numericStock = body.stock !== undefined ? Math.max(0, Number(body.stock)) : 10;
 
-    // ── توضیحات: حذف base64 قدیمی از metadata ──
+    // ── توضیحات: حذف base64 و متادیتای قدیمی با Regex استاندارد ──
     const cleanDesc = String(body.description || "")
-      .replace(/<!--MEDIA_METADATA:[sS]*?-->/g, "")
+      .replace(/<!--MEDIA_METADATA:[\s\S]*?-->/g, "")
       .trim();
+
+    const cleanWarranty = String(body.warranty ?? "")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .trim();
+
+    const cleanBrand = String(body.brand ?? "")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .trim();
+
+    const cleanColorOptions = Array.isArray(body.color_options)
+      ? body.color_options.filter(
+          (co: any) => co && typeof co.name === "string" && typeof co.hex === "string"
+        )
+      : [];
 
     const mediaMeta: Record<string, unknown> = {
       images: imagesList,
       specs: typeof body.specs === "object" && body.specs ? body.specs : {},
-      warranty: String(body.warranty ?? "").trim(),
+      warranty: cleanWarranty,
       sku: String(body.sku || "SKU-" + productId.slice(-6).toUpperCase()).trim(),
-      brand: String(body.brand ?? "").trim(),
+      brand: cleanBrand,
       purchase_price: purchasePrice,
       discount_price: discountPrice,
+      color_options: cleanColorOptions,
       meta_title: String(body.meta_title || cleanTitle).trim(),
       meta_description: String(body.meta_description || cleanDesc.slice(0, 155)).trim(),
       short_description: String(body.short_description || cleanDesc.slice(0, 140)).trim(),
@@ -123,23 +154,38 @@ export async function POST(req: NextRequest) {
       is_available: body.is_available !== undefined ? Boolean(body.is_available) : numericStock > 0,
       image_url: primaryImage,
       description: packagedDescription,
-      color_options: Array.isArray(body.color_options)
-        ? body.color_options.filter((co: any) => co && typeof co.name === "string" && typeof co.hex === "string")
-        : [],
+      color_options: cleanColorOptions,
       updated_at: new Date().toISOString(),
       /* Enterprise Infrastructure Inject */
-      discount_start_date: (typeof body !== 'undefined' && body.discount_start_date) ? new Date(body.discount_start_date).toISOString() : undefined,
-      discount_end_date: (typeof body !== 'undefined' && body.discount_end_date) ? new Date(body.discount_end_date).toISOString() : undefined,
-      media_gallery: (typeof body !== 'undefined' && Array.isArray(body.media_gallery)) ? body.media_gallery : undefined,
-      specs_jsonb: (typeof body !== 'undefined' && typeof body.specs === 'object') ? body.specs : undefined,
+      discount_start_date:
+        typeof body !== "undefined" && body.discount_start_date
+          ? new Date(body.discount_start_date).toISOString()
+          : undefined,
+      discount_end_date:
+        typeof body !== "undefined" && body.discount_end_date
+          ? new Date(body.discount_end_date).toISOString()
+          : undefined,
+      media_gallery:
+        typeof body !== "undefined" && Array.isArray(body.media_gallery)
+          ? body.media_gallery
+          : undefined,
+      specs_jsonb:
+        typeof body !== "undefined" && typeof body.specs === "object"
+          ? body.specs
+          : undefined,
       // ← ستون‌های جدید — مستقیم به DB نوشته میشن
       purchase_price: purchasePrice,
       shipping_type: (() => {
-        const stMap: Record<string, "post"|"tipax"|"both"> = {
-          "post": "post", "tipax": "tipax", "both": "both",
-          "فقط پست": "post",    "پست": "post",
-          "فقط تیپاکس": "tipax", "تیپاکس": "tipax",
-          "پست و تیپاکس": "both", "هر دو": "both",
+        const stMap: Record<string, "post" | "tipax" | "both"> = {
+          post: "post",
+          tipax: "tipax",
+          both: "both",
+          "فقط پست": "post",
+          پست: "post",
+          "فقط تیپاکس": "tipax",
+          تیپاکس: "tipax",
+          "پست و تیپاکس": "both",
+          "هر دو": "both",
         };
         return stMap[String(body.shipping_type || "").trim()] || "both";
       })(),

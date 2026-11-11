@@ -5,6 +5,8 @@ import { soundEngine } from "@/lib/soundEngine";
 
 export default function BulkPriceStockStudio() {
   const [categories, setCategories] = useState<string[]>([]);
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
+  const [totalProductsCount, setTotalProductsCount] = useState<number>(0);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [operation, setOperation] = useState<
     "percent_price" | "fixed_price" | "set_stock" | "clear_discounts"
@@ -21,11 +23,19 @@ export default function BulkPriceStockStudio() {
       .then((r) => r.json())
       .then((json) => {
         const list = json.products || json.data || [];
+        const arr = Array.isArray(list) ? list : [];
         const set = new Set<string>();
-        (Array.isArray(list) ? list : []).forEach((p: any) => {
-          if (p.category) set.add(String(p.category).trim());
+        const counts: Record<string, number> = {};
+        arr.forEach((p: any) => {
+          if (p.category) {
+            const cat = String(p.category).trim();
+            set.add(cat);
+            counts[cat] = (counts[cat] || 0) + 1;
+          }
         });
         setCategories(Array.from(set));
+        setCategoryCounts(counts);
+        setTotalProductsCount(arr.length);
       })
       .catch(() => {});
   }, []);
@@ -35,16 +45,19 @@ export default function BulkPriceStockStudio() {
     const pct = customPct !== undefined ? customPct : percentChange;
     const opType = customPct !== undefined ? "percent_price" : operation;
 
+    const targetLabel =
+      categoryFilter === "all"
+        ? `همه محصولات (${totalProductsCount} کالا)`
+        : `دسته ${categoryFilter} (${categoryCounts[categoryFilter] || 0} کالا)`;
+
     const confirmMsg =
       opType === "percent_price"
-        ? `آیا از تغییر قیمت (${pct > 0 ? "+" + pct : pct}%) برای «${
-            categoryFilter === "all" ? "همه محصولات" : "دسته " + categoryFilter
-          }» اطمینان دارید؟`
+        ? `آیا از تغییر قیمت (${pct > 0 ? "+" + pct : pct}%) برای «${targetLabel}» اطمینان دارید؟`
         : opType === "fixed_price"
-        ? `آیا از تغییر قیمت به مبلغ ${fixedChange.toLocaleString("fa-IR")} تومان اطمینان دارید؟`
+        ? `آیا از تغییر قیمت به مبلغ ${fixedChange.toLocaleString("fa-IR")} تومان برای «${targetLabel}» اطمینان دارید؟`
         : opType === "set_stock"
-        ? `آیا از تنظیم موجودی انبار روی ${stockValue} عدد اطمینان دارید؟`
-        : "آیا از حذف قیمت‌های تخفیف‌خورده و بازگشت به قیمت پایه اطمینان دارید؟";
+        ? `آیا از تنظیم موجودی انبار روی ${stockValue} عدد برای «${targetLabel}» اطمینان دارید؟`
+        : `آیا از حذف قیمت‌های تخفیف‌خورده و بازگشت به قیمت پایه برای «${targetLabel}» اطمینان دارید؟`;
 
     if (!confirm(confirmMsg)) return;
 
@@ -145,10 +158,12 @@ export default function BulkPriceStockStudio() {
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
           >
-            <option value="all">🌟 تمام محصولات فروشگاه</option>
+            <option value="all">
+              🌟 تمام محصولات فروشگاه ({totalProductsCount.toLocaleString("fa-IR")})
+            </option>
             {categories.map((c) => (
               <option key={c} value={c}>
-                📁 فقط دسته: {c}
+                📁 فقط دسته: {c} ({(categoryCounts[c] || 0).toLocaleString("fa-IR")})
               </option>
             ))}
           </select>

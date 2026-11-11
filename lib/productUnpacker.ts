@@ -25,20 +25,53 @@ export function unpackProductRow(p: any) {
       ? meta.images
       : [primaryImg];
 
-  const basePrice = Number(p.price || 0);
-  const discountPrice =
-    p.discount_price !== undefined && p.discount_price !== null && Number(p.discount_price) > 0
-      ? Number(p.discount_price)
+  const basePrice = Math.max(0, Number(p.price || 0));
+
+  // اگر ستون discount_price در دیتابیس موجود باشد (حتی اگر null شده باشد)، اولویت با ستون دیتابیس است
+  const rawDiscount =
+    p.discount_price !== undefined
+      ? p.discount_price !== null && Number(p.discount_price) > 0
+        ? Number(p.discount_price)
+        : null
       : meta.discount_price && Number(meta.discount_price) > 0
       ? Number(meta.discount_price)
       : null;
 
-  const effectiveSellingPrice = discountPrice && discountPrice < basePrice ? discountPrice : basePrice;
-  const purchasePrice = Number(
-    p.purchase_price ?? meta.purchase_price ?? Math.round(effectiveSellingPrice * 0.7)
-  );
+  // قیمت تخفیف‌خورده فقط زمانی معتبر است که کمتر از قیمت پایه باشد
+  const discountPrice =
+    rawDiscount !== null && (basePrice === 0 || rawDiscount < basePrice)
+      ? rawDiscount
+      : null;
 
-  const stock = p.stock !== undefined && p.stock !== null ? Number(p.stock) : 10;
+  const effectiveSellingPrice =
+    discountPrice && discountPrice < basePrice ? discountPrice : basePrice;
+
+  const purchasePrice =
+    p.purchase_price !== undefined && p.purchase_price !== null && Number(p.purchase_price) > 0
+      ? Number(p.purchase_price)
+      : meta.purchase_price !== undefined && meta.purchase_price !== null && Number(meta.purchase_price) > 0
+      ? Number(meta.purchase_price)
+      : effectiveSellingPrice > 0
+      ? Math.round(effectiveSellingPrice * 0.7)
+      : 0;
+
+  const stock = p.stock !== undefined && p.stock !== null ? Math.max(0, Number(p.stock)) : 10;
+
+  // پاکسازی کاراکترهای نامرئی (\u200B) از نام برند و گارانتی
+  const cleanBrand = String(p.brand || meta.brand || "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim();
+
+  const cleanWarranty = String(p.warranty ?? meta.warranty ?? "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim();
+
+  const colorOptions =
+    Array.isArray(p.color_options) && p.color_options.length > 0
+      ? p.color_options
+      : Array.isArray(meta.color_options)
+      ? meta.color_options
+      : [];
 
   return {
     ...p,
@@ -46,7 +79,7 @@ export function unpackProductRow(p: any) {
     title: p.title || p.name || "کالای دیجیتال",
     name: p.name || p.title || "کالای دیجیتال",
     sku: p.sku || meta.sku || "SKU-" + String(p.id).slice(-6).toUpperCase(),
-    brand: p.brand || meta.brand || "",
+    brand: cleanBrand,
     category: p.category || "کالای دیجیتال",
     price: basePrice,
     discount_price: discountPrice,
@@ -60,12 +93,13 @@ export function unpackProductRow(p: any) {
     images: imagesArr,
     description: rawDesc,
     short_description: p.short_description || meta.short_description || rawDesc.slice(0, 140),
-    warranty: p.warranty || meta.warranty || "",
+    warranty: cleanWarranty,
     meta_title: p.meta_title || meta.meta_title || p.title || p.name || "",
     meta_description: p.meta_description || meta.meta_description || rawDesc.slice(0, 155),
     specs: (typeof p.specs === "object" && p.specs) || meta.specs || {},
+    color_options: colorOptions,
     // روش ارسال — از ستون DB
-    shipping_type: (p.shipping_type as "post"|"tipax"|"both"|undefined) || "both",
+    shipping_type: (p.shipping_type as "post" | "tipax" | "both" | undefined) || "both",
   };
 }
 

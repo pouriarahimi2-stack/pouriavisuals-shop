@@ -50,70 +50,94 @@ export async function POST(req: NextRequest) {
     }
 
     let updatedCount = 0;
+    const BATCH_SIZE = 20;
 
-    for (const rawRow of targets) {
-      const unpacked = unpackProductRow(rawRow);
-      let nextPrice = Number(rawRow.price || 0);
-      let nextDiscount =
-        rawRow.discount_price && Number(rawRow.discount_price) > 0
-          ? Number(rawRow.discount_price)
-          : null;
-      let nextStock = Number(rawRow.stock ?? 0);
+    for (let i = 0; i < targets.length; i += BATCH_SIZE) {
+      const batch = targets.slice(i, i + BATCH_SIZE);
 
-      if (operation === "percent_price") {
-        const factor = 1 + Number(percentChange) / 100;
-        nextPrice = Math.max(0, Math.round(nextPrice * factor));
-        if (roundPrices) nextPrice = roundToThousand(nextPrice);
+      const results = await Promise.all(
+        batch.map(async (rawRow: any) => {
+          const unpacked = unpackProductRow(rawRow);
+          let nextPrice = Math.max(0, Number(rawRow.price || 0));
+          let nextDiscount =
+            rawRow.discount_price && Number(rawRow.discount_price) > 0
+              ? Number(rawRow.discount_price)
+              : null;
+          let nextStock = Math.max(0, Number(rawRow.stock ?? 0));
 
-        if (nextDiscount !== null) {
-          nextDiscount = Math.max(0, Math.round(nextDiscount * factor));
-          if (roundPrices) nextDiscount = roundToThousand(nextDiscount);
-        }
-      } else if (operation === "fixed_price") {
-        const delta = Number(fixedChange);
-        nextPrice = Math.max(0, nextPrice + delta);
-        if (roundPrices) nextPrice = roundToThousand(nextPrice);
+          if (operation === "percent_price") {
+            const factor = 1 + Number(percentChange) / 100;
+            if (nextPrice > 0) {
+              nextPrice = Math.max(0, Math.round(nextPrice * factor));
+              if (roundPrices) nextPrice = roundToThousand(nextPrice);
+            }
 
-        if (nextDiscount !== null) {
-          nextDiscount = Math.max(0, nextDiscount + delta);
-          if (roundPrices) nextDiscount = roundToThousand(nextDiscount);
-        }
-      } else if (operation === "set_stock") {
-        nextStock = Math.max(0, Number(stockValue));
-      } else if (operation === "clear_discounts") {
-        nextDiscount = null;
-      }
+            if (nextDiscount !== null && nextDiscount > 0) {
+              nextDiscount = Math.max(0, Math.round(nextDiscount * factor));
+              if (roundPrices) nextDiscount = roundToThousand(nextDiscount);
+            }
+          } else if (operation === "fixed_price") {
+            const delta = Number(fixedChange);
+            // محافظت از کالاهای ۰ تومانی در برابر افزایش/کاهش مبلغ ثابت
+            if (nextPrice > 0) {
+              nextPrice = Math.max(0, nextPrice + delta);
+              if (roundPrices) nextPrice = roundToThousand(nextPrice);
+            }
 
-      const updatedMeta = {
-        images: unpacked.images || [unpacked.image || "/placeholder.png"],
-        specs: unpacked.specs || {},
-        warranty: unpacked.warranty || "۱۸ ماه گارانتی اصالت طلایی",
-        sku: unpacked.sku,
-        brand: unpacked.brand || "",
-        purchase_price: unpacked.purchase_price || Math.round(nextPrice * 0.7),
-        discount_price: nextDiscount,
-        meta_title: unpacked.meta_title || rawRow.title,
-        meta_description: unpacked.meta_description || "",
-      };
+            if (nextDiscount !== null && nextDiscount > 0) {
+              nextDiscount = Math.max(0, nextDiscount + delta);
+              if (roundPrices) nextDiscount = roundToThousand(nextDiscount);
+            }
+          } else if (operation === "set_stock") {
+            nextStock = Math.max(0, Number(stockValue));
+          } else if (operation === "clear_discounts") {
+            nextDiscount = null;
+          }
 
-      const packagedDesc = packProductDescription(
-        unpacked.description || "",
-        updatedMeta
+          // اطمینان از اینکه قیمت تخفیف‌خورده بزرگ‌تر یا مساوی قیمت پایه نباشد
+          if (
+            nextDiscount !== null &&
+            (nextDiscount <= 0 || (nextPrice > 0 && nextDiscount >= nextPrice))
+          ) {
+            nextDiscount = null;
+          }
+
+          const updatedMeta = {
+            images: unpacked.images || [unpacked.image || "/placeholder.png"],
+            specs: unpacked.specs || {},
+            warranty: unpacked.warranty ?? "",
+            sku: unpacked.sku,
+            brand: unpacked.brand || "",
+            purchase_price: unpacked.purchase_price ?? 0,
+            discount_price: nextDiscount,
+            color_options: Array.isArray(unpacked.color_options) ? unpacked.color_options : [],
+            meta_title: unpacked.meta_title || rawRow.title,
+            meta_description: unpacked.meta_description || "",
+            short_description: unpacked.short_description || "",
+          };
+
+          const packagedDesc = packProductDescription(
+            unpacked.description || "",
+            updatedMeta
+          );
+
+          const { error: upErr } = await supabaseAdmin
+            .from("products")
+            .update({
+              price: nextPrice,
+              discount_price: nextDiscount,
+              stock: nextStock,
+              is_available: nextStock > 0,
+              description: packagedDesc,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", rawRow.id);
+
+          return !upErr;
+        })
       );
 
-      const { error: upErr } = await supabaseAdmin
-        .from("products")
-        .update({
-          price: nextPrice,
-          discount_price: nextDiscount,
-          stock: nextStock,
-          is_available: nextStock > 0,
-          description: packagedDesc,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", rawRow.id);
-
-      if (!upErr) updatedCount++;
+      updatedCount += results.filter(Boolean).length;
     }
 
     return NextResponse.json({

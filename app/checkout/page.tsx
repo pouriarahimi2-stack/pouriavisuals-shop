@@ -843,6 +843,7 @@ export default function CheckoutPage() {
             <input
               type="text"
               inputMode="numeric"
+              pattern="\d*"
               required
               dir="ltr"
               maxLength={8}

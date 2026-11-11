@@ -414,10 +414,10 @@ export async function POST(req: NextRequest) {
     } catch {}
 
     // اصلاح: ارسال هوشمندانه پیامکِ شماره سفارش (فقط در صورتی که خطا ندهد)
-    if (sysRules.autoSendOrderSms) {
+    //if (sysRules.autoSendOrderSms) {
       // استفاده از الگو تا کد نامربوط ارسال نشود
-      sendOtpPatternDetailed({ mobile: cleanPhone, code: shortCode }).catch(() => {});
-    }
+      //sendOtpPatternDetailed({ mobile: cleanPhone, code: shortCode }).catch(() => {});
+    //}
 
     return NextResponse.json({
       success: true,

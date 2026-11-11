@@ -22,8 +22,8 @@ const RAW_KEY_UNPADDED =
   "YTJjNDk1NTItNmJmOS00ZjY0LWJjMWQtMjM1OTdmN2M4NDdlMjc1ZmJhYTMxODk5OTNiMmFmM2FmZjA5YTNiYjBhZTY";
 const RAW_KEY_PADDED = RAW_KEY_UNPADDED + "=";
 const EXACT_ORIGIN_NUMBER = "+983000505";
-// کد پترن جدید شما از پنل IPPanel
 const EXACT_PATTERN_CODE = "6xfi2kgb07uy60i";
+const LEGACY_PATTERN_CODE = "3d6fa1fAud3ma1w";
 const NETAFRAZ_STATIC_IP = "185.106.201.79";
 
 export function toE164(phone: string): string {
@@ -75,9 +75,14 @@ function getCleanCredentials() {
     .trim();
   const originE164 = rawOrigin.startsWith("+") ? rawOrigin : toE164(rawOrigin);
 
-  const patternCode = (process.env.IPPANEL_PATTERN_CODE || EXACT_PATTERN_CODE)
+  let patternCode = (process.env.IPPANEL_PATTERN_CODE || EXACT_PATTERN_CODE)
     .replace(/["'\s]/g, "")
     .trim();
+
+  // جلوگیری از بازنویسی کد پترن جدید توسط متغیر محیطی قدیمی در Vercel
+  if (!patternCode || patternCode === LEGACY_PATTERN_CODE) {
+    patternCode = EXACT_PATTERN_CODE;
+  }
 
   return {
     padded,
@@ -123,50 +128,73 @@ export async function sendOtpPatternDetailed({
 
   const attemptsLog: Array<Record<string, any>> = [];
 
-  // ۱. تلاش اول: ارسال از طریق پل هاست نت‌افراز
-  const relayResult = await postViaNetafrazRelay(
-    "https://edge.ippanel.com/v1/api/send",
-    { Authorization: padded },
+  // لیست پترن‌های فعال (اول: پترن جدید WebOTP، دوم: پترن پشتیبان در صورت خطای درگاه)
+  const patternCandidates: Array<{
+    code: string;
+    params: Record<string, string>;
+  }> = [
     {
-      sending_type: "pattern",
-      from_number: originNumber,
       code: patternCode,
-      recipients: [recipientE164],
-      params: { code: cleanCode }, // متغیر اصلاح شد به code
-    }
-  );
+      params: { code: cleanCode },
+    },
+    {
+      code: LEGACY_PATTERN_CODE,
+      params: { "vefification-code": cleanCode },
+    },
+  ];
 
-  if (relayResult) {
-    attemptsLog.push({
-      gateway: "Netafraz-Iran-Relay (" + relayResult.relayUrl + ")",
-      httpStatus: relayResult.status,
-      responseBody: relayResult.data,
-    });
+  // ۱. تلاش اول: ارسال از طریق پل هاست نت‌افراز شما (gate.axoncore.ir -> 185.106.201.79)
+  for (const candidate of patternCandidates) {
+    const relayResult = await postViaNetafrazRelay(
+      "https://edge.ippanel.com/v1/api/send",
+      { Authorization: padded },
+      {
+        sending_type: "pattern",
+        from_number: originNumber,
+        code: candidate.code,
+        recipients: [recipientE164],
+        params: candidate.params,
+      }
+    );
 
-    if (
-      relayResult.status >= 200 &&
-      relayResult.status < 300 &&
-      relayResult.data?.meta?.status !== false
-    ) {
-      return {
-        ok: true,
-        provider: "Netafraz-Iran-Relay",
-        status: relayResult.status,
-        userSafeMessage: "کد تایید پیامکی با موفقیت ارسال گردید.",
-        adminTechnicalDiagnosis: "ارسال موفق از طریق هاست نت‌افراز شما (185.106.201.79).",
-        adminSolutionGuide: [],
-        rawResponse: relayResult.data,
-      };
+    if (relayResult) {
+      attemptsLog.push({
+        gateway: "Netafraz-Iran-Relay (" + relayResult.relayUrl + ")",
+        patternTried: candidate.code,
+        httpStatus: relayResult.status,
+        responseBody: relayResult.data,
+      });
+
+      if (
+        relayResult.status >= 200 &&
+        relayResult.status < 300 &&
+        relayResult.data?.meta?.status !== false
+      ) {
+        return {
+          ok: true,
+          provider: "Netafraz-Iran-Relay (" + candidate.code + ")",
+          status: relayResult.status,
+          userSafeMessage: "کد تایید پیامکی با موفقیت ارسال گردید.",
+          adminTechnicalDiagnosis:
+            "ارسال موفق از طریق هاست نت‌افراز شما (" +
+            NETAFRAZ_STATIC_IP +
+            ") با پترن " +
+            candidate.code,
+          adminSolutionGuide: [],
+          rawResponse: relayResult.data,
+        };
+      }
+    } else {
+      attemptsLog.push({
+        gateway: "Netafraz-Iran-Relay (https://gate.axoncore.ir/axon-relay.php)",
+        patternTried: candidate.code,
+        status: "RELAY_UNREACHABLE",
+      });
+      break;
     }
-  } else {
-    attemptsLog.push({
-      gateway: "Netafraz-Iran-Relay (https://gate.axoncore.ir/axon-relay.php)",
-      status: "NOT_UPLOADED_YET",
-      note: "فایل axon-relay.php هنوز روی ساب‌دامنه gate.axoncore.ir آپلود نشده است.",
-    });
   }
 
-  // ۲. تلاش دوم: اتصال مستقیم
+  // ۲. تلاش دوم: اتصال مستقیم از سرور جاری به درگاه‌های IPPanel
   const gateways: Array<{
     name: string;
     url: string;
@@ -186,7 +214,7 @@ export async function sendOtpPatternDetailed({
         from_number: originNumber,
         code: patternCode,
         recipients: [recipientE164],
-        params: { code: cleanCode }, // متغیر اصلاح شد به code
+        params: { code: cleanCode },
       },
     },
     {
@@ -201,7 +229,7 @@ export async function sendOtpPatternDetailed({
         pattern_code: patternCode,
         originator: originNumber,
         recipient: recipientE164,
-        values: { code: cleanCode }, // متغیر اصلاح شد به code
+        values: { code: cleanCode },
       },
     },
     {
@@ -216,7 +244,7 @@ export async function sendOtpPatternDetailed({
         code: patternCode,
         sender: originNumber,
         recipient: recipientLocal,
-        variable: { code: cleanCode }, // متغیر اصلاح شد به code
+        variable: { code: cleanCode },
       },
     },
   ];
@@ -268,7 +296,7 @@ export async function sendOtpPatternDetailed({
   const hasArvan502 = attemptsLog.some((a) => a.blockedByArvanCloudWAF === true);
   const firstStatus = attemptsLog.find((a) => a.httpStatus)?.httpStatus || 502;
   const diagnosisText = hasArvan502
-    ? "خطای 502 از فایروال ابرآروان: درخواست از سرور Vercel ارسال شده و فایل پل نیاز به بررسی دارد."
+    ? "خطای 502 از فایروال ابرآروان در اتصال مستقیم و عدم تایید پترن در پاسخ رله."
     : "خطا در پاسخ وب‌سرویس پیامک با کد وضعیت HTTP " + firstStatus;
 
   return {
@@ -279,8 +307,8 @@ export async function sendOtpPatternDetailed({
     userSafeMessage: "خطا در ارسال پیامک تایید. لطفاً لحظاتی دیگر مجدداً تلاش کنید.",
     adminTechnicalDiagnosis: diagnosisText,
     adminSolutionGuide: [
-      "۱. پترن جدید با موفقیت در کد اعمال شد.",
-      "۲. مطمئن شوید پترن در IPPanel در وضعیت «پترن فعال» قرار دارد.",
+      "۱. وضعیت پاسخ رله نت‌افراز را در مسیر /api/sms/debug بررسی نمایید.",
+      "۲. از فعال بودن پترن در پنل IPPanel اطمینان حاصل کنید.",
     ],
     rawResponse: attemptsLog,
   };

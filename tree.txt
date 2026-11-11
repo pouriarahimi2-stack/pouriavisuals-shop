@@ -1,0 +1,441 @@
+Folder PATH listing
+Volume serial number is E0A3-791D
+C:\USERS\POURIA\MY-APPLE-STORE\APP
+|   error.tsx
+|   favicon.ico
+|   global-error.tsx
+|   globals.css
+|   layout.tsx
+|   loading.tsx
+|   manifest.ts
+|   not-found.tsx
+|   page.tsx
+|   robots.ts
+|   sitemap.ts
+|   
++---27424534.txt
+|       route.ts
+|       
++---about
+|       page.tsx
+|       
++---account
+|       page.tsx
+|       
++---actions
+|       orders.ts
+|       siteInfo.ts
+|       
++---admin
+|   |   layout.tsx
+|   |   page.tsx
+|   |   
+|   +---ai
+|   |       page.tsx
+|   |       
+|   +---appearance
+|   |       page.tsx
+|   |       
+|   +---audit-logs
+|   |       page.tsx
+|   |       
+|   +---backup
+|   |       page.tsx
+|   |       
+|   +---banners
+|   |       page.tsx
+|   |       
+|   +---blog
+|   |       page.tsx
+|   |       
+|   +---change-pin
+|   |       page.tsx
+|   |       
+|   +---coupons
+|   |       page.tsx
+|   |       
+|   +---customers
+|   |       page.tsx
+|   |       
+|   +---dashboard
+|   |       page.tsx
+|   |       
+|   +---financial
+|   |       page.tsx
+|   |       
+|   +---inventory
+|   |       page.tsx
+|   |       
+|   +---login
+|   |       page.tsx
+|   |       
+|   +---menu
+|   |       page.tsx
+|   |       
+|   +---messages
+|   |       page.tsx
+|   |       
+|   +---monitoring
+|   |       page.tsx
+|   |       
+|   +---news
+|   |       page.tsx
+|   |       
+|   +---orders
+|   |       page.tsx
+|   |       
+|   +---pages
+|   |       page.tsx
+|   |       
+|   +---products
+|   |       page.tsx
+|   |       
+|   +---reports
+|   |       page.tsx
+|   |       
+|   +---reviews
+|   |       page.tsx
+|   |       
+|   +---roles
+|   |       page.tsx
+|   |       
+|   +---seo
+|   |       page.tsx
+|   |       
+|   +---settings
+|   |       page.tsx
+|   |       
+|   \---styles
+|           page.tsx
+|           
++---api
+|   +---accounting
+|   |       route.ts
+|   |       
+|   +---admin
+|   |   +---ai-assistant
+|   |   |       route.ts
+|   |   |       
+|   |   +---ai-config
+|   |   |       route.ts
+|   |   |       
+|   |   +---audit-logs
+|   |   |       route.ts
+|   |   |       
+|   |   +---auth
+|   |   |       route.ts
+|   |   |       
+|   |   +---backup
+|   |   |       route.ts
+|   |   |       
+|   |   +---banners
+|   |   |       route.ts
+|   |   |       
+|   |   +---categories
+|   |   |   \---rename
+|   |   |           route.ts
+|   |   |           
+|   |   +---change-pin
+|   |   |       route.ts
+|   |   |       
+|   |   +---coupons
+|   |   |       route.ts
+|   |   |       
+|   |   +---dashboard-stats
+|   |   |       route.ts
+|   |   |       
+|   |   +---export-products
+|   |   |       route.ts
+|   |   |       
+|   |   +---financial
+|   |   |       route.ts
+|   |   |       
+|   |   +---footer-links
+|   |   |       route.ts
+|   |   |       
+|   |   +---global-search
+|   |   |       route.ts
+|   |   |       
+|   |   +---import-products
+|   |   |       route.ts
+|   |   |       
+|   |   +---login
+|   |   |       route.ts
+|   |   |       
+|   |   +---logout
+|   |   |       route.ts
+|   |   |       
+|   |   +---messages
+|   |   |       route.ts
+|   |   |       
+|   |   +---monitoring
+|   |   |       route.ts
+|   |   |       
+|   |   +---news
+|   |   |       route.ts
+|   |   |       
+|   |   +---orders
+|   |   |       route.ts
+|   |   |       
+|   |   +---parse-document
+|   |   |       route.ts
+|   |   |       
+|   |   +---products
+|   |   |   |   route.ts
+|   |   |   |   
+|   |   |   \---bulk
+|   |   |           route.ts
+|   |   |           
+|   |   +---reports
+|   |   |       route.ts
+|   |   |       
+|   |   +---reviews
+|   |   |       route.ts
+|   |   |       
+|   |   +---roles
+|   |   |       route.ts
+|   |   |       
+|   |   +---send-discount-sms
+|   |   |       route.ts
+|   |   |       
+|   |   +---seo-audit
+|   |   |       route.ts
+|   |   |       
+|   |   +---session
+|   |   |       route.ts
+|   |   |       
+|   |   +---settings
+|   |   |       route.ts
+|   |   |       
+|   |   +---site-info
+|   |   |       route.ts
+|   |   |       
+|   |   +---slider-report
+|   |   |       route.ts
+|   |   |       
+|   |   +---sms
+|   |   |   +---order-status
+|   |   |   |       route.ts
+|   |   |   |       
+|   |   |   \---review-request
+|   |   |           route.ts
+|   |   |           
+|   |   +---styles
+|   |   |       route.ts
+|   |   |       
+|   |   +---upload
+|   |   |       route.ts
+|   |   |       
+|   |   +---upload-image
+|   |   |       route.ts
+|   |   |       
+|   |   \---users
+|   |           route.ts
+|   |           
+|   +---ai-assistant
+|   |   |   route.ts
+|   |   |   
+|   |   \---history
+|   |           route.ts
+|   |           
+|   +---ai-seo-autopilot
+|   |       route.ts
+|   |       
+|   +---ai-teardown
+|   |       route.ts
+|   |       
+|   +---analytics
+|   |   \---device
+|   |           route.ts
+|   |           
+|   +---auth
+|   |   +---otp
+|   |   |   |   route.ts
+|   |   |   |   
+|   |   |   +---send
+|   |   |   |       route.ts
+|   |   |   |       
+|   |   |   \---verify
+|   |   |           route.ts
+|   |   |           
+|   |   \---recovery
+|   |           route.ts
+|   |           
+|   +---blogs
+|   |       route.ts
+|   |       
+|   +---categories
+|   |       route.ts
+|   |       
+|   +---checkout
+|   |       route.ts
+|   |       
+|   +---contact
+|   |       route.ts
+|   |       
+|   +---coupons
+|   |   |   route.ts
+|   |   |   
+|   |   \---validate
+|   |           route.ts
+|   |           
+|   +---crm
+|   |       route.ts
+|   |       
+|   +---cron
+|   |   +---backup
+|   |   |       route.ts
+|   |   |       
+|   |   +---news
+|   |   |       route.ts
+|   |   |       
+|   |   +---release-inventory
+|   |   |       route.ts
+|   |   |       
+|   |   \---review-sms
+|   |           route.ts
+|   |           
+|   +---enamad
+|   |       route.ts
+|   |       
+|   +---live-chat
+|   |       route.ts
+|   |       
+|   +---media-proxy
+|   |       route.ts
+|   |       
+|   +---news
+|   |   |   route.ts
+|   |   |   
+|   |   \---sync
+|   |           route.ts
+|   |           
+|   +---orders
+|   |   |   route.ts
+|   |   |   
+|   |   +---create
+|   |   |       route.ts
+|   |   |       
+|   |   \---track
+|   |           route.ts
+|   |           
+|   +---pages
+|   |       route.ts
+|   |       
+|   +---payment
+|   |   +---request
+|   |   |       route.ts
+|   |   |       
+|   |   \---verify
+|   |           route.ts
+|   |           
+|   +---products
+|   |   |   route.ts
+|   |   |   
+|   |   \---[id]
+|   |       \---reviews
+|   |               route.ts
+|   |               
+|   +---public
+|   |   +---banners
+|   |   |       route.ts
+|   |   |       
+|   |   \---coupons
+|   |           route.ts
+|   |           
+|   +---reviews
+|   |       route.ts
+|   |       
+|   +---security
+|   |   \---vpn-check
+|   |           route.ts
+|   |           
+|   +---send-otp
+|   |       route.ts
+|   |       
+|   +---site-info
+|   |       route.ts
+|   |       
+|   +---sms
+|   |   +---debug
+|   |   |       route.ts
+|   |   |       
+|   |   \---send
+|   |           route.ts
+|   |           
+|   +---styles
+|   |       route.ts
+|   |       
+|   +---test-ai
+|   |       route.ts
+|   |       
+|   +---theme-builder
+|   |       route.ts
+|   |       
+|   +---torob
+|   |       route.ts
+|   |       
+|   \---user
+|       +---auth
+|       |       route.ts
+|       |       
+|       \---session
+|               route.ts
+|               
++---blog
+|   |   loading.tsx
+|   |   page.tsx
+|   |   
+|   \---[id]
+|           page.tsx
+|           
++---checkout
+|   |   page.tsx
+|   |   
+|   \---payment
+|           page.tsx
+|           
++---contact
+|       page.tsx
+|       
++---login
+|       page.tsx
+|       
++---maintenance
+|       page.tsx
+|       
++---my-orders
+|       page.tsx
+|       
++---news
+|   |   page.tsx
+|   |   
+|   \---[slug]
+|           page.tsx
+|           
++---payment
+|       page.tsx
+|       
++---placeholder.png
+|       route.ts
+|       
++---products
+|   |   loading.tsx
+|   |   page.tsx
+|   |   
+|   +---ai-teardown
+|   |       route.ts
+|   |       
+|   \---[id]
+|           page.tsx
+|           
++---theme-demo
++---track
+|       page.tsx
+|       
++---track-order
+|       page.tsx
+|       
+\---[slug]
+        page.tsx
+        

@@ -33,8 +33,13 @@ export default function AdminCustomers() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSmsModalOpen, setIsSmsModalOpen] = useState(false);
   const [activeSmsCustomer, setActiveSmsCustomer] = useState<CrmCustomer | null>(null);
-  const [smsText, setSmsText] = useState("");
+  
+  // استیت‌های جدید برای مدیریت دقیق کوپن پاداش در مودال پیامک
   const [rewardCouponCode, setRewardCouponCode] = useState("");
+  const [rewardDiscountType, setRewardDiscountType] = useState<"percent" | "fixed">("percent");
+  const [rewardDiscountValue, setRewardDiscountValue] = useState<number | "">(15);
+  const [smsText, setSmsText] = useState("");
+  
   const [sendingSms, setSendingSms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -146,62 +151,80 @@ export default function AdminCustomers() {
     }
   };
 
-  const handleGenerateRewardCoupon = async (c: CrmCustomer) => {
+  // تنظیمات اولیه هنگام باز کردن مودال پیامک پاداش
+  const handleOpenRewardModal = (c: CrmCustomer) => {
     soundEngine.playClick();
-    const code = "VIP-" + Math.random().toString(36).substring(2, 7).toUpperCase();
-    setRewardCouponCode(code);
+    setActiveSmsCustomer(c);
+    const initialCode = "VIP-" + Math.random().toString(36).substring(2, 7).toUpperCase();
+    setRewardCouponCode(initialCode);
+    setRewardDiscountType("percent");
+    setRewardDiscountValue(15);
     setSmsText(
-      c.full_name +
-        " عزیز، به پاس همراهی ارزشمند شما با آکسون، کد تخفیف اختصاصی " +
-        code +
-        " (۱۵٪ تخفیف ویژه) با اعتبار ۷ روزه تقدیم می‌گردد. axoncore.ir"
+      `${c.full_name} عزیز، به پاس همراهی ارزشمند شما با آکسون کور، کد تخفیف اختصاصی ${initialCode} (۱۵٪ تخفیف ویژه) با اعتبار ۷ روزه تقدیم شما می‌گردد. axoncore.ir`
     );
+    setIsSmsModalOpen(true);
   };
 
-  const handleSendSms = async (e: React.FormEvent) => {
+  // به‌روزرسانی زنده متن پیامک با تغییر تنظیمات تخفیف
+  useEffect(() => {
+    if (!activeSmsCustomer || !isSmsModalOpen) return;
+    const valText = rewardDiscountType === "percent" 
+      ? `${rewardDiscountValue}٪ تخفیف ویژه` 
+      : `${Number(rewardDiscountValue).toLocaleString("fa-IR")} تومان تخفیف`;
+      
+    setSmsText(
+      `${activeSmsCustomer.full_name} عزیز، به پاس همراهی ارزشمند شما با آکسون کور، کد تخفیف اختصاصی ${rewardCouponCode} (${valText}) با اعتبار ۷ روزه تقدیم شما می‌گردد. axoncore.ir`
+    );
+  }, [rewardCouponCode, rewardDiscountType, rewardDiscountValue, activeSmsCustomer, isSmsModalOpen]);
+
+  const handleSendSmsAndCreateCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeSmsCustomer || !smsText.trim()) return;
+    if (!activeSmsCustomer || !smsText.trim() || !rewardCouponCode.trim() || !rewardDiscountValue) return;
 
     soundEngine.playClick();
     setSendingSms(true);
+    
     try {
-      if (rewardCouponCode) {
-        const expiresDate = new Date();
-        expiresDate.setDate(expiresDate.getDate() + 7);
+      const expiresDate = new Date();
+      expiresDate.setDate(expiresDate.getDate() + 7); // اعتبار ۷ روزه استاندارد
+      
+      const numericVal = Number(rewardDiscountValue);
 
-        try {
-          await fetch("/api/admin/coupons", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              code: rewardCouponCode,
-              type: "percent",
-              discount_type: "percent",
-              value: 15,
-              discount_percent: 15,
-              usage_limit: 1,
-              expires_at: expiresDate.toISOString(),
-              description: "کوپن هدیه اختصاصی CRM برای " + activeSmsCustomer.full_name,
-              is_active: true,
-            }),
-          });
-        } catch {}
+      // ۱. ثبت کوپن در دیتابیس دقیقاً با متد استاندارد ساخت کوپن
+      const couponPayload = {
+        code: rewardCouponCode.trim().toUpperCase(),
+        discount_type: rewardDiscountType,
+        type: rewardDiscountType,
+        value: numericVal,
+        discount_value: numericVal,
+        discount_percent: rewardDiscountType === "percent" ? numericVal : null,
+        discount_amount: rewardDiscountType === "fixed" ? numericVal : null,
+        min_purchase: 0,
+        min_order_amount: 0,
+        max_discount: 0,
+        max_discount_amount: 0,
+        usage_limit: 1, // یک‌بار مصرف برای مشتری اختصاصی
+        target_type: "all",
+        target_id: null,
+        starts_at: new Date().toISOString(),
+        expires_at: expiresDate.toISOString(),
+        description: `هدیه اختصاصی CRM برای ${activeSmsCustomer.full_name} (${activeSmsCustomer.phone})`,
+        is_active: true,
+        publish_to_header: false, // کوپن شخصی در هدر سایت پخش نمی‌شود
+      };
 
-        try {
-          await fetch("/api/site-info", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "create_coupon",
-              code: rewardCouponCode,
-              value: 15,
-              type: "percent",
-            }),
-          });
-        } catch {}
+      const couponRes = await fetch("/api/admin/coupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(couponPayload),
+      });
+
+      if (!couponRes.ok) {
+        throw new Error("خطا در ثبت کوپن در پایگاه داده.");
       }
 
-      const res = await fetch("/api/sms/send", {
+      // ۲. ارسال پیامک به مشتری
+      const smsRes = await fetch("/api/sms/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -210,16 +233,22 @@ export default function AdminCustomers() {
         }),
       });
 
-      const json = await res.json();
-      if (res.ok && json.success) {
+      const smsJson = await smsRes.json();
+      if (smsRes.ok && smsJson.success) {
         soundEngine.playSuccess();
-        showFeedback("پیامک بازاریابی و کد تخفیف با موفقیت ارسال و در دیتابیس فعال گردید.", "success");
+        showFeedback("✓ کوپن در دیتابیس ثبت شد و پیامک با موفقیت ارسال گردید.", "success");
         setIsSmsModalOpen(false);
-        setSmsText("");
-        setRewardCouponCode("");
       } else {
-        showFeedback(json.message || "خطا در ارسال پیامک.", "error");
+        showFeedback(smsJson.message || "کوپن ثبت شد اما در ارسال پیامک خطایی رخ داد.", "error");
       }
+      
+      // آپدیت کردن لیست کوپن‌ها در سایر تب‌های ادمین
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("coupons_updated"));
+      }
+
+    } catch (err: any) {
+       showFeedback(err.message || "خطا در عملیات ثبت و ارسال.", "error");
     } finally {
       setSendingSms(false);
     }
@@ -404,12 +433,7 @@ export default function AdminCustomers() {
                   <td className="p-3.5 text-center">
                     <div className="flex items-center justify-center gap-1.5">
                       <button
-                        onClick={() => {
-                          soundEngine.playClick();
-                          setActiveSmsCustomer(c);
-                          handleGenerateRewardCoupon(c);
-                          setIsSmsModalOpen(true);
-                        }}
+                        onClick={() => handleOpenRewardModal(c)}
                         className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 hover:bg-amber-500 hover:text-slate-950 font-bold text-[11px] transition cursor-pointer whitespace-nowrap"
                         title="ارسال پیامک و کد تخفیف"
                       >
@@ -568,7 +592,7 @@ export default function AdminCustomers() {
           <div className="max-w-md w-full p-5 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 text-xs text-[var(--text-primary)] shadow-2xl">
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
               <h3 className="font-black text-sm">
-                ارسال پیامک پاداش و کد تخفیف: {activeSmsCustomer.full_name}
+                پاداش و کد تخفیف اختصاصی: {activeSmsCustomer.full_name}
               </h3>
               <button
                 onClick={() => setIsSmsModalOpen(false)}
@@ -578,12 +602,45 @@ export default function AdminCustomers() {
               </button>
             </div>
 
-            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex justify-between items-center">
-              <span className="font-bold text-amber-500">کد تخفیف اختصاصی تولیدشده:</span>
-              <span className="font-mono font-black text-sm">{rewardCouponCode || "---"}</span>
-            </div>
+            <form onSubmit={handleSendSmsAndCreateCoupon} className="space-y-4">
+              
+              <div>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">کد تخفیف اختصاصی تولیدشده:</label>
+                <input
+                  type="text"
+                  dir="ltr"
+                  required
+                  value={rewardCouponCode}
+                  onChange={(e) => setRewardCouponCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ""))}
+                  className="w-full p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 font-mono font-black text-amber-500 outline-none focus:border-amber-500 text-center text-sm"
+                />
+              </div>
 
-            <form onSubmit={handleSendSms} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نوع تخفیف:</label>
+                  <select
+                    value={rewardDiscountType}
+                    onChange={(e) => setRewardDiscountType(e.target.value as "percent" | "fixed")}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+                  >
+                    <option value="percent">درصدی (%)</option>
+                    <option value="fixed">مبلغ ثابت (تومان)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">مقدار تخفیف:</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={rewardDiscountValue}
+                    onChange={(e) => setRewardDiscountValue(e.target.value === "" ? "" : Number(e.target.value))}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black outline-none"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">متن پیامک بازاریابی:</label>
                 <textarea
@@ -598,9 +655,9 @@ export default function AdminCustomers() {
               <button
                 type="submit"
                 disabled={sendingSms}
-                className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl cursor-pointer disabled:opacity-50"
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-xs hover:opacity-90 shadow-xl cursor-pointer disabled:opacity-50"
               >
-                {sendingSms ? "در حال ارسال پیامک..." : "ارسال پیامک و فعال‌سازی کوپن در دیتابیس 🚀"}
+                {sendingSms ? "در حال ثبت و ارسال پیامک..." : "ثبت کوپن و ارسال پیامک 🚀"}
               </button>
             </form>
           </div>

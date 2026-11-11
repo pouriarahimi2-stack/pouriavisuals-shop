@@ -138,6 +138,7 @@ export default function CheckoutPage() {
   const [otpCode, setOtpCode] = useState("");
   const [verifiedToken, setVerifiedToken] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const [isOtpRequestLocked, setIsOtpRequestLocked] = useState(false); // قفل امنیتی جلوگیری از دابل کلیک
   const [captchaVerified, setCaptchaVerified] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -192,8 +193,6 @@ export default function CheckoutPage() {
 
   const invoice = PricingEngine.calculateInvoiceBreakdown(cartItems);
   const vatAmount = invoice.totalVatAmount;
-  // --- اصلاح مهم برای رفع مشکل محاسبات صورتحساب ---
-  // مالیات به طور صریح به مبلغ پرداختی (که خود قبلاً منهای تخفیف شده است) اضافه می‌شود.
   const grandTotal = Math.max(0, finalPayable + vatAmount + shippingCost);
 
   const provinceList = Object.keys(IRAN_PROVINCES_CITIES).sort();
@@ -342,7 +341,13 @@ export default function CheckoutPage() {
   };
 
   const handlePrimaryCheckoutClick = async (e: React.FormEvent) => {
+    // جلوگیری قوی‌تر از ارسال فرم و حباب شدن رویدادها
     e.preventDefault();
+    e.stopPropagation();
+
+    // جلوگیری از دابل کلیک و درخواست‌های همزمان
+    if (isOtpRequestLocked || submitting) return;
+
     soundEngine.playClick();
     setErrorMsg(null);
 
@@ -384,7 +389,10 @@ export default function CheckoutPage() {
       return;
     }
 
+    // فعال کردن قفل درخواست پیامک
     setSubmitting(true);
+    setIsOtpRequestLocked(true);
+    
     try {
       const otpRes = await fetch("/api/send-otp", {
         method: "POST",
@@ -392,21 +400,29 @@ export default function CheckoutPage() {
         body: JSON.stringify({ phone: cleanPhone, action: "send" }),
       });
       const otpJson = await otpRes.json();
+      
       if (otpRes.ok && otpJson.success) {
         setOtpModalOpen(true);
-        setSubmitting(false);
       } else {
         setErrorMsg(otpJson.message || "خطا در ارسال پیامک تایید.");
-        setSubmitting(false);
       }
     } catch {
       setErrorMsg("خطا در ارتباط با سرویس پیامک.");
+    } finally {
       setSubmitting(false);
+      // باز کردن قفل پس از ۵ ثانیه برای جلوگیری از ارسال‌های پشت سر هم
+      setTimeout(() => {
+        setIsOtpRequestLocked(false);
+      }, 5000);
     }
   };
 
   const handleVerifyOtpAndPay = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    if (submitting) return;
+
     soundEngine.playClick();
     setSubmitting(true);
     setErrorMsg(null);
@@ -684,7 +700,7 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {/* کادر ثبت کد تخفیف اختصاصی و سراسری - اصلاح بیرون‌زدگی در موبایل */}
+          {/* کادر ثبت کد تخفیف اختصاصی و سراسری */}
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
             <div className="flex items-center justify-between">
               <span className="font-black text-xs text-[var(--text-primary)]">🏷️ کد تخفیف دارید؟</span>
@@ -749,7 +765,6 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          {/* اصلاح جمع‌بندی مالی (افزودن مالیات به مبلغ نهایی) */}
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
             <div className="flex justify-between">
               <span>مجموع اقلام:</span>
@@ -801,11 +816,12 @@ export default function CheckoutPage() {
           
           <button
             type="submit"
-            disabled={submitting || !captchaVerified}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs sm:text-sm shadow-xl cursor-pointer transition disabled:opacity-50"
+            // دکمه فقط در صورتی فعال است که قفلی وجود نداشته باشد
+            disabled={submitting || !captchaVerified || isOtpRequestLocked}
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs sm:text-sm shadow-xl cursor-pointer transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {submitting
-              ? "در حال پردازش..."
+            {submitting || isOtpRequestLocked
+              ? "در حال پردازش امن..."
               : verifiedToken
               ? "💳 ورود به درگاه زرین‌پال ←"
               : "🔒 تایید شماره و پرداخت آنلاین ←"}
@@ -830,7 +846,7 @@ export default function CheckoutPage() {
               required
               dir="ltr"
               maxLength={8}
-              autoComplete="one-time-code" // <--- راه‌حل مشکل خوانده نشدن کد پیامکی موبایل در فایلی که اینپوت دارد
+              autoComplete="one-time-code"
               value={otpCode}
               onChange={(e) => setOtpCode(e.target.value)}
               placeholder="کد تایید را وارد کنید"
@@ -839,7 +855,7 @@ export default function CheckoutPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-4 rounded-2xl bg-emerald-600 text-white font-black text-xs shadow-xl cursor-pointer"
+              className="w-full py-4 rounded-2xl bg-emerald-600 text-white font-black text-xs shadow-xl cursor-pointer disabled:opacity-50"
             >
               {submitting ? "در حال انتقال..." : "✓ تایید کد و پرداخت"}
             </button>

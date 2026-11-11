@@ -850,6 +850,7 @@ export default function CheckoutPage() {
               name="code"
               id="code"
               autoComplete="one-time-code"
+              autoFocus={true}
               value={otpCode}
               onChange={(e) => setOtpCode(e.target.value)}
               placeholder="کد تایید را وارد کنید"

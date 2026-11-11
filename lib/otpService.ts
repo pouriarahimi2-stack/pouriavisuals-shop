@@ -22,7 +22,7 @@ const RAW_KEY_UNPADDED =
   "YTJjNDk1NTItNmJmOS00ZjY0LWJjMWQtMjM1OTdmN2M4NDdlMjc1ZmJhYTMxODk5OTNiMmFmM2FmZjA5YTNiYjBhZTY";
 const RAW_KEY_PADDED = RAW_KEY_UNPADDED + "=";
 const EXACT_ORIGIN_NUMBER = "+983000505";
-const EXACT_PATTERN_CODE = "3d6fa1f8ud3ma1w";
+const EXACT_PATTERN_CODE = "6xfi2kgb07uy60i";
 const NETAFRAZ_STATIC_IP = "185.106.201.79";
 
 export function toE164(phone: string): string {
@@ -131,7 +131,7 @@ export async function sendOtpPatternDetailed({
       from_number: originNumber,
       code: patternCode,
       recipients: [recipientE164],
-      params: { "vefification-code": cleanCode },
+      params: { code: cleanCode },
     }
   );
 
@@ -185,7 +185,7 @@ export async function sendOtpPatternDetailed({
         from_number: originNumber,
         code: patternCode,
         recipients: [recipientE164],
-        params: { "vefification-code": cleanCode },
+        params: { code: cleanCode },
       },
     },
     {
@@ -200,7 +200,7 @@ export async function sendOtpPatternDetailed({
         pattern_code: patternCode,
         originator: originNumber,
         recipient: recipientE164,
-        values: { "vefification-code": cleanCode },
+        params: { code: cleanCode },
       },
     },
     {
@@ -215,7 +215,7 @@ export async function sendOtpPatternDetailed({
         code: patternCode,
         sender: originNumber,
         recipient: recipientLocal,
-        variable: { "vefification-code": cleanCode },
+        params: { code: cleanCode },
       },
     },
   ];

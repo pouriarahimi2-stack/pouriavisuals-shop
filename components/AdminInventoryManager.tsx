@@ -1,7 +1,7 @@
 // File Path: components/AdminInventoryManager.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
 import OrderManager from "@/components/admin/OrderManager";
@@ -27,6 +27,7 @@ export interface ProductFinancialRow {
   totalPurchaseCostMonthly: number;
   totalVatMonthly: number;
   totalNetProfitMonthly: number;
+  shipping_type?: "post" | "tipax" | "both";
 }
 
 export function AdminInventoryManager({
@@ -34,7 +35,9 @@ export function AdminInventoryManager({
 }: {
   defaultSubTab?: "accounting" | "orders" | "reports";
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<"accounting" | "orders" | "reports">(defaultSubTab);
+  const [activeSubTab, setActiveSubTab] = useState<"accounting" | "orders" | "reports">(
+    defaultSubTab
+  );
   const [items, setItems] = useState<ProductFinancialRow[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [summary, setSummary] = useState({
@@ -47,7 +50,9 @@ export function AdminInventoryManager({
   });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(
+    null
+  );
 
   // فرم ورود / کسر موجودی انبار
   const [selectedProdId, setSelectedProdId] = useState("");
@@ -73,26 +78,31 @@ export function AdminInventoryManager({
     setTimeout(() => setFeedback(null), 4000);
   };
 
-  const fetchAccountingData = async () => {
+  const fetchAccountingData = useCallback(async () => {
     try {
-      const res = await fetch("/api/accounting", { cache: "no-store" });
+      const res = await fetch("/api/accounting?t=" + Date.now(), { cache: "no-store" });
       const json = await res.json();
       if (json.success) {
-        const list = json.productFinancials || [];
+        const list: ProductFinancialRow[] = json.productFinancials || [];
         setItems(list);
-        setSummary(json.summary || summary);
+        if (json.summary) setSummary(json.summary);
         setLogs(json.inventoryLogs || []);
-        if (!selectedProdId && list.length > 0) {
-          setSelectedProdId(list[0].id);
-          setPurchaseCostInput(list[0].purchasePrice || "");
-        }
+
+        setSelectedProdId((prevId) => {
+          const targetId = prevId && list.some((x) => x.id === prevId) ? prevId : list[0]?.id || "";
+          const found = list.find((x) => x.id === targetId);
+          if (found) {
+            setPurchaseCostInput(found.purchasePrice ?? "");
+          }
+          return targetId;
+        });
       }
     } catch (e) {
       console.error("Accounting fetch error:", e);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchAccountingData();
@@ -123,7 +133,7 @@ export function AdminInventoryManager({
       supabase.removeChannel(chOrders);
       supabase.removeChannel(chLogs);
     };
-  }, []);
+  }, [fetchAccountingData]);
 
   const executeRestockTransaction = async () => {
     if (!selectedProdId) return;
@@ -179,6 +189,25 @@ export function AdminInventoryManager({
   const handleSaveFullProductEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
+
+    if (!editingProduct.title?.trim()) {
+      notify("❌ عنوان کالا الزامی است.", "error");
+      return;
+    }
+
+    const baseP = Math.max(0, Number(editingProduct.basePrice || 0));
+    const discP =
+      editingProduct.discountPrice !== null &&
+      editingProduct.discountPrice !== undefined &&
+      Number(editingProduct.discountPrice) > 0
+        ? Number(editingProduct.discountPrice)
+        : null;
+
+    if (discP !== null && baseP > 0 && discP >= baseP) {
+      notify("❌ قیمت با تخفیف باید کمتر از قیمت فروش پایه باشد.", "error");
+      return;
+    }
+
     soundEngine.playClick();
     setSavingEdit(true);
 
@@ -186,7 +215,13 @@ export function AdminInventoryManager({
       const res = await fetch("/api/accounting", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editingProduct),
+        body: JSON.stringify({
+          ...editingProduct,
+          basePrice: baseP,
+          discountPrice: discP,
+          purchasePrice: Math.max(0, Number(editingProduct.purchasePrice || 0)),
+          stock: Math.max(0, Number(editingProduct.stock || 0)),
+        }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
@@ -211,9 +246,9 @@ export function AdminInventoryManager({
         '"' +
         p.id +
         '","' +
-        p.title +
+        p.title.replace(/"/g, '""') +
         '","' +
-        p.category +
+        p.category.replace(/"/g, '""') +
         '",' +
         p.stock +
         "," +
@@ -245,7 +280,8 @@ export function AdminInventoryManager({
     (p) =>
       p.title.toLowerCase().includes(search.toLowerCase()) ||
       p.category.toLowerCase().includes(search.toLowerCase()) ||
-      p.sku.toLowerCase().includes(search.toLowerCase())
+      p.sku.toLowerCase().includes(search.toLowerCase()) ||
+      (p.brand && p.brand.toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
@@ -337,7 +373,9 @@ export function AdminInventoryManager({
           <span className="text-lg sm:text-sm md:text-xl font-black font-mono text-emerald-500 block">
             {summary.totalMonthlySalesGross.toLocaleString("fa-IR")} ت
           </span>
-          <span className="text-[10px] text-slate-400">{summary.totalUnitsSold} قلم کالای فروخته‌شده</span>
+          <span className="text-[10px] text-slate-400">
+            {summary.totalUnitsSold} قلم کالای فروخته‌شده (پرداخت‌شده)
+          </span>
         </div>
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1 shadow-sm">
           <span className="text-[var(--text-secondary)] font-bold">مالیات بر ارزش افزوده (۱۰٪):</span>
@@ -372,7 +410,9 @@ export function AdminInventoryManager({
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <div className="lg:col-span-2">
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">انتخاب کالا:</label>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  انتخاب کالا:
+                </label>
                 <select
                   value={selectedProdId}
                   onChange={(e) => {
@@ -410,6 +450,7 @@ export function AdminInventoryManager({
                 </label>
                 <input
                   type="number"
+                  min={0}
                   value={purchaseCostInput}
                   onChange={(e) =>
                     setPurchaseCostInput(e.target.value === "" ? "" : Number(e.target.value))
@@ -455,7 +496,9 @@ export function AdminInventoryManager({
             </div>
 
             {loading ? (
-              <div className="py-12 text-center text-slate-400 font-bold">در حال محاسبه اسناد حسابداری...</div>
+              <div className="py-12 text-center text-slate-400 font-bold">
+                در حال محاسبه اسناد حسابداری...
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-right text-xs min-w-[920px]">
@@ -472,55 +515,87 @@ export function AdminInventoryManager({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--card-border)] font-medium">
-                    {filteredItems.map((p) => (
-                      <tr key={p.id} className="hover:bg-[var(--input-bg)]/50 transition">
-                        <td className="p-3">
-                          <div className="font-black text-[var(--text-primary)]">{p.title}</div>
-                          <div className="text-[10px] font-mono text-slate-400">
-                            {p.sku} | {p.category}
-                          </div>
-                        </td>
-                        <td className="p-3 text-center">
-                          <span
-                            className={
-                              "px-2.5 py-1 rounded-xl font-mono font-black " +
-                              (p.stock > 3
-                                ? "bg-emerald-500/15 text-emerald-400"
-                                : p.stock > 0
-                                ? "bg-amber-500/15 text-amber-400"
-                                : "bg-rose-500/15 text-rose-400")
-                            }
-                          >
-                            {p.stock} عدد
-                          </span>
-                        </td>
-                        <td className="p-3 font-mono text-slate-300">
-                          {p.purchasePrice.toLocaleString("fa-IR")} ت
-                        </td>
-                        <td className="p-3 font-mono font-bold text-[var(--accent-blue)]">
-                          {p.sellingPrice.toLocaleString("fa-IR")} ت
-                        </td>
-                        <td className="p-3 font-mono text-emerald-400">
-                          {p.netProfitPerUnit.toLocaleString("fa-IR")} ت ({p.profitMarginPercent}%)
-                        </td>
-                        <td className="p-3 text-center font-mono font-bold">{p.unitsSoldMonthly}</td>
-                        <td className="p-3 font-mono font-black text-indigo-400">
-                          {p.totalNetProfitMonthly.toLocaleString("fa-IR")} ت
-                        </td>
-                        <td className="p-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              soundEngine.playClick();
-                              setEditingProduct({ ...p });
-                            }}
-                            className="px-3.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-black cursor-pointer transition"
-                          >
-                            ✏️ ویرایش کامل کالا
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredItems.map((p) => {
+                      const hasDiscount =
+                        p.discountPrice !== null &&
+                        p.discountPrice !== undefined &&
+                        Number(p.discountPrice) > 0 &&
+                        Number(p.discountPrice) < p.basePrice;
+
+                      return (
+                        <tr key={p.id} className="hover:bg-[var(--input-bg)]/50 transition">
+                          <td className="p-3">
+                            <div className="font-black text-[var(--text-primary)]">{p.title}</div>
+                            <div className="text-[10px] font-mono text-slate-400">
+                              {p.sku} | {p.category}
+                              {p.brand ? ` | ${p.brand}` : ""}
+                            </div>
+                          </td>
+                          <td className="p-3 text-center">
+                            <span
+                              className={
+                                "px-2.5 py-1 rounded-xl font-mono font-black " +
+                                (p.stock > 3
+                                  ? "bg-emerald-500/15 text-emerald-400"
+                                  : p.stock > 0
+                                  ? "bg-amber-500/15 text-amber-400"
+                                  : "bg-rose-500/15 text-rose-400")
+                              }
+                            >
+                              {p.stock} عدد
+                            </span>
+                          </td>
+                          <td className="p-3 font-mono text-slate-300">
+                            {p.purchasePrice.toLocaleString("fa-IR")} ت
+                          </td>
+                          <td className="p-3 font-mono font-bold text-[var(--accent-blue)]">
+                            {hasDiscount ? (
+                              <div className="space-y-0.5">
+                                <div className="text-[10px] text-slate-400 line-through">
+                                  {p.basePrice.toLocaleString("fa-IR")} ت
+                                </div>
+                                <div className="text-emerald-400 flex items-center gap-1">
+                                  <span>{p.sellingPrice.toLocaleString("fa-IR")} ت</span>
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 font-black">
+                                    ویژه
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <span>{p.sellingPrice.toLocaleString("fa-IR")} ت</span>
+                                {p.sellingPrice === 0 && p.stock > 0 && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-black">
+                                    ⚠️ قیمت ۰
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-3 font-mono text-emerald-400">
+                            {p.netProfitPerUnit.toLocaleString("fa-IR")} ت ({p.profitMarginPercent}%)
+                          </td>
+                          <td className="p-3 text-center font-mono font-bold">
+                            {p.unitsSoldMonthly}
+                          </td>
+                          <td className="p-3 font-mono font-black text-indigo-400">
+                            {p.totalNetProfitMonthly.toLocaleString("fa-IR")} ت
+                          </td>
+                          <td className="p-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                soundEngine.playClick();
+                                setEditingProduct({ ...p });
+                              }}
+                              className="px-3.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-black cursor-pointer transition"
+                            >
+                              ✏️ ویرایش کامل کالا
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -588,9 +663,13 @@ export function AdminInventoryManager({
                     </div>
 
                     <div className="flex items-center gap-2 md:gap-4 font-mono text-[11px] shrink-0">
-                      <span className="font-black text-[var(--accent-blue)]">تعداد: {log.quantity}</span>
+                      <span className="font-black text-[var(--accent-blue)]">
+                        تعداد: {log.quantity}
+                      </span>
                       <span className="text-slate-400">
-                        {log.created_at ? new Date(log.created_at).toLocaleString("fa-IR") : ""}
+                        {log.created_at
+                          ? new Date(log.created_at).toLocaleString("fa-IR")
+                          : ""}
                       </span>
                     </div>
                   </div>
@@ -611,11 +690,21 @@ export function AdminInventoryManager({
             </div>
 
             <p className="text-[var(--text-secondary)] leading-relaxed">
-              کالای <strong className="text-[var(--text-primary)]">«{confirmRestockModal.product.title}»</strong> هم‌اکنون دارای{" "}
-              <strong className="font-mono text-emerald-400">{confirmRestockModal.product.stock} عدد</strong> موجودی ثبت‌شده در انبار است.
+              کالای{" "}
+              <strong className="text-[var(--text-primary)]">
+                «{confirmRestockModal.product.title}»
+              </strong>{" "}
+              هم‌اکنون دارای{" "}
+              <strong className="font-mono text-emerald-400">
+                {confirmRestockModal.product.stock} عدد
+              </strong>{" "}
+              موجودی ثبت‌شده در انبار است.
               <br />
               آیا مطمئن هستید که می‌خواهید{" "}
-              <strong className="font-mono text-amber-400">{confirmRestockModal.delta} عدد دیگر</strong> به موجودی فعلی این کالا اضافه کنید (جمع جدید:{" "}
+              <strong className="font-mono text-amber-400">
+                {confirmRestockModal.delta} عدد دیگر
+              </strong>{" "}
+              به موجودی فعلی این کالا اضافه کنید (جمع جدید:{" "}
               <strong className="font-mono">
                 {confirmRestockModal.product.stock + confirmRestockModal.delta} عدد
               </strong>
@@ -625,7 +714,9 @@ export function AdminInventoryManager({
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--card-border)]">
               <button
                 type="button"
-                onClick={() => setConfirmRestockModal({ isOpen: false, product: null, delta: 0 })}
+                onClick={() =>
+                  setConfirmRestockModal({ isOpen: false, product: null, delta: 0 })
+                }
                 className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold cursor-pointer"
               >
                 انصراف (جلوگیری از ثبت تکراری)
@@ -644,7 +735,12 @@ export function AdminInventoryManager({
 
       {/* مودال ویرایش ۱۰۰٪ کامل محصول از داخل بخش حسابداری و انبار */}
       {editingProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !savingEdit) setEditingProduct(null);
+          }}
+        >
           <div className="w-full max-w-xl rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 space-y-4 shadow-2xl text-xs max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
               <h3 className="text-sm font-black text-[var(--accent-blue)]">
@@ -662,35 +758,81 @@ export function AdminInventoryManager({
             <form onSubmit={handleSaveFullProductEdit} className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3.5">
                 <div className="sm:col-span-2">
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان کامل کالا *</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                    عنوان کامل کالا *
+                  </label>
                   <input
                     type="text"
                     required
                     value={editingProduct.title}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, title: e.target.value })}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, title: e.target.value })
+                    }
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
                   />
                 </div>
 
                 <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">دسته‌بندی:</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                    دسته‌بندی:
+                  </label>
                   <input
                     type="text"
                     value={editingProduct.category}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, category: e.target.value })
+                    }
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">کد کالا (SKU):</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                    برند کالا:
+                  </label>
+                  <input
+                    type="text"
+                    value={editingProduct.brand || ""}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, brand: e.target.value })
+                    }
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                    کد کالا (SKU):
+                  </label>
                   <input
                     type="text"
                     dir="ltr"
                     value={editingProduct.sku}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, sku: e.target.value })}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, sku: e.target.value })
+                    }
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
                   />
+                </div>
+
+                <div>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                    نوع ارسال:
+                  </label>
+                  <select
+                    value={editingProduct.shipping_type || "both"}
+                    onChange={(e) =>
+                      setEditingProduct({
+                        ...editingProduct,
+                        shipping_type: e.target.value as "post" | "tipax" | "both",
+                      })
+                    }
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+                  >
+                    <option value="both">📦 هر دو (پست و تیپاکس)</option>
+                    <option value="post">📮 فقط پست پیشتاز</option>
+                    <option value="tipax">🚚 فقط تیپاکس</option>
+                  </select>
                 </div>
 
                 <div>
@@ -702,7 +844,10 @@ export function AdminInventoryManager({
                     min={0}
                     value={editingProduct.purchasePrice}
                     onChange={(e) =>
-                      setEditingProduct({ ...editingProduct, purchasePrice: Number(e.target.value) })
+                      setEditingProduct({
+                        ...editingProduct,
+                        purchasePrice: Number(e.target.value),
+                      })
                     }
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none focus:border-[var(--accent-blue)]"
                   />
@@ -717,7 +862,10 @@ export function AdminInventoryManager({
                     min={0}
                     value={editingProduct.basePrice}
                     onChange={(e) =>
-                      setEditingProduct({ ...editingProduct, basePrice: Number(e.target.value) })
+                      setEditingProduct({
+                        ...editingProduct,
+                        basePrice: Number(e.target.value),
+                      })
                     }
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none focus:border-[var(--accent-blue)]"
                   />
@@ -750,18 +898,25 @@ export function AdminInventoryManager({
                     min={0}
                     value={editingProduct.stock}
                     onChange={(e) =>
-                      setEditingProduct({ ...editingProduct, stock: Number(e.target.value) })
+                      setEditingProduct({
+                        ...editingProduct,
+                        stock: Number(e.target.value),
+                      })
                     }
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black outline-none focus:border-[var(--accent-blue)]"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">شرح گارانتی:</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                    شرح گارانتی:
+                  </label>
                   <input
                     type="text"
                     value={editingProduct.warranty}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, warranty: e.target.value })}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, warranty: e.target.value })
+                    }
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none"
                   />
                 </div>

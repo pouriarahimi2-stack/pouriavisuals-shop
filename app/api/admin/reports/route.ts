@@ -1,3 +1,4 @@
+// File Path: app/api/admin/reports/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/authSecurityHelper";
@@ -10,8 +11,14 @@ export async function GET(req: NextRequest) {
 
   try {
     const [ordersRes, stockRes] = await Promise.all([
-      supabaseAdmin.from("orders").select("id, status, total_amount, final_amount, created_at"),
-      supabaseAdmin.from("products").select("id, title, stock, price, category").lt("stock", 5).limit(20),
+      supabaseAdmin
+        .from("orders")
+        .select("id, status, payment_status, total_amount, final_amount, created_at"),
+      supabaseAdmin
+        .from("products")
+        .select("id, title, stock, price, category")
+        .lt("stock", 5)
+        .limit(20),
     ]);
 
     let totalRevenue = 0;
@@ -19,7 +26,13 @@ export async function GET(req: NextRequest) {
     const orders = ordersRes.data || [];
 
     orders.forEach((o: any) => {
-      if (o.status === "paid" || o.status === "delivered" || o.status === "shipped") {
+      const st = String(o.status || "").toLowerCase();
+      const pst = String(o.payment_status || "").toLowerCase();
+      if (st === "cancelled" || pst === "failed" || pst === "cancelled") return;
+      if (
+        ["paid", "processing", "shipped", "delivered"].includes(st) ||
+        pst === "paid"
+      ) {
         totalRevenue += Number(o.final_amount || o.total_amount || 0);
         paidOrdersCount++;
       }

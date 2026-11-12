@@ -1,7 +1,7 @@
 // File Path: components/AdminOrders.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { orderService, Order } from "@/services/orderService";
 import { smsService } from "@/services/smsService";
 import { soundEngine } from "@/lib/soundEngine";
@@ -22,20 +22,22 @@ export default function AdminOrders() {
     code: string;
   }>({ open: false, order: null, code: "" });
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       const data = await orderService.getAll();
-      setOrders(data || []);
-      if (selectedOrder) {
-        const refreshed = data.find((o) => o.id === selectedOrder.id);
-        if (refreshed) setSelectedOrder(refreshed);
-      }
+      const list = data || [];
+      setOrders(list);
+      setSelectedOrder((prev) => {
+        if (!prev) return null;
+        const refreshed = list.find((o) => String(o.id) === String(prev.id));
+        return refreshed || prev;
+      });
     } catch (err) {
       console.error("Error loading orders:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchOrders();
@@ -57,7 +59,7 @@ export default function AdminOrders() {
       supabase.removeChannel(channel);
       window.removeEventListener("orders_updated", handleLocalUpdate);
     };
-  }, []);
+  }, [fetchOrders]);
 
   const handleStatusUpdate = async (orderId: string | number, newStatus: string) => {
     soundEngine.playClick();
@@ -74,7 +76,12 @@ export default function AdminOrders() {
 
     setUpdatingId(orderId);
     try {
-      await orderService.updateStatus(orderId, newStatus);
+      const ok = await orderService.updateStatus(orderId, newStatus);
+      if (!ok) {
+        alert("خطا در بروزرسانی وضعیت سفارش");
+        return;
+      }
+
       const updated = orders.map((o) =>
         String(o.id) === String(orderId) ? { ...o, status: newStatus as any } : o
       );
@@ -95,6 +102,7 @@ export default function AdminOrders() {
       }
 
       soundEngine.playSuccess();
+      fetchOrders();
     } catch (err) {
       console.error("Status update error:", err);
       alert("خطا در بروزرسانی وضعیت سفارش");
@@ -112,7 +120,11 @@ export default function AdminOrders() {
     setUpdatingId(orderId);
 
     try {
-      await orderService.updateStatus(orderId, "shipped", code);
+      const ok = await orderService.updateStatus(orderId, "shipped", code);
+      if (!ok) {
+        alert("خطا در ثبت کد رهگیری");
+        return;
+      }
 
       const phone = trackingModal.order.customer?.phone || trackingModal.order.phone;
       const name =
@@ -125,7 +137,9 @@ export default function AdminOrders() {
       }
 
       soundEngine.playSuccess();
-      alert("✅ سفارش به وضعیت «ارسال به پست» تغییر یافت و پیامک کد رهگیری پستی به مشتری ارسال شد.");
+      alert(
+        "✅ سفارش به وضعیت «ارسال به پست» تغییر یافت و پیامک کد رهگیری پستی به مشتری ارسال شد."
+      );
       fetchOrders();
     } catch (err) {
       console.error(err);
@@ -136,19 +150,28 @@ export default function AdminOrders() {
     }
   };
 
-  
-  const handleSendReviewSms = async (order: any) => {
-    if(!confirm("آیا مایل به ارسال پیامک درخواست ثبت نظر برای این سفارش هستید؟")) return;
+  const handleSendReviewSms = async (order: Order) => {
+    if (!confirm("آیا مایل به ارسال پیامک درخواست ثبت نظر برای این سفارش هستید؟")) return;
+    soundEngine.playClick();
     try {
       const res = await fetch("/api/admin/sms/review-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: order.id, phone: order.phone || order.customer?.phone })
+        body: JSON.stringify({
+          orderId: order.id,
+          phone: order.phone || order.customer?.phone,
+        }),
       });
-      const json = await res.json();
-      if(res.ok && json.success) alert("پیامک نظرسنجی با موفقیت ارسال شد.");
-      else alert("خطا: " + json.message);
-    } catch(e) { alert("خطا در برقراری ارتباط با سرور"); }
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success !== false) {
+        soundEngine.playSuccess();
+        alert("پیامک نظرسنجی با موفقیت ارسال شد.");
+      } else {
+        alert("خطا: " + (json.message || "عدم موفقیت در ارسال پیامک"));
+      }
+    } catch {
+      alert("خطا در برقراری ارتباط با سرور");
+    }
   };
 
   const handleDeleteOrder = async (orderId: string | number) => {
@@ -156,9 +179,12 @@ export default function AdminOrders() {
     soundEngine.playClick();
     setUpdatingId(orderId);
     try {
-      const res = await fetch("/api/admin/orders?id=" + encodeURIComponent(String(orderId)), {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        "/api/admin/orders?id=" + encodeURIComponent(String(orderId)),
+        {
+          method: "DELETE",
+        }
+      );
       if (res.ok) {
         soundEngine.playSuccess();
         setOrders((prev) => prev.filter((o) => String(o.id) !== String(orderId)));
@@ -224,6 +250,7 @@ export default function AdminOrders() {
               (idx + 1) +
               "</td><td>" +
               (item.title || item.name) +
+              (item.selectedColor ? ` (${item.selectedColor})` : "") +
               "</td><td>" +
               (item.quantity || 1) +
               "</td><td>" +
@@ -284,14 +311,16 @@ export default function AdminOrders() {
   };
 
   const filteredOrders = orders.filter((o: any) => {
-    const matchesTab = activeTab === "all" || o.status === activeTab;
+    const normalizedSt =
+      o.status === "pending_manual_review" || !o.status ? "pending" : o.status;
+    const matchesTab = activeTab === "all" || normalizedSt === activeTab;
     const name = o.customer?.fullName || o.customerName || "";
     const phone = o.customer?.phone || o.phone || "";
     const id = String(o.id || o.orderNumber || "");
     const matchesSearch =
       name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       phone.includes(searchQuery) ||
-      id.includes(searchQuery);
+      id.toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesTab && matchesSearch;
   });
@@ -349,27 +378,38 @@ export default function AdminOrders() {
             { id: "shipped", label: "تحویل به پست" },
             { id: "delivered", label: "تحویل شده" },
             { id: "cancelled", label: "لغو شده" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                soundEngine.playClick();
-                setActiveTab(tab.id);
-              }}
-              className={
-                "px-3.5 py-2 rounded-xl font-bold transition cursor-pointer whitespace-nowrap text-xs " +
-                (activeTab === tab.id
-                  ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
-                  : "bg-[var(--input-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--card-border)]")
-              }
-            >
-              {tab.label}
-              <span className="mr-1.5 font-mono opacity-80">
-                ({tab.id === "all" ? orders.length : orders.filter((o) => o.status === tab.id).length})
-              </span>
-            </button>
-          ))}
+          ].map((tab) => {
+            const count =
+              tab.id === "all"
+                ? orders.length
+                : orders.filter((o) => {
+                    const st =
+                      (o as any).status === "pending_manual_review" || !o.status
+                        ? "pending"
+                        : o.status;
+                    return st === tab.id;
+                  }).length;
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  soundEngine.playClick();
+                  setActiveTab(tab.id);
+                }}
+                className={
+                  "px-3.5 py-2 rounded-xl font-bold transition cursor-pointer whitespace-nowrap text-xs " +
+                  (activeTab === tab.id
+                    ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
+                    : "bg-[var(--input-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--card-border)]")
+                }
+              >
+                {tab.label}
+                <span className="mr-1.5 font-mono opacity-80">({count})</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -409,10 +449,17 @@ export default function AdminOrders() {
                   const cPhone = order.customer?.phone || order.phone || "---";
                   const total = order.finalAmount || order.totalAmount || 0;
                   const trackCode = order.trackingCode || order.tracking_code;
+                  const currentStatus =
+                    order.status === "pending_manual_review" || !order.status
+                      ? "pending"
+                      : order.status;
 
                   return (
                     <tr key={order.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
-                      <td className="p-4 font-mono font-black text-[var(--accent-blue)] whitespace-nowrap" dir="ltr">
+                      <td
+                        className="p-4 font-mono font-black text-[var(--accent-blue)] whitespace-nowrap"
+                        dir="ltr"
+                      >
                         #{order.orderNumber || order.order_number || order.id}
                       </td>
                       <td className="p-4">
@@ -430,7 +477,7 @@ export default function AdminOrders() {
                       >
                         {formatPrice(total)} تومان
                       </td>
-                      <td className="p-4 text-center">{getStatusBadge(order.status)}</td>
+                      <td className="p-4 text-center">{getStatusBadge(currentStatus)}</td>
                       <td className="p-4 font-mono text-[11px] text-[var(--text-secondary)]">
                         {trackCode ? (
                           <span className="px-2.5 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-blue-400 font-bold whitespace-nowrap">
@@ -453,66 +500,25 @@ export default function AdminOrders() {
                             👁️ پرونده
                           </button>
 
-                          
-                          {selectedOrder?.status === "delivered" && (
-                              <button
-                                type="button"
-                                onClick={() => handleSendReviewSms(selectedOrder!)}
-                                className="px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500 hover:text-white text-sky-500 border border-sky-500/20 text-[11px] font-bold transition cursor-pointer whitespace-nowrap"
-                                title="ارسال دستی پیامک نظرسنجی به مشتری"
-                              >
-                                💬 پیامک نظر
-                              </button>
-                          )}
-                          
-                          {order.status === "delivered" && (
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                    if(!confirm("ارسال پیامک نظرسنجی؟")) return;
-                                    try {
-                                        await fetch("/api/admin/sms/review-request", { method: "POST", body: JSON.stringify({ orderId: order.id, phone: order.phone }) });
-                                        alert("پیامک با موفقیت ارسال شد.");
-                                    } catch(e) {}
-                                }}
-                                className="px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500 hover:text-white text-sky-500 border border-sky-500/20 text-[11px] font-bold transition cursor-pointer"
-                              >
-                                💬 پیامک نظر
-                              </button>
-                          )}
-                          {order.status === "delivered" && (
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                    if(!confirm("آیا از ارسال پیامک درخواست ثبت نظر به این مشتری اطمینان دارید؟")) return;
-                                    try {
-                                        const res = await fetch("/api/admin/sms/review-request", { method:"POST", body: JSON.stringify({orderId: order.id, phone: order.phone})});
-                                        if(res.ok) alert("پیامک با موفقیت ارسال شد.");
-                                    } catch(e){}
-                                }}
-                                className="px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500 hover:text-white text-sky-500 border border-sky-500/20 text-[11px] font-bold transition cursor-pointer whitespace-nowrap"
-                              >
-                                💬 پیامک نظر
-                              </button>
-                          )}
-<button type="button" onClick={() => printOrderInvoice(order)} className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-500 border border-emerald-500/20 text-[11px] font-bold transition cursor-pointer whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => printOrderInvoice(order)}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-500 border border-emerald-500/20 text-[11px] font-bold transition cursor-pointer whitespace-nowrap"
+                          >
                             🖨️ فاکتور
                           </button>
-                          {order.status === "delivered" && (
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                    if(!confirm("ارسال پیامک درخواست نظر به این مشتری؟")) return;
-                                    try {
-                                        const res = await fetch("/api/admin/sms/review-request", { method:"POST", body: JSON.stringify({orderId: order.id, phone: order.phone})});
-                                        if(res.ok) alert("پیامک ارسال شد.");
-                                    } catch(e){}
-                                }}
-                                className="px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500 hover:text-white text-sky-500 border border-sky-500/20 text-[11px] font-bold transition cursor-pointer whitespace-nowrap"
-                              >
-                                💬 پیامک نظر
-                              </button>
+
+                          {currentStatus === "delivered" && (
+                            <button
+                              type="button"
+                              onClick={() => handleSendReviewSms(order)}
+                              className="px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500 hover:text-white text-sky-500 border border-sky-500/20 text-[11px] font-bold transition cursor-pointer whitespace-nowrap"
+                              title="ارسال پیامک درخواست ثبت نظر به مشتری"
+                            >
+                              💬 پیامک نظر
+                            </button>
                           )}
+
                           <button
                             type="button"
                             onClick={() => handleDeleteOrder(order.id)}
@@ -524,7 +530,7 @@ export default function AdminOrders() {
 
                           <select
                             disabled={isUpdating}
-                            value={order.status}
+                            value={currentStatus}
                             onChange={(e) => handleStatusUpdate(order.id, e.target.value)}
                             className="p-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold outline-none cursor-pointer disabled:opacity-50"
                           >
@@ -547,7 +553,12 @@ export default function AdminOrders() {
       )}
 
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn font-sans">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn font-sans"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedOrder(null);
+          }}
+        >
           <div className="max-w-2xl w-full p-5 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-6 shadow-2xl text-[var(--text-primary)] max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
               <div>
@@ -557,6 +568,11 @@ export default function AdminOrders() {
                     {selectedOrder.orderNumber || selectedOrder.id}
                   </span>
                 </h3>
+                {selectedOrder.created_at && (
+                  <p className="text-[11px] text-[var(--text-secondary)] mt-1">
+                    تاریخ ثبت: {new Date(selectedOrder.created_at).toLocaleString("fa-IR")}
+                  </p>
+                )}
               </div>
               <button
                 type="button"
@@ -567,7 +583,7 @@ export default function AdminOrders() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
               <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                 <h4 className="font-black text-[var(--accent-blue)]">👤 مشخصات خریدار:</h4>
                 <p>
@@ -580,14 +596,53 @@ export default function AdminOrders() {
                     {selectedOrder.customer?.phone || selectedOrder.phone}
                   </span>
                 </p>
+                {(selectedOrder.province || selectedOrder.city) && (
+                  <p>
+                    <strong>استان / شهر:</strong>{" "}
+                    {[selectedOrder.province, selectedOrder.city].filter(Boolean).join(" - ")}
+                  </p>
+                )}
                 <p>
                   <strong>نشانی پستی:</strong>{" "}
                   {selectedOrder.customer?.address || selectedOrder.address}
                 </p>
+                {(selectedOrder.postalCode || selectedOrder.postal_code) && (
+                  <p>
+                    <strong>کد پستی:</strong>{" "}
+                    <span className="font-mono">
+                      {selectedOrder.postalCode || selectedOrder.postal_code}
+                    </span>
+                  </p>
+                )}
+                {(selectedOrder.notes || selectedOrder.customer?.notes) && (
+                  <p>
+                    <strong>یادداشت مشتری:</strong>{" "}
+                    {selectedOrder.notes || selectedOrder.customer?.notes}
+                  </p>
+                )}
               </div>
 
               <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
-                <h4 className="font-black text-[var(--accent-blue)]">💳 تراز مالی و وضعیت مرسوله:</h4>
+                <h4 className="font-black text-[var(--accent-blue)]">
+                  💳 تراز مالی و وضعیت مرسوله:
+                </h4>
+                <p>
+                  <strong>مبلغ کل اقلام:</strong>{" "}
+                  <span className="font-mono">
+                    {Number(
+                      selectedOrder.totalAmount || selectedOrder.finalAmount || 0
+                    ).toLocaleString("fa-IR")}{" "}
+                    تومان
+                  </span>
+                </p>
+                {Number(selectedOrder.discountAmount || 0) > 0 && (
+                  <p>
+                    <strong>تخفیف اعمال‌شده:</strong>{" "}
+                    <span className="font-mono text-rose-400">
+                      {Number(selectedOrder.discountAmount).toLocaleString("fa-IR")} تومان
+                    </span>
+                  </p>
+                )}
                 <p>
                   <strong>مبلغ نهایی:</strong>{" "}
                   <span className="font-mono font-black text-emerald-500">
@@ -609,41 +664,70 @@ export default function AdminOrders() {
               </div>
             </div>
 
+            {/* جدول اقلام داخل سفارش */}
+            {Array.isArray(selectedOrder.items) && selectedOrder.items.length > 0 && (
+              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 text-xs">
+                <h4 className="font-black text-[var(--accent-blue)]">
+                  🛍️ اقلام سفارش ({selectedOrder.items.length} قلم):
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-right text-xs">
+                    <thead>
+                      <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)]">
+                        <th className="pb-2">عنوان کالا</th>
+                        <th className="pb-2 text-center">تعداد</th>
+                        <th className="pb-2">قیمت واحد</th>
+                        <th className="pb-2">جمع ردیف</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--card-border)]">
+                      {selectedOrder.items.map((item: any, idx: number) => {
+                        const qty = Number(item.quantity || 1);
+                        const uPrice = Number(item.unit_price || item.price || 0);
+                        return (
+                          <tr key={idx}>
+                            <td className="py-2 font-bold">
+                              {item.title || item.name}
+                              {item.selectedColor && (
+                                <span className="mr-1.5 text-[10px] text-[var(--accent-blue)]">
+                                  (رنگ: {item.selectedColor})
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2 text-center font-mono font-bold">{qty}</td>
+                            <td className="py-2 font-mono">
+                              {uPrice.toLocaleString("fa-IR")} ت
+                            </td>
+                            <td className="py-2 font-mono font-bold text-emerald-500">
+                              {(uPrice * qty).toLocaleString("fa-IR")} ت
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2 pt-2 border-t border-[var(--card-border)]">
-              
-                          {selectedOrder?.status === "delivered" && (
-                              <button
-                                type="button"
-                                onClick={() => handleSendReviewSms(selectedOrder!)}
-                                className="px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500 hover:text-white text-sky-500 border border-sky-500/20 text-[11px] font-bold transition cursor-pointer whitespace-nowrap"
-                                title="ارسال دستی پیامک نظرسنجی به مشتری"
-                              >
-                                💬 پیامک نظر
-                              </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => printOrderInvoice(selectedOrder!)}
+              <button
+                type="button"
+                onClick={() => printOrderInvoice(selectedOrder)}
                 className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition shadow-lg cursor-pointer flex items-center gap-1.5"
               >
                 <span>🖨️</span>
                 <span>چاپ فاکتور رسمی</span>
               </button>
-              {selectedOrder?.status === "delivered" && (
-                 <button
-                   type="button"
-                   onClick={async () => {
-                       if(!confirm("ارسال پیامک درخواست نظر به این مشتری؟")) return;
-                       try {
-                           const res = await fetch("/api/admin/sms/review-request", { method:"POST", body: JSON.stringify({orderId: selectedOrder.id, phone: selectedOrder.phone})});
-                           if(res.ok) alert("پیامک ارسال شد.");
-                       } catch(e){}
-                   }}
-                   className="px-6 py-3 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-black transition shadow-lg cursor-pointer flex items-center gap-1.5"
-                 >
-                   <span>💬</span>
-                   <span>ارسال پیامک نظرسنجی</span>
-                 </button>
+              {selectedOrder.status === "delivered" && (
+                <button
+                  type="button"
+                  onClick={() => handleSendReviewSms(selectedOrder)}
+                  className="px-6 py-3 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-black transition shadow-lg cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>💬</span>
+                  <span>ارسال پیامک نظرسنجی</span>
+                </button>
               )}
             </div>
           </div>
@@ -651,7 +735,14 @@ export default function AdminOrders() {
       )}
 
       {trackingModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn font-sans">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn font-sans"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setTrackingModal({ open: false, order: null, code: "" });
+            }
+          }}
+        >
           <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 shadow-2xl text-[var(--text-primary)]">
             <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-3">
               <span className="text-2xl">📮</span>

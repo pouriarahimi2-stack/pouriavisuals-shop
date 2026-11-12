@@ -8,8 +8,13 @@ export interface OrderItem {
   title: string;
   name?: string;
   price: number;
+  unit_price?: number;
+  total_price?: number;
   quantity: number;
   image?: string;
+  selectedColor?: string | null;
+  shipping_type?: string | null;
+  category?: string;
 }
 
 export interface Order {
@@ -35,6 +40,7 @@ export interface Order {
   couponCode?: string;
   coupon_code?: string;
   status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
+  raw_status?: string;
   payment_status?: "pending" | "paid" | "failed";
   paymentStatus?: "pending" | "paid" | "failed";
   payment_method?: string;
@@ -55,14 +61,19 @@ export interface Order {
 }
 
 export function normalizeOrder(o: any): Order {
-  const customerName = o.customer_name || o.customerName || o.customer?.fullName || o.customer?.name || "خریدار محترم";
+  const customerName =
+    o.customer_name ||
+    o.customerName ||
+    o.customer?.fullName ||
+    o.customer?.name ||
+    "خریدار محترم";
   const phone = o.phone || o.customer_phone || o.customer?.phone || "";
-  const rawAddress = String(o.address || o.customer?.address || "");
+  const rawAddress = String(o.address || o.customer_address || o.customer?.address || "");
   const address = rawAddress.replace(/\s*\[مالیات\s*\d+%:\s*\d+\s*تومان\]/g, "").trim();
   const postalCode = o.postal_code || o.postalCode || o.customer?.postalCode || undefined;
   const province = o.province || o.customer?.province || undefined;
   const city = o.city || o.customer?.city || undefined;
-  const totalAmount = Number(o.total_amount || o.totalAmount || 0);
+  const totalAmount = Number(o.total_amount || o.totalAmount || o.total_price || 0);
   const finalAmount = Number(o.final_amount || o.finalAmount || totalAmount);
   const discountAmount = Number(o.discount_amount || o.discountAmount || 0);
 
@@ -78,6 +89,9 @@ export function normalizeOrder(o: any): Order {
       : rawId.startsWith("AXN-") || rawId.startsWith("ORD-")
       ? rawId.toUpperCase()
       : "AXN-" + shortDigits;
+
+  const normalizedStatus =
+    o.status === "pending_manual_review" || !o.status ? "pending" : o.status;
 
   return {
     ...o,
@@ -98,8 +112,11 @@ export function normalizeOrder(o: any): Order {
     final_amount: finalAmount,
     discountAmount,
     discount_amount: discountAmount,
-    status: o.status || "pending",
+    status: normalizedStatus,
+    raw_status: o.status || "pending",
     payment_status: o.payment_status || o.paymentStatus || "pending",
+    trackingCode: o.tracking_code || o.trackingCode || "",
+    tracking_code: o.tracking_code || o.trackingCode || "",
     items: Array.isArray(o.items) ? o.items : [],
     customer: {
       fullName: customerName,
@@ -161,7 +178,9 @@ export const orderService = {
       if (res.ok && json.success && (json.data || json.order)) {
         const ord = json.data || json.order;
         if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("orders_updated", { detail: [normalizeOrder(ord)] }));
+          window.dispatchEvent(
+            new CustomEvent("orders_updated", { detail: [normalizeOrder(ord)] })
+          );
         }
         return normalizeOrder(ord);
       }
@@ -172,8 +191,35 @@ export const orderService = {
     }
   },
 
-  async updateStatus(id: string | number, status: string, trackingCode?: string): Promise<boolean> {
+  async updateStatus(
+    id: string | number,
+    status: string,
+    trackingCode?: string
+  ): Promise<boolean> {
     try {
+      const res = await fetch("/api/admin/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: String(id),
+          status,
+          tracking_code: trackingCode !== undefined ? trackingCode.trim() : undefined,
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json().catch(() => ({}));
+        if (json.success !== false) {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("orders_updated", { detail: { id, status, trackingCode } })
+            );
+          }
+          return true;
+        }
+      }
+
+      // Fallback در صورت عدم دسترسی موقت به مسیر ادمین
       const payload: Record<string, any> = {
         status,
         updated_at: new Date().toISOString(),
@@ -187,7 +233,9 @@ export const orderService = {
 
       const { error } = await supabase.from("orders").update(payload).eq("id", id);
       if (!error && typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("orders_updated", { detail: { id, status, trackingCode } }));
+        window.dispatchEvent(
+          new CustomEvent("orders_updated", { detail: { id, status, trackingCode } })
+        );
       }
       return !error;
     } catch {
@@ -197,8 +245,13 @@ export const orderService = {
 
   async trackOrder(query: string): Promise<Order[]> {
     try {
-      const clean = query.replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).trim();
-      const res = await fetch(`/api/orders/track?query=${encodeURIComponent(clean)}`, { cache: "no-store" });
+      const clean = query
+        .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+        .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
+        .trim();
+      const res = await fetch(`/api/orders/track?query=${encodeURIComponent(clean)}`, {
+        cache: "no-store",
+      });
       const json = await res.json();
 
       if (json.success && Array.isArray(json.data)) {

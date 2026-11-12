@@ -1,3 +1,4 @@
+// File Path: app/api/orders/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
@@ -36,11 +37,26 @@ export async function POST(req: NextRequest) {
     const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1";
     const rateCheck = await rateLimiter.checkLimit(clientIp, "create_order", 10, 15);
     if (!rateCheck.allowed) {
-      return NextResponse.json({ success: false, message: "تعداد ثبت سفارشات از این IP بیش از حد مجاز است." }, { status: 429 });
+      return NextResponse.json(
+        { success: false, message: "تعداد ثبت سفارشات از این IP بیش از حد مجاز است." },
+        { status: 429 }
+      );
     }
 
     const body = await req.json();
-    const { customer_name, customer_phone, phone, province, city, postal_code, address, customer_address, notes, items, coupon_code } = body;
+    const {
+      customer_name,
+      customer_phone,
+      phone,
+      province,
+      city,
+      postal_code,
+      address,
+      customer_address,
+      notes,
+      items,
+      coupon_code,
+    } = body;
 
     const rawPhone = customer_phone || phone || "";
     const cleanPhone = String(rawPhone)
@@ -50,7 +66,10 @@ export async function POST(req: NextRequest) {
       .replace(/\D/g, "");
 
     if (!cleanPhone || cleanPhone.length !== 11 || !cleanPhone.startsWith("09")) {
-      return NextResponse.json({ success: false, message: "شماره همراه معتبر ۱۱ رقمی الزامی است." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "شماره همراه معتبر ۱۱ رقمی الزامی است." },
+        { status: 400 }
+      );
     }
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -59,17 +78,27 @@ export async function POST(req: NextRequest) {
 
     const finalAddress = String(customer_address || address || "").trim();
     if (finalAddress.length < 5) {
-      return NextResponse.json({ success: false, message: "نشانی پستی دقیق جهت ارسال مرسوله الزامی است." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "نشانی پستی دقیق جهت ارسال مرسوله الزامی است." },
+        { status: 400 }
+      );
     }
 
-    const productIds = items.map((i: any) => String(i.productId || i.product_id || i.id)).filter(Boolean);
+    const productIds = items
+      .map((i: any) => String(i.productId || i.product_id || i.id))
+      .filter(Boolean);
     const { data: dbProducts, error: prodErr } = await supabaseAdmin
       .from("products")
-      .select("id, title, name, price, discount_price, stock, is_available, category")
+      .select(
+        "id, title, name, price, discount_price, purchase_price, stock, is_available, category"
+      )
       .in("id", productIds);
 
     if (prodErr || !dbProducts) {
-      return NextResponse.json({ success: false, message: "خطا در بازیابی اطلاعات موجودی محصولات." }, { status: 500 });
+      return NextResponse.json(
+        { success: false, message: "خطا در بازیابی اطلاعات موجودی محصولات." },
+        { status: 500 }
+      );
     }
 
     const productMap = new Map((dbProducts || []).map((p: any) => [String(p.id), p]));
@@ -82,19 +111,32 @@ export async function POST(req: NextRequest) {
       const realProd = productMap.get(pId);
 
       if (!realProd) {
-        return NextResponse.json({ success: false, message: "کالای مورد نظر در انبار سیستم یافت نشد." }, { status: 400 });
+        return NextResponse.json(
+          { success: false, message: "کالای مورد نظر در انبار سیستم یافت نشد." },
+          { status: 400 }
+        );
       }
 
       const requestedQty = Math.max(1, Number(it.quantity || 1));
-      const currentStock = realProd.stock !== null && realProd.stock !== undefined ? Number(realProd.stock) : 999;
+      const currentStock =
+        realProd.stock !== null && realProd.stock !== undefined ? Number(realProd.stock) : 999;
 
-      if (currentStock < requestedQty) {
-        return NextResponse.json({ success: false, message: "موجودی کالا کافی نیست." }, { status: 400 });
+      if (realProd.is_available === false || currentStock < requestedQty) {
+        return NextResponse.json(
+          { success: false, message: `موجودی کالای «${realProd.title || realProd.name}» کافی نیست.` },
+          { status: 400 }
+        );
       }
 
-      const unitPrice = realProd.discount_price && Number(realProd.discount_price) > 0
-        ? Number(realProd.discount_price)
-        : Number(realProd.price || 0);
+      const basePrice = Math.max(0, Number(realProd.price || 0));
+      const validDiscount =
+        realProd.discount_price &&
+        Number(realProd.discount_price) > 0 &&
+        (basePrice === 0 || Number(realProd.discount_price) < basePrice)
+          ? Number(realProd.discount_price)
+          : null;
+
+      const unitPrice = validDiscount !== null ? validDiscount : basePrice;
 
       const lineTotal = unitPrice * requestedQty;
       calculatedRawTotal += lineTotal;
@@ -128,7 +170,11 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (couponRecord) {
-        const validation = calculateOrderDiscount(couponRecord, calculatedRawTotal, verifiedItems);
+        const validation = calculateOrderDiscount(
+          couponRecord,
+          calculatedRawTotal,
+          verifiedItems
+        );
         if (validation.valid) {
           finalDiscount = validation.discountAmount;
           appliedCoupon = cleanCoupon;
@@ -140,8 +186,12 @@ export async function POST(req: NextRequest) {
     if (payableAmount > 0 && payableAmount < 1000) {
       payableAmount = 1000;
     }
-    
-    const orderNumber = "AXON-" + Date.now().toString().slice(-6) + "-" + Math.random().toString(36).substring(2, 5).toUpperCase();
+
+    const orderNumber =
+      "AXON-" +
+      Date.now().toString().slice(-6) +
+      "-" +
+      Math.random().toString(36).substring(2, 5).toUpperCase();
     const orderId = "ord_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
 
     const orderPayload = {
@@ -182,8 +232,28 @@ export async function POST(req: NextRequest) {
           const nextStock = Math.max(0, Number(p.stock) - Number(it.quantity));
           await supabaseAdmin
             .from("products")
-            .update({ stock: nextStock, is_available: nextStock > 0 })
+            .update({
+              stock: nextStock,
+              is_available: nextStock > 0,
+              updated_at: new Date().toISOString(),
+            })
             .eq("id", it.productId);
+
+          try {
+            await supabaseAdmin.from("inventory_logs").insert([
+              {
+                id: "sale_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+                product_id: String(it.productId),
+                product_title: String(it.title),
+                change_type: "sale",
+                quantity: Number(it.quantity),
+                cost_price: Number(p.purchase_price || 0),
+                supplier: "فروش آنلاین سایت",
+                reference_note: `کسر خودکار بابت ثبت سفارش ${orderNumber}`,
+                created_at: new Date().toISOString(),
+              },
+            ]);
+          } catch {}
         }
       } catch (stkErr) {
         console.warn("Stock decrease warning:", stkErr);
@@ -193,13 +263,20 @@ export async function POST(req: NextRequest) {
     (() => {
       try {
         const persianDate = new Date(createdOrder.created_at).toLocaleDateString("fa-IR", {
-          year: "numeric", month: "long", day: "numeric",
-          hour: "2-digit", minute: "2-digit",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
         });
-        const itemLines = verifiedItems.map((vi: any) => {
-          const colorPart = vi.selectedColor ? ` (رنگ: ${vi.selectedColor})` : "";
-          return `🔸 ${vi.title}${colorPart} × ${vi.quantity} — ${Number(vi.price).toLocaleString("fa-IR")} ت`;
-        }).join("\n");
+        const itemLines = verifiedItems
+          .map((vi: any) => {
+            const colorPart = vi.selectedColor ? ` (رنگ: ${vi.selectedColor})` : "";
+            return `🔸 ${vi.title}${colorPart} × ${vi.quantity} — ${Number(
+              vi.price
+            ).toLocaleString("fa-IR")} ت`;
+          })
+          .join("\n");
 
         const smsText = [
           `✅ سفارش شما در آکسون ثبت شد`,
@@ -208,7 +285,9 @@ export async function POST(req: NextRequest) {
           `━━━━━━━━━━━━━━━━━`,
           `🔸 تاریخ: ${persianDate}`,
           `🔸 مبلغ کل: ${Number(calculatedRawTotal).toLocaleString("fa-IR")} تومان`,
-          ...(finalDiscount > 0 ? [`🔸 تخفیف: ${Number(finalDiscount).toLocaleString("fa-IR")} ت`] : []),
+          ...(finalDiscount > 0
+            ? [`🔸 تخفیف: ${Number(finalDiscount).toLocaleString("fa-IR")} ت`]
+            : []),
           `🔸 مبلغ قابل پرداخت: ${Number(payableAmount).toLocaleString("fa-IR")} تومان`,
           `━━━━━━━━━━━━━━━━━`,
           `📍 اطلاعات تحویل:`,

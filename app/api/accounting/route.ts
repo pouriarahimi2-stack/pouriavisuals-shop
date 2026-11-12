@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
         .from("inventory_logs")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(80),
+        .limit(100),
     ]);
 
     const products = (prodsRes.data || []).map(unpackProductRow);
@@ -30,33 +30,71 @@ export async function GET(req: NextRequest) {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const monthlyOrders = orders.filter((o: { created_at?: string; status?: string; payment_status?: string; items?: Array<{ productId?: string; product_id?: string; id?: string; quantity?: number; discount_price?: number; price?: number }> }) => {
-      const orderDate = new Date(o.created_at || Date.now());
-      return orderDate >= thirtyDaysAgo && o.status !== "cancelled" && o.payment_status !== "failed";
-    });
+    // فقط سفارش‌های تاییدشده و غیرلغوشده در ۳۰ روز اخیر در سود قطعی ماهانه لحاظ می‌شوند
+    const monthlyOrders = orders.filter(
+      (o: {
+        created_at?: string;
+        status?: string;
+        payment_status?: string;
+        items?: Array<{
+          productId?: string;
+          product_id?: string;
+          id?: string;
+          quantity?: number;
+          discount_price?: number;
+          price?: number;
+        }>;
+      }) => {
+        const orderDate = new Date(o.created_at || Date.now());
+        if (orderDate < thirtyDaysAgo) return false;
+        const st = String(o.status || "").toLowerCase();
+        const pst = String(o.payment_status || "").toLowerCase();
+        if (st === "cancelled" || pst === "failed" || pst === "cancelled") return false;
+        return (
+          ["paid", "processing", "shipped", "delivered"].includes(st) || pst === "paid"
+        );
+      }
+    );
 
-    const productFinancials = products.map((p: { id: string; title?: string; sku?: string; brand?: string; category?: string; warranty?: string; stock?: number; is_available?: boolean; price?: number; discount_price?: number; purchase_price?: number }) => {
+    const productFinancials = products.map((p: any) => {
       let unitsSoldMonthly = 0;
       let totalRevenueMonthly = 0;
 
-      monthlyOrders.forEach((o: { created_at?: string; status?: string; payment_status?: string; items?: Array<{ productId?: string; product_id?: string; id?: string; quantity?: number; discount_price?: number; price?: number }> }) => {
+      const basePrice = Math.max(0, Number(p.price || 0));
+      const discountPrice =
+        p.discount_price !== undefined &&
+        p.discount_price !== null &&
+        Number(p.discount_price) > 0 &&
+        (basePrice === 0 || Number(p.discount_price) < basePrice)
+          ? Number(p.discount_price)
+          : null;
+      const sellingPrice = discountPrice !== null ? discountPrice : basePrice;
+
+      monthlyOrders.forEach((o: any) => {
         const items = Array.isArray(o.items) ? o.items : [];
         items.forEach((item: any) => {
           if (String(item.productId || item.product_id || item.id) === String(p.id)) {
-            const qty = Number(item.quantity || 1);
+            const qty = Math.max(1, Number(item.quantity || 1));
             unitsSoldMonthly += qty;
-            totalRevenueMonthly += Number(item.discount_price || item.price || p.price || 0) * qty;
+            const unitSoldPrice = Number(
+              item.discount_price || item.unit_price || item.price || sellingPrice || 0
+            );
+            totalRevenueMonthly += unitSoldPrice * qty;
           }
         });
       });
 
-      const basePrice = Number(p.price || 0);
-      const discountPrice = p.discount_price ? Number(p.discount_price) : null;
-      const sellingPrice = discountPrice && discountPrice > 0 ? discountPrice : basePrice;
-      const purchasePrice = Number(p.purchase_price || Math.round(sellingPrice * 0.7));
-      const vatPerUnit = Math.round(sellingPrice * 0.1);
-      const netSellingRevenuePerUnit = sellingPrice - vatPerUnit;
-      const netProfitPerUnit = Math.max(0, netSellingRevenuePerUnit - purchasePrice);
+      const purchasePrice =
+        p.purchase_price !== undefined && p.purchase_price !== null && Number(p.purchase_price) >= 0
+          ? Number(p.purchase_price)
+          : sellingPrice > 0
+          ? Math.round(sellingPrice * 0.7)
+          : 0;
+
+      const vatPerUnit = sellingPrice > 0 ? Math.round(sellingPrice * 0.1) : 0;
+      const netSellingRevenuePerUnit = Math.max(0, sellingPrice - vatPerUnit);
+      const netProfitPerUnit =
+        sellingPrice > 0 ? Math.max(0, netSellingRevenuePerUnit - purchasePrice) : 0;
 
       const totalPurchaseCostMonthly = unitsSoldMonthly * purchasePrice;
       const totalVatMonthly = Math.round(totalRevenueMonthly * 0.1);
@@ -71,11 +109,11 @@ export async function GET(req: NextRequest) {
         id: String(p.id),
         title: p.title || "کالای بدون عنوان",
         sku: p.sku || "SKU-" + String(p.id).slice(-6).toUpperCase(),
-        brand: p.brand || "Axon",
+        brand: p.brand || "",
         category: p.category || "کالای دیجیتال",
-        warranty: p.warranty || "۱۸ ماه گارانتی اصالت طلایی",
-        stock: Number(p.stock ?? 0),
-        isAvailable: p.is_available !== false,
+        warranty: p.warranty || "",
+        stock: Math.max(0, Number(p.stock ?? 0)),
+        isAvailable: p.is_available !== false && Number(p.stock ?? 0) > 0,
         basePrice,
         discountPrice,
         sellingPrice,
@@ -88,24 +126,32 @@ export async function GET(req: NextRequest) {
         totalPurchaseCostMonthly,
         totalVatMonthly,
         totalNetProfitMonthly,
+        shipping_type: p.shipping_type || "both",
+        color_options: Array.isArray(p.color_options) ? p.color_options : [],
       };
     });
 
     const summary = {
       totalInventoryAssets: productFinancials.reduce(
-        (acc, p) => acc + p.stock * p.purchasePrice,
+        (acc: number, p: any) => acc + p.stock * p.purchasePrice,
         0
       ),
       totalMonthlySalesGross: productFinancials.reduce(
-        (acc, p) => acc + p.totalRevenueMonthly,
+        (acc: number, p: any) => acc + p.totalRevenueMonthly,
         0
       ),
-      totalMonthlyVAT: productFinancials.reduce((acc, p) => acc + p.totalVatMonthly, 0),
+      totalMonthlyVAT: productFinancials.reduce(
+        (acc: number, p: any) => acc + p.totalVatMonthly,
+        0
+      ),
       totalMonthlyNetProfit: productFinancials.reduce(
-        (acc, p) => acc + p.totalNetProfitMonthly,
+        (acc: number, p: any) => acc + p.totalNetProfitMonthly,
         0
       ),
-      totalUnitsSold: productFinancials.reduce((acc, p) => acc + p.unitsSoldMonthly, 0),
+      totalUnitsSold: productFinancials.reduce(
+        (acc: number, p: any) => acc + p.unitsSoldMonthly,
+        0
+      ),
       totalOrdersMonthlyCount: monthlyOrders.length,
     };
 
@@ -131,7 +177,10 @@ export async function POST(req: NextRequest) {
     const { productId, purchasePrice, stockDelta, supplier, referenceNote } = body;
 
     if (!productId) {
-      return NextResponse.json({ success: false, message: "شناسه کالا الزامی است." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "شناسه کالا الزامی است." },
+        { status: 400 }
+      );
     }
 
     const { data: rawProd } = await supabaseAdmin
@@ -145,41 +194,59 @@ export async function POST(req: NextRequest) {
     }
 
     const product = unpackProductRow(rawProd);
-    const currentStock = Number(product.stock || 0);
-    const newStock = Math.max(0, currentStock + Number(stockDelta || 0));
+    const currentStock = Math.max(0, Number(product.stock || 0));
+    const deltaNum = Number(stockDelta || 0);
+    const newStock = Math.max(0, currentStock + deltaNum);
     const newPurchasePrice =
-      purchasePrice !== undefined && purchasePrice !== ""
+      purchasePrice !== undefined && purchasePrice !== "" && Number(purchasePrice) >= 0
         ? Number(purchasePrice)
         : Number(product.purchase_price || 0);
 
     const updatedMeta = {
-      images: product.images || [product.image],
+      images: product.images || [product.image || "/placeholder.png"],
       specs: product.specs || {},
-      warranty: product.warranty || "۱۸ ماه گارانتی اصالت طلایی",
+      warranty: product.warranty ?? "",
       sku: product.sku,
-      brand: product.brand,
+      brand: product.brand ?? "",
       purchase_price: newPurchasePrice,
-      discount_price: product.discount_price,
-      meta_title: product.meta_title,
-      meta_description: product.meta_description,
+      discount_price: product.discount_price ?? null,
+      color_options: Array.isArray(product.color_options) ? product.color_options : [],
+      meta_title: product.meta_title || product.title,
+      meta_description: product.meta_description || "",
+      short_description: product.short_description || "",
     };
 
-    const packagedDesc = packProductDescription(product.description, updatedMeta);
+    const packagedDesc = packProductDescription(product.description || "", updatedMeta);
 
-    await supabaseAdmin
+    const { error: upErr } = await supabaseAdmin
       .from("products")
       .update({
         stock: newStock,
         is_available: newStock > 0,
+        purchase_price: newPurchasePrice,
         description: packagedDesc,
         updated_at: new Date().toISOString(),
-      /* Enterprise Infrastructure Inject */
-      discount_start_date: (typeof body !== 'undefined' && body.discount_start_date) ? new Date(body.discount_start_date).toISOString() : undefined,
-      discount_end_date: (typeof body !== 'undefined' && body.discount_end_date) ? new Date(body.discount_end_date).toISOString() : undefined,
-      media_gallery: (typeof body !== 'undefined' && Array.isArray(body.media_gallery)) ? body.media_gallery : undefined,
-      specs_jsonb: (typeof body !== 'undefined' && typeof body.specs === 'object') ? body.specs : undefined,
+        /* Enterprise Infrastructure Inject */
+        discount_start_date:
+          typeof body !== "undefined" && body.discount_start_date
+            ? new Date(body.discount_start_date).toISOString()
+            : undefined,
+        discount_end_date:
+          typeof body !== "undefined" && body.discount_end_date
+            ? new Date(body.discount_end_date).toISOString()
+            : undefined,
+        media_gallery:
+          typeof body !== "undefined" && Array.isArray(body.media_gallery)
+            ? body.media_gallery
+            : undefined,
+        specs_jsonb:
+          typeof body !== "undefined" && typeof body.specs === "object"
+            ? body.specs
+            : undefined,
       })
       .eq("id", productId);
+
+    if (upErr) throw upErr;
 
     try {
       await supabaseAdmin.from("inventory_logs").insert([
@@ -187,11 +254,15 @@ export async function POST(req: NextRequest) {
           id: "log_" + Date.now(),
           product_id: String(productId),
           product_title: product.title,
-          change_type: Number(stockDelta || 0) >= 0 ? "restock" : "adjustment",
-          quantity: Math.abs(Number(stockDelta || 0)),
+          change_type: deltaNum >= 0 ? "restock" : "adjustment",
+          quantity: Math.abs(deltaNum),
           cost_price: newPurchasePrice,
           supplier: supplier || "تأمین‌کننده رسمی",
-          reference_note: referenceNote || "ثبت سیستمی انبارگردانی",
+          reference_note:
+            referenceNote ||
+            (deltaNum >= 0
+              ? `افزایش موجودی (${currentStock} ← ${newStock})`
+              : `کاهش/اصلاح موجودی (${currentStock} ← ${newStock})`),
           created_at: new Date().toISOString(),
         },
       ]);
@@ -226,9 +297,10 @@ export async function PUT(req: NextRequest) {
       purchasePrice,
       stock,
       isAvailable,
+      shipping_type,
     } = body;
 
-    if (!id || !title) {
+    if (!id || !String(title || "").trim()) {
       return NextResponse.json(
         { success: false, message: "شناسه و عنوان کالا الزامی است." },
         { status: 400 }
@@ -241,23 +313,63 @@ export async function PUT(req: NextRequest) {
       .eq("id", id)
       .maybeSingle();
 
-    const unpackedExisting = rawExisting ? unpackProductRow(rawExisting) : {};
+    if (!rawExisting) {
+      return NextResponse.json(
+        { success: false, message: "کالای مورد نظر در دیتابیس یافت نشد." },
+        { status: 404 }
+      );
+    }
 
+    const unpackedExisting = unpackProductRow(rawExisting);
+
+    const cleanTitle = String(title).trim();
     const numericStock = Math.max(0, Number(stock ?? 0));
+    const cleanBasePrice = Math.max(0, Number(basePrice ?? 0));
+    const rawDiscount =
+      discountPrice !== undefined && discountPrice !== null && Number(discountPrice) > 0
+        ? Number(discountPrice)
+        : null;
+
+    // قیمت تخفیف فقط زمانی معتبر است که کمتر از قیمت فروش پایه باشد
     const cleanDiscount =
-      discountPrice && Number(discountPrice) > 0 ? Number(discountPrice) : null;
-    const cleanPurchase = Math.max(0, Number(purchasePrice ?? unpackedExisting.purchase_price ?? 0));
+      rawDiscount !== null && (cleanBasePrice === 0 || rawDiscount < cleanBasePrice)
+        ? rawDiscount
+        : null;
+
+    const cleanPurchase = Math.max(
+      0,
+      Number(purchasePrice ?? unpackedExisting.purchase_price ?? 0)
+    );
+
+    const cleanBrand =
+      brand !== undefined
+        ? String(brand).replace(/[\u200B-\u200D\uFEFF]/g, "").trim()
+        : unpackedExisting.brand || "";
+
+    const cleanWarranty =
+      warranty !== undefined
+        ? String(warranty).replace(/[\u200B-\u200D\uFEFF]/g, "").trim()
+        : unpackedExisting.warranty || "";
+
+    const cleanSku =
+      sku !== undefined && String(sku).trim()
+        ? String(sku).trim()
+        : unpackedExisting.sku;
 
     const updatedMeta = {
       images: unpackedExisting.images || [unpackedExisting.image || "/placeholder.png"],
       specs: unpackedExisting.specs || {},
-      warranty: warranty ? String(warranty).trim() : unpackedExisting.warranty || "۱۸ ماه گارانتی اصالت طلایی",
-      sku: sku ? String(sku).trim() : unpackedExisting.sku,
-      brand: brand ? String(brand).trim() : unpackedExisting.brand || "Axon",
+      warranty: cleanWarranty,
+      sku: cleanSku,
+      brand: cleanBrand,
       purchase_price: cleanPurchase,
       discount_price: cleanDiscount,
-      meta_title: unpackedExisting.meta_title || String(title).trim(),
+      color_options: Array.isArray(unpackedExisting.color_options)
+        ? unpackedExisting.color_options
+        : [],
+      meta_title: unpackedExisting.meta_title || cleanTitle,
       meta_description: unpackedExisting.meta_description || "",
+      short_description: unpackedExisting.short_description || "",
     };
 
     const packagedDesc = packProductDescription(
@@ -266,23 +378,34 @@ export async function PUT(req: NextRequest) {
     );
 
     const updatePayload: Record<string, any> = {
-      title: String(title).trim(),
-      name: String(title).trim(),
-      category: category ? String(category).trim() : "کالای دیجیتال",
-      price: Math.max(0, Number(basePrice ?? 0)),
+      title: cleanTitle,
+      name: cleanTitle,
+      category: category ? String(category).trim() : unpackedExisting.category || "کالای دیجیتال",
+      price: cleanBasePrice,
       discount_price: cleanDiscount,
+      purchase_price: cleanPurchase,
       stock: numericStock,
       is_available: isAvailable !== undefined ? Boolean(isAvailable) : numericStock > 0,
       description: packagedDesc,
+      shipping_type: shipping_type || unpackedExisting.shipping_type || "both",
       updated_at: new Date().toISOString(),
       /* Enterprise Infrastructure Inject */
-      discount_start_date: (typeof body !== 'undefined' && body.discount_start_date) ? new Date(body.discount_start_date).toISOString() : undefined,
-      discount_end_date: (typeof body !== 'undefined' && body.discount_end_date) ? new Date(body.discount_end_date).toISOString() : undefined,
-      media_gallery: (typeof body !== 'undefined' && Array.isArray(body.media_gallery)) ? body.media_gallery : undefined,
-      specs_jsonb: (typeof body !== 'undefined' && typeof body.specs === 'object') ? body.specs : undefined,
-      sku: sku ? String(sku).trim() : unpackedExisting.sku,
-      brand: brand ? String(brand).trim() : unpackedExisting.brand,
-      warranty: warranty ? String(warranty).trim() : unpackedExisting.warranty,
+      discount_start_date:
+        typeof body !== "undefined" && body.discount_start_date
+          ? new Date(body.discount_start_date).toISOString()
+          : undefined,
+      discount_end_date:
+        typeof body !== "undefined" && body.discount_end_date
+          ? new Date(body.discount_end_date).toISOString()
+          : undefined,
+      media_gallery:
+        typeof body !== "undefined" && Array.isArray(body.media_gallery)
+          ? body.media_gallery
+          : undefined,
+      specs_jsonb:
+        typeof body !== "undefined" && typeof body.specs === "object"
+          ? body.specs
+          : undefined,
     };
 
     const { data: updated, error } = await supabaseAdmin
@@ -304,7 +427,9 @@ export async function PUT(req: NextRequest) {
           quantity: numericStock,
           cost_price: cleanPurchase,
           supplier: "ویرایش مستقیم حسابداری و انبار",
-          reference_note: "بروزرسانی مشخصات، قیمت فروش، بهای خرید و موجودی کالا",
+          reference_note: `بروزرسانی کالا (فروش: ${cleanBasePrice.toLocaleString(
+            "fa-IR"
+          )} ت | خرید: ${cleanPurchase.toLocaleString("fa-IR")} ت | موجودی: ${numericStock})`,
           created_at: new Date().toISOString(),
         },
       ]);

@@ -1,20 +1,13 @@
 // File Path: app/api/sms/send/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/authSecurityHelper";
-import { sendOtpPatternDetailed } from "@/lib/otpService";
+import { sendOtpPatternDetailed, sendTextSMS } from "@/lib/otpService";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-
-// تلاش برای ایمپورت تابع ارسال پیامک متنی آزاد (در صورت وجود در ماژول شما)
-let sendTextSMS: any = null;
-try {
-  const otpService = require("@/lib/otpService");
-  sendTextSMS = otpService.sendTextSMS;
-} catch (e) {}
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  // سد امنیتی: این روت فقط برای ادمین کار می‌کند و در صفحه کاربر قابل فراخوانی نیست
+  // سد امنیتی: این روت فقط برای ادمین کار می‌کند
   const auth = await requireAdmin(req);
   if (!auth.ok) return auth.res;
 
@@ -26,59 +19,91 @@ export async function POST(req: NextRequest) {
       .replace(/\D/g, "");
 
     const rawText = String(body.code || body.message || body.text || "").trim();
+    const explicitCouponCode = String(body.couponCode || "").trim();
 
-    if (!rawPhone || rawPhone.length !== 11) {
+    if (!rawPhone || rawPhone.length !== 11 || !rawPhone.startsWith("09")) {
       return NextResponse.json(
         { success: false, message: "شماره موبایل گیرنده معتبر نیست." },
         { status: 400 }
       );
     }
 
-    let smsResult: { ok: boolean; provider?: string; status?: number; adminTechnicalDiagnosis?: string } = { 
-      ok: false, 
+    let smsResult: {
+      ok: boolean;
+      provider?: string;
+      status?: number;
+      adminTechnicalDiagnosis?: string;
+    } = {
+      ok: false,
       provider: "ippanel",
-      adminTechnicalDiagnosis: "" 
+      adminTechnicalDiagnosis: "",
     };
 
-    // استراتژی ۱: اگر پیامک بازاریابی طولانی CRM است، از تابع پیامک آزاد استفاده کن
-    if (rawText.length > 20 && typeof sendTextSMS === "function") {
-      try {
-         const textRes = await sendTextSMS(rawPhone, rawText);
-         smsResult = {
-           ok: textRes?.ok || textRes?.success || textRes === true || true,
-           provider: textRes?.provider || "ippanel-text",
-           status: textRes?.status || 200
-         };
-      } catch (e: any) {
-         smsResult.adminTechnicalDiagnosis = "Text SMS Failed: " + e.message;
-      }
-    }
+    // استخراج هوشمند کد تخفیف یا کد عددی برای ارسال از طریق پترن رله نت‌افراز / IPPanel
+    const extractedVipToken =
+      explicitCouponCode ||
+      (rawText.match(/\b(VIP-[A-Z0-9_-]{3,14}|AXON-[A-Z0-9_-]{3,14})\b/i)?.[0] ?? "") ||
+      (rawText.match(/\b\d{4,8}\b/)?.[0] ?? "");
 
-    // استراتژی ۲: اگر ارسال متنی شکست خورد یا پیام کوتاه بود (Fallback)
-    if (!smsResult.ok) {
-      // فقط اعداد را استخراج می‌کنیم تا IPPanel به حروف انگلیسیِ کد تخفیف گیر ندهد و 502 ندهد
-      const matchNumericCode = rawText.match(/\d{4,8}/);
-      const codeToSend = matchNumericCode ? matchNumericCode[0] : "123456";
-
+    if (extractedVipToken) {
       try {
         const patternRes = await sendOtpPatternDetailed({
           mobile: rawPhone,
-          code: codeToSend,
+          code: extractedVipToken,
         });
-        
+
         smsResult = {
-          ok: patternRes?.ok || false,
+          ok: Boolean(patternRes?.ok),
           provider: patternRes?.provider || "ippanel-pattern",
           status: patternRes?.status || 500,
-          adminTechnicalDiagnosis: patternRes?.adminTechnicalDiagnosis || ""
+          adminTechnicalDiagnosis: patternRes?.adminTechnicalDiagnosis || "",
         };
+
+        // اگر پترن فقط عدد خالص می‌پذیرد و کد شامل پیشوند حروفی مثل VIP- بود، بخش عددی آن ارسال شود
+        if (!smsResult.ok && /\d{4,8}/.test(extractedVipToken)) {
+          const digitsOnly = extractedVipToken.match(/\d{4,8}/)![0];
+          if (digitsOnly !== extractedVipToken) {
+            const retryRes = await sendOtpPatternDetailed({
+              mobile: rawPhone,
+              code: digitsOnly,
+            });
+            smsResult = {
+              ok: Boolean(retryRes?.ok),
+              provider: retryRes?.provider || "ippanel-pattern-numeric",
+              status: retryRes?.status || 500,
+              adminTechnicalDiagnosis: retryRes?.adminTechnicalDiagnosis || "",
+            };
+          }
+        }
       } catch (e: any) {
         smsResult.ok = false;
         smsResult.adminTechnicalDiagnosis = "Pattern SMS Exception: " + e.message;
       }
     }
 
-    // لاگ کردن نتیجه در دیتابیس CRM
+    // Fallback به sendTextSMS در صورتی که توکن خاصی استخراج نشد یا ارسال اول ناموفق بود
+    if (!smsResult.ok && typeof sendTextSMS === "function") {
+      try {
+        const textRes: any = await sendTextSMS(rawPhone, rawText);
+        const isSuccess =
+          typeof textRes === "boolean"
+            ? textRes
+            : Boolean(textRes?.ok || textRes?.success);
+
+        smsResult = {
+          ok: isSuccess,
+          provider: textRes?.provider || "ippanel-text-fallback",
+          status: isSuccess ? 200 : 502,
+          adminTechnicalDiagnosis:
+            smsResult.adminTechnicalDiagnosis ||
+            (isSuccess ? "Sent via sendTextSMS" : "sendTextSMS returned false"),
+        };
+      } catch (e: any) {
+        smsResult.adminTechnicalDiagnosis = "Text SMS Failed: " + e.message;
+      }
+    }
+
+    // ثبت لاگ در دیتابیس
     try {
       await supabaseAdmin.from("admin_audit_logs").insert([
         {
@@ -86,10 +111,11 @@ export async function POST(req: NextRequest) {
           user_id: auth.session?.username || "admin",
           details: {
             targetMobile: rawPhone,
+            couponCode: extractedVipToken || null,
             provider: smsResult.provider,
             httpStatus: smsResult.status,
             diagnosis: smsResult.adminTechnicalDiagnosis,
-            messageLength: rawText.length
+            messageLength: rawText.length,
           },
           ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
           severity: smsResult.ok ? "info" : "error",
@@ -102,7 +128,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "خطا در ارسال پیامک. (IPPanel از ارسال این الگو جلوگیری کرد)",
+          message:
+            "خطا در ارسال پیامک. (" +
+            (smsResult.adminTechnicalDiagnosis || "پاسخ نامعتبر از درگاه پیامک") +
+            ")",
         },
         { status: 502 }
       );

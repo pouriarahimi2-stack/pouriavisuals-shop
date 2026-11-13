@@ -5,18 +5,52 @@ import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
+function makeCategorySlug(input: string): string {
+  return String(input || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export async function GET() {
   try {
-    const { data: categories, error } = await supabaseAdmin
-      .from("categories")
-      .select("*")
-      .order("created_at", { ascending: true });
+    const [{ data: categories, error }, { data: prodRows }] = await Promise.all([
+      supabaseAdmin.from("categories").select("*").order("created_at", { ascending: true }),
+      supabaseAdmin.from("products").select("category"),
+    ]);
 
-    if (error) throw error;
+    if (error) {
+      console.warn("Categories table warning:", error.message);
+    }
+
+    const combined: any[] = Array.isArray(categories) ? [...categories] : [];
+    const seenNames = new Set<string>(
+      combined.map((c: any) => String(c.name || c.title || "").trim())
+    );
+
+    // ادغام خودکار دسته‌بندی‌های ثبت‌شده روی کالاهای کاتالوگ
+    (prodRows || []).forEach((row: any) => {
+      const catName = String(row?.category || "").trim();
+      if (catName && !seenNames.has(catName)) {
+        seenNames.add(catName);
+        const slug = makeCategorySlug(catName) || "category";
+        combined.push({
+          id: "cat_" + slug,
+          name: catName,
+          title: catName,
+          slug,
+          description: null,
+          icon: "📁",
+          is_active: true,
+        });
+      }
+    });
+
     return NextResponse.json({
       success: true,
-      categories: categories || [],
-      data: categories || [],
+      categories: combined,
+      data: combined,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
@@ -40,11 +74,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const slug = String(body.slug || name)
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
-      .replace(/^-+|-+$/g, "");
+    const slug = makeCategorySlug(body.slug || name);
 
     const payload = {
       name,
@@ -56,7 +86,7 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    if (body.id) {
+    if (body.id && !String(body.id).startsWith("cat_")) {
       const { data: updated, error } = await supabaseAdmin
         .from("categories")
         .update(payload)

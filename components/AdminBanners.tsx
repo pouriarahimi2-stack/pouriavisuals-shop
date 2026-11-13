@@ -1,7 +1,7 @@
 // File Path: components/AdminBanners.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
 import MediaUploadModal from "@/components/admin/MediaUploadModal";
@@ -25,6 +25,8 @@ interface CatalogProduct {
   title: string;
   category?: string;
   price?: number;
+  discount_price?: number | null;
+  stock?: number;
   image?: string;
 }
 
@@ -34,14 +36,26 @@ interface CatalogCategory {
   slug: string;
 }
 
+const STATIC_SITE_PAGES = [
+  "/products",
+  "/blog",
+  "/news",
+  "/contact",
+  "/about",
+  "/track-order",
+];
+
 export default function AdminBanners() {
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(
+    null
+  );
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
@@ -67,9 +81,9 @@ export default function AdminBanners() {
     setTimeout(() => setStatusMsg(null), 4000);
   };
 
-  const fetchBannersAndCatalog = async () => {
+  const fetchBannersAndCatalog = useCallback(async () => {
     try {
-      fetch("/api/theme-builder", { cache: "no-store" })
+      fetch("/api/theme-builder?t=" + Date.now(), { cache: "no-store" })
         .then((r) => r.json())
         .then((tJson) => {
           if (tJson?.config) {
@@ -87,9 +101,9 @@ export default function AdminBanners() {
         .catch(() => {});
 
       const [bannersRes, prodsRes, catsRes] = await Promise.all([
-        fetch("/api/admin/banners", { cache: "no-store" }).catch(() => null),
-        fetch("/api/products", { cache: "no-store" }).catch(() => null),
-        fetch("/api/categories", { cache: "no-store" }).catch(() => null),
+        fetch("/api/admin/banners?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
+        fetch("/api/products?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
+        fetch("/api/categories?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
       ]);
 
       if (bannersRes && bannersRes.ok) {
@@ -104,31 +118,56 @@ export default function AdminBanners() {
         if (supaBanners) setBanners(supaBanners as any);
       }
 
+      let mappedProducts: CatalogProduct[] = [];
       if (prodsRes && prodsRes.ok) {
         const pJson = await prodsRes.json();
         const pList = pJson.data || pJson.products || [];
-        setProducts(
-          (Array.isArray(pList) ? pList : []).map((p: any) => ({
-            id: String(p.id),
-            title: p.title || p.name || "کالای دیجیتال",
-            category: p.category || "کالای دیجیتال",
-            price: Number(p.price || 0),
-            image: p.image || (Array.isArray(p.images) ? p.images[0] : ""),
-          }))
-        );
+        mappedProducts = (Array.isArray(pList) ? pList : []).map((p: any) => ({
+          id: String(p.id),
+          title: p.title || p.name || "کالای دیجیتال",
+          category: p.category || "کالای دیجیتال",
+          price: Number(p.price || 0),
+          discount_price:
+            p.discount_price && Number(p.discount_price) > 0 ? Number(p.discount_price) : null,
+          stock: Number(p.stock ?? 0),
+          image: p.image || (Array.isArray(p.images) ? p.images[0] : ""),
+        }));
+        setProducts(mappedProducts);
       }
 
+      let loadedCats: CatalogCategory[] = [];
       if (catsRes && catsRes.ok) {
         const cJson = await catsRes.json();
         const cList = cJson.categories || cJson.data || [];
-        setCategories(Array.isArray(cList) ? cList : []);
+        if (Array.isArray(cList)) {
+          loadedCats = cList.map((c: any) => ({
+            id: String(c.id || c.name),
+            name: String(c.name || c.title || "").trim(),
+            slug: String(c.slug || c.name || "").trim(),
+          }));
+        }
       }
+
+      // اطمینان از حضور تمامی دسته‌بندی‌های کالاهای کاتالوگ در لیست دسته‌ها
+      const seenCatNames = new Set(loadedCats.map((c) => c.name));
+      mappedProducts.forEach((p) => {
+        const cName = String(p.category || "").trim();
+        if (cName && !seenCatNames.has(cName)) {
+          seenCatNames.add(cName);
+          loadedCats.push({
+            id: "cat_" + cName,
+            name: cName,
+            slug: cName,
+          });
+        }
+      });
+      setCategories(loadedCats);
     } catch (e) {
       console.error("Error loading banners/catalog:", e);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchBannersAndCatalog();
@@ -151,7 +190,7 @@ export default function AdminBanners() {
       supabase.removeChannel(chBanners);
       supabase.removeChannel(chProducts);
     };
-  }, []);
+  }, [fetchBannersAndCatalog]);
 
   const handleSaveBannerSizing = async () => {
     soundEngine.playClick();
@@ -175,8 +214,12 @@ export default function AdminBanners() {
       });
       if (res.ok) {
         soundEngine.playSuccess();
-        showFeedback("✓ ارتفاع و ابعاد بنر برای موبایل، تبلت و دسکتاپ ذخیره و در سایت اعمال شد.");
+        showFeedback(
+          "✓ ارتفاع و ابعاد بنر برای موبایل، تبلت و دسکتاپ ذخیره و در سایت اعمال شد."
+        );
         window.dispatchEvent(new CustomEvent("theme_builder_updated"));
+      } else {
+        showFeedback("خطا در ذخیره ابعاد بنر.", "error");
       }
     } finally {
       setSavingSizing(false);
@@ -197,14 +240,25 @@ export default function AdminBanners() {
 
   const handleSelectEdit = (b: BannerItem) => {
     soundEngine.playClick();
+    const targetLink = b.link_url || (b as any).link || "/products";
     setEditingId(b.id);
     setTitle(b.title || "");
     setSubtitle(b.subtitle || "");
     setImageUrl(b.image_url || (b as any).image || "");
-    setLinkUrl(b.link_url || (b as any).link || "/products");
+    setLinkUrl(targetLink);
     setCtaText(b.cta_text || "مشاهده و خرید");
     setBadgeText(b.badge_text || "پیشنهاد ویژه");
     setIsActive(b.is_active !== false);
+
+    if (targetLink.startsWith("/products/")) {
+      setLinkMode("product");
+    } else if (targetLink.startsWith("/products?category=")) {
+      setLinkMode("category");
+    } else if (STATIC_SITE_PAGES.includes(targetLink)) {
+      setLinkMode("page");
+    } else {
+      setLinkMode("custom");
+    }
   };
 
   const handlePickProductForBanner = (p: CatalogProduct) => {
@@ -248,31 +302,59 @@ export default function AdminBanners() {
       const json = await res.json();
       if (res.ok && (json.success || json.banner || json.data)) {
         soundEngine.playSuccess();
-        showFeedback(editingId ? "بنر با موفقیت ویرایش شد." : "بنر جدید با موفقیت ثبت و در سایت فعال شد.");
+        showFeedback(
+          editingId
+            ? "✓ بنر با موفقیت ویرایش شد."
+            : "✓ بنر جدید با موفقیت ثبت و در سایت فعال شد."
+        );
         resetForm();
-        fetchBannersAndCatalog();
+        if (Array.isArray(json.banners)) {
+          setBanners(json.banners);
+        } else {
+          fetchBannersAndCatalog();
+        }
         window.dispatchEvent(new CustomEvent("banners_updated"));
       } else {
-        const postRes = await fetch("/api/admin/banners", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const postJson = await postRes.json();
-        if (postRes.ok && postJson.success !== false) {
-          soundEngine.playSuccess();
-          showFeedback("بنر با موفقیت در دیتابیس ذخیره شد.");
-          resetForm();
-          fetchBannersAndCatalog();
-          window.dispatchEvent(new CustomEvent("banners_updated"));
-        } else {
-          showFeedback(postJson.message || "خطا در ذخیره بنر.", "error");
-        }
+        showFeedback(json.message || "خطا در ذخیره بنر.", "error");
       }
     } catch {
       showFeedback("خطا در ارتباط با سرور.", "error");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleBannerActive = async (b: BannerItem) => {
+    soundEngine.playClick();
+    setTogglingId(b.id);
+    const nextActive = b.is_active === false;
+    try {
+      const res = await fetch("/api/admin/banners", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...b,
+          image_url: b.image_url || (b as any).image,
+          link_url: b.link_url || (b as any).link || "/products",
+          is_active: nextActive,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        if (Array.isArray(json.banners)) setBanners(json.banners);
+        else fetchBannersAndCatalog();
+        showFeedback(
+          nextActive
+            ? `✓ بنر «${b.title}» در صفحه اصلی سایت فعال شد.`
+            : `بنر «${b.title}» موقتاً غیرفعال شد.`
+        );
+        window.dispatchEvent(new CustomEvent("banners_updated"));
+      }
+    } catch {
+      showFeedback("خطا در تغییر وضعیت بنر.", "error");
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -283,11 +365,13 @@ export default function AdminBanners() {
       const res = await fetch("/api/admin/banners?id=" + encodeURIComponent(id), {
         method: "DELETE",
       });
+      const json = await res.json().catch(() => ({}));
       if (res.ok) {
         soundEngine.playSuccess();
-        showFeedback("بنر با موفقیت حذف شد.");
+        showFeedback("✓ بنر با موفقیت حذف شد.");
         if (editingId === id) resetForm();
-        fetchBannersAndCatalog();
+        if (Array.isArray(json.banners)) setBanners(json.banners);
+        else fetchBannersAndCatalog();
         window.dispatchEvent(new CustomEvent("banners_updated"));
       }
     } catch {
@@ -300,6 +384,10 @@ export default function AdminBanners() {
       (p.title || "").toLowerCase().includes(productSearch.toLowerCase()) ||
       (p.category || "").toLowerCase().includes(productSearch.toLowerCase())
   );
+
+  const selectedCategoryName = linkUrl.startsWith("/products?category=")
+    ? decodeURIComponent(linkUrl.replace("/products?category=", ""))
+    : "";
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
@@ -320,7 +408,7 @@ export default function AdminBanners() {
               soundEngine.playClick();
               resetForm();
             }}
-            className="px-4 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer"
+            className="px-4 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold cursor-pointer transition"
           >
             + ساخت بنر جدید
           </button>
@@ -348,7 +436,7 @@ export default function AdminBanners() {
               📐 تنظیم مستقیم ارتفاع و ابعاد بنر در موبایل، تبلت و دسکتاپ
             </h3>
             <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-              ارتفاع کادر بنر و اندازه تصویر داخل بنر را برای نسخه موبایل و دسکتاپ به دلخواه تنظیم کنید:
+              ارتفاع کادر بنر و اندازه تصویر داخل بنر را برای نسخه موبایل، تبلت و دسکتاپ به دلخواه تنظیم کنید:
             </p>
           </div>
           <button
@@ -361,11 +449,13 @@ export default function AdminBanners() {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5">
             <div className="flex justify-between font-bold">
               <span>📱 ارتفاع بنر در موبایل:</span>
-              <span className="font-mono font-black text-[var(--accent-blue)]">{bannerMobileHeight}px</span>
+              <span className="font-mono font-black text-[var(--accent-blue)]">
+                {bannerMobileHeight}px
+              </span>
             </div>
             <input
               type="range"
@@ -381,7 +471,9 @@ export default function AdminBanners() {
           <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5">
             <div className="flex justify-between font-bold">
               <span>📱 اندازه عکس در موبایل:</span>
-              <span className="font-mono font-black text-emerald-500">{bannerMobileImgSize}px</span>
+              <span className="font-mono font-black text-emerald-500">
+                {bannerMobileImgSize}px
+              </span>
             </div>
             <input
               type="range"
@@ -397,7 +489,9 @@ export default function AdminBanners() {
           <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5">
             <div className="flex justify-between font-bold">
               <span>📟 ارتفاع بنر در تبلت:</span>
-              <span className="font-mono font-black text-[var(--accent-blue)]">{bannerTabletHeight}px</span>
+              <span className="font-mono font-black text-[var(--accent-blue)]">
+                {bannerTabletHeight}px
+              </span>
             </div>
             <input
               type="range"
@@ -413,7 +507,9 @@ export default function AdminBanners() {
           <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5">
             <div className="flex justify-between font-bold">
               <span>🖥️ ارتفاع بنر در دسکتاپ:</span>
-              <span className="font-mono font-black text-[var(--accent-blue)]">{bannerDesktopHeight}px</span>
+              <span className="font-mono font-black text-[var(--accent-blue)]">
+                {bannerDesktopHeight}px
+              </span>
             </div>
             <input
               type="range"
@@ -425,20 +521,52 @@ export default function AdminBanners() {
               className="w-full accent-[var(--accent-blue)] cursor-pointer"
             />
           </div>
+
+          <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5">
+            <div className="flex justify-between font-bold">
+              <span>🖥️ اندازه عکس در دسکتاپ:</span>
+              <span className="font-mono font-black text-emerald-500">
+                {bannerDesktopImgSize}px
+              </span>
+            </div>
+            <input
+              type="range"
+              min={140}
+              max={360}
+              step={5}
+              value={bannerDesktopImgSize}
+              onChange={(e) => setBannerDesktopImgSize(Number(e.target.value))}
+              className="w-full accent-emerald-500 cursor-pointer"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6">
+      {/* چیدمان استاندارد ۱۲ ستونی: ۵ ستون فرم ساخت/ویرایش بنر و ۷ ستون لیست بنرها */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         <form
           onSubmit={handleSaveBanner}
           className="lg:col-span-5 bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-xl text-xs h-fit"
         >
-          <h3 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
-            {editingId ? "✏️ ویرایش بنر انتخاب‌شده" : "➕ افزودن بنر جدید به سایت"}
-          </h3>
+          <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
+            <h3 className="font-black text-sm text-[var(--accent-blue)]">
+              {editingId ? "✏️ ویرایش بنر انتخاب‌شده" : "➕ افزودن بنر جدید به سایت"}
+            </h3>
+            {editingId && (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="text-[11px] font-bold text-rose-400 hover:underline cursor-pointer"
+              >
+                لغو ویرایش ✕
+              </button>
+            )}
+          </div>
 
           <div className="space-y-1.5">
-            <label className="block font-bold text-[var(--text-secondary)]">عنوان اصلی بنر *</label>
+            <label className="block font-bold text-[var(--text-secondary)]">
+              عنوان اصلی بنر *
+            </label>
             <input
               type="text"
               required
@@ -450,7 +578,9 @@ export default function AdminBanners() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="block font-bold text-[var(--text-secondary)]">زیرعنوان / توضیح کوتاه</label>
+            <label className="block font-bold text-[var(--text-secondary)]">
+              زیرعنوان / توضیح کوتاه
+            </label>
             <input
               type="text"
               value={subtitle}
@@ -475,14 +605,14 @@ export default function AdminBanners() {
               <button
                 type="button"
                 onClick={() => setIsUploadOpen(true)}
-                className="px-4 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black cursor-pointer shrink-0"
+                className="px-4 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black cursor-pointer shrink-0 shadow"
               >
                 ☁️ آپلود
               </button>
             </div>
             {imageUrl && (
-              <div className="rounded-2xl overflow-hidden border border-[var(--card-border)] max-h-36 bg-black/20">
-                <img src={imageUrl} alt="Banner Preview" className="w-full h-32 object-cover" />
+              <div className="rounded-2xl overflow-hidden border border-[var(--card-border)] max-h-40 bg-black/20 flex items-center justify-center">
+                <img src={imageUrl} alt="Banner Preview" className="w-full h-36 object-cover" />
               </div>
             )}
           </div>
@@ -527,13 +657,19 @@ export default function AdminBanners() {
                   placeholder="🔍 جستجو در بین محصولات کاتالوگ..."
                   className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
                 />
-                <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
+                <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
                   {filteredProducts.length === 0 ? (
-                    <p className="text-[11px] text-slate-400 text-center py-3">محصولی یافت نشد.</p>
+                    <p className="text-[11px] text-slate-400 text-center py-3">
+                      محصولی یافت نشد.
+                    </p>
                   ) : (
                     filteredProducts.map((p) => {
                       const targetHref = "/products/" + p.id;
                       const isSelected = linkUrl === targetHref;
+                      const finalPrice =
+                        p.discount_price && p.discount_price > 0
+                          ? p.discount_price
+                          : p.price || 0;
                       return (
                         <div
                           key={p.id}
@@ -553,7 +689,14 @@ export default function AdminBanners() {
                                 className="w-8 h-8 rounded-lg object-cover shrink-0 border border-[var(--card-border)]"
                               />
                             )}
-                            <span className="truncate text-[11px]">{p.title}</span>
+                            <div className="overflow-hidden">
+                              <span className="truncate text-[11px] block">{p.title}</span>
+                              {finalPrice > 0 && (
+                                <span className="text-[9px] font-mono text-slate-400 block">
+                                  {finalPrice.toLocaleString("fa-IR")} تومان
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <span className="font-mono text-[10px] shrink-0">
                             {isSelected ? "انتخاب شد ✓" : "انتخاب ←"}
@@ -569,8 +712,13 @@ export default function AdminBanners() {
             {linkMode === "category" && (
               <div className="pt-2">
                 <select
+                  value={selectedCategoryName}
                   onChange={(e) => {
-                    if (e.target.value) setLinkUrl("/products?category=" + encodeURIComponent(e.target.value));
+                    if (e.target.value) {
+                      setLinkUrl(
+                        "/products?category=" + encodeURIComponent(e.target.value)
+                      );
+                    }
                   }}
                   className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold outline-none cursor-pointer"
                 >
@@ -587,7 +735,7 @@ export default function AdminBanners() {
             {linkMode === "page" && (
               <div className="pt-2">
                 <select
-                  value={linkUrl}
+                  value={STATIC_SITE_PAGES.includes(linkUrl) ? linkUrl : "/products"}
                   onChange={(e) => setLinkUrl(e.target.value)}
                   className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold outline-none cursor-pointer"
                 >
@@ -602,7 +750,9 @@ export default function AdminBanners() {
             )}
 
             <div className="pt-1">
-              <label className="block text-[10px] font-bold text-slate-400 mb-1">آدرس نهایی لینک بنر:</label>
+              <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                آدرس نهایی لینک بنر:
+              </label>
               <input
                 type="text"
                 dir="ltr"
@@ -615,7 +765,9 @@ export default function AdminBanners() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">متن دکمه (CTA)</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                متن دکمه (CTA)
+              </label>
               <input
                 type="text"
                 value={ctaText}
@@ -624,7 +776,9 @@ export default function AdminBanners() {
               />
             </div>
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">بج بالای بنر</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                بج بالای بنر
+              </label>
               <input
                 type="text"
                 value={badgeText}
@@ -649,7 +803,11 @@ export default function AdminBanners() {
             disabled={saving}
             className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50"
           >
-            {saving ? "در حال ذخیره در دیتابیس..." : editingId ? "💾 بروزرسانی بنر" : "💾 ثبت و انتشار فوری بنر"}
+            {saving
+              ? "در حال ذخیره در دیتابیس..."
+              : editingId
+              ? "💾 بروزرسانی بنر"
+              : "💾 ثبت و انتشار فوری بنر"}
           </button>
         </form>
 
@@ -659,14 +817,16 @@ export default function AdminBanners() {
             <button
               type="button"
               onClick={fetchBannersAndCatalog}
-              className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold cursor-pointer transition"
             >
               🔄 بروزرسانی
             </button>
           </div>
 
           {loading ? (
-            <div className="py-12 text-center text-slate-400 font-bold">در حال بارگذاری بنرها...</div>
+            <div className="py-12 text-center text-slate-400 font-bold">
+              در حال بارگذاری بنرها...
+            </div>
           ) : banners.length === 0 ? (
             <div className="py-12 text-center text-slate-400 font-bold">
               هنوز بنری ثبت نشده است. از فرم سمت راست اولین بنر خود را بسازید.
@@ -676,10 +836,16 @@ export default function AdminBanners() {
               {banners.map((b) => {
                 const img = b.image_url || (b as any).image || "/placeholder.png";
                 const lnk = b.link_url || (b as any).link || "/products";
+                const activeState = b.is_active !== false;
                 return (
                   <div
                     key={b.id}
-                    className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4 hover:border-[var(--accent-blue)] transition"
+                    className={
+                      "p-3.5 rounded-2xl bg-[var(--input-bg)] border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4 transition " +
+                      (editingId === b.id
+                        ? "border-[var(--accent-blue)] ring-1 ring-[var(--accent-blue)]/40"
+                        : "border-[var(--card-border)] hover:border-[var(--accent-blue)]")
+                    }
                   >
                     <div className="flex items-center gap-3 overflow-hidden">
                       <img
@@ -688,23 +854,41 @@ export default function AdminBanners() {
                         className="w-24 h-16 object-cover rounded-xl border border-[var(--card-border)] shrink-0"
                       />
                       <div className="space-y-1 overflow-hidden">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="font-black text-xs truncate">{b.title}</h4>
-                          <span
+                          <button
+                            type="button"
+                            disabled={togglingId === b.id}
+                            onClick={() => handleToggleBannerActive(b)}
+                            title="کلیک برای تغییر وضعیت نمایش در صفحه اصلی"
                             className={
-                              "px-2 py-0.5 rounded-md text-[9px] font-bold " +
-                              (b.is_active !== false
-                                ? "bg-emerald-500/15 text-emerald-400"
-                                : "bg-rose-500/15 text-rose-400")
+                              "px-2 py-0.5 rounded-md text-[9px] font-bold cursor-pointer transition " +
+                              (activeState
+                                ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
+                                : "bg-rose-500/15 text-rose-400 hover:bg-rose-500/25")
                             }
                           >
-                            {b.is_active !== false ? "فعال" : "غیرفعال"}
-                          </span>
+                            {togglingId === b.id
+                              ? "..."
+                              : activeState
+                              ? "● فعال در سایت"
+                              : "○ غیرفعال"}
+                          </button>
+                          {b.badge_text && (
+                            <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-[var(--accent-blue)]/15 text-[var(--accent-blue)]">
+                              {b.badge_text}
+                            </span>
+                          )}
                         </div>
                         {b.subtitle && (
-                          <p className="text-[11px] text-[var(--text-secondary)] truncate">{b.subtitle}</p>
+                          <p className="text-[11px] text-[var(--text-secondary)] truncate">
+                            {b.subtitle}
+                          </p>
                         )}
-                        <span className="text-[10px] font-mono text-[var(--accent-blue)] block truncate" dir="ltr">
+                        <span
+                          className="text-[10px] font-mono text-[var(--accent-blue)] block truncate"
+                          dir="ltr"
+                        >
                           🔗 {lnk}
                         </span>
                       </div>
@@ -714,7 +898,7 @@ export default function AdminBanners() {
                       <button
                         type="button"
                         onClick={() => handleSelectEdit(b)}
-                        className="px-3 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold cursor-pointer transition"
                       >
                         ✏️ ویرایش
                       </button>

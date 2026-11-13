@@ -12,7 +12,7 @@ interface MediaUploadModalProps {
   currentValue?: string;
 }
 
-async function optimizeRasterImageIfNeeded(file: File, isLogoAsset: boolean): Promise<File> {
+async function optimizeRasterImageIfNeeded(file: File, bucket: string): Promise<File> {
   if (
     file.type === "image/svg+xml" ||
     file.type === "image/gif" ||
@@ -21,18 +21,23 @@ async function optimizeRasterImageIfNeeded(file: File, isLogoAsset: boolean): Pr
   ) {
     return file;
   }
-  if (!isLogoAsset && file.size < 300 * 1024) {
+
+  const isLogoAsset = bucket === "site-assets";
+  const isBannerAsset = bucket === "banners";
+
+  if (!isLogoAsset && !isBannerAsset && file.size < 300 * 1024) {
     return file;
   }
+
   return new Promise((resolve) => {
     const img = new Image();
     const objUrl = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(objUrl);
-      const maxDim = isLogoAsset ? 520 : 1280;
+      const maxDim = isLogoAsset ? 520 : isBannerAsset ? 1920 : 1280;
       let w = img.width;
       let h = img.height;
-      if (w <= maxDim && h <= maxDim && file.size <= 140 * 1024) {
+      if (w <= maxDim && h <= maxDim && file.size <= (isBannerAsset ? 450 * 1024 : 140 * 1024)) {
         resolve(file);
         return;
       }
@@ -56,16 +61,19 @@ async function optimizeRasterImageIfNeeded(file: File, isLogoAsset: boolean): Pr
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       const outMime = file.type === "image/jpeg" ? "image/jpeg" : "image/webp";
+      const quality = isBannerAsset ? 0.94 : 0.92;
       canvas.toBlob(
         (blob) => {
           if (blob && blob.size < file.size) {
-            resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".webp"), { type: outMime }));
+            resolve(
+              new File([blob], file.name.replace(/\.[^.]+$/, ".webp"), { type: outMime })
+            );
           } else {
             resolve(file);
           }
         },
         outMime,
-        0.92
+        quality
       );
     };
     img.onerror = () => {
@@ -89,7 +97,9 @@ export default function MediaUploadModal({
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentValue || null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const tempBlobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -97,10 +107,17 @@ export default function MediaUploadModal({
       setPreviewUrl(currentValue || null);
       setErrorMsg(null);
       setActiveTab("upload");
+      setIsDragging(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
     }
+    return () => {
+      if (tempBlobUrlRef.current) {
+        URL.revokeObjectURL(tempBlobUrlRef.current);
+        tempBlobUrlRef.current = null;
+      }
+    };
   }, [isOpen, currentValue, title]);
 
   if (!isOpen) return null;
@@ -113,11 +130,13 @@ export default function MediaUploadModal({
     }
     setUploading(true);
     try {
-      const processedFile = await optimizeRasterImageIfNeeded(
-        rawFile,
-        bucket === "site-assets"
-      );
-      setPreviewUrl(URL.createObjectURL(processedFile));
+      const processedFile = await optimizeRasterImageIfNeeded(rawFile, bucket);
+      if (tempBlobUrlRef.current) {
+        URL.revokeObjectURL(tempBlobUrlRef.current);
+      }
+      const nextBlobUrl = URL.createObjectURL(processedFile);
+      tempBlobUrlRef.current = nextBlobUrl;
+      setPreviewUrl(nextBlobUrl);
 
       const formData = new FormData();
       formData.append("file", processedFile);
@@ -163,6 +182,11 @@ export default function MediaUploadModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md font-sans select-text"
       dir="rtl"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !uploading) {
+          onClose();
+        }
+      }}
     >
       <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5 text-[var(--text-primary)]">
         <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
@@ -215,10 +239,27 @@ export default function MediaUploadModal({
         {activeTab === "upload" && (
           <div
             onClick={() => {
+              if (uploading) return;
               if (fileInputRef.current) fileInputRef.current.value = "";
               fileInputRef.current?.click();
             }}
-            className="border-2 border-dashed border-[var(--card-border)] hover:border-[var(--accent-blue)] rounded-2xl p-8 text-center cursor-pointer transition flex flex-col items-center justify-center min-h-[160px] bg-[var(--input-bg)]"
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              if (!uploading && e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleFile(e.dataTransfer.files[0]);
+              }
+            }}
+            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition flex flex-col items-center justify-center min-h-[160px] bg-[var(--input-bg)] ${
+              isDragging
+                ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/5"
+                : "border-[var(--card-border)] hover:border-[var(--accent-blue)]"
+            }`}
           >
             <input
               ref={fileInputRef}
@@ -237,16 +278,18 @@ export default function MediaUploadModal({
                   key={previewUrl.slice(-24) + "_" + previewUrl.length}
                   src={previewUrl}
                   alt=""
-                  className="w-24 h-20 object-contain mx-auto rounded-xl border border-[var(--card-border)] p-1 bg-white/5"
+                  className="w-32 h-20 object-contain mx-auto rounded-xl border border-[var(--card-border)] p-1 bg-white/5"
                 />
                 <span className="text-[11px] text-[var(--accent-blue)] font-bold block">
-                  {uploading ? "در حال آپلود و ذخیره‌سازی..." : "برای انتخاب تصویر جدید کلیک کنید"}
+                  {uploading ? "در حال آپلود و ذخیره‌سازی..." : "برای انتخاب تصویر جدید کلیک کنید یا فایل را بکشید"}
                 </span>
               </div>
             ) : (
               <div className="space-y-1.5">
                 <span className="text-3xl block">☁️</span>
-                <span className="text-xs font-bold block">انتخاب فایل لوگو / تصویر از سیستم</span>
+                <span className="text-xs font-bold block">
+                  انتخاب فایل تصویر از سیستم (یا رها کردن فایل در این کادر)
+                </span>
                 <span className="text-[10px] text-slate-400 block">
                   PNG, WebP, JPG, SVG, ICO (حداکثر ۵MB)
                 </span>

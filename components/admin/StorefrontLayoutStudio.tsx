@@ -1,10 +1,12 @@
+// File Path: components/admin/StorefrontLayoutStudio.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import MediaUploadModal from "@/components/admin/MediaUploadModal";
 import AdminMenu from "@/components/AdminMenu";
 import AdminModularPages from "@/components/admin/AdminModularPages";
+import ProPageDesignStudio from "@/components/admin/ProPageDesignStudio";
 import { applyFaviconToDOM } from "@/lib/realtimeSync";
 import { useSiteInfo } from "@/context/SiteInfoContext";
 import { DEFAULT_DEVICE_OFFERS, DeviceSmartOffer } from "@/lib/defaultDeviceConfig";
@@ -156,20 +158,23 @@ export default function StorefrontLayoutStudio({
   const [newQuickTitle, setNewQuickTitle] = useState("");
   const [newQuickUrl, setNewQuickUrl] = useState("");
 
-  // ۳. استیت‌های ابعاد بنر و سکشن‌ها
+  // ۳. استیت‌های ابعاد بنر، سکشن‌ها و بلوک‌های صفحات
   const [sections, setSections] = useState<HomeSectionConfig[]>(DEFAULT_HOME_SECTIONS);
+  const [customPageSections, setCustomPageSections] = useState<any[]>([]);
   const [bannerMobileHeight, setBannerMobileHeight] = useState<number>(160);
   const [bannerTabletHeight, setBannerTabletHeight] = useState<number>(250);
   const [bannerDesktopHeight, setBannerDesktopHeight] = useState<number>(340);
   const [bannerMobileImgSize, setBannerMobileImgSize] = useState<number>(90);
   const [bannerDesktopImgSize, setBannerDesktopImgSize] = useState<number>(220);
-  const [bannerMobileLayout, setBannerMobileLayout] = useState<"horizontal" | "vertical">("horizontal");
+  const [bannerMobileLayout, setBannerMobileLayout] = useState<"horizontal" | "vertical">(
+    "horizontal"
+  );
 
-  const loadStudioConfig = async () => {
+  const loadStudioConfig = useCallback(async () => {
     try {
       const [res, statRes] = await Promise.all([
         fetch("/api/theme-builder?t=" + Date.now(), { cache: "no-store" }),
-        fetch("/api/analytics/device", { cache: "no-store" }).catch(() => null),
+        fetch("/api/analytics/device?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
       ]);
 
       if (statRes && statRes.ok) {
@@ -255,6 +260,10 @@ export default function StorefrontLayoutStudio({
         if (bs.mobileLayout) setBannerMobileLayout(bs.mobileLayout);
       }
 
+      if (Array.isArray(cfg.customPageSections)) {
+        setCustomPageSections(cfg.customPageSections);
+      }
+
       if (Array.isArray(cfg.homeSections) && cfg.homeSections.length > 0) {
         setSections(
           cfg.homeSections.map((s: any) => ({
@@ -279,11 +288,23 @@ export default function StorefrontLayoutStudio({
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadStudioConfig();
-  }, []);
+
+    const handlePagesStudioUpdated = () => {
+      loadStudioConfig();
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("axon_pages_studio_updated", handlePagesStudioUpdated);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("axon_pages_studio_updated", handlePagesStudioUpdated);
+      }
+    };
+  }, [loadStudioConfig]);
 
   const moveSection = (index: number, dir: "up" | "down") => {
     soundEngine.playClick();
@@ -392,7 +413,7 @@ export default function StorefrontLayoutStudio({
         announcementEnabled,
         ctaText: ctaText.trim(),
         ctaUrl: ctaUrl.trim() || "/products",
-        bgColor: headerBg,
+        bgColor: headerBg.trim(),
       },
       globalFooter: {
         footerLogoUrl: effectiveFooterLogo.trim(),
@@ -433,6 +454,7 @@ export default function StorefrontLayoutStudio({
       },
       deviceOffers,
       homeSections: sections,
+      customPageSections,
     };
 
     try {
@@ -501,11 +523,14 @@ export default function StorefrontLayoutStudio({
         </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-3 text-xs">
+      {/* کارت‌های سهم بازدید دستگاه‌ها */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
         <div className="p-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-between">
           <div>
             <span className="font-black text-sky-400 block">📱 سهم کاربران موبایل</span>
-            <span className="text-[11px] text-[var(--text-secondary)]">پیشنهاد: فعال‌سازی آفر موبایل</span>
+            <span className="text-[11px] text-[var(--text-secondary)]">
+              پیشنهاد: فعال‌سازی آفر موبایل
+            </span>
           </div>
           <span className="font-mono font-black text-lg text-sky-400">
             {deviceStats.mobile.sharePercent}%
@@ -531,6 +556,7 @@ export default function StorefrontLayoutStudio({
         </div>
       </div>
 
+      {/* ۵ تب اصلی استودیوی ظاهر، منوها و صفحه‌ساز */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-2 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-black">
         {[
           { id: "header", label: "🧭 ۱. هدر، لوگو و آفر دستگاه‌ها" },
@@ -565,10 +591,16 @@ export default function StorefrontLayoutStudio({
       )}
 
       {activeTab === "menus" && <AdminMenu />}
-      {activeTab === "page_builder" && <AdminModularPages />}
+
+      {activeTab === "page_builder" && (
+        <div className="space-y-8">
+          <ProPageDesignStudio />
+          <AdminModularPages />
+        </div>
+      )}
 
       {(activeTab === "header" || activeTab === "footer" || activeTab === "sections") && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6 text-xs">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start text-xs">
           <form
             onSubmit={handleSaveAll}
             className="lg:col-span-7 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5"
@@ -579,10 +611,10 @@ export default function StorefrontLayoutStudio({
                   تنظیمات کامل هدر، ابعاد لوگوی هدر، سایز فونت منو، فاوآیکون و نوار اعلان
                 </h2>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
-                      نام برند در هدر (در صورت خالی گذاشتن، فقط لوگو نمایش داده می‌شود):
+                      نام برند در هدر (خالی = فقط نمایش لوگو):
                     </label>
                     <input
                       type="text"
@@ -594,7 +626,9 @@ export default function StorefrontLayoutStudio({
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">قالب ظاهری هدر:</label>
+                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                      قالب ظاهری هدر:
+                    </label>
                     <select
                       value={headerVariant}
                       onChange={(e) => setHeaderVariant(e.target.value as any)}
@@ -607,7 +641,9 @@ export default function StorefrontLayoutStudio({
 
                   <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <label className="font-black text-[var(--text-primary)]">تصویر لوگوی هدر:</label>
+                      <label className="font-black text-[var(--text-primary)]">
+                        تصویر لوگوی هدر:
+                      </label>
                       {logoUrl && (
                         <button
                           type="button"
@@ -624,7 +660,12 @@ export default function StorefrontLayoutStudio({
                     <div className="flex items-center gap-3">
                       <div className="w-16 h-14 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 p-1">
                         {logoUrl ? (
-                          <img key={logoUrl.slice(-32) + "_" + logoUrl.length} src={logoUrl} alt="Header Logo" className="w-full h-full object-contain" />
+                          <img
+                            key={logoUrl.slice(-32) + "_" + logoUrl.length}
+                            src={logoUrl}
+                            alt="Header Logo"
+                            className="w-full h-full object-contain"
+                          />
                         ) : (
                           <span className="text-[10px] text-slate-400">پیش‌فرض</span>
                         )}
@@ -656,7 +697,11 @@ export default function StorefrontLayoutStudio({
                     <div className="flex items-center gap-3">
                       <div className="w-16 h-14 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 p-2">
                         {faviconUrl ? (
-                          <img src={faviconUrl} alt="Favicon" className="w-full h-full object-contain" />
+                          <img
+                            src={faviconUrl}
+                            alt="Favicon"
+                            className="w-full h-full object-contain"
+                          />
                         ) : (
                           <span className="text-[10px] text-slate-400">ICO</span>
                         )}
@@ -687,7 +732,7 @@ export default function StorefrontLayoutStudio({
                   <span className="font-black text-[var(--accent-blue)] block">
                     📐 تنظیم دقیق سایز لوگوی هدر، ارتفاع هدر و سایز فونت منو:
                   </span>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
                       <div className="flex justify-between font-bold text-[11px]">
                         <span>عرض لوگوی هدر:</span>
@@ -746,6 +791,60 @@ export default function StorefrontLayoutStudio({
                         onChange={(e) => setMenuFontSize(Number(e.target.value))}
                         className="w-full accent-indigo-500 cursor-pointer"
                       />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-[var(--card-border)]">
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        متن دکمه هدر (CTA):
+                      </label>
+                      <input
+                        type="text"
+                        value={ctaText}
+                        onChange={(e) => setCtaText(e.target.value)}
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        لینک دکمه هدر:
+                      </label>
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={ctaUrl}
+                        onChange={(e) => setCtaUrl(e.target.value)}
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        گردی گوشه لوگو:
+                      </label>
+                      <select
+                        value={logoRadius}
+                        onChange={(e) => setLogoRadius(e.target.value)}
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+                      >
+                        <option value="0px">بدون گردی (0px)</option>
+                        <option value="8px">ملایم (8px)</option>
+                        <option value="12px">استاندارد (12px)</option>
+                        <option value="9999px">دایره‌ای کامل (9999px)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        نحوه نمایش لوگو:
+                      </label>
+                      <select
+                        value={logoObjectFit}
+                        onChange={(e) => setLogoObjectFit(e.target.value as "contain" | "cover")}
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+                      >
+                        <option value="contain">نمایش کامل (Contain)</option>
+                        <option value="cover">پر کردن کادر (Cover)</option>
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -819,7 +918,7 @@ export default function StorefrontLayoutStudio({
                     </span>
                   </label>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     <input
                       type="text"
                       value={activeOfferObj.badge}
@@ -865,7 +964,7 @@ export default function StorefrontLayoutStudio({
                     )}
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-center gap-2 md:gap-4">
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
                     <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center min-w-[140px] min-h-[70px]">
                       {footerLogoUrl ? (
                         <img
@@ -901,11 +1000,13 @@ export default function StorefrontLayoutStudio({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-3 pt-2 border-t border-[var(--card-border)]">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[var(--card-border)]">
                     <div className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
                       <div className="flex justify-between font-bold text-[11px]">
                         <span>عرض لوگوی فوتر:</span>
-                        <span className="font-mono font-black text-[var(--accent-blue)]">{footerLogoWidth}px</span>
+                        <span className="font-mono font-black text-[var(--accent-blue)]">
+                          {footerLogoWidth}px
+                        </span>
                       </div>
                       <input
                         type="range"
@@ -921,7 +1022,9 @@ export default function StorefrontLayoutStudio({
                     <div className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
                       <div className="flex justify-between font-bold text-[11px]">
                         <span>ارتفاع لوگوی فوتر:</span>
-                        <span className="font-mono font-black text-[var(--accent-blue)]">{footerLogoHeight}px</span>
+                        <span className="font-mono font-black text-[var(--accent-blue)]">
+                          {footerLogoHeight}px
+                        </span>
                       </div>
                       <input
                         type="range"
@@ -939,15 +1042,15 @@ export default function StorefrontLayoutStudio({
                         type="checkbox"
                         checked={showFooterLogoBox}
                         onChange={(e) => setShowFooterLogoBox(e.target.checked)}
-                        className="w-4 h-4 accent-[var(--accent-blue)] rounded"
+                        className="w-4 h-4 accent-[var(--accent-blue)] rounded cursor-pointer"
                       />
                       <span className="text-[11px]">کادر سفید دور لوگوی فوتر</span>
                     </label>
                   </div>
                 </div>
 
-                {/* ۲. متون فوتر (در صورت خالی گذاشتن هر فیلد، در فوتر نمایش داده نمی‌شود) */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
+                {/* ۲. متون فوتر */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
                       عنوان برند در فوتر (خالی = عدم نمایش عنوان متنی):
@@ -987,7 +1090,9 @@ export default function StorefrontLayoutStudio({
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">تلفن پشتیبانی فوتر:</label>
+                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                      تلفن پشتیبانی فوتر:
+                    </label>
                     <input
                       type="text"
                       dir="ltr"
@@ -998,7 +1103,9 @@ export default function StorefrontLayoutStudio({
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">ایمیل پشتیبانی فوتر:</label>
+                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                      ایمیل پشتیبانی فوتر:
+                    </label>
                     <input
                       type="text"
                       dir="ltr"
@@ -1009,7 +1116,9 @@ export default function StorefrontLayoutStudio({
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نشانی فیزیکی در فوتر:</label>
+                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                      نشانی فیزیکی در فوتر:
+                    </label>
                     <input
                       type="text"
                       value={warehouseAddress}
@@ -1019,7 +1128,9 @@ export default function StorefrontLayoutStudio({
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">ساعات پاسخگویی:</label>
+                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                      ساعات پاسخگویی:
+                    </label>
                     <input
                       type="text"
                       value={workingHours}
@@ -1029,13 +1140,135 @@ export default function StorefrontLayoutStudio({
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">متن کپی‌رایت پایین فوتر:</label>
+                    <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                      متن کپی‌رایت پایین فوتر:
+                    </label>
                     <input
                       type="text"
                       value={copyrightText}
                       onChange={(e) => setCopyrightText(e.target.value)}
                       className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
                     />
+                  </div>
+                </div>
+
+                {/* بج‌های اعتماد و تنظیمات اینماد فوتر */}
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-black text-[var(--accent-blue)]">
+                      🛡️ نشان‌های اعتماد و تنظیمات اینماد (eNamad) در فوتر:
+                    </span>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showTrustBadges}
+                          onChange={(e) => setShowTrustBadges(e.target.checked)}
+                          className="w-4 h-4 accent-[var(--accent-blue)] rounded cursor-pointer"
+                        />
+                        <span>نمایش بج‌های ضمانت</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 font-bold cursor-pointer text-emerald-400">
+                        <input
+                          type="checkbox"
+                          checked={enamadEnabled}
+                          onChange={(e) => setEnamadEnabled(e.target.checked)}
+                          className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+                        />
+                        <span>نمایش نماد اعتماد (اینماد)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        متن بج اعتماد ۱:
+                      </label>
+                      <input
+                        type="text"
+                        value={badge1Text}
+                        onChange={(e) => setBadge1Text(e.target.value)}
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        متن بج اعتماد ۲:
+                      </label>
+                      <input
+                        type="text"
+                        value={badge2Text}
+                        onChange={(e) => setBadge2Text(e.target.value)}
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        کد شناسه اینماد:
+                      </label>
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={enamadCode}
+                        onChange={(e) => setEnamadCode(e.target.value)}
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        لینک مستقیم پروفایل اینماد:
+                      </label>
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={enamadLink}
+                        onChange={(e) => setEnamadLink(e.target.value)}
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[var(--card-border)]">
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        عنوان ستون پشتیبانی:
+                      </label>
+                      <input
+                        type="text"
+                        value={supportTitle}
+                        onChange={(e) => setSupportTitle(e.target.value)}
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        مقیاس اندازه فوتر:
+                      </label>
+                      <select
+                        value={footerScale}
+                        onChange={(e) => setFooterScale(e.target.value as any)}
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+                      >
+                        <option value="compact">فشرده (Compact)</option>
+                        <option value="normal">استاندارد (Normal)</option>
+                        <option value="large">بزرگ (Large)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        فاصله داخلی فوتر (Padding):
+                      </label>
+                      <select
+                        value={footerPadding}
+                        onChange={(e) => setFooterPadding(e.target.value as any)}
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+                      >
+                        <option value="compact">کم (Compact)</option>
+                        <option value="normal">متوسط (Normal)</option>
+                        <option value="relaxed">باز و دلباز (Relaxed)</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -1178,11 +1411,13 @@ export default function StorefrontLayoutStudio({
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-3.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                     <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5">
                       <div className="flex justify-between font-bold">
                         <span>📱 ارتفاع بنر موبایل:</span>
-                        <span className="font-mono font-black text-[var(--accent-blue)]">{bannerMobileHeight}px</span>
+                        <span className="font-mono font-black text-[var(--accent-blue)]">
+                          {bannerMobileHeight}px
+                        </span>
                       </div>
                       <input
                         type="range"
@@ -1198,7 +1433,9 @@ export default function StorefrontLayoutStudio({
                     <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5">
                       <div className="flex justify-between font-bold">
                         <span>📟 ارتفاع بنر تبلت:</span>
-                        <span className="font-mono font-black text-[var(--accent-blue)]">{bannerTabletHeight}px</span>
+                        <span className="font-mono font-black text-[var(--accent-blue)]">
+                          {bannerTabletHeight}px
+                        </span>
                       </div>
                       <input
                         type="range"
@@ -1214,7 +1451,9 @@ export default function StorefrontLayoutStudio({
                     <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5">
                       <div className="flex justify-between font-bold">
                         <span>🖥️ ارتفاع بنر دسکتاپ:</span>
-                        <span className="font-mono font-black text-[var(--accent-blue)]">{bannerDesktopHeight}px</span>
+                        <span className="font-mono font-black text-[var(--accent-blue)]">
+                          {bannerDesktopHeight}px
+                        </span>
                       </div>
                       <input
                         type="range"
@@ -1225,6 +1464,56 @@ export default function StorefrontLayoutStudio({
                         onChange={(e) => setBannerDesktopHeight(Number(e.target.value))}
                         className="w-full accent-[var(--accent-blue)] cursor-pointer"
                       />
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5">
+                      <div className="flex justify-between font-bold">
+                        <span>📱 اندازه تصویر در موبایل:</span>
+                        <span className="font-mono font-black text-emerald-500">
+                          {bannerMobileImgSize}px
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={60}
+                        max={150}
+                        step={4}
+                        value={bannerMobileImgSize}
+                        onChange={(e) => setBannerMobileImgSize(Number(e.target.value))}
+                        className="w-full accent-emerald-500 cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5">
+                      <div className="flex justify-between font-bold">
+                        <span>🖥️ اندازه تصویر در دسکتاپ:</span>
+                        <span className="font-mono font-black text-emerald-500">
+                          {bannerDesktopImgSize}px
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={140}
+                        max={360}
+                        step={5}
+                        value={bannerDesktopImgSize}
+                        onChange={(e) => setBannerDesktopImgSize(Number(e.target.value))}
+                        className="w-full accent-emerald-500 cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5">
+                      <span className="block font-bold">📱 چیدمان بنر در موبایل:</span>
+                      <select
+                        value={bannerMobileLayout}
+                        onChange={(e) =>
+                          setBannerMobileLayout(e.target.value as "horizontal" | "vertical")
+                        }
+                        className="w-full p-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+                      >
+                        <option value="horizontal">افقی (متن کنار تصویر)</option>
+                        <option value="vertical">عمودی (تصویر بالای متن)</option>
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -1254,7 +1543,7 @@ export default function StorefrontLayoutStudio({
                               onClick={() => moveSection(idx, "up")}
                               className="px-2.5 py-1 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer"
                             >
-                              ⬆
+                              ⬆️
                             </button>
                             <button
                               type="button"
@@ -1279,7 +1568,7 @@ export default function StorefrontLayoutStudio({
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                           <input
                             type="text"
                             value={sec.title}
@@ -1346,12 +1635,14 @@ export default function StorefrontLayoutStudio({
               disabled={saving}
               className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-xl hover:opacity-90 transition cursor-pointer disabled:opacity-50"
             >
-              {saving ? "در حال ذخیره و انتشار زنده..." : "💾 ذخیره و انتشار آنی تغییرات در کل سایت"}
+              {saving
+                ? "در حال ذخیره و انتشار زنده..."
+                : "💾 ذخیره و انتشار آنی تغییرات در کل سایت"}
             </button>
           </form>
 
           {/* ستون پیش‌نمایش زنده ریسپانسیو هدر و فوتر (۵ ستون) */}
-          <div className="lg:col-span-5 p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 h-fit">
+          <div className="lg:col-span-5 p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 h-fit sticky top-6">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
               <span className="font-black text-sm">پیش‌نمایش زنده ریسپانسیو</span>
               <div className="flex gap-1 p-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold">
@@ -1405,7 +1696,13 @@ export default function StorefrontLayoutStudio({
                   </div>
                 )}
 
-                <div className="p-3 rounded-full bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-lg flex items-center justify-between">
+                <div
+                  className={
+                    "p-3 bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-lg flex items-center justify-between " +
+                    (headerVariant === "capsule" ? "rounded-full" : "rounded-2xl")
+                  }
+                  style={{ minHeight: Math.min(84, headerHeight) + "px" }}
+                >
                   <div className="flex items-center gap-2">
                     {logoUrl && (
                       <img
@@ -1420,12 +1717,21 @@ export default function StorefrontLayoutStudio({
                       />
                     )}
                     {brandName && (
-                      <span className="font-black text-xs truncate max-w-[140px]">{brandName}</span>
+                      <span className="font-black text-xs truncate max-w-[140px]">
+                        {brandName}
+                      </span>
                     )}
                   </div>
-                  <span className="px-3 py-1 rounded-full bg-[var(--accent-blue)] text-white text-[10px] font-black">
-                    🛒 0
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {ctaText && previewDevice !== "mobile" && (
+                      <span className="px-2.5 py-1 rounded-full bg-white/10 text-[9px] font-bold">
+                        {ctaText}
+                      </span>
+                    )}
+                    <span className="px-3 py-1 rounded-full bg-[var(--accent-blue)] text-white text-[10px] font-black">
+                      🛒 0
+                    </span>
+                  </div>
                 </div>
 
                 {/* پیش‌نمایش فوتر و لوگوی بزرگ فوتر */}
@@ -1452,6 +1758,20 @@ export default function StorefrontLayoutStudio({
                       )}
                     </div>
                   </div>
+                  {showTrustBadges && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {badge1Text && (
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[9px] font-bold">
+                          ✓ {badge1Text}
+                        </span>
+                      )}
+                      {badge2Text && (
+                        <span className="px-2 py-0.5 rounded-md bg-sky-500/10 border border-sky-500/30 text-sky-400 text-[9px] font-bold">
+                          🚀 {badge2Text}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {copyrightText && (
                     <div className="text-[10px] text-[var(--text-secondary)] border-t border-[var(--card-border)] pt-2 truncate">
                       {copyrightText}

@@ -2,179 +2,217 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { DEFAULT_HOMEPAGE_LAYOUT_CONFIG } from "@/services/siteInfoService";
-import { getMasterSiteInfoRow, saveMasterSiteInfoRow, pickNonEmpty } from "@/lib/siteInfoPersistence";
+import { getMasterSiteInfoRow, saveMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
 import { DEFAULT_DEVICE_OFFERS } from "@/lib/defaultDeviceConfig";
 
 export const dynamic = "force-dynamic";
 
+const DEFAULT_HOME_SECTIONS = [
+  {
+    id: "sec_banners",
+    type: "banners_slider",
+    title: "اسلایدر بنرهای تبلیغاتی و محصولات ویژه (بالای صفحه)",
+    subtitle: "نمایش بنرهای کلیک‌پذیر متصل به صفحات محصول در بالاترین بخش سایت",
+    enabled: true,
+    showOnMobile: true,
+    showOnTablet: true,
+    showOnDesktop: true,
+  },
+  {
+    id: "sec_perspective",
+    type: "NativePerspectiveSlider",
+    title: "نمایشگاه تعاملی سه‌بعدی محصولات پرچمدار (ویژه موبایل)",
+    subtitle: "پیمایش لمسی محصولات در موبایل",
+    enabled: true,
+    showOnMobile: true,
+    showOnTablet: false,
+    showOnDesktop: false,
+  },
+  {
+    id: "sec_catalog",
+    type: "NativeProductCatalog",
+    title: "کاتالوگ تجهیزات و محصولات (ویژه دسکتاپ و تبلت)",
+    subtitle: "تمامی کالاها با گارانتی اصالت طلایی، تست سلامت فیزیکی و ارسال پیشتاز عرضه می‌شوند",
+    enabled: true,
+    showOnMobile: false,
+    showOnTablet: true,
+    showOnDesktop: true,
+  },
+];
+
 export async function GET() {
   try {
-    const data = await getMasterSiteInfoRow();
-    const layoutCfg =
-      data?.homepage_layout_config && typeof data.homepage_layout_config === "object"
-        ? data.homepage_layout_config
-        : DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
-
-    const persisted = layoutCfg._persisted_identity || {};
-    const existingTb = layoutCfg.theme_builder_config || {};
-    const existingGh = existingTb.globalHeader || {};
-    const existingGf = existingTb.globalFooter || {};
+    const siteInfo = (await getMasterSiteInfoRow()) || {};
+    const layoutCfg = siteInfo.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
+    const persisted = layoutCfg?._persisted_identity || {};
+    const tbCfg = layoutCfg?.theme_builder_config || {};
+    const savedGh = tbCfg?.globalHeader || {};
+    const savedGf = tbCfg?.globalFooter || {};
+    const savedBs = tbCfg?.bannerSizing || layoutCfg?.bannerSizing || {};
 
     const resolvedHeaderLogo =
-      existingGh.logoUrl !== undefined
-        ? String(existingGh.logoUrl)
-        : pickNonEmpty(persisted.logo_url, layoutCfg?.header?.brand?.logoUrl, data?.logo_url);
+      savedGh.logoUrl !== undefined
+        ? String(savedGh.logoUrl).trim()
+        : persisted.logo_url !== undefined
+        ? String(persisted.logo_url).trim()
+        : String(siteInfo.logo_url || "").trim();
 
     const resolvedFooterLogo =
-      existingGf.footerLogoUrl !== undefined
-        ? String(existingGf.footerLogoUrl)
-        : pickNonEmpty(persisted.footer_logo_url, layoutCfg?.footer?.footerLogoUrl, data?.footer_logo_url);
+      savedGf.footerLogoUrl !== undefined
+        ? String(savedGf.footerLogoUrl).trim()
+        : persisted.footer_logo_url !== undefined
+        ? String(persisted.footer_logo_url).trim()
+        : String(siteInfo.footer_logo_url || "").trim();
 
-    const resolvedFavicon = pickNonEmpty(
-      existingGh.faviconUrl,
-      persisted.favicon_url,
-      data?.favicon_url,
-      "/favicon.ico"
-    );
+    const resolvedFavicon =
+      savedGh.faviconUrl !== undefined
+        ? String(savedGh.faviconUrl).trim()
+        : String(persisted.favicon_url || siteInfo.favicon_url || "/favicon.ico").trim();
 
-    const storedTheme = {
-      ...existingTb,
+    const resolvedBrandName =
+      savedGh.brandName !== undefined
+        ? String(savedGh.brandName)
+        : String(persisted.site_name ?? siteInfo.site_name ?? "آکسون کور | Axon Core");
+
+    const resolvedCustomPageSections = Array.isArray(tbCfg.customPageSections)
+      ? tbCfg.customPageSections
+      : Array.isArray(layoutCfg.customPageSections)
+      ? layoutCfg.customPageSections
+      : [];
+
+    const resolvedNavigationMenu = Array.isArray(siteInfo.navigation_menu)
+      ? siteInfo.navigation_menu
+      : Array.isArray(layoutCfg.navigation_menu)
+      ? layoutCfg.navigation_menu
+      : [];
+
+    const normalizedConfig = {
+      ...tbCfg,
       globalHeader: {
-        brandName:
-          existingGh.brandName !== undefined
-            ? String(existingGh.brandName)
-            : pickNonEmpty(persisted.site_name, data?.site_name, "آکسون کور | Axon Core"),
-        logoText:
-          existingGh.logoText !== undefined
-            ? String(existingGh.logoText)
-            : pickNonEmpty(data?.site_name, "آکسون کور"),
+        brandName: resolvedBrandName,
+        logoText: resolvedBrandName,
         logoUrl: resolvedHeaderLogo,
-        logoWidth: Number(existingGh.logoWidth || 44),
-        logoHeight: Number(existingGh.logoHeight || 44),
-        logoRadius: existingGh.logoRadius || "12px",
-        logoObjectFit: existingGh.logoObjectFit || "contain",
+        logoWidth: Number(savedGh.logoWidth || 44),
+        logoHeight: Number(savedGh.logoHeight || 44),
+        logoRadius: savedGh.logoRadius || "12px",
+        logoObjectFit: savedGh.logoObjectFit || "contain",
         faviconUrl: resolvedFavicon,
-        variant: existingGh.variant || "capsule",
-        height: Number(existingGh.height || 64),
-        menuFontSize: Number(existingGh.menuFontSize || 12),
+        variant: savedGh.variant || "capsule",
+        height: Number(savedGh.height || 64),
+        menuFontSize: Number(savedGh.menuFontSize || 12),
         announcementText:
-          existingGh.announcementText !== undefined
-            ? String(existingGh.announcementText)
-            : pickNonEmpty(persisted.header_announcement, data?.header_announcement),
-        announcementEnabled: Boolean(
-          existingGh.announcementEnabled ?? layoutCfg?.header?.announcement?.show ?? false
-        ),
-        ctaText: existingGh.ctaText !== undefined ? String(existingGh.ctaText) : "کاتالوگ محصولات",
-        ctaUrl: existingGh.ctaUrl || "/products",
-        bgColor: existingGh.bgColor || "",
+          savedGh.announcementText !== undefined
+            ? String(savedGh.announcementText)
+            : String(persisted.header_announcement ?? siteInfo.header_announcement ?? ""),
+        announcementEnabled: Boolean(savedGh.announcementEnabled ?? false),
+        ctaText: savedGh.ctaText !== undefined ? String(savedGh.ctaText) : "کاتالوگ محصولات",
+        ctaUrl: savedGh.ctaUrl || "/products",
+        bgColor: savedGh.bgColor || "",
       },
       globalFooter: {
-        ...existingGf,
         footerLogoUrl: resolvedFooterLogo,
-        footerLogoWidth: Number(existingGf.footerLogoWidth || 140),
-        footerLogoHeight: Number(existingGf.footerLogoHeight || 56),
-        footerLogoRadius: existingGf.footerLogoRadius || "12px",
-        showFooterLogoBox:
-          existingGf.showFooterLogoBox !== undefined
-            ? Boolean(existingGf.showFooterLogoBox)
-            : false,
-        brandTitle:
-          existingGf.brandTitle !== undefined
-            ? String(existingGf.brandTitle)
-            : "آکسون کور | Axon Core",
+        footerLogoWidth: Number(savedGf.footerLogoWidth || 140),
+        footerLogoHeight: Number(savedGf.footerLogoHeight || 56),
+        footerLogoRadius: savedGf.footerLogoRadius || "12px",
+        showFooterLogoBox: Boolean(savedGf.showFooterLogoBox ?? false),
+        brandTitle: savedGf.brandTitle !== undefined ? String(savedGf.brandTitle) : "",
         brandSubtitle:
-          existingGf.brandSubtitle !== undefined
-            ? String(existingGf.brandSubtitle)
-            : "مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال",
+          savedGf.brandSubtitle !== undefined
+            ? String(savedGf.brandSubtitle)
+            : String(persisted.tagline ?? siteInfo.tagline ?? ""),
         brandDescription:
-          existingGf.brandDescription !== undefined
-            ? String(existingGf.brandDescription)
-            : pickNonEmpty(persisted.description, data?.description),
-        showTrustBadges:
-          existingGf.showTrustBadges !== undefined ? Boolean(existingGf.showTrustBadges) : true,
+          savedGf.brandDescription !== undefined
+            ? String(savedGf.brandDescription)
+            : String(persisted.description ?? siteInfo.description ?? ""),
+        showTrustBadges: savedGf.showTrustBadges !== false,
         badge1Text:
-          existingGf.badge1Text !== undefined ? String(existingGf.badge1Text) : "ضمانت اصالت کالا",
+          savedGf.badge1Text !== undefined ? String(savedGf.badge1Text) : "ضمانت اصالت کالا",
         badge2Text:
-          existingGf.badge2Text !== undefined ? String(existingGf.badge2Text) : "ارسال سریع سراسری",
+          savedGf.badge2Text !== undefined ? String(savedGf.badge2Text) : "ارسال سریع سراسری",
         quickLinksTitle:
-          existingGf.quickLinksTitle !== undefined
-            ? String(existingGf.quickLinksTitle)
-            : "دسترسی سریع",
+          savedGf.quickLinksTitle !== undefined ? String(savedGf.quickLinksTitle) : "دسترسی سریع",
         supportTitle:
-          existingGf.supportTitle !== undefined
-            ? String(existingGf.supportTitle)
+          savedGf.supportTitle !== undefined
+            ? String(savedGf.supportTitle)
             : "مرکز ارتباط و پشتیبانی",
-        scaleMode: existingGf.scaleMode || "normal",
-        paddingMode: existingGf.paddingMode || "normal",
-        bgColor: existingGf.bgColor || "",
+        scaleMode: savedGf.scaleMode || "normal",
+        paddingMode: savedGf.paddingMode || "normal",
+        bgColor: savedGf.bgColor || "",
         columnOrder:
-          Array.isArray(existingGf.columnOrder) && existingGf.columnOrder.length === 4
-            ? existingGf.columnOrder
+          Array.isArray(savedGf.columnOrder) && savedGf.columnOrder.length === 4
+            ? savedGf.columnOrder
             : ["brand", "quick_links", "support", "enamad"],
         supportPhone:
-          existingGf.supportPhone !== undefined
-            ? String(existingGf.supportPhone)
-            : pickNonEmpty(persisted.phone, data?.phone, "09376110200"),
+          savedGf.supportPhone !== undefined
+            ? String(savedGf.supportPhone)
+            : String(persisted.phone ?? siteInfo.phone ?? "09376110200"),
         supportEmail:
-          existingGf.supportEmail !== undefined
-            ? String(existingGf.supportEmail)
-            : pickNonEmpty(persisted.email, data?.email, "Pouriarahimi@yahoo.com"),
+          savedGf.supportEmail !== undefined
+            ? String(savedGf.supportEmail)
+            : String(persisted.email ?? siteInfo.email ?? "Pouriarahimi@yahoo.com"),
         warehouseAddress:
-          existingGf.warehouseAddress !== undefined
-            ? String(existingGf.warehouseAddress)
-            : pickNonEmpty(persisted.address, data?.address, "شیراز - ستارخان"),
+          savedGf.warehouseAddress !== undefined
+            ? String(savedGf.warehouseAddress)
+            : String(persisted.address ?? siteInfo.address ?? "شیراز - ستارخان"),
         workingHours:
-          existingGf.workingHours !== undefined
-            ? String(existingGf.workingHours)
-            : pickNonEmpty(
-                persisted.working_hours,
-                data?.working_hours,
-                "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰"
+          savedGf.workingHours !== undefined
+            ? String(savedGf.workingHours)
+            : String(
+                persisted.working_hours ??
+                  siteInfo.working_hours ??
+                  "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰"
               ),
-        enamadCode: existingGf.enamadCode !== undefined ? String(existingGf.enamadCode) : "7434404",
+        enamadCode: savedGf.enamadCode !== undefined ? String(savedGf.enamadCode) : "7434404",
         enamadLink:
-          existingGf.enamadLink ||
+          savedGf.enamadLink ||
           "https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD",
-        enamadEnabled: existingGf.enamadEnabled !== false,
-        copyright:
-          existingGf.copyright !== undefined
-            ? String(existingGf.copyright)
-            : "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026",
-        quickLinks: Array.isArray(existingGf.quickLinks)
-          ? existingGf.quickLinks
+        enamadEnabled: savedGf.enamadEnabled !== false,
+        quickLinks: Array.isArray(savedGf.quickLinks)
+          ? savedGf.quickLinks
           : [
-              { id: "q1", title: "🛍 کاتالوگ محصولات دیجیتال", url: "/products", show: true },
+              { id: "q1", title: "🛍️ کاتالوگ محصولات دیجیتال", url: "/products", show: true },
               { id: "q2", title: "📡 رادار اخبار تکنولوژی", url: "/news", show: true },
               { id: "q3", title: "📚 مجله تخصصی و راهنمای خرید", url: "/blog", show: true },
               { id: "q4", title: "📦 پیگیری لحظه‌ای سفارشات", url: "/track-order", show: true },
             ],
-        externalLinks: Array.isArray(existingGf.externalLinks)
-          ? existingGf.externalLinks.filter(
-              (x: any) => x.url !== "/api/torob" && x.url !== "/sitemap.xml"
-            )
-          : [],
+        externalLinks: Array.isArray(savedGf.externalLinks) ? savedGf.externalLinks : [],
+        copyright:
+          savedGf.copyright !== undefined
+            ? String(savedGf.copyright)
+            : String(
+                persisted.footer_text ??
+                  siteInfo.footer_text ??
+                  "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026"
+              ),
       },
-      bannerSizing: existingTb.bannerSizing ||
-        layoutCfg.bannerSizing || {
-          mobileHeight: 160,
-          tabletHeight: 250,
-          desktopHeight: 340,
-          mobileImageSize: 90,
-          desktopImageSize: 220,
-          mobileLayout: "horizontal",
-        },
+      bannerSizing: {
+        mobileHeight: Number(savedBs.mobileHeight || 160),
+        tabletHeight: Number(savedBs.tabletHeight || 250),
+        desktopHeight: Number(savedBs.desktopHeight || 340),
+        mobileImageSize: Number(savedBs.mobileImageSize || 90),
+        desktopImageSize: Number(savedBs.desktopImageSize || 220),
+        mobileLayout: savedBs.mobileLayout || "horizontal",
+      },
       deviceOffers: {
         ...DEFAULT_DEVICE_OFFERS,
-        ...(existingTb.deviceOffers || layoutCfg.deviceOffers || {}),
+        ...(tbCfg.deviceOffers || layoutCfg.deviceOffers || {}),
       },
-      adminSidebarLabels: existingTb.adminSidebarLabels || layoutCfg.adminSidebarLabels || {},
-      homeSections: Array.isArray(existingTb.homeSections)
-        ? existingTb.homeSections
-        : layoutCfg.homeSections || [],
+      homeSections:
+        Array.isArray(tbCfg.homeSections) && tbCfg.homeSections.length > 0
+          ? tbCfg.homeSections
+          : Array.isArray(layoutCfg.homeSections) && layoutCfg.homeSections.length > 0
+          ? layoutCfg.homeSections
+          : DEFAULT_HOME_SECTIONS,
+      customPageSections: resolvedCustomPageSections,
+      navigation_menu: resolvedNavigationMenu,
     };
 
     return NextResponse.json(
-      { success: true, config: storedTheme },
+      {
+        success: true,
+        config: normalizedConfig,
+        data: normalizedConfig,
+      },
       { headers: { "Cache-Control": "no-store, max-age=0" } }
     );
   } catch (err: any) {
@@ -184,163 +222,153 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!(await verifyAdminSession(req))) {
+    const session = await verifyAdminSession(req);
+    if (!session) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
     const body = await req.json();
-    const { config } = body;
-    const existing = await getMasterSiteInfoRow();
+    const incomingConfig = body.config || body.theme_builder_config || body;
 
+    const existing = await getMasterSiteInfoRow();
     const prevLayout =
       existing?.homepage_layout_config && typeof existing.homepage_layout_config === "object"
         ? existing.homepage_layout_config
         : DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
 
+    const prevPersisted = prevLayout._persisted_identity || {};
     const prevTb = prevLayout.theme_builder_config || {};
-    const gh = { ...(prevTb.globalHeader || {}), ...(config?.globalHeader || {}) };
-    const gf = { ...(prevTb.globalFooter || {}), ...(config?.globalFooter || {}) };
+    const prevGh = prevTb.globalHeader || {};
+    const prevGf = prevTb.globalFooter || {};
+    const prevBs = prevTb.bannerSizing || prevLayout.bannerSizing || {};
 
-    const homeSections = Array.isArray(config?.homeSections)
-      ? config.homeSections
-      : prevTb.homeSections || prevLayout.homeSections || [];
-
-    const bannerSizing = config?.bannerSizing ||
-      prevTb.bannerSizing ||
-      prevLayout.bannerSizing || {
-        mobileHeight: 160,
-        tabletHeight: 250,
-        desktopHeight: 340,
-        mobileImageSize: 90,
-        desktopImageSize: 220,
-        mobileLayout: "horizontal",
-      };
-
-    const deviceOffers = {
+    const gh = { ...prevGh, ...(incomingConfig.globalHeader || {}) };
+    const gf = { ...prevGf, ...(incomingConfig.globalFooter || {}) };
+    const bs = { ...prevBs, ...(incomingConfig.bannerSizing || {}) };
+    const devOffers = {
       ...DEFAULT_DEVICE_OFFERS,
-      ...(prevTb.deviceOffers || {}),
-      ...(config?.deviceOffers || {}),
+      ...(prevTb.deviceOffers || prevLayout.deviceOffers || {}),
+      ...(incomingConfig.deviceOffers || {}),
     };
 
-    const adminSidebarLabels = {
-      ...(prevTb.adminSidebarLabels || {}),
-      ...(config?.adminSidebarLabels || {}),
+    const nextHomeSections = Array.isArray(incomingConfig.homeSections)
+      ? incomingConfig.homeSections
+      : Array.isArray(prevTb.homeSections)
+      ? prevTb.homeSections
+      : Array.isArray(prevLayout.homeSections)
+      ? prevLayout.homeSections
+      : DEFAULT_HOME_SECTIONS;
+
+    // حفظ تضمینی customPageSections در صورتی که در درخواست فعلی ارسال نشده باشد
+    const nextCustomPageSections = Array.isArray(incomingConfig.customPageSections)
+      ? incomingConfig.customPageSections
+      : Array.isArray(prevTb.customPageSections)
+      ? prevTb.customPageSections
+      : Array.isArray(prevLayout.customPageSections)
+      ? prevLayout.customPageSections
+      : [];
+
+    const nextNavigationMenu = Array.isArray(incomingConfig.navigation_menu)
+      ? incomingConfig.navigation_menu
+      : Array.isArray(prevLayout.navigation_menu)
+      ? prevLayout.navigation_menu
+      : [];
+
+    const nextSiteName =
+      gh.brandName !== undefined ? String(gh.brandName) : String(prevPersisted.site_name ?? "");
+    const nextHeaderLogo =
+      gh.logoUrl !== undefined ? String(gh.logoUrl).trim() : String(prevPersisted.logo_url ?? "");
+    const nextFooterLogo =
+      gf.footerLogoUrl !== undefined
+        ? String(gf.footerLogoUrl).trim()
+        : String(prevPersisted.footer_logo_url ?? "");
+    const nextFavicon =
+      gh.faviconUrl !== undefined
+        ? String(gh.faviconUrl).trim()
+        : String(prevPersisted.favicon_url ?? "/favicon.ico");
+
+    const cleanThemeBuilderConfig = {
+      ...prevTb,
+      ...incomingConfig,
+      globalHeader: {
+        ...gh,
+        brandName: nextSiteName,
+        logoText: nextSiteName,
+        logoUrl: nextHeaderLogo,
+        faviconUrl: nextFavicon,
+      },
+      globalFooter: {
+        ...gf,
+        footerLogoUrl: nextFooterLogo,
+      },
+      bannerSizing: bs,
+      deviceOffers: devOffers,
+      homeSections: nextHomeSections,
+      customPageSections: nextCustomPageSections,
     };
-
-    const headerLogoUrl = gh.logoUrl !== undefined ? String(gh.logoUrl).trim() : "";
-    const footerLogoUrl = gf.footerLogoUrl !== undefined ? String(gf.footerLogoUrl).trim() : "";
-    const faviconUrl = gh.faviconUrl !== undefined ? String(gh.faviconUrl).trim() : "/favicon.ico";
-
-    // حفظ دقیق رشته‌های خالی (اگر ادمین عنوان برند در فوتر یا هدر را پاک کرد، دقیقاً "" ذخیره شود)
-    const exactHeaderBrandName = gh.brandName !== undefined ? String(gh.brandName) : "آکسون کور | Axon Core";
-    const exactFooterBrandTitle = gf.brandTitle !== undefined ? String(gf.brandTitle) : "";
-    const exactFooterSubtitle = gf.brandSubtitle !== undefined ? String(gf.brandSubtitle) : "";
 
     const updatedLayout = {
       ...prevLayout,
-      theme_builder_config: {
-        ...prevTb,
-        ...config,
-        globalHeader: {
-          ...gh,
-          brandName: exactHeaderBrandName,
-          logoUrl: headerLogoUrl,
-          faviconUrl,
-        },
-        globalFooter: {
-          ...gf,
-          brandTitle: exactFooterBrandTitle,
-          brandSubtitle: exactFooterSubtitle,
-          footerLogoUrl,
-        },
-        bannerSizing,
-        deviceOffers,
-        adminSidebarLabels,
-        homeSections,
-      },
-      bannerSizing,
-      deviceOffers,
-      adminSidebarLabels,
-      homeSections,
-      header: {
-        ...(prevLayout.header || DEFAULT_HOMEPAGE_LAYOUT_CONFIG.header),
-        variant: gh.variant || "capsule",
-        height: Number(gh.height || 64),
-        brand: {
-          name: exactHeaderBrandName,
-          logoUrl: headerLogoUrl,
-          logoWidth: Number(gh.logoWidth || 44),
-          logoHeight: Number(gh.logoHeight || 44),
-          showLogo: true,
-          showName: exactHeaderBrandName.trim().length > 0,
-        },
-        announcement: {
-          show: Boolean(gh.announcementEnabled),
-          text: String(gh.announcementText || ""),
-          backgroundColor: "#0284c7",
-          textColor: "#ffffff",
-          dismissible: true,
-        },
-      },
-      footer: {
-        ...(prevLayout.footer || DEFAULT_HOMEPAGE_LAYOUT_CONFIG.footer),
-        logoUrl: footerLogoUrl,
-        footerLogoUrl,
-        footerLogoWidth: Number(gf.footerLogoWidth || 140),
-        footerLogoHeight: Number(gf.footerLogoHeight || 56),
-        showFooterLogoBox: Boolean(gf.showFooterLogoBox),
-        brandTitle: exactFooterBrandTitle,
-        brandSubtitle: exactFooterSubtitle,
-        description: String(gf.brandDescription ?? ""),
-        scaleMode: gf.scaleMode || "normal",
-        paddingMode: gf.paddingMode || "normal",
-        bgColor: gf.bgColor || "",
-        columnOrder: gf.columnOrder || ["brand", "quick_links", "support", "enamad"],
-        supportPhone: gf.supportPhone !== undefined ? String(gf.supportPhone) : "09376110200",
-        supportEmail: gf.supportEmail !== undefined ? String(gf.supportEmail) : "Pouriarahimi@yahoo.com",
-        warehouseAddress: gf.warehouseAddress !== undefined ? String(gf.warehouseAddress) : "شیراز - ستارخان",
-        workingHours: gf.workingHours !== undefined ? String(gf.workingHours) : "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-        enamadCode: gf.enamadCode !== undefined ? String(gf.enamadCode) : "7434404",
-        enamadLink: gf.enamadLink || "",
-        enamadEnabled: gf.enamadEnabled !== false,
-        quickLinks: { show: true, title: gf.quickLinksTitle || "دسترسی سریع", links: gf.quickLinks || [] },
-        externalLinks: Array.isArray(gf.externalLinks) ? gf.externalLinks : [],
-        bottomBar: {
-          show: true,
-          copyrightText: gf.copyright !== undefined ? String(gf.copyright) : "",
-        },
-      },
+      theme_builder_config: cleanThemeBuilderConfig,
+      homeSections: nextHomeSections,
+      customPageSections: nextCustomPageSections,
+      navigation_menu: nextNavigationMenu,
+      bannerSizing: bs,
+      deviceOffers: devOffers,
     };
 
     const topLevelFields = {
-      site_name: exactHeaderBrandName || "آکسون کور | Axon Core",
-      tagline: exactFooterSubtitle,
-      description: String(gf.brandDescription ?? ""),
-      footer_text: String(gf.copyright ?? ""),
-      logo_url: headerLogoUrl,
-      footer_logo_url: footerLogoUrl,
-      favicon_url: faviconUrl,
-      phone: String(gf.supportPhone ?? "09376110200"),
-      email: String(gf.supportEmail ?? "Pouriarahimi@yahoo.com"),
-      address: String(gf.warehouseAddress ?? "شیراز - ستارخان"),
-      working_hours: String(gf.workingHours ?? "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰"),
-      header_announcement: String(gh.announcementText ?? ""),
+      site_name: nextSiteName,
+      tagline:
+        gf.brandSubtitle !== undefined
+          ? String(gf.brandSubtitle)
+          : String(prevPersisted.tagline ?? ""),
+      description:
+        gf.brandDescription !== undefined
+          ? String(gf.brandDescription)
+          : String(prevPersisted.description ?? ""),
+      footer_text:
+        gf.copyright !== undefined
+          ? String(gf.copyright)
+          : String(prevPersisted.footer_text ?? ""),
+      logo_url: nextHeaderLogo,
+      footer_logo_url: nextFooterLogo,
+      favicon_url: nextFavicon,
+      phone:
+        gf.supportPhone !== undefined
+          ? String(gf.supportPhone)
+          : String(prevPersisted.phone ?? ""),
+      email:
+        gf.supportEmail !== undefined
+          ? String(gf.supportEmail)
+          : String(prevPersisted.email ?? ""),
+      address:
+        gf.warehouseAddress !== undefined
+          ? String(gf.warehouseAddress)
+          : String(prevPersisted.address ?? ""),
+      working_hours:
+        gf.workingHours !== undefined
+          ? String(gf.workingHours)
+          : String(prevPersisted.working_hours ?? ""),
+      header_announcement:
+        gh.announcementText !== undefined
+          ? String(gh.announcementText)
+          : String(prevPersisted.header_announcement ?? ""),
     };
 
     const { savedRow } = await saveMasterSiteInfoRow(existing, updatedLayout, topLevelFields);
 
     return NextResponse.json({
       success: true,
-      config: savedRow.homepage_layout_config.theme_builder_config,
-      siteInfo: {
-        ...savedRow,
-        logoUrl: headerLogoUrl,
-        footerLogoUrl: footerLogoUrl,
-        theme_builder_config: savedRow.homepage_layout_config.theme_builder_config,
-      },
-      message: "✓ تمامی تغییرات متون، ابعاد لوگوها، هدر و فوتر با موفقیت در دیتابیس ذخیره و در لحظه روی سایت اعمال شد.",
+      message: "✓ تنظیمات ظاهر، لوگوها، فوتر و سکشن‌ها با موفقیت در دیتابیس ذخیره شد.",
+      config: cleanThemeBuilderConfig,
+      siteInfo: savedRow,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
+}
+
+export async function PUT(req: NextRequest) {
+  return POST(req);
 }

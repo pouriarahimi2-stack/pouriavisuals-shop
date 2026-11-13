@@ -1,8 +1,9 @@
 "use client";
 // File Path: components/admin/ProPageDesignStudio.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { CustomPageSection } from "@/components/LivePageSectionsRenderer";
+import MediaUploadModal from "@/components/admin/MediaUploadModal";
 
 const BLOCK_TEMPLATES: Record<
   CustomPageSection["type"],
@@ -99,21 +100,47 @@ const BLOCK_TEMPLATES: Record<
 
 export default function ProPageDesignStudio() {
   const [sections, setSections] = useState<CustomPageSection[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<string>("/");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(
+    null
+  );
 
-  useEffect(() => {
-    fetch("/api/theme-builder?t=" + Date.now(), { cache: "no-store" })
-      .then((r) => r.json())
-      .then((json) => {
+  const loadSectionsAndCategories = useCallback(async () => {
+    try {
+      const [tbRes, catRes] = await Promise.all([
+        fetch("/api/theme-builder?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
+        fetch("/api/categories?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
+      ]);
+
+      if (tbRes && tbRes.ok) {
+        const json = await tbRes.json();
         if (Array.isArray(json?.config?.customPageSections)) {
           setSections(json.config.customPageSections);
         }
-      })
-      .catch(() => {});
+      }
+
+      if (catRes && catRes.ok) {
+        const cJson = await catRes.json();
+        const list = cJson.categories || cJson.data || [];
+        const names = Array.from(
+          new Set(
+            (Array.isArray(list) ? list : [])
+              .map((c: any) => String(c.name || c.title || "").trim())
+              .filter(Boolean)
+          )
+        );
+        setCategories(names);
+      }
+    } catch {}
   }, []);
+
+  useEffect(() => {
+    loadSectionsAndCategories();
+  }, [loadSectionsAndCategories]);
 
   const handleAddBlock = (type: CustomPageSection["type"]) => {
     soundEngine.playClick();
@@ -145,9 +172,30 @@ export default function ProPageDesignStudio() {
   };
 
   const handleUpdateBlock = (id: string, patch: Partial<CustomPageSection>) => {
-    setSections((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, ...patch } : s))
-    );
+    setSections((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  };
+
+  const handleMoveBlockInRoute = (blockId: string, dir: "up" | "down") => {
+    soundEngine.playClick();
+    const routeList = sections.filter((s) => s.targetRoute === selectedRoute);
+    const currentIdx = routeList.findIndex((s) => s.id === blockId);
+    if (currentIdx === -1) return;
+    const targetIdx = dir === "up" ? currentIdx - 1 : currentIdx + 1;
+    if (targetIdx < 0 || targetIdx >= routeList.length) return;
+
+    const reorderedRouteList = [...routeList];
+    const temp = reorderedRouteList[currentIdx];
+    reorderedRouteList[currentIdx] = reorderedRouteList[targetIdx];
+    reorderedRouteList[targetIdx] = temp;
+
+    let routePointer = 0;
+    const nextAllSections = sections.map((s) => {
+      if (s.targetRoute === selectedRoute) {
+        return reorderedRouteList[routePointer++];
+      }
+      return s;
+    });
+    setSections(nextAllSections);
   };
 
   const handleDeleteBlock = (id: string) => {
@@ -180,14 +228,29 @@ export default function ProPageDesignStudio() {
 
       if (res.ok) {
         soundEngine.playSuccess();
-        window.dispatchEvent(new CustomEvent("axon_pages_studio_updated"));
-        window.dispatchEvent(new CustomEvent("theme_builder_updated"));
-        setFeedback("✓ طراحی و بلوک‌های صفحات با موفقیت ذخیره و به صورت زنده در سایت منتشر شد!");
-        setTimeout(() => setFeedback(null), 4000);
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("axon_site_info_cache_permanent_v2026");
+          window.dispatchEvent(new CustomEvent("axon_pages_studio_updated"));
+          window.dispatchEvent(new CustomEvent("theme_builder_updated"));
+        }
+        setFeedback({
+          type: "success",
+          text: "✓ طراحی و چیدمان بلوک‌های صفحات با موفقیت در دیتابیس ذخیره و به صورت زنده در سایت منتشر شد!",
+        });
+      } else {
+        setFeedback({
+          type: "error",
+          text: "خطا در ذخیره بلوک‌های صفحات.",
+        });
       }
     } catch {
+      setFeedback({
+        type: "error",
+        text: "خطا در ارتباط با سرور.",
+      });
     } finally {
       setSaving(false);
+      setTimeout(() => setFeedback(null), 4500);
     }
   };
 
@@ -220,8 +283,15 @@ export default function ProPageDesignStudio() {
       </div>
 
       {feedback && (
-        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-black">
-          {feedback}
+        <div
+          className={
+            "p-3.5 rounded-2xl font-black animate-fadeIn " +
+            (feedback.type === "success"
+              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400"
+              : "bg-rose-500/15 border border-rose-500/30 text-rose-400")
+          }
+        >
+          {feedback.text}
         </div>
       )}
 
@@ -235,79 +305,113 @@ export default function ProPageDesignStudio() {
           { route: "/about", label: "ℹ️ صفحه درباره ما (/about)" },
           { route: "/contact", label: "📞 صفحه تماس با ما (/contact)" },
           { route: "all", label: "🌐 نمایش در تمام صفحات سایت" },
-        ].map((r) => (
-          <button
-            key={r.route}
-            type="button"
-            onClick={() => {
-              soundEngine.playClick();
-              setSelectedRoute(r.route);
-              setEditingId(null);
-            }}
-            className={
-              "px-3.5 py-2 rounded-2xl border font-black cursor-pointer transition " +
-              (selectedRoute === r.route
-                ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-lg"
-                : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)]")
-            }
-          >
-            {r.label}
-          </button>
-        ))}
+        ].map((r) => {
+          const countInRoute = sections.filter((s) => s.targetRoute === r.route).length;
+          return (
+            <button
+              key={r.route}
+              type="button"
+              onClick={() => {
+                soundEngine.playClick();
+                setSelectedRoute(r.route);
+                setEditingId(null);
+              }}
+              className={
+                "px-3.5 py-2 rounded-2xl border font-black cursor-pointer transition flex items-center gap-1.5 " +
+                (selectedRoute === r.route
+                  ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-lg"
+                  : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]")
+              }
+            >
+              <span>{r.label}</span>
+              {countInRoute > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-black/20 font-mono text-[10px]">
+                  {countInRoute}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
         <div className="font-black text-[var(--accent-blue)]">
           ➕ افزودن بلوک جدید به صفحه انتخاب‌شده ({selectedRoute}):
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-          {(Object.keys(BLOCK_TEMPLATES) as Array<CustomPageSection["type"]>).map(
-            (typeKey) => (
-              <button
-                key={typeKey}
-                type="button"
-                onClick={() => handleAddBlock(typeKey)}
-                className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-right font-bold cursor-pointer transition flex items-center justify-between gap-2"
-              >
-                <span className="truncate">{BLOCK_TEMPLATES[typeKey].label}</span>
-                <span className="text-[var(--accent-blue)] font-black">+</span>
-              </button>
-            )
-          )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          {(Object.keys(BLOCK_TEMPLATES) as Array<CustomPageSection["type"]>).map((typeKey) => (
+            <button
+              key={typeKey}
+              type="button"
+              onClick={() => handleAddBlock(typeKey)}
+              className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-right font-bold cursor-pointer transition flex items-center justify-between gap-2"
+            >
+              <span className="truncate">{BLOCK_TEMPLATES[typeKey].label}</span>
+              <span className="text-[var(--accent-blue)] font-black text-sm shrink-0">+</span>
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-5">
+      {/* چیدمان استاندارد ۱۲ ستونی: ۵ ستون لیست بلوک‌های فعال و ۷ ستون پنل ویرایش جزئیات */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         <div className="lg:col-span-5 space-y-2.5">
           <div className="font-black text-[var(--text-secondary)]">
             🧱 بلوک‌های فعال در مسیر «{selectedRoute}» ({routeSections.length} بلوک):
           </div>
           {routeSections.length === 0 ? (
-            <div className="p-6 rounded-2xl bg-[var(--input-bg)] border border-dashed border-[var(--card-border)] text-center text-[var(--text-secondary)]">
+            <div className="p-8 rounded-2xl bg-[var(--input-bg)] border border-dashed border-[var(--card-border)] text-center text-[var(--text-secondary)] font-bold">
               هنوز بلوکی به این صفحه اضافه نشده است. از دکمه‌های بالا یک بلوک انتخاب کنید.
             </div>
           ) : (
             routeSections.map((sec, idx) => (
               <div
                 key={sec.id}
-                onClick={() => setEditingId(sec.id)}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setEditingId(sec.id);
+                }}
                 className={
                   "p-3.5 rounded-2xl border cursor-pointer transition flex items-center justify-between gap-2 " +
                   (editingId === sec.id
-                    ? "bg-[var(--accent-blue)]/15 border-[var(--accent-blue)]"
-                    : "bg-[var(--input-bg)] border-[var(--card-border)]")
+                    ? "bg-[var(--accent-blue)]/15 border-[var(--accent-blue)] shadow-md"
+                    : "bg-[var(--input-bg)] border-[var(--card-border)] hover:border-[var(--accent-blue)]/50")
                 }
               >
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="font-black truncate">
                     {idx + 1}. {sec.title}
                   </div>
-                  <div className="text-[10px] text-[var(--text-secondary)]">
+                  <div className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">
                     {BLOCK_TEMPLATES[sec.type]?.label} | جایگاه:{" "}
-                    {sec.position === "top" ? "بالای صفحه" : "پایین صفحه"}
+                    {sec.position === "top" ? "⬆️ بالای صفحه" : "⬇️ پایین صفحه"}
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    disabled={idx === 0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMoveBlockInRoute(sec.id, "up");
+                    }}
+                    className="px-2 py-1 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer"
+                    title="انتقال به بالا"
+                  >
+                    ⬆️
+                  </button>
+                  <button
+                    type="button"
+                    disabled={idx === routeSections.length - 1}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMoveBlockInRoute(sec.id, "down");
+                    }}
+                    className="px-2 py-1 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer"
+                    title="انتقال به پایین"
+                  >
+                    ⬇️
+                  </button>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -321,7 +425,7 @@ export default function ProPageDesignStudio() {
                         : "bg-slate-500/20 text-slate-400")
                     }
                   >
-                    {sec.enabled ? "فعال" : "مخفی"}
+                    {sec.enabled ? "فعال ✓" : "مخفی"}
                   </button>
                   <button
                     type="button"
@@ -329,7 +433,7 @@ export default function ProPageDesignStudio() {
                       e.stopPropagation();
                       handleDeleteBlock(sec.id);
                     }}
-                    className="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-400 text-[10px] font-black cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white text-[10px] font-black cursor-pointer transition"
                   >
                     حذف
                   </button>
@@ -350,71 +454,114 @@ export default function ProPageDesignStudio() {
                   <span>استایل شیشه‌ای (Liquid Glass)</span>
                   <input
                     type="checkbox"
-                    checked={activeBlock.glassStyle}
+                    checked={Boolean(activeBlock.glassStyle)}
                     onChange={(e) =>
                       handleUpdateBlock(activeBlock.id, {
                         glassStyle: e.target.checked,
                       })
                     }
-                    className="w-4 h-4 accent-sky-500"
+                    className="w-4 h-4 accent-sky-500 cursor-pointer"
                   />
                 </label>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block mb-1 font-bold">عنوان اصلی بلوک:</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                    عنوان اصلی بلوک:
+                  </label>
                   <input
                     type="text"
                     value={activeBlock.title}
                     onChange={(e) =>
                       handleUpdateBlock(activeBlock.id, { title: e.target.value })
                     }
-                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
                   />
                 </div>
                 <div>
-                  <label className="block mb-1 font-bold">بج بالای عنوان (Badge):</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                    بج بالای عنوان (Badge):
+                  </label>
                   <input
                     type="text"
                     value={activeBlock.badgeText || ""}
                     onChange={(e) =>
                       handleUpdateBlock(activeBlock.id, { badgeText: e.target.value })
                     }
-                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block mb-1 font-bold">زیرعنوان / توضیحات بلوک:</label>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  زیرعنوان / توضیحات بلوک:
+                </label>
                 <textarea
                   rows={2}
                   value={activeBlock.subtitle}
                   onChange={(e) =>
                     handleUpdateBlock(activeBlock.id, { subtitle: e.target.value })
                   }
-                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none"
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] leading-relaxed"
                 />
               </div>
 
-              {activeBlock.type === "product_showcase" && (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3 p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
-                  <div>
-                    <label className="block mb-1 font-bold">فیلتر دسته‌بندی محصولات:</label>
+              {/* تصویر اختیاری برای بلوک‌های بنری و فراخوان */}
+              {(activeBlock.type === "hero_banner" ||
+                activeBlock.type === "countdown_offer" ||
+                activeBlock.type === "glass_callout") && (
+                <div className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
+                  <label className="block font-bold text-[var(--text-secondary)]">
+                    🖼️ تصویر یا بنر پس‌زمینه بلوک (اختیاری):
+                  </label>
+                  <div className="flex gap-2">
                     <input
                       type="text"
+                      dir="ltr"
+                      value={activeBlock.mediaUrl || ""}
+                      onChange={(e) =>
+                        handleUpdateBlock(activeBlock.id, { mediaUrl: e.target.value })
+                      }
+                      placeholder="https://..."
+                      className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsMediaModalOpen(true)}
+                      className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-black cursor-pointer shrink-0"
+                    >
+                      ☁️ آپلود تصویر
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {activeBlock.type === "product_showcase" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
+                  <div>
+                    <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                      فیلتر دسته‌بندی محصولات:
+                    </label>
+                    <select
                       value={activeBlock.categoryFilter || "all"}
                       onChange={(e) =>
                         handleUpdateBlock(activeBlock.id, { categoryFilter: e.target.value })
                       }
-                      placeholder="all یا نام دسته (مثلاً اتوبخار)"
-                      className="w-full p-2 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] outline-none"
-                    />
+                      className="w-full p-2.5 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+                    >
+                      <option value="all">🌟 نمایش از تمام دسته‌بندی‌ها (all)</option>
+                      {categories.map((catName) => (
+                        <option key={catName} value={catName}>
+                          📁 فقط دسته: {catName}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="flex items-end">
-                    <label className="w-full p-2 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between cursor-pointer font-bold">
-                      <span>فقط نمایش کالاهای تخفیف‌دار</span>
+                    <label className="w-full p-2.5 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between cursor-pointer font-bold">
+                      <span>🔥 فقط نمایش کالاهای تخفیف‌دار</span>
                       <input
                         type="checkbox"
                         checked={Boolean(activeBlock.onlyDiscounted)}
@@ -423,7 +570,7 @@ export default function ProPageDesignStudio() {
                             onlyDiscounted: e.target.checked,
                           })
                         }
-                        className="w-4 h-4 accent-sky-500"
+                        className="w-4 h-4 accent-sky-500 cursor-pointer"
                       />
                     </label>
                   </div>
@@ -432,7 +579,9 @@ export default function ProPageDesignStudio() {
 
               {activeBlock.type === "custom_html" && (
                 <div>
-                  <label className="block mb-1 font-bold">کد سفارشی HTML / Tailwind:</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                    کد سفارشی HTML / Tailwind:
+                  </label>
                   <textarea
                     rows={4}
                     dir="ltr"
@@ -458,23 +607,39 @@ export default function ProPageDesignStudio() {
                       onClick={() => {
                         const nextItems = [
                           ...(activeBlock.items || []),
-                          { title: "عنوان آیتم جدید", desc: "توضیحات این آیتم...", badge: "VIP", icon: "✨" },
+                          {
+                            title: "عنوان آیتم جدید",
+                            desc: "توضیحات این آیتم...",
+                            badge: "VIP",
+                            icon: "✨",
+                          },
                         ];
                         handleUpdateBlock(activeBlock.id, { items: nextItems });
                       }}
-                      className="px-3 py-1 rounded-lg bg-emerald-600 text-white font-black text-[10px] cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] cursor-pointer transition"
                     >
                       + افزودن آیتم جدید
                     </button>
                   </div>
 
-                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                     {(activeBlock.items || []).map((it, idx) => (
                       <div
                         key={idx}
                         className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2"
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="text"
+                            value={it.icon || ""}
+                            onChange={(e) => {
+                              const copy = [...(activeBlock.items || [])];
+                              copy[idx] = { ...copy[idx], icon: e.target.value };
+                              handleUpdateBlock(activeBlock.id, { items: copy });
+                            }}
+                            placeholder="آیکون"
+                            className="w-12 p-1.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] text-center outline-none"
+                          />
                           <input
                             type="text"
                             value={it.title}
@@ -484,7 +649,18 @@ export default function ProPageDesignStudio() {
                               handleUpdateBlock(activeBlock.id, { items: copy });
                             }}
                             placeholder="عنوان آیتم"
-                            className="flex-1 p-1.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
+                            className="flex-1 min-w-[140px] p-1.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
+                          />
+                          <input
+                            type="text"
+                            value={it.badge || ""}
+                            onChange={(e) => {
+                              const copy = [...(activeBlock.items || [])];
+                              copy[idx] = { ...copy[idx], badge: e.target.value };
+                              handleUpdateBlock(activeBlock.id, { items: copy });
+                            }}
+                            placeholder="بج (Badge)"
+                            className="w-28 p-1.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] outline-none"
                           />
                           <button
                             type="button"
@@ -492,7 +668,7 @@ export default function ProPageDesignStudio() {
                               const copy = (activeBlock.items || []).filter((_, i) => i !== idx);
                               handleUpdateBlock(activeBlock.id, { items: copy });
                             }}
-                            className="px-2 py-1 rounded-lg bg-rose-500/20 text-rose-400 font-bold cursor-pointer"
+                            className="px-2.5 py-1.5 rounded-lg bg-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white font-bold cursor-pointer transition"
                           >
                             ✕
                           </button>
@@ -514,9 +690,11 @@ export default function ProPageDesignStudio() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block mb-1 font-bold">متن دکمه (CTA):</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                    متن دکمه (CTA):
+                  </label>
                   <input
                     type="text"
                     value={activeBlock.ctaText || ""}
@@ -527,7 +705,9 @@ export default function ProPageDesignStudio() {
                   />
                 </div>
                 <div>
-                  <label className="block mb-1 font-bold">لینک دکمه:</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                    لینک دکمه:
+                  </label>
                   <input
                     type="text"
                     dir="ltr"
@@ -539,7 +719,9 @@ export default function ProPageDesignStudio() {
                   />
                 </div>
                 <div>
-                  <label className="block mb-1 font-bold">محل نمایش در صفحه:</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                    محل نمایش در صفحه:
+                  </label>
                   <select
                     value={activeBlock.position}
                     onChange={(e) =>
@@ -554,14 +736,47 @@ export default function ProPageDesignStudio() {
                   </select>
                 </div>
               </div>
+
+              <div className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-between gap-4">
+                <span className="font-bold text-[var(--text-secondary)] shrink-0">
+                  ↕️ فاصله عمودی بلوک (Padding Y):{" "}
+                  <strong className="font-mono text-[var(--accent-blue)]">
+                    {activeBlock.paddingY ?? 28}px
+                  </strong>
+                </span>
+                <input
+                  type="range"
+                  min={8}
+                  max={72}
+                  step={4}
+                  value={activeBlock.paddingY ?? 28}
+                  onChange={(e) =>
+                    handleUpdateBlock(activeBlock.id, { paddingY: Number(e.target.value) })
+                  }
+                  className="w-48 accent-[var(--accent-blue)] cursor-pointer"
+                />
+              </div>
             </div>
           ) : (
-            <div className="h-full min-h-[180px] p-6 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-[var(--text-secondary)] font-bold">
+            <div className="h-full min-h-[190px] p-6 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-[var(--text-secondary)] font-bold text-center">
               روی یکی از بلوک‌های سمت راست کلیک کنید تا جزئیات کامل آن را ویرایش نمایید.
             </div>
           )}
         </div>
       </div>
+
+      <MediaUploadModal
+        isOpen={isMediaModalOpen}
+        bucket="banners"
+        title="انتخاب تصویر برای بلوک صفحه"
+        currentValue={activeBlock?.mediaUrl || ""}
+        onClose={() => setIsMediaModalOpen(false)}
+        onUploadSuccess={(url) => {
+          if (activeBlock) {
+            handleUpdateBlock(activeBlock.id, { mediaUrl: url });
+          }
+        }}
+      />
     </div>
   );
 }

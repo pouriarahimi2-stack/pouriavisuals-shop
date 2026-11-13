@@ -1,6 +1,6 @@
 // File Path: components/admin/AdminModularPages.tsx
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Puck, Data } from "@measured/puck";
 import "@measured/puck/puck.css";
 import { puckConfig } from "@/lib/puckConfig";
@@ -19,11 +19,13 @@ const CORE_DEFAULT_PAGES = [
   { id: "core_contact", slug: "contact", title: "تماس و پشتیبانی" },
 ];
 
+const CORE_SLUGS_SET = new Set(CORE_DEFAULT_PAGES.map((p) => p.slug));
+
 const DEFAULT_GLOBAL_HEADER = {
   type: "HeaderCapsuleBar",
   props: {
     id: "global-header-core",
-    brandText: "Axon | آکسون",
+    brandText: "آکسون کور | Axon Core",
     logoUrl: "",
     logoWidth: 36,
     logoHeight: 36,
@@ -50,7 +52,7 @@ const DEFAULT_GLOBAL_FOOTER = {
   props: {
     id: "global-footer-core",
     footerLogoUrl: "",
-    brandTitle: "Axon | آکسون",
+    brandTitle: "آکسون کور | Axon Core",
     brandSubtitle: "مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال",
     brandDesc: "",
     supportPhone: "09376110200",
@@ -58,7 +60,7 @@ const DEFAULT_GLOBAL_FOOTER = {
     warehouseAddress: "شیراز - ستارخان",
     workingHours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
     enamadCode: "7434404",
-    copyrightText: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026",
+    copyrightText: "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026",
     footerBg: "#07090e",
   },
 };
@@ -144,29 +146,87 @@ export default function AdminModularPages() {
   // مودال ساخت ۱-کلیکی لندینگ‌پیج تبلیغاتی متصل به محصول
   const [showCampaignModal, setShowCampaignModal] = useState(false);
   const [campaignTitle, setCampaignTitle] = useState("جشنواره فروش ویژه با ارسال رایگان");
-  const [campaignSlug, setCampaignSlug] = useState("offer-" + Math.floor(100 + Math.random() * 900));
+  const [campaignSlug, setCampaignSlug] = useState(
+    "offer-" + Math.floor(100 + Math.random() * 900)
+  );
   const [campaignBadge, setCampaignBadge] = useState("🔥 تخفیف محدود ویژه کمپین تبلیغاتی");
   const [campaignProductId, setCampaignProductId] = useState("");
   const [campaignCouponCode, setCampaignCouponCode] = useState("VIP15");
 
-  const getGlobalHeaderFooter = () => {
+  const getGlobalHeaderFooter = async () => {
+    let headerBlock = JSON.parse(JSON.stringify(DEFAULT_GLOBAL_HEADER));
+    let footerBlock = JSON.parse(JSON.stringify(DEFAULT_GLOBAL_FOOTER));
+
     if (typeof window !== "undefined") {
       try {
         const stored = localStorage.getItem(GLOBAL_NAV_KEY);
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (parsed.header && parsed.footer) return parsed;
+          if (parsed.header) headerBlock = parsed.header;
+          if (parsed.footer) footerBlock = parsed.footer;
         }
       } catch {}
     }
-    return { header: DEFAULT_GLOBAL_HEADER, footer: DEFAULT_GLOBAL_FOOTER };
+
+    // همگام‌سازی زنده با تنظیمات واقعی هدر، فوتر و منوها از دیتابیس
+    try {
+      const tbRes = await fetch("/api/theme-builder?t=" + Date.now(), { cache: "no-store" });
+      if (tbRes.ok) {
+        const tbJson = await tbRes.json();
+        const cfg = tbJson?.config;
+        if (cfg) {
+          const gh = cfg.globalHeader || {};
+          const gf = cfg.globalFooter || {};
+          const nav = Array.isArray(cfg.navigation_menu)
+            ? cfg.navigation_menu.filter((m: any) => m.is_active !== false)
+            : [];
+
+          headerBlock.props = {
+            ...headerBlock.props,
+            brandText: gh.brandName !== undefined ? gh.brandName : headerBlock.props.brandText,
+            logoUrl: gh.logoUrl !== undefined ? gh.logoUrl : headerBlock.props.logoUrl,
+            logoWidth: Number(gh.logoWidth || headerBlock.props.logoWidth || 40),
+            logoHeight: Number(gh.logoHeight || headerBlock.props.logoHeight || 40),
+            menu1Text: nav[0]?.title || headerBlock.props.menu1Text,
+            menu1Url: nav[0]?.url || headerBlock.props.menu1Url,
+            menu2Text: nav[1]?.title || headerBlock.props.menu2Text,
+            menu2Url: nav[1]?.url || headerBlock.props.menu2Url,
+            menu3Text: nav[2]?.title || headerBlock.props.menu3Text,
+            menu3Url: nav[2]?.url || headerBlock.props.menu3Url,
+            menu4Text: nav[3]?.title || headerBlock.props.menu4Text,
+            menu4Url: nav[3]?.url || headerBlock.props.menu4Url,
+            menu5Text: nav[4]?.title || headerBlock.props.menu5Text,
+            menu5Url: nav[4]?.url || headerBlock.props.menu5Url,
+          };
+
+          footerBlock.props = {
+            ...footerBlock.props,
+            footerLogoUrl:
+              gf.footerLogoUrl !== undefined ? gf.footerLogoUrl : footerBlock.props.footerLogoUrl,
+            brandTitle: gf.brandTitle !== undefined ? gf.brandTitle : footerBlock.props.brandTitle,
+            brandSubtitle:
+              gf.brandSubtitle !== undefined ? gf.brandSubtitle : footerBlock.props.brandSubtitle,
+            brandDesc:
+              gf.brandDescription !== undefined ? gf.brandDescription : footerBlock.props.brandDesc,
+            supportPhone: gf.supportPhone || footerBlock.props.supportPhone,
+            supportEmail: gf.supportEmail || footerBlock.props.supportEmail,
+            warehouseAddress: gf.warehouseAddress || footerBlock.props.warehouseAddress,
+            workingHours: gf.workingHours || footerBlock.props.workingHours,
+            enamadCode: gf.enamadCode !== undefined ? gf.enamadCode : footerBlock.props.enamadCode,
+            copyrightText: gf.copyright || footerBlock.props.copyrightText,
+          };
+        }
+      }
+    } catch {}
+
+    return { header: headerBlock, footer: footerBlock };
   };
 
-  const fetchPagesAndProducts = async () => {
+  const fetchPagesAndProducts = useCallback(async () => {
     try {
       const [res, pRes] = await Promise.all([
-        fetch("/api/pages", { cache: "no-store" }).catch(() => null),
-        fetch("/api/products", { cache: "no-store" }).catch(() => null),
+        fetch("/api/pages?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
+        fetch("/api/products?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
       ]);
       if (res && res.ok) {
         const json = await res.json();
@@ -199,16 +259,37 @@ export default function AdminModularPages() {
         }
       }
     } catch {}
-  };
+  }, [campaignProductId]);
 
-  const loadPage = async (slug: string, customTitle?: string) => {
+  const loadPage = useCallback(async (slug: string, customTitle?: string) => {
     setCurrentSlug(slug);
     setLoading(true);
     soundEngine.playClick();
-    const { header: currentGlobalHeader, footer: currentGlobalFooter } = getGlobalHeaderFooter();
+    const { header: currentGlobalHeader, footer: currentGlobalFooter } =
+      await getGlobalHeaderFooter();
     let targetData: Data | null = null;
 
-    if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/pages?slug=" + encodeURIComponent(slug) + "&t=" + Date.now(), {
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (
+        json.success &&
+        json.page &&
+        json.page.puck_data &&
+        Array.isArray(json.page.puck_data.content)
+      ) {
+        targetData = json.page.puck_data;
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem(STORAGE_PREFIX + slug, JSON.stringify(targetData));
+          } catch {}
+        }
+      }
+    } catch {}
+
+    if (!targetData && typeof window !== "undefined") {
       try {
         const local = localStorage.getItem(STORAGE_PREFIX + slug);
         if (local) {
@@ -219,22 +300,6 @@ export default function AdminModularPages() {
         }
       } catch {}
     }
-
-    try {
-      const res = await fetch("/api/pages?slug=" + encodeURIComponent(slug), { cache: "no-store" });
-      const json = await res.json();
-      if (
-        json.success &&
-        json.page &&
-        json.page.puck_data &&
-        Array.isArray(json.page.puck_data.content)
-      ) {
-        targetData = json.page.puck_data;
-        if (typeof window !== "undefined") {
-          localStorage.setItem(STORAGE_PREFIX + slug, JSON.stringify(targetData));
-        }
-      }
-    } catch {}
 
     let bodyBlocks = targetData?.content
       ? targetData.content.filter(
@@ -257,7 +322,7 @@ export default function AdminModularPages() {
     setPageData(mergedData);
     setRenderKey(slug + "_" + Date.now());
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     fetchPagesAndProducts();
@@ -271,7 +336,7 @@ export default function AdminModularPages() {
     return () => {
       supabase.removeChannel(ch);
     };
-  }, []);
+  }, [fetchPagesAndProducts, loadPage]);
 
   const handleSave = async (data: Data) => {
     soundEngine.playClick();
@@ -301,26 +366,69 @@ export default function AdminModularPages() {
     try {
       const currentPageObj = pages.find((p) => p.slug === currentSlug);
       const pageTitle = currentPageObj?.title || currentSlug;
-      await fetch("/api/pages", {
+      const res = await fetch("/api/pages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: currentPageObj?.id,
           slug: currentSlug,
           title: pageTitle,
           puck_data: sanitizedData,
           is_published: true,
         }),
       });
-      soundEngine.playSuccess();
-      setToast("✓ صفحه «/" + (currentSlug === "home" ? "" : currentSlug) + "» با موفقیت در دیتابیس ذخیره و منتشر شد.");
+      if (res.ok) {
+        soundEngine.playSuccess();
+        setToast(
+          "✓ صفحه «/" +
+            (currentSlug === "home" ? "" : currentSlug) +
+            "» با موفقیت در دیتابیس ذخیره و منتشر شد."
+        );
+        fetchPagesAndProducts();
+      } else {
+        setToast("خطا در ذخیره‌سازی صفحه.");
+      }
     } catch {
-      setToast("خطا در ذخیره‌سازی.");
+      setToast("خطا در ارتباط با سرور.");
     } finally {
       setTimeout(() => setToast(null), 3500);
     }
   };
 
-  const handleCreateNewPage = (e: React.FormEvent) => {
+  const handleDeleteCurrentPage = async () => {
+    if (CORE_SLUGS_SET.has(currentSlug)) return;
+    const currentPageObj = pages.find((p) => p.slug === currentSlug);
+    if (
+      !confirm(
+        `آیا از حذف صفحه سفارشی «${currentPageObj?.title || currentSlug}» اطمینان دارید؟`
+      )
+    ) {
+      return;
+    }
+
+    soundEngine.playClick();
+    try {
+      const res = await fetch(
+        `/api/pages?slug=${encodeURIComponent(currentSlug)}&id=${encodeURIComponent(
+          currentPageObj?.id || ""
+        )}`,
+        { method: "DELETE" }
+      );
+      if (res.ok) {
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.removeItem(STORAGE_PREFIX + currentSlug);
+          } catch {}
+        }
+        soundEngine.playSuccess();
+        setToast("✓ صفحه سفارشی با موفقیت حذف شد.");
+        setPages((prev) => prev.filter((p) => p.slug !== currentSlug));
+        loadPage("home");
+      }
+    } catch {}
+  };
+
+  const handleCreateNewPage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPageTitle.trim() || !newPageSlug.trim()) return;
     soundEngine.playSuccess();
@@ -330,11 +438,14 @@ export default function AdminModularPages() {
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9-]/g, "");
     const title = newPageTitle.trim();
-    setPages((prev) => [...prev, { id: "page_" + Date.now(), slug: cleanSlug, title }]);
+    setPages((prev) => [
+      ...prev.filter((p) => p.slug !== cleanSlug),
+      { id: "page_" + Date.now(), slug: cleanSlug, title },
+    ]);
     setShowNewPageModal(false);
     setNewPageTitle("");
     setNewPageSlug("");
-    loadPage(cleanSlug, title);
+    await loadPage(cleanSlug, title);
   };
 
   const handleGenerateCampaignLandingPage = async (e: React.FormEvent) => {
@@ -348,8 +459,11 @@ export default function AdminModularPages() {
 
     const selProd = products.find((p) => p.id === campaignProductId) || products[0];
     const prodName = selProd ? selProd.title : "محصول ویژه آکسون کور";
-    const prodPrice = selProd ? selProd.price.toLocaleString("fa-IR") + " تومان" : "قیمت ویژه جشنواره";
-    const { header: currentGlobalHeader, footer: currentGlobalFooter } = getGlobalHeaderFooter();
+    const prodPrice = selProd
+      ? selProd.price.toLocaleString("fa-IR") + " تومان"
+      : "قیمت ویژه جشنواره";
+    const { header: currentGlobalHeader, footer: currentGlobalFooter } =
+      await getGlobalHeaderFooter();
 
     const campaignData: Data = {
       content: [
@@ -411,7 +525,9 @@ export default function AdminModularPages() {
         }),
       });
       if (typeof window !== "undefined") {
-        localStorage.setItem(STORAGE_PREFIX + cleanSlug, JSON.stringify(campaignData));
+        try {
+          localStorage.setItem(STORAGE_PREFIX + cleanSlug, JSON.stringify(campaignData));
+        } catch {}
       }
       setPages((prev) => [
         ...prev.filter((x) => x.slug !== cleanSlug),
@@ -479,6 +595,17 @@ export default function AdminModularPages() {
             <span>➕</span>
             <span>صفحه جدید</span>
           </button>
+
+          {!CORE_SLUGS_SET.has(currentSlug) && (
+            <button
+              type="button"
+              onClick={handleDeleteCurrentPage}
+              className="px-3 py-2.5 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white text-xs font-black cursor-pointer transition"
+              title="حذف این صفحه سفارشی"
+            >
+              🗑️ حذف صفحه
+            </button>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -488,7 +615,9 @@ export default function AdminModularPages() {
               onClick={() => setViewportMode("desktop")}
               className={
                 "px-2.5 py-1.5 rounded-lg transition cursor-pointer " +
-                (viewportMode === "desktop" ? "bg-[var(--accent-blue)] text-white" : "text-slate-400")
+                (viewportMode === "desktop"
+                  ? "bg-[var(--accent-blue)] text-white"
+                  : "text-slate-400")
               }
             >
               🖥️ دسکتاپ
@@ -498,7 +627,9 @@ export default function AdminModularPages() {
               onClick={() => setViewportMode("mobile")}
               className={
                 "px-2.5 py-1.5 rounded-lg transition cursor-pointer " +
-                (viewportMode === "mobile" ? "bg-[var(--accent-blue)] text-white" : "text-slate-400")
+                (viewportMode === "mobile"
+                  ? "bg-[var(--accent-blue)] text-white"
+                  : "text-slate-400")
               }
             >
               📱 موبایل
@@ -508,7 +639,9 @@ export default function AdminModularPages() {
               onClick={() => setViewportMode("tablet")}
               className={
                 "px-2.5 py-1.5 rounded-lg transition cursor-pointer " +
-                (viewportMode === "tablet" ? "bg-[var(--accent-blue)] text-white" : "text-slate-400")
+                (viewportMode === "tablet"
+                  ? "bg-[var(--accent-blue)] text-white"
+                  : "text-slate-400")
               }
             >
               📟 تبلت
@@ -536,6 +669,9 @@ export default function AdminModularPages() {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn font-sans"
           dir="rtl"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowCampaignModal(false);
+          }}
         >
           <div className="max-w-lg w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 shadow-2xl text-[var(--text-primary)] text-xs">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
@@ -579,10 +715,21 @@ export default function AdminModularPages() {
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-emerald-500"
                 />
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  ۳. بج بالای هیرو (Badge):
+                </label>
+                <input
+                  type="text"
+                  value={campaignBadge}
+                  onChange={(e) => setCampaignBadge(e.target.value)}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                    ۳. آدرس اختصاصی لندینگ‌پیج (Slug) *:
+                    ۴. آدرس اختصاصی لندینگ‌پیج (Slug) *:
                   </label>
                   <input
                     type="text"
@@ -596,7 +743,7 @@ export default function AdminModularPages() {
                 </div>
                 <div>
                   <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                    ۴. کد تخفیف نمایشی در لندینگ:
+                    ۵. کد تخفیف نمایشی در لندینگ:
                   </label>
                   <input
                     type="text"
@@ -631,6 +778,9 @@ export default function AdminModularPages() {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn font-sans"
           dir="rtl"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowNewPageModal(false);
+          }}
         >
           <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 shadow-2xl text-[var(--text-primary)]">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
@@ -640,7 +790,7 @@ export default function AdminModularPages() {
               <button
                 type="button"
                 onClick={() => setShowNewPageModal(false)}
-                className="w-7 h-7 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold"
+                className="w-7 h-7 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -677,7 +827,7 @@ export default function AdminModularPages() {
                 <button
                   type="button"
                   onClick={() => setShowNewPageModal(false)}
-                  className="px-4 py-2 rounded-xl bg-[var(--input-bg)] text-xs font-bold"
+                  className="px-4 py-2 rounded-xl bg-[var(--input-bg)] text-xs font-bold cursor-pointer"
                 >
                   انصراف
                 </button>

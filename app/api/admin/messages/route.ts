@@ -1,7 +1,9 @@
+// File Path: app/api/admin/messages/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/authSecurityHelper";
 import { sendTextSMS } from "@/lib/otpService";
+import { smsService } from "@/services/smsService";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +30,16 @@ export async function GET(req: NextRequest) {
     if (!auth.ok) return auth.res;
 
     const [m1, m2] = await Promise.all([
-      supabaseAdmin.from("messages").select("*").order("created_at", { ascending: false }).limit(100),
-      supabaseAdmin.from("contact_messages").select("*").order("created_at", { ascending: false }).limit(100),
+      supabaseAdmin
+        .from("messages")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100),
+      supabaseAdmin
+        .from("contact_messages")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100),
     ]);
 
     const list1 = (m1.data || []).map((x: any) => normalizeMessage(x, "messages"));
@@ -43,14 +53,17 @@ export async function GET(req: NextRequest) {
     const allMessages = Array.from(combinedMap.values()).sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
-    const unreadCount = allMessages.filter((x) => !x.is_read).length;
+    const unreadCount = allMessages.filter((x) => !x.is_read || x.status === "pending").length;
 
-    return NextResponse.json({
-      success: true,
-      messages: allMessages,
-      data: allMessages,
-      unread: unreadCount,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        messages: allMessages,
+        data: allMessages,
+        unread: unreadCount,
+      },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -62,39 +75,53 @@ export async function PATCH(req: NextRequest) {
     if (!auth.ok) return auth.res;
 
     const body = await req.json();
-    const { id, is_read, reply, admin_reply, message, phone } = body;
+    const { id, is_read, reply, admin_reply, message, phone, status } = body;
 
     if (!id) {
-      return NextResponse.json({ success: false, message: "شناسه پیام الزامی است." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "شناسه پیام الزامی است." },
+        { status: 400 }
+      );
     }
 
     const finalReply = reply !== undefined ? reply : admin_reply;
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
     if (is_read !== undefined) updates.is_read = Boolean(is_read);
-    if (finalReply !== undefined) updates.admin_reply = finalReply;
+    if (finalReply !== undefined) {
+      updates.admin_reply = finalReply;
+      updates.is_read = true;
+    }
     if (message !== undefined) updates.message = message;
 
-    await Promise.all([
-      supabaseAdmin.from("messages").update(updates).eq("id", id),
+    const [res1, res2] = await Promise.all([
+      supabaseAdmin.from("messages").update(updates).eq("id", id).select().maybeSingle(),
       supabaseAdmin
         .from("contact_messages")
         .update({
           ...updates,
-          ...(finalReply ? { status: "answered" } : {}),
+          status: status || (finalReply ? "answered" : undefined),
         })
-        .eq("id", id),
+        .eq("id", id)
+        .select()
+        .maybeSingle(),
     ]);
 
-    // اگر پاسخ ثبت شد و شماره موبایل وجود داشت، پیامک اطلاع‌رسانی ارسال شود
-    if (finalReply && phone) {
-      const cleanPhone = String(phone).replace(/\D/g, "");
+    const targetPhone = phone || res2?.data?.phone || res1?.data?.phone || "";
+
+    if (finalReply && targetPhone) {
+      const cleanPhone = String(targetPhone).replace(/\D/g, "");
       if (cleanPhone.length === 11) {
+        const smsText =
+          "پاسخ تیکت شما در فروشگاه آکسون کور ثبت شد: " +
+          String(finalReply).slice(0, 120) +
+          " | axoncore.ir";
         try {
-          await sendTextSMS(
-            cleanPhone,
-            "پاسخ تیکت شما در فروشگاه آکسون ثبت شد: " + String(finalReply).slice(0, 120) + " | axoncore.ir"
-          );
-        } catch {}
+          await smsService.sendSMS(cleanPhone, smsText);
+        } catch {
+          try {
+            await sendTextSMS(cleanPhone, smsText);
+          } catch {}
+        }
       }
     }
 
@@ -123,7 +150,7 @@ export async function DELETE(req: NextRequest) {
       supabaseAdmin.from("messages").delete().eq("id", id),
       supabaseAdmin.from("contact_messages").delete().eq("id", id),
     ]);
-    return NextResponse.json({ success: true, message: "پیام با موفقیت حذف شد." });
+    return NextResponse.json({ success: true, message: "✓ پیام با موفقیت حذف شد." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

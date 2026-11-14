@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { getMasterSiteInfoRow, saveMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
 import { verifyPayload, COOKIE_NAME } from "@/lib/session";
 import { getAllAdminUsers } from "@/lib/adminUsersStorage";
+import { smsService } from "@/services/smsService";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,7 @@ export interface LiveChatNotificationAlert {
 
 const ipRateMap = new Map<string, { count: number; resetAt: number }>();
 
-function checkRateLimit(ip: string, maxReq = 30, windowMs = 60_000): boolean {
+function checkRateLimit(ip: string, maxReq = 40, windowMs = 60_000): boolean {
   const now = Date.now();
   const entry = ipRateMap.get(ip);
   if (!entry || now > entry.resetAt) {
@@ -72,7 +73,7 @@ function generateServerGraphicalCaptcha() {
     code += chars[crypto.randomInt(0, chars.length)];
   }
 
-  const expiresAt = Date.now() + 3 * 60 * 1000;
+  const expiresAt = Date.now() + 5 * 60 * 1000;
   const nonce = crypto.randomBytes(8).toString("hex");
   const payload = `${code.toUpperCase()}:${expiresAt}:${nonce}`;
   const sig = crypto.createHmac("sha256", CHAT_SECRET).update(payload).digest("hex");
@@ -176,6 +177,7 @@ function sanitizeText(raw: string, maxLen = 1000): string {
 function sanitizeSafeLink(raw: string): string | undefined {
   const clean = String(raw || "").trim();
   if (!clean) return undefined;
+  if (clean.startsWith("/")) return clean.slice(0, 300);
   try {
     const u = new URL(clean);
     if (u.protocol !== "https:" && u.protocol !== "http:") return undefined;
@@ -201,12 +203,27 @@ async function resolveAdminResponder(req: NextRequest) {
     );
     return {
       username: found?.username || sessionAny.username || "admin",
-      fullName: found?.full_name || sessionAny.username || "پشتیبانی آکسون",
+      fullName: found?.full_name || sessionAny.username || "پشتیبانی آکسون کور",
       role: found?.role || sessionAny.role || "superadmin",
     };
   } catch {
     return null;
   }
+}
+
+function normalizeSessionStatus(s: LiveChatLeadSession): LiveChatLeadSession {
+  const msgs = Array.isArray(s.messages) ? s.messages : [];
+  if (msgs.length > 0 && s.status !== "closed") {
+    const lastMsg = msgs[msgs.length - 1];
+    // اگر آخرین پیام بعد از پیام خوش‌آمدگویی از سمت مشتری باشد، وضعیت گفتگو در انتظار پاسخ ("open") است
+    if (lastMsg.senderType === "customer") {
+      return { ...s, status: "open" };
+    }
+    if (lastMsg.senderType === "admin" && !String(lastMsg.id).startsWith("msg_welcome_")) {
+      return { ...s, status: "answered" };
+    }
+  }
+  return s;
 }
 
 export async function GET(req: NextRequest) {
@@ -224,9 +241,10 @@ export async function GET(req: NextRequest) {
 
     const siteRow = await getMasterSiteInfoRow();
     const layoutCfg = siteRow?.homepage_layout_config || {};
-    const sessions: LiveChatLeadSession[] = Array.isArray(layoutCfg.live_chat_sessions)
+    const rawSessions: LiveChatLeadSession[] = Array.isArray(layoutCfg.live_chat_sessions)
       ? layoutCfg.live_chat_sessions
       : [];
+    const sessions = rawSessions.map(normalizeSessionStatus);
     const lastAlert: LiveChatNotificationAlert | null =
       layoutCfg.live_chat_last_alert || null;
 
@@ -240,6 +258,7 @@ export async function GET(req: NextRequest) {
         (acc, s) => acc + Number(s.unreadForAdmin || 0),
         0
       );
+      const waitingReplyCount = sessions.filter((s) => s.status === "open").length;
 
       return NextResponse.json(
         {
@@ -247,6 +266,7 @@ export async function GET(req: NextRequest) {
           canReply: !isViewer,
           shouldNotify: !isViewer,
           totalUnread: isViewer ? 0 : totalUnread,
+          waitingReplyCount,
           lastAlert: isViewer ? null : lastAlert,
           responder: adminUser,
           sessions: sessions.sort(
@@ -281,7 +301,7 @@ export async function POST(req: NextRequest) {
       req.headers.get("x-real-ip") ||
       "127.0.0.1";
 
-    if (!checkRateLimit(ip, 35, 60_000)) {
+    if (!checkRateLimit(ip, 40, 60_000)) {
       return NextResponse.json(
         { success: false, message: "تعداد درخواست‌های شما بیش از حد مجاز است. کمی صبر کنید." },
         { status: 429 }
@@ -298,7 +318,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ۱. شروع مستقیم گفتگوی زنده فقط با ثبت نام + شماره موبایل + وریفای کپچای گرافیکی سرور (بدون OTP)
+    // ۱. شروع مستقیم گفتگوی زنده با نام + شماره موبایل + کپچای گرافیکی سرور
     if (action === "start_chat" || action === "request_otp") {
       const fullName = sanitizeText(body.fullName, 60);
       const phone = String(body.phone || "")
@@ -361,7 +381,7 @@ export async function POST(req: NextRequest) {
           fullName,
           phone,
           verified: true,
-          leadCategory: "مخاطب ثبت‌شده گفتگوی زنده (سرنخ فروش / Lead)",
+          leadCategory: "مخاطب تاییدشده گفتگوی زنده (سرنخ فروش / Lead)",
           platform,
           ip,
           status: "open",
@@ -378,7 +398,7 @@ export async function POST(req: NextRequest) {
               text:
                 "سلام " +
                 fullName +
-                " عزیز 👋 خوش آمدید. کارشناسان ما آنلاین هستند؛ سوال، لینک یا فایل خود را ارسال کنید تا بلافاصله پاسخ دهیم.",
+                " عزیز 👋 خوش آمدید. کارشناسان ما آنلاین هستند؛ سوال، لینک یا تصویر مورد نظر خود را ارسال کنید تا بلافاصله پاسخ دهیم.",
               createdAt: nowIso,
             },
           ],
@@ -398,7 +418,7 @@ export async function POST(req: NextRequest) {
           id: existing.sessionId,
           full_name: existing.fullName,
           phone: existing.phone,
-          type: "مخاطب ثبت‌شده گفتگوی زنده (سرنخ فروش)",
+          type: "مخاطب تاییدشده گفتگوی زنده (سرنخ فروش)",
           platform,
           ip,
           created_at: nowIso,
@@ -436,7 +456,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ۲. ارسال پیام، لینک یا فایل محدودشده توسط کاربر + ایجاد نوتیفیکیشن بلادرنگ برای مدیران (به‌جز بیننده)
+    // ۲. ارسال پیام، لینک یا فایل توسط مشتری
     if (action === "send_customer_message") {
       const {
         sessionId,
@@ -483,14 +503,14 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      if (hasAttachment || safeLink) {
+      if (hasAttachment && captchaToken) {
         if (!verifyServerGraphicalCaptcha(captchaInput, captchaToken)) {
           const freshCaptcha = generateServerGraphicalCaptcha();
           return NextResponse.json(
             {
               success: false,
               ...freshCaptcha,
-              message: "کپچای امنیتی ارسال فایل/لینک صحیح نیست. تصویر جدید را وارد کنید.",
+              message: "کپچای امنیتی ارسال فایل صحیح نیست. تصویر جدید را وارد کنید.",
             },
             { status: 400 }
           );
@@ -578,7 +598,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ۳. علامت‌گذاری گفتگو به عنوان خوانده‌شده وقتی ادمین (غیر از بیننده) آن را باز می‌کند
+    // ۳. علامت‌گذاری پیام‌های خوانده‌نشده گفتگو هنگام باز کردن توسط ادمین (بدون تغییر وضعیت open به answered)
     if (action === "mark_session_read") {
       const responder = await resolveAdminResponder(req);
       if (!responder || responder.role === "viewer_reporter") {
@@ -602,7 +622,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    // ۴. پاسخگویی بلادرنگ توسط مدیر ارشد و تمام نقش‌ها به‌جز نقش بیننده
+    // ۴. پاسخگویی بلادرنگ توسط مدیر + امکان ارسال هم‌زمان پیامک اطلاع‌رسانی به مشتری
     if (action === "send_admin_reply") {
       const responder = await resolveAdminResponder(req);
       if (!responder) {
@@ -621,7 +641,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const { sessionId, text, linkUrl, attachmentUrl, attachmentName } = body;
+      const { sessionId, text, linkUrl, attachmentUrl, attachmentName, sendSmsNotify } = body;
       const cleanText = sanitizeText(text, 1200);
       const safeLink = sanitizeSafeLink(linkUrl);
 
@@ -679,10 +699,73 @@ export async function POST(req: NextRequest) {
         {}
       );
 
+      // در صورت انتخاب گزینه ارسال پیامک هم‌زمان به موبایل مشتری
+      let smsSent = false;
+      if (sendSmsNotify && sessions[idx].phone) {
+        const cleanPhone = String(sessions[idx].phone).replace(/\D/g, "");
+        if (cleanPhone.length === 11) {
+          try {
+            await smsService.sendSMS(
+              cleanPhone,
+              `${sessions[idx].fullName} عزیز، پاسخ جدید کارشناس آکسون کور در گفتگوی آنلاین ثبت شد: ${cleanText.slice(0, 110)}`
+            );
+            smsSent = true;
+          } catch {}
+        }
+      }
+
       return NextResponse.json({
         success: true,
+        smsSent,
         session: sessions[idx],
         reply: replyMsg,
+      });
+    }
+
+    // ۵. حذف کامل یک نشست گفتگو یا حذف یک پیام خاص توسط ادمین
+    if (action === "delete_session" || action === "delete_message" || action === "toggle_status") {
+      const responder = await resolveAdminResponder(req);
+      if (!responder || responder.role === "viewer_reporter") {
+        return NextResponse.json({ success: false, message: "عدم دسترسی" }, { status: 403 });
+      }
+
+      const { sessionId, messageId, nextStatus } = body;
+      const siteRow = await getMasterSiteInfoRow();
+      const layoutCfg = siteRow?.homepage_layout_config || {};
+      let sessions: LiveChatLeadSession[] = Array.isArray(layoutCfg.live_chat_sessions)
+        ? layoutCfg.live_chat_sessions
+        : [];
+
+      if (action === "delete_session") {
+        sessions = sessions.filter((s) => s.sessionId !== sessionId);
+      } else if (action === "delete_message") {
+        sessions = sessions.map((s) => {
+          if (s.sessionId !== sessionId) return s;
+          return {
+            ...s,
+            messages: (s.messages || []).filter((m) => m.id !== messageId),
+          };
+        });
+      } else if (action === "toggle_status") {
+        sessions = sessions.map((s) => {
+          if (s.sessionId !== sessionId) return s;
+          return { ...s, status: nextStatus || "closed", unreadForAdmin: 0 };
+        });
+      }
+
+      await saveMasterSiteInfoRow(
+        siteRow,
+        {
+          ...layoutCfg,
+          live_chat_sessions: sessions,
+        },
+        {}
+      );
+
+      return NextResponse.json({
+        success: true,
+        sessions: sessions.map(normalizeSessionStatus),
+        message: "✓ تغییرات با موفقیت اعمال شد.",
       });
     }
 

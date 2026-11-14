@@ -14,7 +14,6 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -24,11 +23,22 @@ export const viewport: Viewport = {
 };
 
 const GOOGLE_FONT_MAP: Record<string, string> = {
-  Vazirmatn: "https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;900&display=swap",
-  IRANSans: "",
-  Yekan: "",
-  Shabnam: "",
-  Samim: "https://fonts.googleapis.com/css2?family=Samim&display=swap",
+  Vazirmatn:
+    "https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap",
+  YekanBakh:
+    "https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap",
+  IRANSans:
+    "https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap",
+  IRANSansX:
+    "https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap",
+  Dana: "https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap",
+  Yekan: "https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap",
+  Peyda: "https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap",
+  Shabnam:
+    "https://cdn.jsdelivr.net/gh/rastikerdar/shabnam-font@v5.0.1/dist/font-face.css",
+  Samim: "https://fonts.googleapis.com/css2?family=Samim:wght@400;700&display=swap",
+  Inter:
+    "https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Vazirmatn:wght@100..900&display=swap",
 };
 
 async function getSiteStyles() {
@@ -38,7 +48,14 @@ async function getSiteStyles() {
       .select("primary_color,secondary_color,font_family,border_radius,custom_css")
       .limit(1)
       .maybeSingle();
-    return data || null;
+    if (data) return data;
+
+    const { data: siteRow } = await supabaseAdmin
+      .from("site_info")
+      .select("homepage_layout_config")
+      .limit(1)
+      .maybeSingle();
+    return siteRow?.homepage_layout_config?.visual_styles_config || null;
   } catch {
     return null;
   }
@@ -110,6 +127,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const cssVars = [
     "--accent-blue: " + primaryColor + ";",
     "--accent-purple: " + secondaryColor + ";",
+    "--secondary-color: " + secondaryColor + ";",
     "--font-primary: " + JSON.stringify(fontFamily) + ", Vazirmatn, sans-serif;",
     "--border-radius-card: " + borderRadius + ";",
   ].join(" ");
@@ -120,14 +138,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <head>
-      <script dangerouslySetInnerHTML={{ __html: `
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
         // پاک‌سازی service worker cache
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.getRegistrations().then(function(regs) {
             regs.forEach(function(r) { r.unregister(); });
           });
         }
-      ` }} />
+      `,
+          }}
+        />
         <script
           dangerouslySetInnerHTML={{
             __html:

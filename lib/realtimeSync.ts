@@ -1,7 +1,15 @@
 // File Path: lib/realtimeSync.ts
 import { supabase } from "./supabase";
 
-const SAFE_PUBLIC_TABLES = ["products", "banners", "site_info", "categories", "posts", "tech_news"];
+const SAFE_PUBLIC_TABLES = [
+  "products",
+  "banners",
+  "site_info",
+  "site_styles",
+  "categories",
+  "posts",
+  "tech_news",
+];
 let activeChannel: any = null;
 const debounceTimers: Record<string, NodeJS.Timeout | null> = {};
 

@@ -1,6 +1,6 @@
 "use client";
-
-import React, { useState, useEffect, useRef } from "react";
+// File Path: components/admin/StyleFontManager.tsx
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { fontEngine, CustomFontItem } from "@/lib/fontEngine";
 import { supabase } from "@/lib/supabase";
@@ -11,39 +11,60 @@ export default function StyleFontManager() {
   const [selectedFont, setSelectedFont] = useState("Vazirmatn");
   const [selectedWeight, setSelectedWeight] = useState(400);
   const [borderRadius, setBorderRadius] = useState("1.5rem");
-  const [customCss, setCustomCss] = useState("");
+  const [userCustomCss, setUserCustomCss] = useState("");
 
   // کنترلرهای استایل‌ساز بصری پیشرفته (Visual CSS Studio)
   const [glassBlurPx, setGlassBlurPx] = useState<number>(20);
-  const [cardShadowStrength, setCardShadowStrength] = useState<"soft" | "medium" | "deep" | "neon">("medium");
+  const [cardShadowStrength, setCardShadowStrength] = useState<
+    "soft" | "medium" | "deep" | "neon"
+  >("medium");
   const [buttonHoverScale, setButtonHoverScale] = useState<number>(1.03);
   const [lineHeightScale, setLineHeightScale] = useState<number>(1.8);
   const [headingTracking, setHeadingTracking] = useState<string>("-0.02em");
 
   const [fontsList, setFontsList] = useState<CustomFontItem[]>([]);
   const [saving, setSaving] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const fontFileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchStyles = async () => {
+  const fetchStyles = useCallback(async () => {
     try {
       setFontsList(fontEngine.getAllFonts());
-      const res = await fetch("/api/styles", { cache: "no-store" });
+      const res = await fetch("/api/styles?t=" + Date.now(), { cache: "no-store" });
       if (res.ok) {
         const json = await res.json();
-        if (json.data) {
-          setPrimaryColor(json.data.primary_color || "#0071e3");
-          setSecondaryColor(json.data.secondary_color || "#4f46e5");
-          setSelectedFont(json.data.font_family || "Vazirmatn");
-          setBorderRadius(json.data.border_radius || "1.5rem");
-          setCustomCss(json.data.custom_css || "");
+        const d = json.data;
+        if (d) {
+          if (d.primary_color) setPrimaryColor(d.primary_color);
+          if (d.secondary_color) setSecondaryColor(d.secondary_color);
+          if (d.font_family) {
+            setSelectedFont(d.font_family);
+            fontEngine.applyFontToTarget(d.font_family, "body");
+          }
+          if (d.border_radius) setBorderRadius(d.border_radius);
+          if (d.font_weight !== undefined) setSelectedWeight(Number(d.font_weight));
+          if (d.glass_blur_px !== undefined) setGlassBlurPx(Number(d.glass_blur_px));
+          if (d.card_shadow_strength) setCardShadowStrength(d.card_shadow_strength);
+          if (d.button_hover_scale !== undefined)
+            setButtonHoverScale(Number(d.button_hover_scale));
+          if (d.line_height_scale !== undefined) setLineHeightScale(Number(d.line_height_scale));
+          if (d.heading_tracking) setHeadingTracking(String(d.heading_tracking));
+          if (d.user_raw_css !== undefined) setUserCustomCss(String(d.user_raw_css));
+
+          if (Array.isArray(d.custom_fonts) && d.custom_fonts.length > 0) {
+            const merged = fontEngine.syncCustomFontsFromServer(d.custom_fonts);
+            setFontsList(merged);
+          }
         }
       }
     } catch (e) {
       console.error("Error fetching site styles:", e);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchStyles();
@@ -58,9 +79,9 @@ export default function StyleFontManager() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchStyles]);
 
-  const buildGeneratedVisualCss = () => {
+  const buildGeneratedVisualCss = (customFonts: CustomFontItem[]) => {
     const shadowVal =
       cardShadowStrength === "soft"
         ? "0 8px 24px -6px rgba(0,0,0,0.12)"
@@ -70,15 +91,42 @@ export default function StyleFontManager() {
         ? "0 12px 36px -8px " + primaryColor + "55"
         : "0 14px 34px -10px rgba(0,0,0,0.25)";
 
-    return [
-      "/* === AXON VISUAL CSS ENGINE === */",
-      ":root { --accent-blue: " + primaryColor + "; --secondary-color: " + secondaryColor + "; --border-radius-card: " + borderRadius + "; }",
+    const metaComment =
+      "/* === AXON_STYLE_META:" +
+      JSON.stringify({
+        font_weight: selectedWeight,
+        glass_blur_px: glassBlurPx,
+        card_shadow_strength: cardShadowStrength,
+        button_hover_scale: buttonHoverScale,
+        line_height_scale: lineHeightScale,
+        heading_tracking: headingTracking,
+      }) +
+      " === */";
+
+    const customFontsBlock = fontEngine.buildCustomFontsCssRules(customFonts);
+
+    const engineBlock = [
+      "/* === AXON VISUAL CSS ENGINE START === */",
+      ":root { --accent-blue: " +
+        primaryColor +
+        "; --accent-purple: " +
+        secondaryColor +
+        "; --secondary-color: " +
+        secondaryColor +
+        "; --border-radius-card: " +
+        borderRadius +
+        "; }",
       "body { line-height: " + lineHeightScale + "; font-weight: " + selectedWeight + "; }",
       "h1, h2, h3, h4 { letter-spacing: " + headingTracking + "; }",
-      ".backdrop-blur-2xl, .backdrop-blur-xl { backdrop-filter: blur(" + glassBlurPx + "px) !important; }",
+      ".backdrop-blur-2xl, .backdrop-blur-xl { backdrop-filter: blur(" +
+        glassBlurPx +
+        "px) !important; }",
       ".shadow-xl, .shadow-2xl { box-shadow: " + shadowVal + " !important; }",
       "button:hover, a.rounded-2xl:hover { transform: scale(" + buttonHoverScale + "); }",
+      "/* === AXON VISUAL CSS ENGINE END === */",
     ].join("\n");
+
+    return [metaComment, customFontsBlock, engineBlock].filter(Boolean).join("\n\n");
   };
 
   const applyVisualPreset = (presetName: string) => {
@@ -89,18 +137,24 @@ export default function StyleFontManager() {
       setBorderRadius("1.75rem");
       setGlassBlurPx(28);
       setCardShadowStrength("medium");
+      setButtonHoverScale(1.03);
+      setLineHeightScale(1.8);
     } else if (presetName === "cyber_neon") {
       setPrimaryColor("#0284c7");
       setSecondaryColor("#6366f1");
       setBorderRadius("1.5rem");
       setGlassBlurPx(24);
       setCardShadowStrength("neon");
+      setButtonHoverScale(1.04);
+      setLineHeightScale(1.8);
     } else if (presetName === "minimal_sharp") {
       setPrimaryColor("#2563eb");
       setSecondaryColor("#475569");
       setBorderRadius("0.85rem");
       setGlassBlurPx(12);
       setCardShadowStrength("soft");
+      setButtonHoverScale(1.01);
+      setLineHeightScale(1.7);
     }
   };
 
@@ -108,8 +162,23 @@ export default function StyleFontManager() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const fontName =
-      prompt("نام این فونت را وارد کنید:", file.name.replace(/\.[^/.]+$/, "")) || "CustomFont";
+    if (file.size > 2.5 * 1024 * 1024) {
+      alert("حجم فایل فونت باید کمتر از ۲.۵ مگابایت باشد (فرمت woff2 پیشنهاد می‌شود).");
+      e.target.value = "";
+      return;
+    }
+
+    const defaultLabel = file.name.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "");
+    const fontName = prompt(
+      "نام انگلیسی فونت را وارد کنید (مثلاً YekanBakh یا CustomFont):",
+      defaultLabel || "CustomFont"
+    );
+    if (!fontName || !fontName.trim()) {
+      e.target.value = "";
+      return;
+    }
+
+    const cleanFontFamily = fontName.trim().replace(/['"]/g, "");
     const reader = new FileReader();
 
     reader.onloadend = () => {
@@ -119,8 +188,8 @@ export default function StyleFontManager() {
 
         const newFont: CustomFontItem = {
           id: "custom_" + Date.now(),
-          name: fontName + " (اختصاصی)",
-          fontFamily: fontName,
+          name: cleanFontFamily + " (فونت اختصاصی آپلودشده)",
+          fontFamily: cleanFontFamily,
           fontUrlOrBase64: reader.result,
           format,
           weights: [100, 200, 300, 400, 500, 600, 700, 800, 900],
@@ -129,12 +198,29 @@ export default function StyleFontManager() {
 
         fontEngine.registerCustomFont(newFont);
         setFontsList(fontEngine.getAllFonts());
-        setSelectedFont(fontName);
-        fontEngine.applyFontToTarget(fontName, "body");
+        setSelectedFont(cleanFontFamily);
+        fontEngine.applyFontToTarget(cleanFontFamily, "body");
         soundEngine.playSuccess();
+        setStatusMessage({
+          type: "success",
+          text: `✓ فونت «${cleanFontFamily}» بارگذاری شد. برای انتشار آن برای تمامی کاربران سایت، روی «ذخیره و انتشار سراسری در سایت» کلیک کنید.`,
+        });
       }
+      e.target.value = "";
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleDeleteCustomFont = (fontItem: CustomFontItem) => {
+    if (!fontItem.isCustom) return;
+    if (!confirm(`آیا از حذف فونت اختصاصی «${fontItem.name}» اطمینان دارید؟`)) return;
+    soundEngine.playClick();
+    fontEngine.removeCustomFont(fontItem.id);
+    setFontsList(fontEngine.getAllFonts());
+    if (selectedFont === fontItem.fontFamily) {
+      setSelectedFont("Vazirmatn");
+      fontEngine.applyFontToTarget("Vazirmatn", "body");
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -143,14 +229,25 @@ export default function StyleFontManager() {
     setSaving(true);
     setStatusMessage(null);
 
-    const cleanCustom = customCss.replace(/\/\* === AXON VISUAL CSS ENGINE === \*\/[\s\S]*?(?=\/\*|$)/g, "").trim();
-    const compiledCss = buildGeneratedVisualCss() + (cleanCustom ? "\n" + cleanCustom : "");
+    const customFonts = fontEngine.getCustomFonts();
+    const cleanUserCss = userCustomCss.trim();
+    const compiledCss = [buildGeneratedVisualCss(customFonts), cleanUserCss]
+      .filter(Boolean)
+      .join("\n\n");
 
     const payload = {
       primary_color: primaryColor,
       secondary_color: secondaryColor,
       font_family: selectedFont,
       border_radius: borderRadius,
+      font_weight: selectedWeight,
+      glass_blur_px: glassBlurPx,
+      card_shadow_strength: cardShadowStrength,
+      button_hover_scale: buttonHoverScale,
+      line_height_scale: lineHeightScale,
+      heading_tracking: headingTracking,
+      user_raw_css: cleanUserCss,
+      custom_fonts: customFonts,
       custom_css: compiledCss,
     };
 
@@ -164,16 +261,30 @@ export default function StyleFontManager() {
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || "خطا در ذخیره دیتابیس");
 
-      setCustomCss(compiledCss);
       soundEngine.playSuccess();
       setStatusMessage({
         type: "success",
         text: "⚡ هویت بصری، تایپوگرافی و قوانین استایل‌ساز CSS با موفقیت در دیتابیس ذخیره و به صورت زنده در کل سایت اعمال شد.",
       });
 
+      // اعمال فوری در DOM صفحه فعلی
       document.documentElement.style.setProperty("--accent-blue", primaryColor);
+      document.documentElement.style.setProperty("--accent-purple", secondaryColor);
+      document.documentElement.style.setProperty("--secondary-color", secondaryColor);
+      document.documentElement.style.setProperty("--border-radius-card", borderRadius);
       fontEngine.applyFontToTarget(selectedFont, "body");
-      window.dispatchEvent(new Event("site_styles_updated"));
+
+      const liveStyleTag = document.getElementById("axon-live-custom-css");
+      if (liveStyleTag) {
+        liveStyleTag.textContent =
+          `:root { --accent-blue: ${primaryColor}; --accent-purple: ${secondaryColor}; --secondary-color: ${secondaryColor}; --font-primary: '${selectedFont}', Vazirmatn, sans-serif; --border-radius-card: ${borderRadius}; } body { font-family: var(--font-primary); } ` +
+          compiledCss;
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("axon_site_info_cache_permanent_v2026");
+        window.dispatchEvent(new Event("site_styles_updated"));
+      }
     } catch (err: any) {
       setStatusMessage({
         type: "error",
@@ -181,9 +292,11 @@ export default function StyleFontManager() {
       });
     } finally {
       setSaving(false);
-      setTimeout(() => setStatusMessage(null), 4000);
+      setTimeout(() => setStatusMessage(null), 4500);
     }
   };
+
+  const activeFontObj = fontsList.find((f) => f.fontFamily === selectedFont);
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
@@ -246,7 +359,7 @@ export default function StyleFontManager() {
           <span className="font-black text-[var(--accent-blue)] block">
             🎨 پیش‌فرض‌های آماده طراحی (با یک کلیک اعمال کنید):
           </span>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <button
               type="button"
               onClick={() => applyVisualPreset("apple_glass")}
@@ -271,11 +384,22 @@ export default function StyleFontManager() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           <div className="space-y-2">
-            <label className="block font-bold text-[var(--text-secondary)]">
-              تایپوگرافی و قلم اصلی کل سایت:
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block font-bold text-[var(--text-secondary)]">
+                تایپوگرافی و قلم اصلی کل سایت:
+              </label>
+              {activeFontObj?.isCustom && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCustomFont(activeFontObj)}
+                  className="text-[10px] text-rose-400 font-bold hover:underline cursor-pointer"
+                >
+                  حذف این فونت ✕
+                </button>
+              )}
+            </div>
             <select
               value={selectedFont}
               onChange={(e) => {
@@ -334,7 +458,7 @@ export default function StyleFontManager() {
                 type="color"
                 value={primaryColor}
                 onChange={(e) => setPrimaryColor(e.target.value)}
-                className="w-12 h-12 rounded-2xl border border-[var(--card-border)] cursor-pointer bg-transparent"
+                className="w-12 h-12 rounded-2xl border border-[var(--card-border)] cursor-pointer bg-transparent shrink-0"
               />
               <input
                 type="text"
@@ -355,7 +479,7 @@ export default function StyleFontManager() {
                 type="color"
                 value={secondaryColor}
                 onChange={(e) => setSecondaryColor(e.target.value)}
-                className="w-12 h-12 rounded-2xl border border-[var(--card-border)] cursor-pointer bg-transparent"
+                className="w-12 h-12 rounded-2xl border border-[var(--card-border)] cursor-pointer bg-transparent shrink-0"
               />
               <input
                 type="text"
@@ -390,11 +514,13 @@ export default function StyleFontManager() {
             🎛️ کنترلرهای بصری استایل‌ساز پیشرفته CSS (تولید خودکار کدهای استایل)
           </h3>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-2 md:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
               <div className="flex justify-between">
                 <span className="font-bold">شدت ماتی شیشه‌ای (Backdrop Blur):</span>
-                <span className="font-mono font-black text-[var(--accent-blue)]">{glassBlurPx}px</span>
+                <span className="font-mono font-black text-[var(--accent-blue)]">
+                  {glassBlurPx}px
+                </span>
               </div>
               <input
                 type="range"
@@ -409,7 +535,9 @@ export default function StyleFontManager() {
             <div className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
               <div className="flex justify-between">
                 <span className="font-bold">ضریب بزرگنمایی دکمه‌ها (Hover Scale):</span>
-                <span className="font-mono font-black text-emerald-400">{buttonHoverScale}x</span>
+                <span className="font-mono font-black text-emerald-400">
+                  {buttonHoverScale}x
+                </span>
               </div>
               <input
                 type="range"
@@ -441,14 +569,14 @@ export default function StyleFontManager() {
 
           <div className="space-y-2 pt-2">
             <label className="block font-bold text-[var(--text-secondary)]">
-              کدهای تکمیلی CSS (خروجی استایل‌ساز بصری + کدهای دلخواه شما):
+              کدهای تکمیلی CSS سفارشی شما (با ذخیره تنظیمات بالا، به صورت خودکار ترکیب و حفظ می‌شوند):
             </label>
             <textarea
               rows={4}
               dir="ltr"
-              value={customCss}
-              onChange={(e) => setCustomCss(e.target.value)}
-              placeholder="/* کدهای سفارشی CSS */"
+              value={userCustomCss}
+              onChange={(e) => setUserCustomCss(e.target.value)}
+              placeholder="/* کدهای CSS سفارشی دلخواه خود را اینجا بنویسید... */"
               className="w-full p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[11px] outline-none leading-relaxed"
             />
           </div>
@@ -457,7 +585,7 @@ export default function StyleFontManager() {
         {/* پیش‌نمایش زنده فونت و استایل */}
         <div
           style={{
-            fontFamily: "'" + selectedFont + "', sans-serif",
+            fontFamily: "'" + selectedFont + "', Vazirmatn, sans-serif",
             fontWeight: selectedWeight,
             lineHeight: lineHeightScale,
             borderRadius,

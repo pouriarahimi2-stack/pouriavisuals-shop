@@ -186,7 +186,7 @@ export default function GlobalSiteBackground() {
 
   const fetchBgConfig = useCallback(async () => {
     try {
-      const res = await fetch("/api/theme-builder", { cache: "no-store" });
+      const res = await fetch("/api/theme-builder?t=" + Date.now(), { cache: "no-store" });
       if (!res.ok) return;
       const json = await res.json();
       const gb = json?.config?.globalBackground;
@@ -306,12 +306,30 @@ export default function GlobalSiteBackground() {
 
   const glassEnabled = config.liquidGlassEnabled !== false;
   const gBlur = Math.max(8, Math.min(40, Number(config.glassBlurPx ?? 24)));
-  const gAlphaDark = Math.max(0.35, Math.min(0.92, Number(config.glassSurfaceOpacity ?? 64) / 100));
-  const gAlphaLight = Math.max(0.55, Math.min(0.94, Number(config.glassSurfaceOpacity ?? 64) / 100));
-  const gBorderAlpha = Math.max(0.18, Math.min(0.85, Number(config.glassBorderGlow ?? 42) / 100));
+  const gAlphaDark = Math.max(
+    0.35,
+    Math.min(0.92, Number(config.glassSurfaceOpacity ?? 64) / 100)
+  );
+  const gAlphaLight = Math.max(
+    0.55,
+    Math.min(0.94, Number(config.glassSurfaceOpacity ?? 64) / 100)
+  );
+  const gBorderAlpha = Math.max(
+    0.18,
+    Math.min(0.85, Number(config.glassBorderGlow ?? 42) / 100)
+  );
 
   const sliderOp = Math.max(0, Math.min(100, Number(config.sliderBgOpacity ?? 30))) / 100;
+  const safeSliderCustomUrl = toIranSafeUrl(config.sliderCustomBgUrl || "");
+
   const chatSide = config.chatButtonSide === "right" ? "right" : "left";
+  const chatBottom = Math.max(10, Math.min(200, Number(config.chatButtonBottomPx ?? 80)));
+  const chatMobSize = Math.max(35, Math.min(80, Number(config.chatSizeMobile ?? 48)));
+  const chatDeskSize = Math.max(45, Math.min(100, Number(config.chatSizeDesktop ?? 56)));
+  const rawChatSvg = String(config.chatIconSvg || "").trim();
+  const customChatSvgDataUri = rawChatSvg.startsWith("<svg")
+    ? `url("data:image/svg+xml;utf8,${encodeURIComponent(rawChatSvg)}")`
+    : "";
 
   const rawResolved =
     config.mediaType === "preset_svg"
@@ -334,6 +352,7 @@ export default function GlobalSiteBackground() {
         <style>{`
           :root {
             --axon-slider-bg-op: ${sliderOp};
+            ${safeSliderCustomUrl ? `--axon-slider-bg-url: url("${safeSliderCustomUrl}");` : ""}
           }
           ${
             glassEnabled
@@ -357,7 +376,10 @@ export default function GlobalSiteBackground() {
           html:not(.dark) header > div,
           html.light footer,
           html:not(.dark) footer {
-            background: linear-gradient(135deg, rgba(240, 249, 255, ${gAlphaLight}), rgba(224, 242, 254, ${Math.max(0.42, gAlphaLight - 0.12)})) !important;
+            background: linear-gradient(135deg, rgba(240, 249, 255, ${gAlphaLight}), rgba(224, 242, 254, ${Math.max(
+              0.42,
+              gAlphaLight - 0.12
+            )})) !important;
             backdrop-filter: blur(${gBlur}px) saturate(190%) !important;
             -webkit-backdrop-filter: blur(${gBlur}px) saturate(190%) !important;
             border-color: rgba(14, 165, 233, ${Math.min(0.65, gBorderAlpha)}) !important;
@@ -367,20 +389,52 @@ export default function GlobalSiteBackground() {
               : ""
           }
 
-          
+          button[data-axon-livechat-fab="true"] {
+            bottom: ${chatBottom}px !important;
+            ${chatSide}: 20px !important;
+            ${chatSide === "left" ? "right: auto !important;" : "left: auto !important;"}
+            width: ${chatMobSize}px !important;
+            height: ${chatMobSize}px !important;
+            padding: 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            border-radius: 9999px !important;
+          }
+
+          @media (min-width: 768px) {
+            button[data-axon-livechat-fab="true"] {
+              width: ${chatDeskSize}px !important;
+              height: ${chatDeskSize}px !important;
+            }
           }
 
           ${
             config.chatButtonIconOnly !== false
               ? `
-          
           button[data-axon-livechat-fab="true"] * {
             font-size: 0 !important;
+            display: none !important;
           }
           button[data-axon-livechat-fab="true"]::before {
+            ${
+              customChatSvgDataUri
+                ? `
+            content: "";
+            display: inline-block;
+            width: 55%;
+            height: 55%;
+            background-image: ${customChatSvgDataUri};
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            `
+                : `
             content: "💬";
             font-size: 22px !important;
             line-height: 1 !important;
+            `
+            }
           }
           button[data-axon-livechat-fab="true"]::after {
             content: "";
@@ -416,9 +470,21 @@ export default function GlobalSiteBackground() {
               : ""
           }
 
-          ${!config.showShowcaseHeader ? `[data-axon-leaf-role="showcase_header"] { display: none !important; }` : ""}
-          ${!config.showCatalogHeader ? `[data-axon-leaf-role="catalog_header"] { display: none !important; }` : ""}
-          ${!config.showCardBrand ? `[data-axon-leaf-role="card_brand"] { display: none !important; }` : ""}
+          ${
+            !config.showShowcaseHeader
+              ? `[data-axon-leaf-role="showcase_header"] { display: none !important; }`
+              : ""
+          }
+          ${
+            !config.showCatalogHeader
+              ? `[data-axon-leaf-role="catalog_header"] { display: none !important; }`
+              : ""
+          }
+          ${
+            !config.showCardBrand
+              ? `[data-axon-leaf-role="card_brand"] { display: none !important; }`
+              : ""
+          }
           ${
             !config.showCardCategory
               ? `article > div:first-child > span.rounded-full { display: none !important; }`
@@ -429,8 +495,16 @@ export default function GlobalSiteBackground() {
               ? `article p.line-clamp-2 { display: none !important; }`
               : ""
           }
-          ${!config.showCardStockText ? `[data-axon-leaf-role="card_stock"] { display: none !important; }` : ""}
-          ${!config.showCardCartCountText ? `[data-axon-leaf-role="card_cartcount"] { display: none !important; }` : ""}
+          ${
+            !config.showCardStockText
+              ? `[data-axon-leaf-role="card_stock"] { display: none !important; }`
+              : ""
+          }
+          ${
+            !config.showCardCartCountText
+              ? `[data-axon-leaf-role="card_cartcount"] { display: none !important; }`
+              : ""
+          }
 
           footer {
             padding-top: ${bgPadY}px !important;

@@ -1,5 +1,6 @@
-"use client";
 // File Path: components/admin/AdminReadOnlyGuard.tsx
+"use client";
+
 import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { canRoleWriteOnAdminPage, canRoleMutateApi } from "@/lib/roleWriteFirewall";
@@ -64,6 +65,7 @@ function isPureSubTabSwitcher(btn: HTMLElement): boolean {
     "تولید",
     "ارسال",
     "پاکسازی",
+    "پاک‌سازی",
     "بکاپ",
     "تغییر",
     "اعمال",
@@ -83,7 +85,7 @@ function isPureSubTabSwitcher(btn: HTMLElement): boolean {
   }
 
   // فقط تب‌های شماره‌دار بالای صفحات چندتبی (مثل ۱. حسابداری / ۲. سفارشات / ۳. گزارش مالی)
-  return /^[🧭🏛📑🌳⚡🏭📦📈🎯✏️📡💻📊📋🔍🚀📚🤖]*s*[۱۱۲۳۴۵12345]./.test(text);
+  return /^[🧭🏛📑🌳⚡🏭📦📈🎯✏️📡💻📊📋🔍🚀📚🤖]*\s*[۱۱۲۳۴۵12345]\./.test(text);
 }
 
 export default function AdminReadOnlyGuard() {
@@ -111,7 +113,11 @@ export default function AdminReadOnlyGuard() {
     const isSuper = adminUser.role === "superadmin";
     if (isSuper) return;
 
-    if (pathname.startsWith("/admin/roles") || pathname.startsWith("/admin/monitoring") || pathname.startsWith("/admin/change-pin")) {
+    if (
+      pathname.startsWith("/admin/roles") ||
+      pathname.startsWith("/admin/monitoring") ||
+      pathname.startsWith("/admin/change-pin")
+    ) {
       router.replace("/admin/dashboard");
       return;
     }
@@ -138,7 +144,7 @@ export default function AdminReadOnlyGuard() {
       const workspace = document.getElementById("axon-admin-main-workspace");
       if (!workspace) return;
 
-      // ۱. قفل کردن ۱۰۰٪ تمامی input، textarea و select (شامل کادرهای جستجو، فایل، چک‌باکس و اسلایدر)
+      // ۱. قفل کردن ۱۰۰٪ تمامی input، textarea و select
       const formControls = workspace.querySelectorAll<
         HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
       >("input, textarea, select");
@@ -155,7 +161,7 @@ export default function AdminReadOnlyGuard() {
         el.style.filter = "grayscale(100%)";
       });
 
-      // ۲. قفل کردن تگ‌های <label> که نقش دکمه آپلود/بازیابی فایل دارند (مانند دکمه سبز «بازیابی سایت از فایل پشتیبان»)
+      // ۲. قفل کردن تگ‌های <label> عملیاتی
       const labels = workspace.querySelectorAll<HTMLLabelElement>("label");
       labels.forEach((lbl) => {
         const hasFileOrCheckbox = lbl.querySelector("input");
@@ -184,7 +190,9 @@ export default function AdminReadOnlyGuard() {
       });
 
       // ۴. قفل کردن لینک‌های دانلود یا عملیاتی داخل محیط کاری
-      const actionLinks = workspace.querySelectorAll<HTMLAnchorElement>("a[download], a[target='_blank']");
+      const actionLinks = workspace.querySelectorAll<HTMLAnchorElement>(
+        "a[download], a[target='_blank']"
+      );
       actionLinks.forEach((a) => {
         a.style.opacity = "0.35";
         a.style.cursor = "not-allowed";
@@ -198,7 +206,8 @@ export default function AdminReadOnlyGuard() {
       lockAllInteractiveElements();
     });
 
-    const workspace = document.getElementById("axon-admin-main-workspace") || document.body;
+    const workspace =
+      document.getElementById("axon-admin-main-workspace") || document.body;
     observer.observe(workspace, { childList: true, subtree: true });
 
     const blockCaptureEvent = (e: Event) => {
@@ -245,11 +254,18 @@ export default function AdminReadOnlyGuard() {
       const urlStr = typeof input === "string" ? input : input.toString();
 
       if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
-        if (urlStr.includes("/api/analytics/device") || urlStr.includes("/api/admin/logout") || urlStr.includes("/api/admin/monitoring")) {
+        if (
+          urlStr.includes("/api/analytics/device") ||
+          urlStr.includes("/api/admin/logout") ||
+          urlStr.includes("/api/admin/monitoring")
+        ) {
           return originalFetch.apply(this, [input, init as any]);
         }
 
-        if (urlStr.includes(".supabase.co/rest/") || urlStr.includes(".supabase.co/storage/")) {
+        if (
+          urlStr.includes(".supabase.co/rest/") ||
+          urlStr.includes(".supabase.co/storage/")
+        ) {
           if (isCurrentPageReadOnly || role === "viewer_reporter") {
             return new Response(
               JSON.stringify({ success: false, readOnly: true }),

@@ -4,13 +4,40 @@
 // هر ماژول دیگری که توسط مدیر ارشد برای این نقش‌ها تیک بخورد، صرفاً در حالت «فقط مشاهده (Read-Only)» باز می‌شود.
 export const ROLE_WRITABLE_MODULES_MAP: Record<string, string[]> = {
   superadmin: ["all"],
-  product_manager: ["products", "inventory", "menu", "banners", "reviews", "messages"],
-  order_manager: ["orders", "customers", "financial", "coupons", "messages"],
-  content_seo_manager: ["blog", "news", "seo", "ai", "pages", "messages"],
+  product_manager: [
+    "products",
+    "inventory",
+    "menu",
+    "banners",
+    "reviews",
+    "messages",
+  ],
+  order_manager: [
+    "orders",
+    "inventory",
+    "customers",
+    "financial",
+    "reports",
+    "coupons",
+    "messages",
+  ],
+  content_seo_manager: [
+    "blog",
+    "news",
+    "seo",
+    "ai",
+    "pages",
+    "appearance",
+    "styles",
+    "messages",
+  ],
   viewer_reporter: [], // بیننده و گزارش‌دهنده در تمام بخش‌ها ۱۰۰٪ فقط خواندنی است
 };
 
-export function canRoleWriteModule(role: string | undefined, moduleId: string): boolean {
+export function canRoleWriteModule(
+  role: string | undefined,
+  moduleId: string
+): boolean {
   const cleanRole = String(role || "").toLowerCase();
   if (cleanRole === "superadmin") return true;
   if (cleanRole === "viewer_reporter") return false;
@@ -38,6 +65,7 @@ const ADMIN_PAGE_TO_MODULE: Array<{ prefix: string; moduleId: string }> = [
   { prefix: "/admin/messages", moduleId: "messages" },
   { prefix: "/admin/reviews", moduleId: "reviews" },
   { prefix: "/admin/roles", moduleId: "roles" },
+  { prefix: "/admin/monitoring", moduleId: "roles" },
   { prefix: "/admin/change-pin", moduleId: "change_pin" },
   { prefix: "/admin/audit-logs", moduleId: "audit_logs" },
   { prefix: "/admin/backup", moduleId: "backup" },
@@ -46,36 +74,60 @@ const ADMIN_PAGE_TO_MODULE: Array<{ prefix: string; moduleId: string }> = [
   { prefix: "/admin/dashboard", moduleId: "dashboard" },
 ];
 
-export function canRoleWriteOnAdminPage(role: string | undefined, pathname: string): boolean {
+export function canRoleWriteOnAdminPage(
+  role: string | undefined,
+  pathname: string
+): boolean {
   const cleanRole = String(role || "").toLowerCase();
   if (cleanRole === "superadmin") return true;
   if (cleanRole === "viewer_reporter") return false;
 
-  const matched = ADMIN_PAGE_TO_MODULE.find((m) => pathname.startsWith(m.prefix));
+  const matched = ADMIN_PAGE_TO_MODULE.find((m) =>
+    pathname.startsWith(m.prefix)
+  );
   if (!matched) return false;
 
-  // در صفحه یکپارچه /admin/inventory، هم مدیر انبار و هم پشتیبان سفارشات در تب مربوط به خودشان مجاز به کار هستند
+  // در صفحه یکپارچه /admin/inventory، هم مدیر انبار و هم پشتیبان سفارشات مجاز به کار هستند
   if (matched.prefix === "/admin/inventory") {
     return cleanRole === "product_manager" || cleanRole === "order_manager";
   }
-  // در صفحه /admin/appearance، اگر مدیر منو یا صفحه‌ساز باشد
-  if (matched.prefix === "/admin/appearance") {
-    return cleanRole === "content_seo_manager" || cleanRole === "product_manager";
+  // در صفحات ظاهر و صفحه‌ساز، کارشناس محتوا و مدیر کاتالوگ مجاز به کار هستند
+  if (
+    matched.prefix === "/admin/appearance" ||
+    matched.prefix === "/admin/pages" ||
+    matched.prefix === "/admin/menu"
+  ) {
+    return (
+      cleanRole === "content_seo_manager" || cleanRole === "product_manager"
+    );
   }
 
   return canRoleWriteModule(cleanRole, matched.moduleId);
 }
 
 // بررسی دقیق مجوز نوشتن/ویرایش/حذف در سطح APIهای بک‌اند برای هر نقش
-export function canRoleMutateApi(role: string | undefined, apiPathname: string): boolean {
+export function canRoleMutateApi(
+  role: string | undefined,
+  apiPathname: string
+): boolean {
   const cleanRole = String(role || "").toLowerCase();
   if (cleanRole === "superadmin") return true;
   if (cleanRole === "viewer_reporter") return false;
 
-  // خروج از حساب برای همه مجاز است
-  if (apiPathname.startsWith("/api/admin/logout")) return true;
-  // تمام نقش‌های مدیریتی به‌جز بیننده (viewer_reporter) مجاز به پاسخگویی در گفتگوی زنده هستند
-  if (apiPathname.startsWith("/api/live-chat") || apiPathname.startsWith("/api/admin/messages")) {
+  // خروج از حساب و ثبت تله‌متری برای همه مجاز است
+  if (
+    apiPathname.startsWith("/api/admin/logout") ||
+    apiPathname.startsWith("/api/admin/monitoring")
+  ) {
+    return true;
+  }
+
+  // تمام نقش‌های مدیریتی به‌جز بیننده (viewer_reporter) مجاز به پاسخگویی در گفتگوی زنده و تیکت‌ها هستند
+  if (
+    apiPathname.startsWith("/api/live-chat") ||
+    apiPathname.startsWith("/api/admin/messages") ||
+    apiPathname.startsWith("/api/contact")
+  ) {
     return cleanRole !== "viewer_reporter";
   }
 
@@ -87,9 +139,6 @@ export function canRoleMutateApi(role: string | undefined, apiPathname: string):
     "/api/admin/roles",
     "/api/admin/change-pin",
     "/api/admin/audit-logs",
-    "/api/styles",
-    "/api/admin/styles",
-    "/api/theme-builder",
   ];
   if (ownerOnlyApis.some((p) => apiPathname.startsWith(p))) {
     return false;
@@ -104,11 +153,14 @@ export function canRoleMutateApi(role: string | undefined, apiPathname: string):
       "/api/accounting",
       "/api/admin/financial",
       "/api/categories",
+      "/api/admin/categories",
       "/api/admin/banners",
       "/api/admin/reviews",
       "/api/reviews",
       "/api/admin/upload",
-      "/api/site-info", // برای ذخیره درخت منو و دسته‌بندی‌ها
+      "/api/admin/upload-image",
+      "/api/site-info",
+      "/api/admin/site-info",
     ];
     return allowed.some((p) => apiPathname.startsWith(p));
   }
@@ -117,6 +169,9 @@ export function canRoleMutateApi(role: string | undefined, apiPathname: string):
     const allowed = [
       "/api/admin/orders",
       "/api/orders",
+      "/api/accounting",
+      "/api/admin/financial",
+      "/api/admin/reports",
       "/api/crm",
       "/api/admin/coupons",
       "/api/coupons",
@@ -137,8 +192,15 @@ export function canRoleMutateApi(role: string | undefined, apiPathname: string):
       "/api/admin/seo-audit",
       "/api/ai-seo-autopilot",
       "/api/ai-assistant",
+      "/api/admin/ai-assistant",
       "/api/pages",
+      "/api/styles",
+      "/api/admin/styles",
+      "/api/theme-builder",
       "/api/admin/upload",
+      "/api/admin/upload-image",
+      "/api/site-info",
+      "/api/admin/site-info",
     ];
     return allowed.some((p) => apiPathname.startsWith(p));
   }

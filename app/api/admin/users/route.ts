@@ -26,10 +26,13 @@ export async function GET(req: NextRequest) {
 
   try {
     const users = await getAllAdminUsers();
-    return NextResponse.json({
-      success: true,
-      users: users.map(sanitizeUserForClient),
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        users: users.map(sanitizeUserForClient),
+      },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
   } catch (err: any) {
     return NextResponse.json(
       { success: false, message: err.message || "خطا در دریافت لیست مدیران." },
@@ -52,7 +55,8 @@ export async function POST(req: NextRequest) {
       const idx = users.findIndex(
         (u) =>
           (body.id && String(u.id) === String(body.id)) ||
-          (body.username && u.username.toLowerCase() === String(body.username).toLowerCase()) ||
+          (body.username &&
+            u.username.toLowerCase() === String(body.username).toLowerCase()) ||
           (body.role === "superadmin" && u.role === "superadmin")
       );
       if (idx !== -1) {
@@ -66,17 +70,23 @@ export async function POST(req: NextRequest) {
           success: true,
           user: sanitizeUserForClient(users[idx]),
           users: users.map(sanitizeUserForClient),
-          message: `✓ تم پنل برای «${users[idx].full_name || users[idx].username}» به حالت ${
-            targetTheme === "light" ? "روشن (Light)" : "تیره (Dark)"
-          } تغییر یافت.`,
+          message: `✓ تم پنل برای «${
+            users[idx].full_name || users[idx].username
+          }» به حالت ${targetTheme === "light" ? "روشن (Light)" : "تیره (Dark)"} تغییر یافت.`,
         });
       }
     }
 
-    const rawUsername = String(body.username || "").trim();
+    const rawUsername = String(body.username || "")
+      .trim()
+      .replace(/\s+/g, "_");
     const fullName = String(body.full_name || rawUsername).trim();
     const password = String(body.password || "").trim();
-    const role = String(body.role || "viewer_reporter").trim();
+    const isMasterAccount =
+      rawUsername.toLowerCase() === "admin" || body.id === "master-superadmin";
+    const role = isMasterAccount
+      ? "superadmin"
+      : String(body.role || "viewer_reporter").trim();
     const uiTheme: "dark" | "light" = body.ui_theme === "light" ? "light" : "dark";
     const permissions: string[] = Array.isArray(body.permissions)
       ? body.permissions
@@ -89,13 +99,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!body.id && (!password || password.length < 4)) {
-      return NextResponse.json(
-        { success: false, message: "کلمه عبور امنیتی باید حداقل ۴ کاراکتر باشد." },
-        { status: 400 }
-      );
-    }
-
     const users = await getAllAdminUsers();
     const lowerUsername = rawUsername.toLowerCase();
     const existingIndex = users.findIndex(
@@ -104,17 +107,29 @@ export async function POST(req: NextRequest) {
         u.username.toLowerCase() === lowerUsername
     );
 
+    if (existingIndex === -1 && (!password || password.length < 4)) {
+      return NextResponse.json(
+        { success: false, message: "کلمه عبور امنیتی باید حداقل ۴ کاراکتر باشد." },
+        { status: 400 }
+      );
+    }
+
     const nowIso = new Date().toISOString();
 
     if (existingIndex !== -1) {
       const prev = users[existingIndex];
+      const finalUsername =
+        prev.username.toLowerCase() === "admin" ? "admin" : rawUsername;
+      const finalRole =
+        finalUsername === "admin" ? "superadmin" : role;
+
       const updatedUser: StoredAdminUser = {
         ...prev,
-        username: rawUsername,
+        username: finalUsername,
         full_name: fullName,
-        role,
+        role: finalRole,
         ui_theme: uiTheme,
-        permissions: role === "superadmin" ? ["all"] : permissions,
+        permissions: finalRole === "superadmin" ? ["all"] : permissions,
         password_hash: password ? hashAdminPassword(password) : prev.password_hash,
         updated_at: nowIso,
       };
@@ -125,7 +140,7 @@ export async function POST(req: NextRequest) {
         success: true,
         user: sanitizeUserForClient(updatedUser),
         users: users.map(sanitizeUserForClient),
-        message: `✓ اطلاعات، دسترسی‌ها و تم پنل «${fullName} (@${rawUsername})» با موفقیت بروزرسانی شد.`,
+        message: `✓ اطلاعات، دسترسی‌ها و تم پنل «${fullName} (@${finalUsername})» با موفقیت بروزرسانی شد.`,
       });
     } else {
       const newId = randomUUID();
@@ -186,13 +201,25 @@ export async function DELETE(req: NextRequest) {
 
     const users = await getAllAdminUsers();
     const target = users.find((u) => String(u.id) === String(id));
+
+    if (!target) {
+      return NextResponse.json(
+        { success: false, message: "حساب مدیر مورد نظر یافت نشد." },
+        { status: 404 }
+      );
+    }
+
     if (
-      target &&
-      target.role === "superadmin" &&
-      users.filter((u) => u.role === "superadmin").length <= 1
+      target.username.toLowerCase() === "admin" ||
+      target.id === "master-superadmin" ||
+      (target.role === "superadmin" &&
+        users.filter((u) => u.role === "superadmin").length <= 1)
     ) {
       return NextResponse.json(
-        { success: false, message: "حذف تنها مدیر ارشد سیستم مجاز نیست." },
+        {
+          success: false,
+          message: "⛔ حساب مالک اصلی سیستم (@admin) قابل حذف نیست.",
+        },
         { status: 400 }
       );
     }
@@ -207,7 +234,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({
       success: true,
       users: filtered.map(sanitizeUserForClient),
-      message: "✓ حساب مدیر با موفقیت حذف گردید.",
+      message: "✓ حساب زیرمجموعه با موفقیت حذف گردید.",
     });
   } catch (err: any) {
     return NextResponse.json(

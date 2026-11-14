@@ -1,4 +1,6 @@
+// File Path: components/admin/AdminSidebar.tsx
 "use client";
+
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -17,25 +19,163 @@ export interface SidebarNavItem {
 }
 
 export const UNIFIED_ADMIN_NAV: SidebarNavItem[] = [
-  { id: "dashboard", permKey: "dashboard", label: "داشبورد تحلیلی و فرماندهی", href: "/admin/dashboard", icon: "📊", requiredPerm: ["dashboard", "all"] },
-  { id: "inventory_hub", permKey: "inventory", label: "حسابداری، انبار، سفارشات و مالی", href: "/admin/inventory", icon: "🏛️", badge: "یکپارچه", requiredPerm: ["inventory", "orders", "financial", "reports", "all"] },
-  { id: "products", permKey: "products", label: "کاتالوگ محصولات و قیمت‌ها", href: "/admin/products", icon: "🛍️", requiredPerm: ["products", "all"] },
-  { id: "banners", permKey: "banners", label: "بنرها و اسلایدر محصولات", href: "/admin/banners", icon: "🖼️", requiredPerm: ["banners", "all"] },
-  { id: "customers", permKey: "customers", label: "مشتریان (CRM) و پیامک", href: "/admin/customers", icon: "👥", requiredPerm: ["customers", "all"] },
-  { id: "coupons", permKey: "coupons", label: "کدهای تخفیف زمان‌دار و هدفمند", href: "/admin/coupons", icon: "🏷️", requiredPerm: ["coupons", "all"] },
-  { id: "appearance_hub", permKey: "appearance", label: "استودیوی ظاهر، منوها و صفحه‌ساز", href: "/admin/pages", icon: "🎨", badge: "یکپارچه", requiredPerm: ["appearance", "menu", "pages", "all"] },
-  { id: "styles", permKey: "styles", label: "هویت بصری، فونت‌ها و CSS", href: "/admin/styles", icon: "✨", requiredPerm: ["appearance", "styles", "all"] },
-  { id: "seo", permKey: "seo", label: "دستیار تخصصی سئو (رنک ۱)", href: "/admin/seo", icon: "🚀", badge: "SEO", requiredPerm: ["seo", "all"] },
-  { id: "blog", permKey: "blog", label: "وبلاگ و مقالات سئو (متصل به کالا)", href: "/admin/blog", icon: "📚", requiredPerm: ["blog", "seo", "all"] },
-  { id: "news", permKey: "news", label: "رادار خودکار اخبار فناوری", href: "/admin/news", icon: "📡", requiredPerm: ["news", "seo", "all"] },
-  { id: "messages", permKey: "messages", label: "گفتگوی زنده و پیام‌های کاربران", badge: "زنده", href: "/admin/messages", icon: "📩", requiredPerm: ["messages", "all"] },
-  { id: "reviews", permKey: "reviews", label: "دیدگاه‌ها و رضایت خریداران", href: "/admin/reviews", icon: "⭐", requiredPerm: ["reviews", "all"] },
-  { id: "roles", permKey: "roles", label: "مدیران و ماتریس دسترسی‌ها", href: "/admin/roles", icon: "🛡️", requiredPerm: ["roles", "all"] },
-  { id: "monitoring", permKey: "roles", label: "رادار نظارت زنده بر مدیران", href: "/admin/monitoring", icon: "👁️‍🗨️", badge: "ویژه مالک", requiredPerm: ["roles"] },
-  { id: "change_pin", permKey: "change_pin", label: "تغییر رمز عبور و پین امنیتی", href: "/admin/change-pin", icon: "🔐", requiredPerm: ["settings", "all"] },
-  { id: "audit_logs", permKey: "audit_logs", label: "لاگ‌های امنیتی و اسکنر هوشمند", href: "/admin/audit-logs", icon: "🚨", requiredPerm: ["audit_logs", "all"] },
-  { id: "backup", permKey: "backup", label: "بکاپ خودکار روزانه و بازیابی", href: "/admin/backup", icon: "💾", requiredPerm: ["backup", "all"] },
-  { id: "settings", permKey: "settings", label: "تنظیمات کلان و حالت تعمیرات", href: "/admin/settings", icon: "⚙️", requiredPerm: ["settings", "all"] },
+  {
+    id: "dashboard",
+    permKey: "dashboard",
+    label: "داشبورد تحلیلی و فرماندهی",
+    href: "/admin/dashboard",
+    icon: "📊",
+    requiredPerm: ["dashboard", "all"],
+  },
+  {
+    id: "inventory_hub",
+    permKey: "inventory",
+    label: "حسابداری، انبار، سفارشات و مالی",
+    href: "/admin/inventory",
+    icon: "🏛️",
+    badge: "یکپارچه",
+    requiredPerm: ["inventory", "orders", "financial", "reports", "all"],
+  },
+  {
+    id: "products",
+    permKey: "products",
+    label: "کاتالوگ محصولات و قیمت‌ها",
+    href: "/admin/products",
+    icon: "🛍️",
+    requiredPerm: ["products", "all"],
+  },
+  {
+    id: "banners",
+    permKey: "banners",
+    label: "بنرها و اسلایدر محصولات",
+    href: "/admin/banners",
+    icon: "🖼️",
+    requiredPerm: ["banners", "all"],
+  },
+  {
+    id: "customers",
+    permKey: "customers",
+    label: "مشتریان (CRM) و پیامک",
+    href: "/admin/customers",
+    icon: "👥",
+    requiredPerm: ["customers", "all"],
+  },
+  {
+    id: "coupons",
+    permKey: "coupons",
+    label: "کدهای تخفیف زمان‌دار و هدفمند",
+    href: "/admin/coupons",
+    icon: "🏷️",
+    requiredPerm: ["coupons", "all"],
+  },
+  {
+    id: "appearance_hub",
+    permKey: "appearance",
+    label: "استودیوی ظاهر، منوها و صفحه‌ساز",
+    href: "/admin/pages",
+    icon: "🎨",
+    badge: "یکپارچه",
+    requiredPerm: ["appearance", "menu", "pages", "all"],
+  },
+  {
+    id: "styles",
+    permKey: "styles",
+    label: "هویت بصری، فونت‌ها و CSS",
+    href: "/admin/styles",
+    icon: "✨",
+    requiredPerm: ["appearance", "styles", "all"],
+  },
+  {
+    id: "seo",
+    permKey: "seo",
+    label: "دستیار تخصصی سئو (رنک ۱)",
+    href: "/admin/seo",
+    icon: "🚀",
+    badge: "SEO",
+    requiredPerm: ["seo", "all"],
+  },
+  {
+    id: "blog",
+    permKey: "blog",
+    label: "وبلاگ و مقالات سئو (متصل به کالا)",
+    href: "/admin/blog",
+    icon: "📚",
+    requiredPerm: ["blog", "seo", "all"],
+  },
+  {
+    id: "news",
+    permKey: "news",
+    label: "رادار خودکار اخبار فناوری",
+    href: "/admin/news",
+    icon: "📡",
+    requiredPerm: ["news", "seo", "all"],
+  },
+  {
+    id: "messages",
+    permKey: "messages",
+    label: "گفتگوی زنده و پیام‌های کاربران",
+    badge: "زنده",
+    href: "/admin/messages",
+    icon: "📩",
+    requiredPerm: ["messages", "all"],
+  },
+  {
+    id: "reviews",
+    permKey: "reviews",
+    label: "دیدگاه‌ها و رضایت خریداران",
+    href: "/admin/reviews",
+    icon: "⭐",
+    requiredPerm: ["reviews", "all"],
+  },
+  {
+    id: "roles",
+    permKey: "roles",
+    label: "مدیران و ماتریس دسترسی‌ها",
+    href: "/admin/roles",
+    icon: "🛡️",
+    requiredPerm: ["roles", "all"],
+  },
+  {
+    id: "monitoring",
+    permKey: "roles",
+    label: "رادار نظارت زنده بر مدیران",
+    href: "/admin/monitoring",
+    icon: "👁️‍🗨️",
+    badge: "ویژه مالک",
+    requiredPerm: ["roles"],
+  },
+  {
+    id: "change_pin",
+    permKey: "change_pin",
+    label: "تغییر رمز عبور و پین امنیتی",
+    href: "/admin/change-pin",
+    icon: "🔐",
+    requiredPerm: ["settings", "all"],
+  },
+  {
+    id: "audit_logs",
+    permKey: "audit_logs",
+    label: "لاگ‌های امنیتی و اسکنر هوشمند",
+    href: "/admin/audit-logs",
+    icon: "🚨",
+    requiredPerm: ["audit_logs", "all"],
+  },
+  {
+    id: "backup",
+    permKey: "backup",
+    label: "بکاپ خودکار روزانه و بازیابی",
+    href: "/admin/backup",
+    icon: "💾",
+    requiredPerm: ["backup", "all"],
+  },
+  {
+    id: "settings",
+    permKey: "settings",
+    label: "تنظیمات کلان و حالت تعمیرات",
+    href: "/admin/settings",
+    icon: "⚙️",
+    requiredPerm: ["settings", "all"],
+  },
 ];
 
 export function AdminSidebar(props: any = {}) {
@@ -130,8 +270,10 @@ export function AdminSidebar(props: any = {}) {
   const allowedMenuItems = UNIFIED_ADMIN_NAV.filter((item) => {
     if (!sessionLoaded) return item.id === "dashboard";
     if (isSuper) return true;
-    // صفحه مدیریت مدیران (/admin/roles) و تغییر پین فقط مخصوص مالک سایت (superadmin) است
-    if (item.id === "roles" || item.id === "monitoring" || item.id === "change_pin") return false;
+    // صفحات مدیریت مدیران، رادار نظارت زنده و تغییر پین فقط مخصوص مالک سایت (superadmin) هستند
+    if (item.id === "roles" || item.id === "monitoring" || item.id === "change_pin") {
+      return false;
+    }
     return item.requiredPerm.some((p) => userPerms.includes(p));
   });
 
@@ -141,7 +283,7 @@ export function AdminSidebar(props: any = {}) {
     if (role === "order_manager") return "💳 پشتیبان سفارشات و مالی";
     if (role === "content_seo_manager") return "🚀 کارشناس محتوا و سئو";
     if (role === "viewer_reporter") return "👁️ بیننده و گزارش‌دهنده";
-    return "🛡 مدیر سیستم";
+    return "🛡️ مدیر سیستم";
   };
 
   return (
@@ -173,7 +315,6 @@ export function AdminSidebar(props: any = {}) {
         <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="font-black text-xs text-[var(--accent-blue)]">AXON ADMIN OS</span>
-            {/* دکمه ویرایش منوها منحصراً برای مدیر ارشد (superadmin) نمایش داده می‌شود */}
             {isSuper && (
               <button
                 type="button"
@@ -275,8 +416,8 @@ export function AdminSidebar(props: any = {}) {
                   pathname?.startsWith("/admin/reports"))) ||
               (item.id === "appearance_hub" &&
                 (pathname?.startsWith("/admin/pages") ||
-                  pathname?.startsWith("/admin/pages") ||
-                  pathname?.startsWith("/admin/pages")));
+                  pathname?.startsWith("/admin/appearance") ||
+                  pathname?.startsWith("/admin/menu")));
 
             const displayLabel =
               customLabels[item.id] && String(customLabels[item.id]).trim() !== ""
@@ -315,6 +456,17 @@ export function AdminSidebar(props: any = {}) {
                   <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white font-mono text-[10px] font-black animate-pulse shrink-0">
                     {unreadChatCount} پیام جدید
                   </span>
+                ) : isReadOnlyItem ? (
+                  <span
+                    className={
+                      "px-2 py-0.5 rounded-md text-[9px] font-bold shrink-0 " +
+                      (isActive
+                        ? "bg-white/20 text-white"
+                        : "bg-amber-500/15 text-amber-400")
+                    }
+                  >
+                    فقط مشاهده
+                  </span>
                 ) : item.badge ? (
                   <span
                     className={
@@ -349,5 +501,3 @@ export function AdminSidebar(props: any = {}) {
   );
 }
 export default AdminSidebar;
-
-// Sidebar Route Fixed: 1791382671242

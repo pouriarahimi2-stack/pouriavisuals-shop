@@ -72,7 +72,7 @@ export async function getAllAdminUsers(): Promise<StoredAdminUser[]> {
   const defaultSuper: StoredAdminUser = {
     id: "master-superadmin",
     username: "admin",
-    full_name: "مدیر ارشد",
+    full_name: "مدیر ارشد کل سیستم",
     role: "superadmin",
     permissions: ["all"],
     ui_theme: "dark",
@@ -83,18 +83,20 @@ export async function getAllAdminUsers(): Promise<StoredAdminUser[]> {
   for (const u of dbUsers) {
     const uname = String(u.username || u.email || "admin").trim().toLowerCase();
     const mappedInfo = legacyPermissionsMap[u.id] || legacyPermissionsMap[uname] || {};
+    const resolvedRole = uname === "admin" ? "superadmin" : u.role || mappedInfo.role || "viewer_reporter";
     mergedMap.set(uname, {
-      id: String(u.id || uname),
+      id: uname === "admin" ? "master-superadmin" : String(u.id || uname),
       username: String(u.username || u.email || "admin").trim(),
       full_name: u.full_name || mappedInfo.full_name || u.username || "مدیر سیستم",
-      role: u.role || mappedInfo.role || "superadmin",
-      permissions: Array.isArray(u.permissions)
-        ? u.permissions
-        : Array.isArray(mappedInfo.permissions)
-        ? mappedInfo.permissions
-        : u.role === "superadmin"
-        ? ["all"]
-        : ["dashboard"],
+      role: resolvedRole,
+      permissions:
+        resolvedRole === "superadmin"
+          ? ["all"]
+          : Array.isArray(u.permissions)
+          ? u.permissions
+          : Array.isArray(mappedInfo.permissions)
+          ? mappedInfo.permissions
+          : ["dashboard"],
       ui_theme: mappedInfo.ui_theme === "light" ? "light" : "dark",
       password_hash: u.password_hash || u.password || mappedInfo.password_hash,
       created_at: u.created_at || new Date().toISOString(),
@@ -105,10 +107,19 @@ export async function getAllAdminUsers(): Promise<StoredAdminUser[]> {
     if (!regUser?.username) continue;
     const uname = String(regUser.username).trim().toLowerCase();
     const existing = mergedMap.get(uname);
+    const resolvedRole = uname === "admin" ? "superadmin" : regUser.role || existing?.role || "viewer_reporter";
     mergedMap.set(uname, {
       ...(existing || {}),
       ...regUser,
+      id: uname === "admin" ? "master-superadmin" : regUser.id || existing?.id || uname,
       username: String(regUser.username).trim(),
+      role: resolvedRole,
+      permissions:
+        resolvedRole === "superadmin"
+          ? ["all"]
+          : Array.isArray(regUser.permissions) && regUser.permissions.length > 0
+          ? regUser.permissions
+          : existing?.permissions || ["dashboard"],
       ui_theme: regUser.ui_theme === "light" ? "light" : existing?.ui_theme || "dark",
       password_hash: regUser.password_hash || existing?.password_hash,
     });
@@ -126,16 +137,17 @@ export async function saveAdminUsersRegistry(users: StoredAdminUser[]): Promise<
   };
 
   for (const u of users) {
+    const isMaster = u.username.toLowerCase() === "admin";
     const entry = {
-      id: u.id,
+      id: isMaster ? "master-superadmin" : u.id,
       username: u.username,
       full_name: u.full_name,
-      role: u.role,
-      permissions: u.permissions,
+      role: isMaster ? "superadmin" : u.role,
+      permissions: isMaster || u.role === "superadmin" ? ["all"] : u.permissions,
       ui_theme: u.ui_theme === "light" ? "light" : "dark",
       password_hash: u.password_hash,
     };
-    permissionsMap[u.id] = entry;
+    permissionsMap[entry.id] = entry;
     permissionsMap[u.username.toLowerCase()] = entry;
   }
 

@@ -1,5 +1,5 @@
-import { recordSubAdminActivity } from "@/lib/subAdminMonitor";
 // File Path: app/api/admin/auth/route.ts
+import { recordSubAdminActivity } from "@/lib/subAdminMonitor";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyPayload, signPayload, COOKIE_NAME } from "@/lib/session";
 import { getAllAdminUsers, verifySubAdminCredentials } from "@/lib/adminUsersStorage";
@@ -89,7 +89,8 @@ export async function POST(req: NextRequest) {
 
     const subUserMatch = await verifySubAdminCredentials(rawUser, rawPass);
     if (subUserMatch) {
-      const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1";
+      const ip =
+        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1";
       recordSubAdminActivity({
         username: subUserMatch.username,
         full_name: subUserMatch.full_name,
@@ -101,6 +102,7 @@ export async function POST(req: NextRequest) {
         ip,
         userAgent: req.headers.get("user-agent") || "",
       }).catch(() => {});
+
       const resolvedTheme = subUserMatch.ui_theme === "light" ? "light" : "dark";
       const token = await signPayload({
         userId: subUserMatch.id,
@@ -132,50 +134,58 @@ export async function POST(req: NextRequest) {
       return res;
     }
 
-    const siteRow = await getMasterSiteInfoRow();
-    const secCfg = siteRow?.homepage_layout_config?.auth_security_config || {};
-    const adminPin = String(
-      secCfg.adminPin || process.env.ADMIN_MASTER_PIN || "123456"
-    ).trim();
-    const adminPass = String(
-      secCfg.adminPassword || process.env.ADMIN_PASSWORD || "admin123"
-    ).trim();
+    const isMasterUsername =
+      !rawUser || rawUser.toLowerCase() === "admin" || rawUser.toLowerCase() === "superadmin";
 
-    if (rawPass === adminPin || rawPass === adminPass || rawPass === "Axon2026!") {
-      const allUsers = await getAllAdminUsers();
-      const superRecord = allUsers.find(
-        (u) => u.role === "superadmin" || u.username.toLowerCase() === "admin"
-      );
-      const superTheme = superRecord?.ui_theme === "light" ? "light" : "dark";
+    if (isMasterUsername) {
+      const siteRow = await getMasterSiteInfoRow();
+      const secCfg = siteRow?.homepage_layout_config?.auth_security_config || {};
+      const adminPin = String(
+        secCfg.adminPin ||
+          secCfg.adminDeck?.pin ||
+          process.env.ADMIN_MASTER_PIN ||
+          "123456"
+      ).trim();
+      const adminPass = String(
+        secCfg.adminPassword || process.env.ADMIN_PASSWORD || "admin123"
+      ).trim();
 
-      const token = await signPayload({
-        userId: superRecord?.id || "master-superadmin",
-        username: superRecord?.username || "admin",
-        role: "superadmin",
-        permissions: ["all"],
-        ui_theme: superTheme,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 12,
-      } as any);
+      if (rawPass === adminPin || rawPass === adminPass || rawPass === "Axon2026!") {
+        const allUsers = await getAllAdminUsers();
+        const superRecord = allUsers.find(
+          (u) => u.role === "superadmin" || u.username.toLowerCase() === "admin"
+        );
+        const superTheme = superRecord?.ui_theme === "light" ? "light" : "dark";
 
-      const res = NextResponse.json({
-        success: true,
-        authenticated: true,
-        user: {
-          id: superRecord?.id || "master-superadmin",
+        const token = await signPayload({
+          userId: superRecord?.id || "master-superadmin",
           username: superRecord?.username || "admin",
-          full_name: superRecord?.full_name || "مدیر ارشد",
           role: "superadmin",
           permissions: ["all"],
           ui_theme: superTheme,
-        },
-      });
-      res.cookies.set(COOKIE_NAME, token, {
-        httpOnly: true,
-        path: "/",
-        sameSite: "lax",
-        maxAge: 60 * 60 * 12,
-      });
-      return res;
+          exp: Math.floor(Date.now() / 1000) + 60 * 60 * 12,
+        } as any);
+
+        const res = NextResponse.json({
+          success: true,
+          authenticated: true,
+          user: {
+            id: superRecord?.id || "master-superadmin",
+            username: superRecord?.username || "admin",
+            full_name: superRecord?.full_name || "مدیر ارشد کل سیستم",
+            role: "superadmin",
+            permissions: ["all"],
+            ui_theme: superTheme,
+          },
+        });
+        res.cookies.set(COOKIE_NAME, token, {
+          httpOnly: true,
+          path: "/",
+          sameSite: "lax",
+          maxAge: 60 * 60 * 12,
+        });
+        return res;
+      }
     }
 
     return NextResponse.json(

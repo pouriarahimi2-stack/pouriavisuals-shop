@@ -6,15 +6,25 @@ import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
 
-// ─── autoSeed: فقط از /api/cron/news صدا زده می‌شود (نه از GET عمومی)
-// تابع export شده تا cron بتواند مستقیم صدایش بزند
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function normalizeSlug(raw: string): string {
+  return String(raw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+// ─── autoSeed: فقط از /api/cron/news صدا زده می‌شود (با بررسی کامل عدم تکرار تیتر)
 export async function autoSeedWeeklySeoNewsIfNeeded(): Promise<void> {
   try {
     const { data: existing } = await supabaseAdmin
       .from("tech_news")
-      .select("id, created_at")
+      .select("id, title, created_at")
       .order("created_at", { ascending: false })
-      .limit(5);
+      .limit(30);
 
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
     const isStale =
@@ -23,6 +33,10 @@ export async function autoSeedWeeklySeoNewsIfNeeded(): Promise<void> {
       Date.now() - new Date(existing[0].created_at || 0).getTime() > sevenDaysMs;
 
     if (!isStale) return;
+
+    const existingTitles = new Set(
+      (existing || []).map((item: any) => String(item.title || "").trim())
+    );
 
     const { data: prods } = await supabaseAdmin
       .from("products")
@@ -33,17 +47,25 @@ export async function autoSeedWeeklySeoNewsIfNeeded(): Promise<void> {
     const p2 = prods?.[1] || p1;
 
     const nowIso = new Date().toISOString();
-    const autonomousNews = [
+    const candidateNews = [
       {
         id: randomUUID(),
-        title: "تحول بزرگ در گجت‌های هوشمند کاربردی ۲۰۲۶؛ چرا ابزارهای پرتابل نسل جدید پرفروش‌ترین‌های بازار شدند؟",
-        slug: "smart-portable-gadgets-trends-2026-" + Date.now().toString().slice(-4),
-        summary: "بررسی تخصصی جدیدترین فناوری‌های به‌‌کاررفته در گجت‌های هوشمند خانگی و پرتابل با مصرف بهینه انرژی و ارگونومی پیشرفته.",
+        title:
+          "تحول بزرگ در گجت‌های هوشمند کاربردی ۲۰۲۶؛ چرا ابزارهای پرتابل نسل جدید پرفروش‌ترین‌های بازار شدند؟",
+        slug: "smart-portable-gadgets-trends-2026",
+        summary:
+          "بررسی تخصصی جدیدترین فناوری‌های به‌کاررفته در گجت‌های هوشمند خانگی و پرتابل با مصرف بهینه انرژی و ارگونومی پیشرفته.",
         content: [
           "<h2>عصر جدید گجت‌های هوشمند و پرتابل در سال ۲۰۲۶</h2>",
           "<p>امروزه کاربران حرفه‌ای به دنبال ابزارهایی هستند که علاوه بر اشغال کمترین فضا، بالاترین بازدهی و سرعت را در استفاده روزمره و سفر ارائه دهند.</p>",
           p1
-            ? "<h3>پیشنهاد ویژه در کاتالوگ آکسون: " + p1.title + "</h3><p>یکی از برجسته‌ترین محصولات موجود در این رده، <strong>" + p1.title + '</strong> است که با ضمانت اصالت و ارسال سریع در <a href="/products/' + p1.id + '">کاتالوگ رسمی آکسون کور</a> عرضه می‌شود.</p>'
+            ? "<h3>پیشنهاد ویژه در کاتالوگ آکسون: " +
+              p1.title +
+              "</h3><p>یکی از برجسته‌ترین محصولات موجود در این رده، <strong>" +
+              p1.title +
+              '</strong> است که با ضمانت اصالت و ارسال سریع در <a href="/products/' +
+              p1.id +
+              '">کاتالوگ رسمی آکسون کور</a> عرضه می‌شود.</p>'
             : "",
           "<p>انتظار می‌رود تقاضا برای گجت‌های هوشمند چندکاره در نیمه دوم سال بیش از ۴۵ درصد رشد داشته باشد.</p>",
         ].join("\n"),
@@ -59,14 +81,20 @@ export async function autoSeedWeeklySeoNewsIfNeeded(): Promise<void> {
       },
       {
         id: randomUUID(),
-        title: "استاندارد تاندربولت ۵ و USB4؛ جهش ۳ برابری سرعت انتقال داده و شارژ فوق سریع در تجهیزات دیجیتال",
-        slug: "thunderbolt-5-usb4-hardware-revolution-" + (Date.now() + 1).toString().slice(-4),
-        summary: "تحلیل فنی پهنای باند ۱۲۰ گیگابیت بر ثانیه در استاندارد Thunderbolt 5 و تاثیر آن بر نمایشگرها و گجت‌های نسل جدید.",
+        title:
+          "استاندارد تاندربولت ۵ و USB4؛ جهش ۳ برابری سرعت انتقال داده و شارژ فوق سریع در تجهیزات دیجیتال",
+        slug: "thunderbolt-5-usb4-hardware-revolution",
+        summary:
+          "تحلیل فنی پهنای باند ۱۲۰ گیگابیت بر ثانیه در استاندارد Thunderbolt 5 و تاثیر آن بر نمایشگرها و گجت‌های نسل جدید.",
         content: [
           "<h2>پایان عصر کابل‌های کند و شلوغ با Thunderbolt 5</h2>",
           "<p>استاندارد جدید تاندربولت ۵ با ارائه پهنای باند دوطرفه ۸۰ گیگابیت بر ثانیه و حالت Bandwidth Boost تا ۱۲۰ گیگابیت بر ثانیه، امکان انتقال هم‌زمان تصویر، داده و توان شارژ تا ۲۴۰ وات را روی یک کابل واحد فراهم می‌کند.</p>",
           p2
-            ? '<p>جهت بررسی و خرید جدیدترین تجهیزات دیجیتال استاندارد، به صفحه <a href="/products/' + p2.id + '"><strong>' + p2.title + "</strong></a> مراجعه فرمایید.</p>"
+            ? '<p>جهت بررسی و خرید جدیدترین تجهیزات دیجیتال استاندارد، به صفحه <a href="/products/' +
+              p2.id +
+              '"><strong>' +
+              p2.title +
+              "</strong></a> مراجعه فرمایید.</p>"
             : "",
         ].join("\n"),
         category: "hardware",
@@ -81,42 +109,76 @@ export async function autoSeedWeeklySeoNewsIfNeeded(): Promise<void> {
       },
     ];
 
-    await supabaseAdmin.from("tech_news").insert(autonomousNews);
+    const nonDuplicateNews = candidateNews.filter(
+      (item) => !existingTitles.has(item.title.trim())
+    );
+
+    if (nonDuplicateNews.length > 0) {
+      await supabaseAdmin.from("tech_news").insert(nonDuplicateNews);
+    }
   } catch {
-    // سایلنت — شکست در autoSeed نباید GET عمومی رو خراب کنه
+    // سایلنت
   }
 }
 
-// ─── GET عمومی: فقط خواندن — بدون هیچ‌گونه نوشتن
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get("slug");
+    const id = searchParams.get("id");
+    const includeDrafts = searchParams.get("includeDrafts") === "true";
 
-    if (slug) {
-      const { data: newsItem, error } = await supabaseAdmin
-        .from("tech_news")
-        .select("*")
-        .eq("slug", slug)
-        .eq("is_published", true)   // فقط منتشرشده
-        .maybeSingle();
-      if (error) throw error;
+    if (slug || id) {
+      const targetKey = decodeURIComponent(String(slug || id || "")).trim();
+      let newsItem: any = null;
+
+      if (UUID_REGEX.test(targetKey)) {
+        const { data } = await supabaseAdmin
+          .from("tech_news")
+          .select("*")
+          .eq("id", targetKey)
+          .maybeSingle();
+        newsItem = data;
+      }
+
+      if (!newsItem) {
+        const { data } = await supabaseAdmin
+          .from("tech_news")
+          .select("*")
+          .eq("slug", targetKey)
+          .maybeSingle();
+        newsItem = data;
+      }
+
       if (!newsItem) {
         return NextResponse.json(
           { success: false, data: null, news: null, message: "خبر یافت نشد." },
           { status: 404 }
         );
       }
-      return NextResponse.json({ success: true, data: newsItem, news: newsItem });
+
+      return NextResponse.json(
+        { success: true, data: newsItem, news: newsItem },
+        { headers: { "Cache-Control": "no-store, max-age=0" } }
+      );
     }
 
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("tech_news")
       .select("*")
-      .eq("is_published", true)     // فقط منتشرشده‌ها
       .order("created_at", { ascending: false });
+
+    if (!includeDrafts) {
+      query = query.eq("is_published", true);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
-    return NextResponse.json({ success: true, data: data || [], news: data || [] });
+
+    return NextResponse.json(
+      { success: true, data: data || [], news: data || [] },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
   } catch (err: any) {
     return NextResponse.json(
       { success: false, data: [], news: [], message: err.message },
@@ -125,29 +187,53 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ─── POST: ایجاد یا ویرایش خبر (فقط ادمین)
 export async function POST(req: NextRequest) {
   try {
     const session = await verifyAdminSession(req);
     if (!session) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
+
     const body = await req.json();
+
+    // اکشن تغییر سریع وضعیت انتشار خبر
+    if (body.action === "toggle_publish" && body.id) {
+      const { data: updated, error } = await supabaseAdmin
+        .from("tech_news")
+        .update({
+          is_published: Boolean(body.is_published),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", body.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return NextResponse.json({
+        success: true,
+        message: updated.is_published
+          ? "✓ خبر در رادار فناوری سایت منتشر شد."
+          : "✓ خبر به حالت پیش‌نویس تغییر یافت.",
+        data: updated,
+      });
+    }
+
     const cleanTitle = String(body.title || "").trim();
     if (!cleanTitle) {
-      return NextResponse.json({ success: false, message: "تیتر خبر الزامی است." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "تیتر خبر الزامی است." },
+        { status: 400 }
+      );
     }
-    const newsId = body.id && String(body.id).length > 10 ? body.id : randomUUID();
-    const cleanSlug = String(body.slug || cleanTitle)
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
-      .replace(/^-+|-+$/g, "");
 
+    const newsId = body.id && String(body.id).length > 10 ? body.id : randomUUID();
+    const baseSlug =
+      normalizeSlug(body.slug || cleanTitle) || "tech-news-" + Date.now().toString().slice(-5);
+
+    const nowIso = new Date().toISOString();
     const payload: Record<string, any> = {
       id: newsId,
       title: cleanTitle,
-      slug: cleanSlug,
+      slug: baseSlug,
       summary: body.summary ? String(body.summary).trim() : cleanTitle,
       content: body.content ? String(body.content).trim() : "",
       category: body.category || "hardware",
@@ -158,7 +244,7 @@ export async function POST(req: NextRequest) {
       tags: Array.isArray(body.tags) ? body.tags : ["تکنولوژی", "سخت افزار"],
       is_published: body.is_published !== undefined ? Boolean(body.is_published) : true,
       trending_score: body.trending_score ? Number(body.trending_score) : 95,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso,
     };
 
     if (body.id) {
@@ -169,17 +255,36 @@ export async function POST(req: NextRequest) {
         .select()
         .single();
       if (error) throw error;
-      return NextResponse.json({ success: true, message: "خبر با موفقیت به‌روزرسانی شد.", data });
+      return NextResponse.json({
+        success: true,
+        message: "✓ خبر با موفقیت به‌روزرسانی شد.",
+        data,
+      });
     } else {
-      payload.published_at = new Date().toISOString();
-      payload.created_at = new Date().toISOString();
+      const { data: existingSlug } = await supabaseAdmin
+        .from("tech_news")
+        .select("id")
+        .eq("slug", baseSlug)
+        .maybeSingle();
+
+      if (existingSlug) {
+        payload.slug = `${baseSlug}-${Date.now().toString().slice(-4)}`;
+      }
+
+      payload.published_at = nowIso;
+      payload.created_at = nowIso;
+
       const { data, error } = await supabaseAdmin
         .from("tech_news")
         .insert([payload])
         .select()
         .single();
       if (error) throw error;
-      return NextResponse.json({ success: true, message: "خبر با موفقیت منتشر گردید.", data });
+      return NextResponse.json({
+        success: true,
+        message: "✓ خبر با موفقیت منتشر گردید.",
+        data,
+      });
     }
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
@@ -199,11 +304,17 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     if (!id) {
-      return NextResponse.json({ success: false, message: "شناسه خبر الزامی است." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "شناسه خبر الزامی است." },
+        { status: 400 }
+      );
     }
     const { error } = await supabaseAdmin.from("tech_news").delete().eq("id", id);
     if (error) throw error;
-    return NextResponse.json({ success: true, message: "خبر با موفقیت از سیستم حذف گردید." });
+    return NextResponse.json({
+      success: true,
+      message: "✓ خبر با موفقیت از دیتابیس حذف گردید.",
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

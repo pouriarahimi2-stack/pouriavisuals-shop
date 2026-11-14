@@ -1,6 +1,7 @@
+// File Path: components/ProductReviews.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
 
@@ -37,10 +38,13 @@ export function ProductReviews(props: ProductReviewsProps) {
     text: string;
   } | null>(null);
 
-  const fetchProductReviews = async () => {
+  const fetchProductReviews = useCallback(async () => {
     try {
       const res = await fetch(
-        "/api/reviews?productId=" + encodeURIComponent(resolvedProductId),
+        "/api/reviews?productId=" +
+          encodeURIComponent(resolvedProductId) +
+          "&t=" +
+          Date.now(),
         { cache: "no-store" }
       );
       const json = await res.json();
@@ -53,7 +57,7 @@ export function ProductReviews(props: ProductReviewsProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [resolvedProductId]);
 
   useEffect(() => {
     fetchProductReviews();
@@ -62,11 +66,29 @@ export function ProductReviews(props: ProductReviewsProps) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "reviews" },
-        () => { fetchProductReviews(); }
+        () => {
+          fetchProductReviews();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "product_reviews" },
+        () => {
+          fetchProductReviews();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "site_info" },
+        () => {
+          fetchProductReviews();
+        }
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [resolvedProductId]);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [resolvedProductId, fetchProductReviews]);
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +112,8 @@ export function ProductReviews(props: ProductReviewsProps) {
         soundEngine.playSuccess();
         setFeedback({ type: "success", text: json.message });
         setComment("");
-        fetchProductReviews();
+        setUserName("");
+        await fetchProductReviews();
       } else {
         setFeedback({
           type: "error",
@@ -101,7 +124,7 @@ export function ProductReviews(props: ProductReviewsProps) {
       setFeedback({ type: "error", text: "خطا در برقراری ارتباط با سرور." });
     } finally {
       setSubmitting(false);
-      setTimeout(() => setFeedback(null), 4000);
+      setTimeout(() => setFeedback(null), 4500);
     }
   };
 
@@ -109,10 +132,10 @@ export function ProductReviews(props: ProductReviewsProps) {
     <section
       className="mt-10 p-5 sm:p-8 rounded-3xl border font-sans select-text space-y-6"
       style={{
-        background: "var(--glass-bg)",
+        background: "var(--glass-bg, var(--modal-bg))",
         backdropFilter: "blur(16px) saturate(160%)",
         WebkitBackdropFilter: "blur(16px) saturate(160%)",
-        border: "1px solid var(--glass-border)",
+        border: "1px solid var(--glass-border, var(--card-border))",
         color: "var(--text-primary)",
       }}
       dir="rtl"
@@ -120,22 +143,20 @@ export function ProductReviews(props: ProductReviewsProps) {
       {/* هدر آمار */}
       <div
         className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 pb-5"
-        style={{ borderBottom: "1px solid var(--glass-border)" }}
+        style={{ borderBottom: "1px solid var(--glass-border, var(--card-border))" }}
       >
         <div>
           <h3
             className="text-base sm:text-lg font-black flex items-center gap-2"
             style={{ color: "var(--accent-blue)" }}
           >
-            <span>💬</span> دیدگاه‌ها، تجربیات خرید و میزان رضایت از{" "}
-            {resolvedTitle}
+            <span>💬</span> دیدگاه‌ها، تجربیات خرید و میزان رضایت از {resolvedTitle}
           </h3>
           <p
             className="text-xs mt-1 font-medium"
             style={{ color: "var(--text-secondary)" }}
           >
-            تمامی دیدگاه‌ها به صورت بلادرنگ (Realtime) نمایش داده می‌شوند و
-            قابل پیگیری هستند
+            تمامی دیدگاه‌ها به صورت بلادرنگ (Realtime) نمایش داده می‌شوند و قابل پیگیری هستند
           </p>
         </div>
 
@@ -144,7 +165,7 @@ export function ProductReviews(props: ProductReviewsProps) {
             className="p-3 rounded-2xl"
             style={{
               background: "var(--input-bg)",
-              border: "1px solid var(--glass-border)",
+              border: "1px solid var(--glass-border, var(--card-border))",
             }}
           >
             <span
@@ -172,14 +193,11 @@ export function ProductReviews(props: ProductReviewsProps) {
             <span className="font-mono font-black text-base text-amber-400 block">
               {stats.averageRating} ★
             </span>
-            <span className="text-[10px] text-amber-400 font-bold">
-              امتیاز کل
-            </span>
+            <span className="text-[10px] text-amber-400 font-bold">امتیاز کل</span>
           </div>
         </div>
       </div>
 
-      {/* فیدبک ثبت */}
       {feedback && (
         <div
           className={
@@ -193,12 +211,6 @@ export function ProductReviews(props: ProductReviewsProps) {
         </div>
       )}
 
-      {/*
-        ══ Layout ════════════════════════════════════════════
-        موبایل: 1 ستون (فرم بالا، لیست پایین)
-        دسکتاپ: 2 ستون (فرم 5/12، لیست 7/12)
-        ═════════════════════════════════════════════════════
-      */}
       <div className="flex flex-col lg:flex-row gap-6">
         {/* فرم ثبت دیدگاه */}
         <form
@@ -206,7 +218,7 @@ export function ProductReviews(props: ProductReviewsProps) {
           className="w-full lg:w-5/12 p-5 rounded-2xl space-y-4 h-fit"
           style={{
             background: "var(--input-bg)",
-            border: "1px solid var(--glass-border)",
+            border: "1px solid var(--glass-border, var(--card-border))",
           }}
         >
           <h4 className="font-black text-sm" style={{ color: "var(--text-primary)" }}>
@@ -228,7 +240,7 @@ export function ProductReviews(props: ProductReviewsProps) {
               className="w-full p-3 rounded-xl font-bold outline-none text-sm"
               style={{
                 background: "var(--modal-bg)",
-                border: "1px solid var(--glass-border)",
+                border: "1px solid var(--glass-border, var(--card-border))",
                 color: "var(--text-primary)",
               }}
             />
@@ -254,15 +266,14 @@ export function ProductReviews(props: ProductReviewsProps) {
                   style={
                     rating === star
                       ? {
-                          background:
-                            "linear-gradient(135deg,#f59e0b,#d97706)",
+                          background: "linear-gradient(135deg,#f59e0b,#d97706)",
                           color: "#fff",
                           boxShadow: "0 2px 8px rgba(245,158,11,0.4)",
                         }
                       : {
                           background: "var(--modal-bg)",
                           color: "var(--text-secondary)",
-                          border: "1px solid var(--glass-border)",
+                          border: "1px solid var(--glass-border, var(--card-border))",
                         }
                   }
                 >
@@ -288,24 +299,23 @@ export function ProductReviews(props: ProductReviewsProps) {
               className="w-full p-3 rounded-xl outline-none leading-relaxed text-sm"
               style={{
                 background: "var(--modal-bg)",
-                border: "1px solid var(--glass-border)",
+                border: "1px solid var(--glass-border, var(--card-border))",
                 color: "var(--text-primary)",
               }}
             />
           </div>
 
-          {/* دکمه ثبت — گرادیان کپسولی */}
           <button
             type="submit"
             disabled={submitting}
-            className="btn-glass-primary w-full py-3.5 font-black text-sm transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-glass-primary w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-sm transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
           >
             {submitting ? "در حال ثبت..." : "ثبت دیدگاه زیر محصول 🚀"}
           </button>
         </form>
 
         {/* لیست دیدگاه‌ها */}
-        <div className="w-full lg:w-7/12 space-y-3 lg:max-h-[520px] lg:overflow-y-auto">
+        <div className="w-full lg:w-7/12 space-y-3 lg:max-h-[520px] lg:overflow-y-auto pr-1">
           {loading ? (
             <div
               className="py-12 text-center font-bold text-sm"
@@ -318,12 +328,11 @@ export function ProductReviews(props: ProductReviewsProps) {
               className="p-8 rounded-2xl text-center font-bold text-sm"
               style={{
                 background: "var(--input-bg)",
-                border: "1px solid var(--glass-border)",
+                border: "1px solid var(--glass-border, var(--card-border))",
                 color: "var(--text-secondary)",
               }}
             >
-              اولین نفری باشید که دیدگاه خود را برای این محصول ثبت
-              می‌کند.
+              اولین نفری باشید که دیدگاه خود را برای این محصول ثبت می‌کند.
             </div>
           ) : (
             reviews.map((rev) => (
@@ -332,7 +341,7 @@ export function ProductReviews(props: ProductReviewsProps) {
                 className="p-4 rounded-2xl space-y-2.5"
                 style={{
                   background: "var(--input-bg)",
-                  border: "1px solid var(--glass-border)",
+                  border: "1px solid var(--glass-border, var(--card-border))",
                 }}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -345,15 +354,20 @@ export function ProductReviews(props: ProductReviewsProps) {
                     </span>
                     {Number(rev.rating || 5) >= 4 && (
                       <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold">
-                        پیشنهاد می‌کنم 👍
+                        خریدار راضی 👍
                       </span>
                     )}
                   </div>
-                  <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-mono font-bold text-xs self-start sm:self-auto">
-                    {"★".repeat(
-                      Math.max(1, Math.min(5, Number(rev.rating || 5)))
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-mono font-bold text-xs">
+                      {"★".repeat(Math.max(1, Math.min(5, Number(rev.rating || 5))))}
+                    </span>
+                    {rev.created_at && (
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {new Date(rev.created_at).toLocaleDateString("fa-IR")}
+                      </span>
                     )}
-                  </span>
+                  </div>
                 </div>
 
                 <p
@@ -364,9 +378,8 @@ export function ProductReviews(props: ProductReviewsProps) {
                 </p>
 
                 {rev.admin_reply && (
-                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs">
-                    <strong>پاسخ رسمی پشتیبانی آکسون:</strong>{" "}
-                    {rev.admin_reply}
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs leading-relaxed">
+                    <strong>🛡️ پاسخ رسمی پشتیبانی آکسون کور:</strong> {rev.admin_reply}
                   </div>
                 )}
               </div>

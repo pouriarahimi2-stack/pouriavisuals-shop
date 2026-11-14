@@ -5,9 +5,9 @@ import { getAllAdminUsers } from "@/lib/adminUsersStorage";
 import {
   recordSubAdminActivity,
   getSubAdminMonitoringSnapshot,
+  clearSubAdminMonitoringLedger,
   MonitorEventType,
 } from "@/lib/subAdminMonitor";
-import { getMasterSiteInfoRow, saveMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +50,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        message: "⛔ دسترسی غیرمجاز! بخش نظارت زنده بر مدیران منحصراً در اختیار مدیر ارشد است.",
+        message:
+          "⛔ دسترسی غیرمجاز! بخش نظارت زنده بر مدیران منحصراً در اختیار مدیر ارشد است.",
       },
       { status: 403 }
     );
@@ -67,12 +68,19 @@ export async function GET(req: NextRequest) {
     const subAdminOnlyList = allUsers.filter(
       (u) => u.role !== "superadmin" && u.username.toLowerCase() !== "admin"
     );
+
     const monitoredUsers = subAdminOnlyList.map((u) => {
       const key = u.username.toLowerCase();
       const p = snapshot.presenceMap[key];
       const lastActiveMs = p?.lastActiveAt ? new Date(p.lastActiveAt).getTime() : 0;
-      const secondsAgo = lastActiveMs > 0 ? Math.max(0, Math.floor((nowMs - lastActiveMs) / 1000)) : null;
-      const isOnline = secondsAgo !== null && secondsAgo < 45;
+      const secondsAgo =
+        lastActiveMs > 0 ? Math.max(0, Math.floor((nowMs - lastActiveMs) / 1000)) : null;
+
+      const isOnline =
+        !p?.isLoggedOut &&
+        p?.lastEventType !== "logout" &&
+        secondsAgo !== null &&
+        secondsAgo < 45;
 
       const sectionVisitsObj = p?.sectionVisits || {};
       const topSections = Object.entries(sectionVisitsObj)
@@ -108,10 +116,14 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    const filteredEvents = snapshot.events.filter(
+      (e) => e.role !== "superadmin" && e.username.toLowerCase() !== "admin"
+    );
+
     const onlineCount = monitoredUsers.filter((u) => u.isOnline).length;
-    const subAdminsCount = monitoredUsers.filter((u) => u.role !== "superadmin").length;
-    const totalEventsCount = snapshot.events.length;
-    const totalBlockedCount = snapshot.events.filter(
+    const subAdminsCount = monitoredUsers.length;
+    const totalEventsCount = filteredEvents.length;
+    const totalBlockedCount = filteredEvents.filter(
       (e) => e.eventType === "action_blocked"
     ).length;
 
@@ -127,9 +139,7 @@ export async function GET(req: NextRequest) {
           totalBlockedCount,
         },
         users: monitoredUsers,
-        events: snapshot.events.filter(
-          (e) => e.role !== "superadmin" && e.username.toLowerCase() !== "admin"
-        ),
+        events: filteredEvents,
       },
       { headers: { "Cache-Control": "no-store, max-age=0" } }
     );
@@ -147,27 +157,17 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
 
-    if (body.action === "clear_logs") {
+    if (body.action === "clear_logs" || body.action === "reset_all") {
       if (currentUser.role !== "superadmin") {
         return NextResponse.json({ success: false }, { status: 403 });
       }
-      const siteRow = await getMasterSiteInfoRow();
-      const layoutCfg = siteRow?.homepage_layout_config || {};
-      await saveMasterSiteInfoRow(
-        siteRow,
-        {
-          ...layoutCfg,
-          subadmin_monitoring_ledger: {
-            presenceMap: layoutCfg.subadmin_monitoring_ledger?.presenceMap || {},
-            events: [],
-            updatedAt: new Date().toISOString(),
-          },
-        },
-        {}
-      );
+      const resetCounters = body.action === "reset_all";
+      await clearSubAdminMonitoringLedger(resetCounters);
       return NextResponse.json({
         success: true,
-        message: "✓ تاریخچه ریز فعالیت‌ها پاکسازی شد.",
+        message: resetCounters
+          ? "✓ تاریخچه رویدادها و تمام شمارنده‌های آماری زیرمجموعه‌ها بازنشانی شد."
+          : "✓ تاریخچه ریز فعالیت‌ها به طور کامل پاکسازی شد.",
       });
     }
 

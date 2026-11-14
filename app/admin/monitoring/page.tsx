@@ -1,6 +1,8 @@
-"use client";
 // File Path: app/admin/monitoring/page.tsx
+"use client";
+
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
@@ -124,7 +126,6 @@ export default function AdminMonitoringPage() {
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [wsConnected, setWsConnected] = useState(true);
 
   const [summary, setSummary] = useState({
     totalUsers: 0,
@@ -154,7 +155,7 @@ export default function AdminMonitoringPage() {
       }
       const json = await res.json();
       if (json.success) {
-        setSummary(json.summary || summary);
+        if (json.summary) setSummary(json.summary);
         setUsers(json.users || []);
         setEvents(json.events || []);
       }
@@ -164,11 +165,11 @@ export default function AdminMonitoringPage() {
     }
   }, [router]);
 
-  // اتصال هم‌زمان به وب‌سوکت Supabase Realtime + BroadcastChannel + استریم زنده ۲ ثانیه‌ای (بدون نیاز به هیچ رفرشی)
   useEffect(() => {
     fetchMonitoringData();
 
-    const uniqueChannelName = "axon-monitoring-page-" + Math.random().toString(36).slice(2, 8);
+    const uniqueChannelName =
+      "axon-monitoring-page-" + Math.random().toString(36).slice(2, 8);
     const ch = supabase
       .channel(uniqueChannelName)
       .on(
@@ -178,9 +179,7 @@ export default function AdminMonitoringPage() {
           fetchMonitoringData();
         }
       )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") setWsConnected(true);
-      });
+      .subscribe();
 
     let bc: BroadcastChannel | null = null;
     try {
@@ -190,7 +189,7 @@ export default function AdminMonitoringPage() {
       };
     } catch {}
 
-    const timer = autoRefresh ? setInterval(fetchMonitoringData, 2000) : null;
+    const timer = autoRefresh ? setInterval(fetchMonitoringData, 2500) : null;
 
     return () => {
       supabase.removeChannel(ch);
@@ -199,19 +198,23 @@ export default function AdminMonitoringPage() {
     };
   }, [fetchMonitoringData, autoRefresh]);
 
-  const handleClearLogs = async () => {
-    if (!confirm("آیا از پاکسازی تاریخچه ریز فعالیت‌ها اطمینان دارید؟")) return;
+  const handleClearLogs = async (resetAll = false) => {
+    const confirmMsg = resetAll
+      ? "آیا از پاکسازی کامل تاریخچه رویدادها و صفر کردن تمام شمارنده‌های آماری زیرمجموعه‌ها اطمینان دارید؟"
+      : "آیا از پاکسازی تاریخچه ریز فعالیت‌ها اطمینان دارید؟";
+    if (!confirm(confirmMsg)) return;
+
     soundEngine.playClick();
     const res = await fetch("/api/admin/monitoring", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "clear_logs" }),
+      body: JSON.stringify({ action: resetAll ? "reset_all" : "clear_logs" }),
     });
     const json = await res.json();
     if (res.ok && json.success) {
       soundEngine.playSuccess();
       setFeedback(json.message);
-      fetchMonitoringData();
+      await fetchMonitoringData();
       setTimeout(() => setFeedback(null), 3500);
     }
   };
@@ -247,7 +250,9 @@ export default function AdminMonitoringPage() {
     const csvContent =
       "\uFEFF" +
       [headers, ...rows]
-        .map((r) => r.map((cell) => `"${String(cell || "").replace(/"/g, '""')}"`).join(","))
+        .map((r) =>
+          r.map((cell) => `"${String(cell || "").replace(/"/g, '""')}"`).join(",")
+        )
         .join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -294,11 +299,11 @@ export default function AdminMonitoringPage() {
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       {/* هدر مرکز نظارت زنده مدیر ارشد */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2 md:gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-              <span>👁️️‍🗨️</span> رادار نظارت بلادرنگ (WebSocket) و کارنامه کامل زیرمجموعه‌ها
+              <span>👁️‍🗨️</span> رادار نظارت بلادرنگ (WebSocket) و کارنامه کامل زیرمجموعه‌ها
             </h1>
             <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-black flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
@@ -337,74 +342,100 @@ export default function AdminMonitoringPage() {
 
           <button
             type="button"
-            onClick={handleClearLogs}
+            onClick={() => handleClearLogs(false)}
             className="px-3.5 py-2.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 font-bold cursor-pointer hover:bg-rose-500 hover:text-white transition"
           >
             🗑️ پاکسازی تاریخچه
           </button>
+
+          <button
+            type="button"
+            onClick={() => handleClearLogs(true)}
+            className="px-3.5 py-2.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold cursor-pointer hover:bg-amber-500 hover:text-slate-950 transition"
+            title="پاکسازی تاریخچه و صفر کردن شمارنده‌های آماری"
+          >
+            🔄 بازنشانی شمارنده‌ها
+          </button>
         </div>
       </div>
 
-      {/* نوار تیکر زنده آخرین حرکت انجام‌شده در کل پنل در همین ثانیه */}
+      {/* نوار تیکر زنده آخرین حرکت انجام‌شده در کل پنل */}
       {latestEvent && (
         <div className="p-3.5 px-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--accent-blue)]/40 flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2.5">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping shrink-0" />
-            <span className="font-black text-[var(--accent-blue)]">آخرین حرکت ثبت‌شده به صورت زنده:</span>
-            <span className="font-black">{latestEvent.full_name} (@{latestEvent.username})</span>
+            <span className="font-black text-[var(--accent-blue)]">
+              آخرین حرکت ثبت‌شده به صورت زنده:
+            </span>
+            <span className="font-black">
+              {latestEvent.full_name} (@{latestEvent.username})
+            </span>
             <span>←</span>
             <span className="font-bold text-emerald-400">{latestEvent.details}</span>
           </div>
           <span className="font-mono text-[11px] text-slate-400">
-            {new Date(latestEvent.timestamp).toLocaleTimeString("fa-IR")} | IP: {latestEvent.ip}
+            {new Date(latestEvent.timestamp).toLocaleTimeString("fa-IR")} | IP:{" "}
+            {latestEvent.ip}
           </span>
         </div>
       )}
 
       {feedback && (
-        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-black">
+        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-black animate-fadeIn">
           {feedback}
         </div>
       )}
 
       {/* کارت‌های خلاصه وضعیت کلی */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 text-xs">
-        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
-          <span className="text-[var(--text-secondary)] font-bold">افراد آنلاین در همین لحظه:</span>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1 shadow-md">
+          <span className="text-[var(--text-secondary)] font-bold">
+            افراد آنلاین در همین لحظه:
+          </span>
           <span className="text-xl font-black font-mono text-emerald-400 block">
             {summary.onlineCount} نفر آنلاین ●
           </span>
           <span className="text-[10px] text-slate-400">
-            از مجموع {summary.totalUsers} حساب مدیریتی
+            از مجموع {summary.totalUsers} زیرمجموعه مدیریتی
           </span>
         </div>
 
-        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
-          <span className="text-[var(--text-secondary)] font-bold">زیرمجموعه‌های تحت نظارت:</span>
+        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1 shadow-md">
+          <span className="text-[var(--text-secondary)] font-bold">
+            زیرمجموعه‌های تحت نظارت:
+          </span>
           <span className="text-xl font-black font-mono text-[var(--accent-blue)] block">
             {summary.subAdminsCount} زیرمجموعه
           </span>
           <span className="text-[10px] text-slate-400">رصد ۱۰۰٪ خودکار با وب‌سوکت</span>
         </div>
 
-        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
-          <span className="text-[var(--text-secondary)] font-bold">کل حرکات و کلیک‌های ثبت‌شده:</span>
+        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1 shadow-md">
+          <span className="text-[var(--text-secondary)] font-bold">
+            کل حرکات و کلیک‌های ثبت‌شده:
+          </span>
           <span className="text-xl font-black font-mono text-indigo-400 block">
             {summary.totalEventsCount} رویداد
           </span>
-          <span className="text-[10px] text-slate-400">شامل ورود، کلیک، تب، جستجو و ویرایش</span>
+          <span className="text-[10px] text-slate-400">
+            شامل ورود، کلیک، تب، جستجو و ویرایش
+          </span>
         </div>
 
-        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1">
-          <span className="text-[var(--text-secondary)] font-bold">تلاش‌های غیرمجاز مهارشده:</span>
+        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1 shadow-md">
+          <span className="text-[var(--text-secondary)] font-bold">
+            تلاش‌های غیرمجاز مهارشده:
+          </span>
           <span className="text-xl font-black font-mono text-rose-400 block">
             {summary.totalBlockedCount} مورد ⛔
           </span>
-          <span className="text-[10px] text-slate-400">مسدودشده توسط فایروال نقش‌ها</span>
+          <span className="text-[10px] text-slate-400">
+            مسدودشده توسط فایروال نقش‌ها
+          </span>
         </div>
       </div>
 
-      {/* بخش ۱: مانیتور زنده تک‌تک مدیران و زیرمجموعه‌ها با تمام مشخصات سیستم و آخرین اقدام */}
+      {/* بخش ۱: مانیتور زنده تک‌تک مدیران و زیرمجموعه‌ها */}
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] pb-3">
           <h2 className="font-black text-sm text-[var(--accent-blue)]">
@@ -421,148 +452,188 @@ export default function AdminMonitoringPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:grid-cols-2 gap-2 md:gap-4">
-          {users.map((u) => {
-            const isSelected = selectedUserFilter.toLowerCase() === u.username.toLowerCase();
-            return (
-              <div
-                key={u.id}
-                onClick={() => {
-                  soundEngine.playClick();
-                  setSelectedUserFilter(isSelected ? "all" : u.username);
-                }}
-                className={
-                  "p-5 rounded-3xl border transition cursor-pointer space-y-3.5 " +
-                  (isSelected
-                    ? "bg-[var(--accent-blue)]/10 border-2 border-[var(--accent-blue)] shadow-lg"
-                    : "bg-[var(--input-bg)] border-[var(--card-border)] hover:border-[var(--accent-blue)]/50")
-                }
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={
-                          "w-2.5 h-2.5 rounded-full shrink-0 " +
-                          (u.isOnline ? "bg-emerald-400 animate-ping" : "bg-slate-500")
-                        }
-                      />
-                      <h3 className="font-black text-sm">{u.full_name}</h3>
-                      <span className="font-mono text-xs text-[var(--accent-blue)]">
-                        @{u.username}
+        {users.length === 0 ? (
+          <div className="py-10 text-center space-y-3 text-slate-400 font-bold">
+            <p>هنوز هیچ زیرمجموعه مدیریتی در سیستم تعریف نشده است.</p>
+            <Link
+              href="/admin/roles"
+              className="inline-block px-5 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-md"
+            >
+              ➕ تعریف زیرمجموعه در بخش مدیران و دسترسی‌ها
+            </Link>
+          </div>
+        ) : (
+          /* گرید ۱ ستونه در موبایل و ۲ ستونه عریض در دسکتاپ برای خوانایی کامل مشخصات هر زیرمجموعه */
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {users.map((u) => {
+              const isSelected =
+                selectedUserFilter.toLowerCase() === u.username.toLowerCase();
+              return (
+                <div
+                  key={u.id}
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setSelectedUserFilter(isSelected ? "all" : u.username);
+                  }}
+                  className={
+                    "p-5 rounded-3xl border transition cursor-pointer space-y-3.5 " +
+                    (isSelected
+                      ? "bg-[var(--accent-blue)]/10 border-2 border-[var(--accent-blue)] shadow-lg"
+                      : "bg-[var(--input-bg)] border-[var(--card-border)] hover:border-[var(--accent-blue)]/50")
+                  }
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={
+                            "w-2.5 h-2.5 rounded-full shrink-0 " +
+                            (u.isOnline
+                              ? "bg-emerald-400 animate-ping"
+                              : "bg-slate-500")
+                          }
+                        />
+                        <h3 className="font-black text-sm">{u.full_name}</h3>
+                        <span className="font-mono text-xs text-[var(--accent-blue)]">
+                          @{u.username}
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-400 mt-1">
+                        {getRoleTitleFa(u.role)} | تم پنل:{" "}
+                        {u.ui_theme === "light" ? "☀️ روشن" : "🌙 تیره"}
+                      </div>
+                    </div>
+
+                    <span
+                      className={
+                        "px-3 py-1 rounded-full text-[10px] font-black border " +
+                        (u.isOnline
+                          ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400"
+                          : "bg-slate-500/15 border-slate-500/30 text-slate-400")
+                      }
+                    >
+                      {u.isOnline
+                        ? `🟢 آنلاین در همین لحظه (${u.secondsAgo || 0} ثانیه پیش)`
+                        : "⚪ آفلاین"}
+                    </span>
+                  </div>
+
+                  {/* جزئیات لحظه‌ای: الان کجاست و دقیقاً چه کاری انجام داده */}
+                  <div className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 text-[11px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[var(--text-secondary)] font-bold shrink-0">
+                        📍 بخش و تب فعلی:
+                      </span>
+                      <span className="font-black text-[var(--accent-blue)] truncate">
+                        {u.currentSectionTitle} ({u.currentSubTab})
                       </span>
                     </div>
-                    <div className="text-[11px] font-bold text-slate-400 mt-1">
-                      {getRoleTitleFa(u.role)} | تم پنل:{" "}
-                      {u.ui_theme === "light" ? "☀️ روشن" : "🌙 تیره"}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[var(--text-secondary)] font-bold shrink-0">
+                        ⚡ آخرین اقدام / کلیک:
+                      </span>
+                      <span className="font-black text-emerald-400 truncate max-w-[320px]">
+                        {u.lastActionDetails}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[var(--text-secondary)] font-bold shrink-0">
+                        💻 سیستم، مرورگر و تصویر:
+                      </span>
+                      <span className="font-mono text-[10px]" dir="ltr">
+                        {u.deviceType} | {u.os} | {u.browser} ({u.screenResolution})
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[var(--text-secondary)] font-bold shrink-0">
+                        🌐 آی‌پی و زمان فعالیت:
+                      </span>
+                      <span className="font-mono text-[10px]">
+                        IP: {u.ip} |{" "}
+                        {u.lastActiveAt
+                          ? new Date(u.lastActiveAt).toLocaleString("fa-IR")
+                          : "هنوز وارد نشده"}
+                      </span>
                     </div>
                   </div>
 
-                  <span
-                    className={
-                      "px-3 py-1 rounded-full text-[10px] font-black border " +
-                      (u.isOnline
-                        ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400"
-                        : "bg-slate-500/15 border-slate-500/30 text-slate-400")
-                    }
-                  >
-                    {u.isOnline
-                      ? `🟢 آنلاین در همین لحظه (${u.secondsAgo || 0} ثانیه پیش)`
-                      : "⚪ آفلاین"}
-                  </span>
-                </div>
-
-                {/* جزئیات لحظه‌ای: الان کجاست و دقیقاً چه کاری انجام داده */}
-                <div className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 text-[11px]">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[var(--text-secondary)] font-bold">
-                      📍 بخش و تب فعلی:
-                    </span>
-                    <span className="font-black text-[var(--accent-blue)] truncate">
-                      {u.currentSectionTitle} ({u.currentSubTab})
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[var(--text-secondary)] font-bold">
-                      ⚡ آخرین اقدام / کلیک:
-                    </span>
-                    <span className="font-black text-emerald-400 truncate max-w-[260px]">
-                      {u.lastActionDetails}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[var(--text-secondary)] font-bold">
-                      💻 سیستم، مرورگر و تصویر:
-                    </span>
-                    <span className="font-mono text-[10px]" dir="ltr">
-                      {u.deviceType} | {u.os} | {u.browser} ({u.screenResolution})
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[var(--text-secondary)] font-bold">
-                      🌐 آی‌پی و زمان فعالیت:
-                    </span>
-                    <span className="font-mono text-[10px]">
-                      IP: {u.ip} |{" "}
-                      {u.lastActiveAt
-                        ? new Date(u.lastActiveAt).toLocaleString("fa-IR")
-                        : "هنوز وارد نشده"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* ۵ شاخص آماری کامل این کاربر */}
-                <div className="grid grid-cols-5 gap-1.5 text-center font-mono">
-                  <div className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
-                    <div className="text-sm font-black text-emerald-400">{u.totalLogins}</div>
-                    <div className="text-[9px] font-sans font-bold text-slate-400">ورود</div>
-                  </div>
-                  <div className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
-                    <div className="text-sm font-black text-indigo-400">{u.totalPageViews}</div>
-                    <div className="text-[9px] font-sans font-bold text-slate-400">بازدید صفحه</div>
-                  </div>
-                  <div className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
-                    <div className="text-sm font-black text-amber-400">{u.totalClicks}</div>
-                    <div className="text-[9px] font-sans font-bold text-slate-400">کلیک/جستجو</div>
-                  </div>
-                  <div className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
-                    <div className="text-sm font-black text-sky-400">{u.totalActions}</div>
-                    <div className="text-[9px] font-sans font-bold text-slate-400">ویرایش</div>
-                  </div>
-                  <div className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
-                    <div className="text-sm font-black text-rose-400">{u.totalBlocked}</div>
-                    <div className="text-[9px] font-sans font-bold text-slate-400">مسدودشده</div>
-                  </div>
-                </div>
-
-                {u.topSections.length > 0 && (
-                  <div className="space-y-1 pt-1">
-                    <span className="text-[10px] font-bold text-[var(--text-secondary)] block">
-                      📊 بخش‌های بازدیدشده توسط این زیرمجموعه:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {u.topSections.slice(0, 6).map((sec, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-0.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] font-bold"
-                        >
-                          {sec.title}: <strong className="text-[var(--accent-blue)]">{sec.count} بار</strong>
-                        </span>
-                      ))}
+                  {/* ۵ شاخص آماری کامل این کاربر */}
+                  <div className="grid grid-cols-5 gap-1.5 text-center font-mono">
+                    <div className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
+                      <div className="text-sm font-black text-emerald-400">
+                        {u.totalLogins}
+                      </div>
+                      <div className="text-[9px] font-sans font-bold text-slate-400">
+                        ورود
+                      </div>
+                    </div>
+                    <div className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
+                      <div className="text-sm font-black text-indigo-400">
+                        {u.totalPageViews}
+                      </div>
+                      <div className="text-[9px] font-sans font-bold text-slate-400">
+                        بازدید صفحه
+                      </div>
+                    </div>
+                    <div className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
+                      <div className="text-sm font-black text-amber-400">
+                        {u.totalClicks}
+                      </div>
+                      <div className="text-[9px] font-sans font-bold text-slate-400">
+                        کلیک/جستجو
+                      </div>
+                    </div>
+                    <div className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
+                      <div className="text-sm font-black text-sky-400">
+                        {u.totalActions}
+                      </div>
+                      <div className="text-[9px] font-sans font-bold text-slate-400">
+                        ویرایش
+                      </div>
+                    </div>
+                    <div className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
+                      <div className="text-sm font-black text-rose-400">
+                        {u.totalBlocked}
+                      </div>
+                      <div className="text-[9px] font-sans font-bold text-slate-400">
+                        مسدودشده
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+
+                  {u.topSections.length > 0 && (
+                    <div className="space-y-1 pt-1">
+                      <span className="text-[10px] font-bold text-[var(--text-secondary)] block">
+                        📊 بخش‌های بازدیدشده توسط این زیرمجموعه:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {u.topSections.slice(0, 6).map((sec, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] font-bold"
+                          >
+                            {sec.title}:{" "}
+                            <strong className="text-[var(--accent-blue)]">
+                              {sec.count} بار
+                            </strong>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* بخش ۲: جدول بلادرنگ ریزِ تمام فعالیت‌ها، کلیک‌ها، جستجوها و تغییرات */}
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
         <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-3 border-b border-[var(--card-border)] pb-3">
           <h2 className="font-black text-sm text-[var(--accent-blue)]">
-            📡 جریان زنده ریزِ حرکات، کلیک‌ها، جستجوها و تغییرات ({filteredEvents.length} رویداد)
+            📡 جریان زنده ریزِ حرکات، کلیک‌ها، جستجوها و تغییرات ({filteredEvents.length}{" "}
+            رویداد)
           </h2>
 
           <div className="flex flex-wrap gap-2">
@@ -571,7 +642,7 @@ export default function AdminMonitoringPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="🔍 جستجو در نام، دکمه، بخش، آی‌پی..."
-              className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+              className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
             />
 
             <select
@@ -646,7 +717,9 @@ export default function AdminMonitoringPage() {
                   return (
                     <tr key={ev.id} className="hover:bg-[var(--input-bg)]/50 transition">
                       <td className="py-3 px-3">
-                        <div className="font-black text-[var(--text-primary)]">{ev.full_name}</div>
+                        <div className="font-black text-[var(--text-primary)]">
+                          {ev.full_name}
+                        </div>
                         <div className="font-mono text-[10px] text-[var(--accent-blue)]">
                           @{ev.username} ({getRoleTitleFa(ev.role)})
                         </div>
@@ -671,8 +744,12 @@ export default function AdminMonitoringPage() {
                         </div>
                       </td>
                       <td className="py-3 px-3 font-mono text-[10px]" dir="ltr">
-                        <div>{ev.deviceType} | {ev.os}</div>
-                        <div className="text-slate-400">{ev.browser} ({ev.screenResolution})</div>
+                        <div>
+                          {ev.deviceType} | {ev.os}
+                        </div>
+                        <div className="text-slate-400">
+                          {ev.browser} ({ev.screenResolution})
+                        </div>
                       </td>
                       <td className="py-3 px-3 font-mono text-[11px]">{ev.ip}</td>
                       <td className="py-3 px-3 text-left font-mono text-[11px] text-slate-400">

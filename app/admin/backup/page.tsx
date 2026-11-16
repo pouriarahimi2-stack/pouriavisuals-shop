@@ -1,7 +1,7 @@
 // File Path: app/admin/backup/page.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 
 interface BackupEntry {
@@ -14,37 +14,65 @@ interface BackupEntry {
   counts: Record<string, number>;
 }
 
+const MONITORED_TABLES = [
+  { key: "products", label: "📦 محصولات کاتالوگ" },
+  { key: "categories", label: "📁 دسته‌بندی‌ها" },
+  { key: "orders", label: "🧾 سفارشات ثبت‌شده" },
+  { key: "crm_customers", label: "👥 مشتریان CRM" },
+  { key: "coupons", label: "🏷️ کدهای تخفیف" },
+  { key: "banners", label: "🖼️ بنرها و اسلایدر" },
+  { key: "posts", label: "📚 مقالات سئو" },
+  { key: "tech_news", label: "📡 اخبار تکنولوژی" },
+  { key: "modular_pages", label: "⚡ صفحات ماژولار" },
+  { key: "site_info", label: "⚙️ تنظیمات کلان سایت" },
+  { key: "site_styles", label: "🎨 استایل‌ها و تم" },
+  { key: "inventory_logs", label: "🏭 اسناد انبار" },
+  { key: "all_reviews", label: "⭐ دیدگاه‌های خریداران" },
+  { key: "messages", label: "📩 تیکت‌ها و پیام‌ها" },
+];
+
 export default function AdminBackupPage() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [fullSnapshot, setFullSnapshot] = useState<any>(null);
   const [history, setHistory] = useState<BackupEntry[]>([]);
   const [latestBackupNumber, setLatestBackupNumber] = useState<number>(101);
+  const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [creatingBackup, setCreatingBackup] = useState(false);
   const [restoring, setRestoring] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
-  const fetchSnapshotAndHistory = async () => {
+  const fetchSnapshotAndHistory = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/backup", { cache: "no-store" });
+      const res = await fetch("/api/admin/backup?t=" + Date.now(), {
+        cache: "no-store",
+      });
       const json = await res.json();
       if (json.success && json.backup) {
         setFullSnapshot(json.backup);
         setCounts(json.backup.counts || {});
         setHistory(Array.isArray(json.history) ? json.history : []);
-        if (json.latestBackupNumber) setLatestBackupNumber(Number(json.latestBackupNumber));
+        if (json.latestBackupNumber) {
+          setLatestBackupNumber(Number(json.latestBackupNumber));
+        }
+        if (json.lastBackup) {
+          setLastBackupAt(json.lastBackup);
+        }
       }
     } catch (e) {
       console.error("Backup load error:", e);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchSnapshotAndHistory();
-  }, []);
+  }, [fetchSnapshotAndHistory]);
 
   const handleDownloadBackupJson = (customNumber?: number) => {
     if (!fullSnapshot) return;
@@ -80,41 +108,81 @@ export default function AdminBackupPage() {
       const res = await fetch("/api/admin/backup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "create_numbered_backup", type: "manual" }),
+        body: JSON.stringify({
+          action: "create_numbered_backup",
+          type: "manual",
+        }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
         setFullSnapshot(json.backup);
+        setCounts(json.backup?.counts || {});
         setHistory(json.history || []);
         setLatestBackupNumber(json.backupNumber);
+        setLastBackupAt(new Date().toISOString());
         setFeedback({ type: "success", text: json.message });
+      } else {
+        setFeedback({
+          type: "error",
+          text: json.message || "خطا در ثبت پشتیبان جدید.",
+        });
       }
     } finally {
       setCreatingBackup(false);
     }
   };
 
-  const handleRestoreFromFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDeleteHistoryItem = async (id: string) => {
+    if (!confirm("این رکورد از لیست آرشیو تاریخچه حذف شود؟")) return;
+    soundEngine.playClick();
+    try {
+      const res = await fetch(
+        "/api/admin/backup?id=" + encodeURIComponent(id),
+        { method: "DELETE" }
+      );
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        setHistory(json.history || []);
+        setFeedback({ type: "success", text: json.message });
+      }
+    } catch {}
+  };
+
+  const handleRestoreFromFile = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (
-      !confirm(
-        "آیا از بازیابی اطلاعات سایت از طریق این فایل پشتیبان اطمینان دارید؟ تمامی اطلاعات فایل در جداول سایت بازنویسی و همگام می‌شوند."
-      )
-    ) {
-      e.target.value = "";
-      return;
-    }
-
-    soundEngine.playClick();
-    setRestoring(true);
-    setFeedback(null);
 
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
+      const tablesObj = parsed?.tables || parsed?.backup?.tables;
+
+      if (!tablesObj || typeof tablesObj !== "object") {
+        setFeedback({
+          type: "error",
+          text: "ساختار فایل JSON انتخاب‌شده معتبر نیست یا فاقد جداول دیتابیس است.",
+        });
+        e.target.value = "";
+        return;
+      }
+
+      const tableCount = Object.keys(tablesObj).length;
+      if (
+        !confirm(
+          `فایل پشتیبان شامل ${tableCount} جدول دیتابیس شناسایی شد. آیا از بازیابی و همگام‌سازی کامل اطلاعات سایت اطمینان دارید؟`
+        )
+      ) {
+        e.target.value = "";
+        return;
+      }
+
+      soundEngine.playClick();
+      setRestoring(true);
+      setFeedback(null);
 
       const res = await fetch("/api/admin/backup", {
         method: "POST",
@@ -126,20 +194,32 @@ export default function AdminBackupPage() {
       if (res.ok && json.success) {
         soundEngine.playSuccess();
         setFeedback({ type: "success", text: json.message });
-        fetchSnapshotAndHistory();
+        await fetchSnapshotAndHistory();
       } else {
-        setFeedback({ type: "error", text: json.message || "خطا در بازیابی بکاپ." });
+        setFeedback({
+          type: "error",
+          text: json.message || "خطا در بازیابی بکاپ.",
+        });
       }
     } catch {
-      setFeedback({ type: "error", text: "فایل JSON انتخاب‌شده معتبر نیست." });
+      setFeedback({
+        type: "error",
+        text: "فایل JSON انتخاب‌شده معتبر نیست.",
+      });
     } finally {
       setRestoring(false);
       e.target.value = "";
     }
   };
 
+  const totalSnapshotRecords = fullSnapshot?.totalRecords || 0;
+
   return (
-    <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
+    <div
+      className="space-y-6 font-sans select-text text-[var(--text-primary)]"
+      dir="rtl"
+    >
+      {/* هدر اصلی */}
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -147,7 +227,7 @@ export default function AdminBackupPage() {
               <span>💾</span> مرکز پشتیبان‌گیری خودکار روزانه و بازیابی کامل سایت
             </h1>
             <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-black">
-              بکاپ خودکار روزانه در پس‌زمینه: فعال ✓ (آخرین شماره: #{latestBackupNumber})
+              بکاپ خودکار روزانه: فعال ✓ (آخرین شماره: #{latestBackupNumber})
             </span>
           </div>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
@@ -160,7 +240,7 @@ export default function AdminBackupPage() {
             type="button"
             onClick={handleCreateManualNumberedBackup}
             disabled={creatingBackup || loading}
-            className="flex-1 lg:flex-initial justify-center px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-black cursor-pointer transition"
+            className="flex-1 lg:flex-initial justify-center px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-black cursor-pointer transition disabled:opacity-50"
           >
             {creatingBackup ? "در حال تولید..." : "➕ ثبت بکاپ شماره‌دار جدید"}
           </button>
@@ -175,7 +255,9 @@ export default function AdminBackupPage() {
           </button>
 
           <label className="flex-1 lg:flex-initial justify-center px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-lg transition cursor-pointer flex items-center gap-2">
-            <span>{restoring ? "در حال بازیابی..." : "⬆️ بازیابی سایت از فایل پشتیبان"}</span>
+            <span>
+              {restoring ? "در حال بازیابی..." : "⬆️ بازیابی سایت از فایل پشتیبان"}
+            </span>
             <input
               type="file"
               accept=".json,application/json"
@@ -183,6 +265,44 @@ export default function AdminBackupPage() {
               className="hidden"
             />
           </label>
+        </div>
+      </div>
+
+      {/* ردیف کارت‌های KPI خلاصه وضعیت بکاپ */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md flex items-center justify-between">
+          <span className="font-bold text-[var(--text-secondary)]">
+            آخرین شماره بکاپ:
+          </span>
+          <span className="font-mono font-black text-lg text-[var(--accent-blue)]">
+            #{latestBackupNumber}
+          </span>
+        </div>
+        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md flex items-center justify-between">
+          <span className="font-bold text-[var(--text-secondary)]">
+            مجموع رکوردهای محافظت‌شده:
+          </span>
+          <span className="font-mono font-black text-lg text-emerald-500">
+            {totalSnapshotRecords} رکورد
+          </span>
+        </div>
+        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md flex items-center justify-between">
+          <span className="font-bold text-[var(--text-secondary)]">
+            نسخه‌های موجود در آرشیو:
+          </span>
+          <span className="font-mono font-black text-lg text-indigo-400">
+            {history.length} نسخه
+          </span>
+        </div>
+        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md flex items-center justify-between">
+          <span className="font-bold text-[var(--text-secondary)]">
+            زمان آخرین پشتیبان‌گیری:
+          </span>
+          <span className="font-mono font-bold text-[11px] text-amber-400">
+            {lastBackupAt
+              ? new Date(lastBackupAt).toLocaleDateString("fa-IR")
+              : "امروز"}
+          </span>
         </div>
       </div>
 
@@ -207,8 +327,11 @@ export default function AdminBackupPage() {
           </h2>
           <button
             type="button"
-            onClick={fetchSnapshotAndHistory}
-            className="px-3.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold cursor-pointer"
+            onClick={() => {
+              soundEngine.playClick();
+              fetchSnapshotAndHistory();
+            }}
+            className="px-3.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold cursor-pointer transition"
           >
             🔄 بروزرسانی لیست
           </button>
@@ -246,23 +369,35 @@ export default function AdminBackupPage() {
                             : "bg-indigo-500/15 text-indigo-400")
                         }
                       >
-                        {item.type === "auto_daily" ? "بکاپ اتوماتیک روزانه 🕒" : "ثبت دستی ادمین"}
+                        {item.type === "auto_daily"
+                          ? "بکاپ اتوماتیک روزانه 🕒"
+                          : "ثبت دستی ادمین"}
                       </span>
                     </div>
-                    <span className="text-[11px] text-slate-400 font-mono">
-                      تاریخ: {new Date(item.createdAt).toLocaleString("fa-IR")} | مجموع رکوردها:{" "}
-                      {item.totalRecords} رکورد
+                    <span className="text-[11px] text-slate-400 font-mono block mt-0.5">
+                      تاریخ: {new Date(item.createdAt).toLocaleString("fa-IR")} —
+                      مجموع رکوردها: {item.totalRecords} رکورد
                     </span>
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleDownloadBackupJson(item.backupNumber)}
-                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-emerald-500 text-emerald-400 font-black cursor-pointer transition"
-                >
-                  ⬇️ دانلود فایل JSON شماره #{item.backupNumber}
-                </button>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadBackupJson(item.backupNumber)}
+                    className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-emerald-500 text-emerald-400 font-black cursor-pointer transition"
+                  >
+                    ⬇️ دانلود JSON شماره #{item.backupNumber}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteHistoryItem(item.id)}
+                    className="px-2.5 py-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white font-bold cursor-pointer transition"
+                    title="حذف از تاریخچه"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -272,24 +407,11 @@ export default function AdminBackupPage() {
       {/* وضعیت زنده جداول */}
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
         <h2 className="font-black text-sm border-b border-[var(--card-border)] pb-3">
-          📊 وضعیت زنده رکوردهای دیتابیس در فایل پشتیبان
+          📊 وضعیت زنده رکوردهای دیتابیس در فایل پشتیبان ({MONITORED_TABLES.length} جدول)
         </h2>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {[
-            { key: "products", label: "📦 محصولات" },
-            { key: "categories", label: "📁 دسته‌بندی‌ها" },
-            { key: "orders", label: "🧾 سفارشات" },
-            { key: "crm_customers", label: "👥 مشتریان CRM" },
-            { key: "coupons", label: "🏷️ کدهای تخفیف" },
-            { key: "banners", label: "🖼️ بنرها" },
-            { key: "posts", label: "📚 مقالات سئو" },
-            { key: "tech_news", label: "📡 اخبار تکنولوژی" },
-            { key: "modular_pages", label: "⚡ صفحات ماژولار" },
-            { key: "site_info", label: "⚙️ تنظیمات سایت" },
-            { key: "site_styles", label: "🎨 استایل‌ها" },
-            { key: "inventory_logs", label: "🏭 اسناد انبار" },
-          ].map((item) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+          {MONITORED_TABLES.map((item) => (
             <div
               key={item.key}
               className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1"

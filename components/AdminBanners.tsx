@@ -53,9 +53,10 @@ export default function AdminBanners() {
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(
-    null
-  );
+  const [statusMsg, setStatusMsg] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
@@ -66,7 +67,9 @@ export default function AdminBanners() {
   const [badgeText, setBadgeText] = useState("پیشنهاد ویژه");
   const [isActive, setIsActive] = useState(true);
 
-  const [linkMode, setLinkMode] = useState<"product" | "category" | "page" | "custom">("product");
+  const [linkMode, setLinkMode] = useState<
+    "product" | "category" | "page" | "custom"
+  >("product");
   const [fullThemeConfig, setFullThemeConfig] = useState<any>(null);
   const [bannerMobileHeight, setBannerMobileHeight] = useState<number>(165);
   const [bannerTabletHeight, setBannerTabletHeight] = useState<number>(250);
@@ -75,6 +78,12 @@ export default function AdminBanners() {
   const [bannerDesktopImgSize, setBannerDesktopImgSize] = useState<number>(230);
   const [savingSizing, setSavingSizing] = useState(false);
   const [productSearch, setProductSearch] = useState("");
+
+  // استیت‌های ویجت هوشمند پرفروش‌های ۷ روز اخیر (منتقل‌شده از تنظیمات کلان به بخش بنرها)
+  const [reportLoading, setReportLoading] = useState(false);
+  const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [selectedForSlider, setSelectedForSlider] = useState<string[]>([]);
+  const [sliderFeedback, setSliderFeedback] = useState<string | null>(null);
 
   const showFeedback = (text: string, type: "success" | "error" = "success") => {
     setStatusMsg({ type, text });
@@ -92,18 +101,27 @@ export default function AdminBanners() {
             if (bs) {
               if (bs.mobileHeight) setBannerMobileHeight(Number(bs.mobileHeight));
               if (bs.tabletHeight) setBannerTabletHeight(Number(bs.tabletHeight));
-              if (bs.desktopHeight) setBannerDesktopHeight(Number(bs.desktopHeight));
-              if (bs.mobileImageSize) setBannerMobileImgSize(Number(bs.mobileImageSize));
-              if (bs.desktopImageSize) setBannerDesktopImgSize(Number(bs.desktopImageSize));
+              if (bs.desktopHeight)
+                setBannerDesktopHeight(Number(bs.desktopHeight));
+              if (bs.mobileImageSize)
+                setBannerMobileImgSize(Number(bs.mobileImageSize));
+              if (bs.desktopImageSize)
+                setBannerDesktopImgSize(Number(bs.desktopImageSize));
             }
           }
         })
         .catch(() => {});
 
       const [bannersRes, prodsRes, catsRes] = await Promise.all([
-        fetch("/api/admin/banners?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
-        fetch("/api/products?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
-        fetch("/api/categories?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
+        fetch("/api/admin/banners?t=" + Date.now(), { cache: "no-store" }).catch(
+          () => null
+        ),
+        fetch("/api/products?t=" + Date.now(), { cache: "no-store" }).catch(
+          () => null
+        ),
+        fetch("/api/categories?t=" + Date.now(), { cache: "no-store" }).catch(
+          () => null
+        ),
       ]);
 
       if (bannersRes && bannersRes.ok) {
@@ -128,7 +146,9 @@ export default function AdminBanners() {
           category: p.category || "کالای دیجیتال",
           price: Number(p.price || 0),
           discount_price:
-            p.discount_price && Number(p.discount_price) > 0 ? Number(p.discount_price) : null,
+            p.discount_price && Number(p.discount_price) > 0
+              ? Number(p.discount_price)
+              : null,
           stock: Number(p.stock ?? 0),
           image: p.image || (Array.isArray(p.images) ? p.images[0] : ""),
         }));
@@ -148,7 +168,6 @@ export default function AdminBanners() {
         }
       }
 
-      // اطمینان از حضور تمامی دسته‌بندی‌های کالاهای کاتالوگ در لیست دسته‌ها
       const seenCatNames = new Set(loadedCats.map((c) => c.name));
       mappedProducts.forEach((p) => {
         const cName = String(p.category || "").trim();
@@ -174,16 +193,24 @@ export default function AdminBanners() {
 
     const chBanners = supabase
       .channel("realtime-admin-banners")
-      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => {
-        fetchBannersAndCatalog();
-      })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "banners" },
+        () => {
+          fetchBannersAndCatalog();
+        }
+      )
       .subscribe();
 
     const chProducts = supabase
       .channel("realtime-admin-banners-products")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
-        fetchBannersAndCatalog();
-      })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        () => {
+          fetchBannersAndCatalog();
+        }
+      )
       .subscribe();
 
     return () => {
@@ -191,6 +218,78 @@ export default function AdminBanners() {
       supabase.removeChannel(chProducts);
     };
   }, [fetchBannersAndCatalog]);
+
+  const fetchWeeklyReport = async () => {
+    soundEngine.playClick();
+    setReportLoading(true);
+    try {
+      const res = await fetch("/api/admin/slider-report?t=" + Date.now(), {
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (json.success) {
+        setTopProducts(json.topProducts || []);
+        if ((json.topProducts || []).length === 0) {
+          showFeedback("در ۷ روز گذشته سفارشی برای تحلیل پرفروش‌ها ثبت نشده است.");
+        }
+      }
+    } catch {
+      showFeedback("خطا در دریافت گزارش پرفروش‌ها", "error");
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const toggleSliderSelection = (id: string) => {
+    soundEngine.playClick();
+    setSelectedForSlider((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handlePublishSlider = async () => {
+    if (selectedForSlider.length === 0) {
+      showFeedback(
+        "لطفاً حداقل یک محصول را برای نمایش در اسلایدر انتخاب کنید.",
+        "error"
+      );
+      return;
+    }
+    soundEngine.playClick();
+    setReportLoading(true);
+    try {
+      const bannersToSave = topProducts
+        .filter((p) => selectedForSlider.includes(p.id))
+        .map((p) => ({
+          id: "smart-" + p.id,
+          title: p.title,
+          image_url:
+            p.image || (p.images && p.images[0]) || "/placeholder.png",
+          link_url: `/products/${p.id}`,
+          is_active: true,
+        }));
+      const res = await fetch("/api/admin/slider-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approvedBanners: bannersToSave }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        soundEngine.playSuccess();
+        setSliderFeedback(
+          "✅ محصولات انتخاب‌شده با موفقیت در اسلایدر سایت منتشر شدند!"
+        );
+        setSelectedForSlider([]);
+        await fetchBannersAndCatalog();
+        window.dispatchEvent(new CustomEvent("banners_updated"));
+        setTimeout(() => setSliderFeedback(null), 5000);
+      }
+    } catch {
+      showFeedback("خطا در انتشار اسلایدر پرفروش‌ها", "error");
+    } finally {
+      setReportLoading(false);
+    }
+  };
 
   const handleSaveBannerSizing = async () => {
     soundEngine.playClick();
@@ -362,9 +461,12 @@ export default function AdminBanners() {
     if (!confirm("آیا از حذف این بنر تبلیغاتی اطمینان دارید؟")) return;
     soundEngine.playClick();
     try {
-      const res = await fetch("/api/admin/banners?id=" + encodeURIComponent(id), {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        "/api/admin/banners?id=" + encodeURIComponent(id),
+        {
+          method: "DELETE",
+        }
+      );
       const json = await res.json().catch(() => ({}));
       if (res.ok) {
         soundEngine.playSuccess();
@@ -390,7 +492,10 @@ export default function AdminBanners() {
     : "";
 
   return (
-    <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
+    <div
+      className="space-y-6 font-sans select-text text-[var(--text-primary)]"
+      dir="rtl"
+    >
       <div className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4">
         <div>
           <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
@@ -542,6 +647,83 @@ export default function AdminBanners() {
         </div>
       </div>
 
+      {/* ویجت هوشمند گزارش پرفروش‌های ۷ روز اخیر و انتشار خودکار در اسلایدر (منتقل‌شده به جای اصلی خود در بخش بنرها) */}
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--card-border)] pb-3">
+          <div>
+            <h3 className="font-black text-sm text-indigo-400 flex items-center gap-2">
+              <span>🤖</span> تولید هوشمند اسلایدر از محصولات پرفروش ۷ روز اخیر
+            </h3>
+            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+              آنالیز خودکار سبدهای خرید ۱ هفته گذشته و تبدیل ۱-کلیکی کالاهای پرطرفدار به بنرهای فعال اسلایدر:
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={fetchWeeklyReport}
+            disabled={reportLoading}
+            className="px-4 py-2.5 bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 rounded-2xl font-black cursor-pointer transition hover:bg-indigo-500 hover:text-white"
+          >
+            {reportLoading ? "در حال پردازش..." : "📊 استعلام پرفروش‌های ۷ روز اخیر"}
+          </button>
+        </div>
+
+        {sliderFeedback && (
+          <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold rounded-2xl">
+            {sliderFeedback}
+          </div>
+        )}
+
+        {topProducts.length > 0 && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-64 overflow-y-auto p-2 border border-[var(--card-border)] rounded-2xl bg-[var(--input-bg)]">
+              {topProducts.map((p) => (
+                <label
+                  key={p.id}
+                  className={
+                    "flex items-center justify-between p-3 rounded-xl border cursor-pointer transition " +
+                    (selectedForSlider.includes(p.id)
+                      ? "border-indigo-500 bg-indigo-500/15"
+                      : "border-[var(--card-border)] bg-[var(--modal-bg)]")
+                  }
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={selectedForSlider.includes(p.id)}
+                      onChange={() => toggleSliderSelection(p.id)}
+                      className="w-4 h-4 accent-indigo-500 cursor-pointer shrink-0"
+                    />
+                    <img
+                      src={p.image || "/placeholder.png"}
+                      className="w-10 h-10 rounded-lg object-contain bg-white p-0.5 shrink-0"
+                      alt={p.title}
+                    />
+                    <div className="min-w-0">
+                      <div className="font-black truncate">{p.title}</div>
+                      <div className="text-[10px] text-[var(--text-secondary)] truncate">
+                        {p.category}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="font-mono font-black text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg shrink-0">
+                    {p.sales_last_7_days} فروش
+                  </span>
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={handlePublishSlider}
+              disabled={reportLoading || selectedForSlider.length === 0}
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl cursor-pointer disabled:opacity-50 transition shadow-lg"
+            >
+              🚀 انتشار موارد تیک‌خورده ({selectedForSlider.length} محصول) در اسلایدر سایت
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* چیدمان استاندارد ۱۲ ستونی: ۵ ستون فرم ساخت/ویرایش بنر و ۷ ستون لیست بنرها */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         <form
@@ -591,7 +773,9 @@ export default function AdminBanners() {
           </div>
 
           <div className="space-y-2">
-            <label className="block font-bold text-[var(--text-secondary)]">تصویر بنر *</label>
+            <label className="block font-bold text-[var(--text-secondary)]">
+              تصویر بنر *
+            </label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -612,7 +796,11 @@ export default function AdminBanners() {
             </div>
             {imageUrl && (
               <div className="rounded-2xl overflow-hidden border border-[var(--card-border)] max-h-40 bg-black/20 flex items-center justify-center">
-                <img src={imageUrl} alt="Banner Preview" className="w-full h-36 object-cover" />
+                <img
+                  src={imageUrl}
+                  alt="Banner Preview"
+                  className="w-full h-36 object-cover"
+                />
               </div>
             )}
           </div>
@@ -690,7 +878,9 @@ export default function AdminBanners() {
                               />
                             )}
                             <div className="overflow-hidden">
-                              <span className="truncate text-[11px] block">{p.title}</span>
+                              <span className="truncate text-[11px] block">
+                                {p.title}
+                              </span>
                               {finalPrice > 0 && (
                                 <span className="text-[9px] font-mono text-slate-400 block">
                                   {finalPrice.toLocaleString("fa-IR")} تومان
@@ -735,16 +925,22 @@ export default function AdminBanners() {
             {linkMode === "page" && (
               <div className="pt-2">
                 <select
-                  value={STATIC_SITE_PAGES.includes(linkUrl) ? linkUrl : "/products"}
+                  value={
+                    STATIC_SITE_PAGES.includes(linkUrl) ? linkUrl : "/products"
+                  }
                   onChange={(e) => setLinkUrl(e.target.value)}
                   className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold outline-none cursor-pointer"
                 >
-                  <option value="/products">🛍️ کاتالوگ تمام محصولات (/products)</option>
+                  <option value="/products">
+                    🛍️ کاتالوگ تمام محصولات (/products)
+                  </option>
                   <option value="/blog">📚 مجله تخصصی سئو (/blog)</option>
                   <option value="/news">📡 رادار اخبار تکنولوژی (/news)</option>
                   <option value="/contact">📞 تماس با ما و مشاوره (/contact)</option>
                   <option value="/about">ℹ️ درباره آکسون (/about)</option>
-                  <option value="/track-order">📦 پیگیری سفارش (/track-order)</option>
+                  <option value="/track-order">
+                    📦 پیگیری سفارش (/track-order)
+                  </option>
                 </select>
               </div>
             )}
@@ -813,7 +1009,9 @@ export default function AdminBanners() {
 
         <div className="lg:col-span-7 bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-xl text-xs">
           <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
-            <h3 className="font-black text-sm">لیست بنرهای ثبت‌شده ({banners.length})</h3>
+            <h3 className="font-black text-sm">
+              لیست بنرهای ثبت‌شده ({banners.length})
+            </h3>
             <button
               type="button"
               onClick={fetchBannersAndCatalog}
@@ -834,7 +1032,8 @@ export default function AdminBanners() {
           ) : (
             <div className="space-y-3 max-h-[680px] overflow-y-auto pr-1">
               {banners.map((b) => {
-                const img = b.image_url || (b as any).image || "/placeholder.png";
+                const img =
+                  b.image_url || (b as any).image || "/placeholder.png";
                 const lnk = b.link_url || (b as any).link || "/products";
                 const activeState = b.is_active !== false;
                 return (
@@ -855,7 +1054,9 @@ export default function AdminBanners() {
                       />
                       <div className="space-y-1 overflow-hidden">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-black text-xs truncate">{b.title}</h4>
+                          <h4 className="font-black text-xs truncate">
+                            {b.title}
+                          </h4>
                           <button
                             type="button"
                             disabled={togglingId === b.id}

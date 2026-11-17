@@ -44,7 +44,10 @@ export async function getMasterSiteInfoRow(): Promise<any> {
   });
 
   if (sorted.length > 1) {
-    const extraIds = sorted.slice(1).map((r: any) => r.id).filter(Boolean);
+    const extraIds = sorted
+      .slice(1)
+      .map((r: any) => r.id)
+      .filter(Boolean);
     if (extraIds.length > 0) {
       try {
         await supabaseAdmin.from("site_info").delete().in("id", extraIds);
@@ -61,7 +64,8 @@ export async function saveMasterSiteInfoRow(
   topLevelFields: Record<string, any>
 ): Promise<{ ok: boolean; savedRow: any; error?: string }> {
   const nowIso = new Date().toISOString();
-  const prevPersisted = existingRow?.homepage_layout_config?._persisted_identity || {};
+  const prevPersisted =
+    existingRow?.homepage_layout_config?._persisted_identity || {};
 
   const finalLogoUrl =
     topLevelFields.logo_url !== undefined
@@ -78,14 +82,17 @@ export async function saveMasterSiteInfoRow(
       ? String(topLevelFields.favicon_url).trim()
       : prevPersisted.favicon_url ?? "";
 
-  // جلوگیری از کپی شدن چندباره رشته‌های سنگین Base64 در زیرشاخه‌های قدیمی
+  // جلوگیری از کپی شدن چندباره رشته‌های سنگین در زیرشاخه‌های قدیمی
   const cleanUpdatedLayout = { ...updatedLayout };
-  delete cleanUpdatedLayout.theme_builder_config?.siteInfo;
+  if (cleanUpdatedLayout.theme_builder_config?.siteInfo) {
+    delete cleanUpdatedLayout.theme_builder_config.siteInfo;
+  }
 
   const safeLayout = {
     ...(existingRow?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG),
     ...cleanUpdatedLayout,
     _persisted_identity: {
+      ...prevPersisted,
       site_name:
         topLevelFields.site_name !== undefined
           ? String(topLevelFields.site_name)
@@ -98,6 +105,14 @@ export async function saveMasterSiteInfoRow(
         topLevelFields.description !== undefined
           ? String(topLevelFields.description)
           : prevPersisted.description ?? "",
+      meta_description:
+        topLevelFields.meta_description !== undefined
+          ? String(topLevelFields.meta_description)
+          : prevPersisted.meta_description ?? "",
+      meta_keywords:
+        topLevelFields.meta_keywords !== undefined
+          ? String(topLevelFields.meta_keywords)
+          : prevPersisted.meta_keywords ?? "",
       footer_text:
         topLevelFields.footer_text !== undefined
           ? String(topLevelFields.footer_text)
@@ -105,10 +120,22 @@ export async function saveMasterSiteInfoRow(
       logo_url: finalLogoUrl,
       footer_logo_url: finalFooterLogoUrl,
       favicon_url: finalFaviconUrl,
+      apple_touch_icon_url:
+        topLevelFields.apple_touch_icon_url !== undefined
+          ? String(topLevelFields.apple_touch_icon_url).trim()
+          : prevPersisted.apple_touch_icon_url ?? finalFaviconUrl,
+      og_image_url:
+        topLevelFields.og_image_url !== undefined
+          ? String(topLevelFields.og_image_url).trim()
+          : prevPersisted.og_image_url ?? "",
       phone:
         topLevelFields.phone !== undefined
           ? String(topLevelFields.phone)
           : prevPersisted.phone ?? "",
+      mobile_support:
+        topLevelFields.mobile_support !== undefined
+          ? String(topLevelFields.mobile_support)
+          : prevPersisted.mobile_support ?? "",
       email:
         topLevelFields.email !== undefined
           ? String(topLevelFields.email)
@@ -117,6 +144,10 @@ export async function saveMasterSiteInfoRow(
         topLevelFields.address !== undefined
           ? String(topLevelFields.address)
           : prevPersisted.address ?? "",
+      postal_code:
+        topLevelFields.postal_code !== undefined
+          ? String(topLevelFields.postal_code)
+          : prevPersisted.postal_code ?? "",
       working_hours:
         topLevelFields.working_hours !== undefined
           ? String(topLevelFields.working_hours)
@@ -125,6 +156,30 @@ export async function saveMasterSiteInfoRow(
         topLevelFields.header_announcement !== undefined
           ? String(topLevelFields.header_announcement)
           : prevPersisted.header_announcement ?? "",
+      instagram_url:
+        topLevelFields.instagram_url !== undefined
+          ? String(topLevelFields.instagram_url)
+          : prevPersisted.instagram_url ?? "",
+      telegram_url:
+        topLevelFields.telegram_url !== undefined
+          ? String(topLevelFields.telegram_url)
+          : prevPersisted.telegram_url ?? "",
+      whatsapp_url:
+        topLevelFields.whatsapp_url !== undefined
+          ? String(topLevelFields.whatsapp_url)
+          : prevPersisted.whatsapp_url ?? "",
+      youtube_url:
+        topLevelFields.youtube_url !== undefined
+          ? String(topLevelFields.youtube_url)
+          : prevPersisted.youtube_url ?? "",
+      aparat_url:
+        topLevelFields.aparat_url !== undefined
+          ? String(topLevelFields.aparat_url)
+          : prevPersisted.aparat_url ?? "",
+      enamad_code:
+        topLevelFields.enamad_code !== undefined
+          ? String(topLevelFields.enamad_code)
+          : prevPersisted.enamad_code ?? "",
       updated_at: nowIso,
     },
   };
@@ -142,23 +197,27 @@ export async function saveMasterSiteInfoRow(
         })
         .eq("id", r.id);
 
-      // اگر آدرس لوگو کوتاه (URL معمولی) یا خالی است در ستون‌های جدول هم ثبت شود تا خطای طول ستون رخ ندهد
+      // بروزرسانی ایمن ستون‌های سطح اول جدول در صورت وجود در اسکیمای دیتابیس
+      const extraColumns: Record<string, any> = { updated_at: nowIso };
+      if (safeLayout._persisted_identity.tagline) {
+        extraColumns.tagline = safeLayout._persisted_identity.tagline;
+      }
+      if (safeLayout._persisted_identity.description) {
+        extraColumns.description = safeLayout._persisted_identity.description;
+      }
       if (finalLogoUrl.length < 500) {
-        try {
-          await supabaseAdmin
-            .from("site_info")
-            .update({ logo_url: finalLogoUrl, updated_at: nowIso })
-            .eq("id", r.id);
-        } catch {}
+        extraColumns.logo_url = finalLogoUrl;
       }
       if (finalFooterLogoUrl.length < 500) {
-        try {
-          await supabaseAdmin
-            .from("site_info")
-            .update({ footer_logo_url: finalFooterLogoUrl })
-            .eq("id", r.id);
-        } catch {}
+        extraColumns.footer_logo_url = finalFooterLogoUrl;
       }
+      if (finalFaviconUrl.length < 500) {
+        extraColumns.favicon_url = finalFaviconUrl;
+      }
+
+      try {
+        await supabaseAdmin.from("site_info").update(extraColumns).eq("id", r.id);
+      } catch {}
     }
 
     return {

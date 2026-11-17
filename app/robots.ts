@@ -1,7 +1,7 @@
 // File Path: app/robots.ts
 import { MetadataRoute } from "next";
-import { supabaseAdmin } from "@/lib/supabaseServer";
 import { normalizeSystemSettings } from "@/lib/systemSettings";
+import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
 
 export const dynamic = "force-dynamic";
 
@@ -9,26 +9,15 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
   let baseUrl = "https://axoncore.ir";
 
   try {
-    const { data: row } = await supabaseAdmin
-      .from("site_info")
-      .select("allow_google_index, homepage_layout_config")
-      .limit(1)
-      .maybeSingle();
-
+    const row = await getMasterSiteInfoRow();
     const layoutCfg = row?.homepage_layout_config || {};
-    const sys = normalizeSystemSettings(layoutCfg);
-    const techSeo = layoutCfg?.seo_technical_config || {};
+    const sys = normalizeSystemSettings(layoutCfg, row);
 
-    if (typeof techSeo.canonicalBaseUrl === "string" && techSeo.canonicalBaseUrl.startsWith("http")) {
-      baseUrl = techSeo.canonicalBaseUrl.trim().replace(/\/+$/, "");
+    if (sys.canonicalBaseUrl && sys.canonicalBaseUrl.startsWith("http")) {
+      baseUrl = sys.canonicalBaseUrl;
     }
 
-    const indexDisabled =
-      row?.allow_google_index === false ||
-      sys.noIndex === true ||
-      techSeo.allowGoogleIndex === false;
-
-    if (indexDisabled) {
+    if (sys.noIndex || sys.disallowRobots) {
       return {
         rules: { userAgent: "*", disallow: "/" },
         sitemap: `${baseUrl}/sitemap.xml`,

@@ -1,5 +1,6 @@
-"use client";
 // File Path: components/Header.tsx
+"use client";
+
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -30,12 +31,18 @@ interface ActiveAnnouncement {
 export default function Header() {
   const pathname = usePathname() || "/";
   const { openCart, totalItems } = useCart();
-  const { siteInfo } = useSiteInfo();
+  const { siteInfo, refresh: refreshSiteInfo } = useSiteInfo();
 
   const layoutCfg = siteInfo?.homepage_layout_config || {};
   const persisted = layoutCfg?._persisted_identity || {};
+  const sysSettings =
+    siteInfo?.settings ||
+    siteInfo?.system_settings ||
+    layoutCfg?.system_settings ||
+    {};
   const headerCfg = layoutCfg?.header || DEFAULT_HEADER_CONFIG;
-  const tbCfg = siteInfo?.theme_builder_config || layoutCfg?.theme_builder_config || {};
+  const tbCfg =
+    siteInfo?.theme_builder_config || layoutCfg?.theme_builder_config || {};
   const themeHeader = tbCfg?.globalHeader || {};
   const deviceOffers = tbCfg?.deviceOffers || layoutCfg?.deviceOffers || {};
   const annCfg = headerCfg?.announcement || {};
@@ -48,41 +55,63 @@ export default function Header() {
   const [annDismissed, setAnnDismissed] = useState(false);
   const [offerDismissed, setOfferDismissed] = useState(false);
   const [copiedCoupon, setCopiedCoupon] = useState<string | null>(null);
-  const [currentDevice, setCurrentDevice] = useState<"mobile" | "tablet" | "desktop">("desktop");
+  const [currentDevice, setCurrentDevice] = useState<
+    "mobile" | "tablet" | "desktop"
+  >("desktop");
 
-  const [announcements, setAnnouncements] = useState<ActiveAnnouncement[]>([]);
+  const [couponAnnouncements, setCouponAnnouncements] = useState<
+    ActiveAnnouncement[]
+  >([]);
   const [activeAnnIndex, setActiveAnnIndex] = useState(0);
 
   const rawHeaderLogo =
-    themeHeader.logoUrl !== undefined
+    sysSettings.logo_url !== undefined && String(sysSettings.logo_url).trim() !== ""
+      ? String(sysSettings.logo_url)
+      : themeHeader.logoUrl !== undefined
       ? String(themeHeader.logoUrl)
       : persisted.logo_url !== undefined
       ? String(persisted.logo_url)
       : String(siteInfo?.logo_url || "");
   const logoSrc = resolveSafeUrl(rawHeaderLogo);
 
-  // واکشی بلادرنگ با فیلتر کردن کدهایی که همین کاربر (در صورت موفقیت‌آمیز بودن سفارش) استفاده کرده است
   const syncAnnouncements = useCallback(async () => {
     try {
-      const res = await fetch(`/api/public/coupons?t=${Date.now()}`, { cache: "no-store" });
+      const res = await fetch(`/api/public/coupons?t=${Date.now()}`, {
+        cache: "no-store",
+      });
       if (res.ok) {
         const json = await res.json();
         const activeCoupons = json.coupons || [];
-        
+
         let usedLocal: string[] = [];
-        try { 
-            usedLocal = JSON.parse(localStorage.getItem("axon_used_coupons") || "[]"); 
+        try {
+          usedLocal = JSON.parse(
+            localStorage.getItem("axon_used_coupons") || "[]"
+          );
         } catch {}
 
         const validList: ActiveAnnouncement[] = activeCoupons
-          .filter((c: any) => c.publish_to_header !== false && !usedLocal.includes(c.code))
+          .filter(
+            (c: any) =>
+              c.publish_to_header !== false && !usedLocal.includes(c.code)
+          )
           .map((c: any) => {
-            const isPct = (c.discount_type || c.type || "percent") === "percent";
-            const val = Number(c.discount_percent ?? c.value ?? c.discount_value ?? c.discount_amount ?? 0);
-            const valStr = isPct ? `${val}٪ تخفیف` : `${val.toLocaleString("fa-IR")} تومان تخفیف`;
+            const isPct =
+              (c.discount_type || c.type || "percent") === "percent";
+            const val = Number(
+              c.discount_percent ??
+                c.value ??
+                c.discount_value ??
+                c.discount_amount ??
+                0
+            );
+            const valStr = isPct
+              ? `${val}٪ تخفیف`
+              : `${val.toLocaleString("fa-IR")} تومان تخفیف`;
             let targetLabel = "روی کل سبد خرید";
             if (c.target_type === "product") targetLabel = "روی کالای منتخب";
-            if (c.target_type === "category") targetLabel = `روی محصولات دسته‌بندی ${c.target_id || ""}`;
+            if (c.target_type === "category")
+              targetLabel = `روی محصولات دسته‌بندی ${c.target_id || ""}`;
 
             return {
               id: c.id,
@@ -92,17 +121,54 @@ export default function Header() {
             };
           });
 
-        setAnnouncements(validList);
-        if (validList.length === 0) {
-          setActiveAnnIndex(0);
-        }
+        setCouponAnnouncements(validList);
       }
     } catch {}
   }, []);
 
-  // وب‌سوکت زنده و بلادرنگ برای دریافت تغییرات بلافاصله
+  // ترکیب اعلان سراسری تنظیمات کلان با اعلان‌های کوپن‌های فعال
+  const customAnnouncementText = String(
+    sysSettings.header_announcement ??
+      themeHeader.announcementText ??
+      persisted.header_announcement ??
+      siteInfo?.header_announcement ??
+      ""
+  ).trim();
+
+  const isCustomAnnouncementEnabled =
+    sysSettings.header_announcement_enabled !== false &&
+    themeHeader.showAnnouncement !== false;
+
+  const announcements: ActiveAnnouncement[] = React.useMemo(() => {
+    const merged: ActiveAnnouncement[] = [];
+    if (isCustomAnnouncementEnabled && customAnnouncementText) {
+      merged.push({
+        id: "global-site-announcement",
+        code: "",
+        text: customAnnouncementText,
+        targetType: "global",
+      });
+    }
+    return [...merged, ...couponAnnouncements];
+  }, [
+    isCustomAnnouncementEnabled,
+    customAnnouncementText,
+    couponAnnouncements,
+  ]);
+
+  useEffect(() => {
+    if (activeAnnIndex >= announcements.length && announcements.length > 0) {
+      setActiveAnnIndex(0);
+    }
+  }, [announcements.length, activeAnnIndex]);
+
   useEffect(() => {
     syncAnnouncements();
+
+    const onSiteInfoUpdated = () => {
+      setAnnDismissed(false);
+      refreshSiteInfo();
+    };
 
     const channel = supabase
       .channel("realtime-header-coupons")
@@ -118,24 +184,26 @@ export default function Header() {
         { event: "*", schema: "public", table: "site_info" },
         () => {
           syncAnnouncements();
+          refreshSiteInfo();
         }
       )
       .subscribe();
 
     window.addEventListener("coupons_updated", syncAnnouncements);
+    window.addEventListener("site_info_updated", onSiteInfoUpdated);
 
     return () => {
       window.removeEventListener("coupons_updated", syncAnnouncements);
+      window.removeEventListener("site_info_updated", onSiteInfoUpdated);
       supabase.removeChannel(channel);
     };
-  }, [syncAnnouncements]);
+  }, [syncAnnouncements, refreshSiteInfo]);
 
-  // چرخش اسلایدر هر ۴ ثانیه بین کدهای فعال
   useEffect(() => {
     if (announcements.length <= 1) return;
     const interval = setInterval(() => {
       setActiveAnnIndex((prev) => (prev + 1) % announcements.length);
-    }, 4000);
+    }, 4500);
     return () => clearInterval(interval);
   }, [announcements.length]);
 
@@ -159,17 +227,20 @@ export default function Header() {
   const syncUserSession = () => {
     try {
       let resolvedName = "";
-      const draftRaw = localStorage.getItem("axon_checkout_form_draft_v2026");
+      const draftRaw = localStorage.getItem("axon_checkout_form_draft_v2027");
       if (draftRaw) {
         const draft = JSON.parse(draftRaw);
-        if (draft?.fullName && String(draft.fullName).trim().length > 1) {
+        if (draft?.firstName || draft?.lastName) {
+          resolvedName = `${draft.firstName || ""} ${draft.lastName || ""}`.trim();
+        } else if (draft?.fullName && String(draft.fullName).trim().length > 1) {
           resolvedName = String(draft.fullName).trim();
         }
       }
       const local = localStorage.getItem("axon_user_session");
       if (local) {
         const parsed = JSON.parse(local);
-        const rawName = parsed?.full_name || parsed?.name || parsed?.username || "";
+        const rawName =
+          parsed?.full_name || parsed?.name || parsed?.username || "";
         if (rawName && !/^0?9\d{9}$/.test(String(rawName).trim())) {
           setUserLabel(String(rawName).trim());
         } else if (resolvedName) {
@@ -235,18 +306,28 @@ export default function Header() {
   const isCapsule = variantMode !== "full-width";
 
   const brandName =
-    themeHeader.brandName !== undefined
+    sysSettings.site_name !== undefined &&
+    String(sysSettings.site_name).trim() !== ""
+      ? String(sysSettings.site_name).trim()
+      : themeHeader.brandName !== undefined
       ? String(themeHeader.brandName).trim()
       : String(persisted.site_name ?? siteInfo?.site_name ?? "").trim();
 
-  const menuFontSize = Number(themeHeader.menuFontSize || headerCfg?.menu?.fontSize || 12);
-  const logoWidth = Number(themeHeader.logoWidth || headerCfg?.brand?.logoWidth || 44);
-  const logoHeight = Number(themeHeader.logoHeight || headerCfg?.brand?.logoHeight || 44);
+  const menuFontSize = Number(
+    themeHeader.menuFontSize || headerCfg?.menu?.fontSize || 12
+  );
+  const logoWidth = Number(
+    themeHeader.logoWidth || headerCfg?.brand?.logoWidth || 44
+  );
+  const logoHeight = Number(
+    themeHeader.logoHeight || headerCfg?.brand?.logoHeight || 44
+  );
   const logoRadius = themeHeader.logoRadius || "12px";
   const logoFit = themeHeader.logoObjectFit || "contain";
   const baseHeight = Number(themeHeader.height || headerCfg.height || 64);
 
-  const navMenuFromDb = siteInfo?.navigation_menu || layoutCfg?.navigation_menu;
+  const navMenuFromDb =
+    siteInfo?.navigation_menu || layoutCfg?.navigation_menu;
   const menuItems =
     Array.isArray(navMenuFromDb) && navMenuFromDb.length > 0
       ? navMenuFromDb
@@ -271,11 +352,16 @@ export default function Header() {
     Boolean(activeDeviceOffer?.text) &&
     !offerDismissed;
 
-  const imgKey = logoSrc ? logoSrc.slice(-32) + "_" + logoSrc.length : "no_header_logo";
+  const imgKey = logoSrc
+    ? logoSrc.slice(-32) + "_" + logoSrc.length
+    : "no_header_logo";
 
   return (
     <>
-      <div className="fixed top-0 inset-x-0 z-40 flex flex-col items-center pointer-events-none" dir="rtl">
+      <div
+        className="fixed top-0 inset-x-0 z-40 flex flex-col items-center pointer-events-none"
+        dir="rtl"
+      >
         {showAnnouncement && (
           <div
             style={{
@@ -295,7 +381,9 @@ export default function Header() {
                 className="px-2 py-0.5 rounded-lg bg-white/20 hover:bg-white/30 text-white font-mono text-[10px] font-black cursor-pointer transition shrink-0"
                 title="برای کپی کد تخفیف کلیک کنید"
               >
-                {copiedCoupon === currentAnnouncement.code ? "کپی شد ✓" : "📋 کپی کد"}
+                {copiedCoupon === currentAnnouncement.code
+                  ? "کپی شد ✓"
+                  : "📋 کپی کد"}
               </button>
             )}
 
@@ -341,7 +429,9 @@ export default function Header() {
                 }}
                 className="px-2.5 py-0.5 rounded-lg bg-emerald-500 text-slate-950 font-mono text-[10px] font-black cursor-pointer hover:opacity-90 transition"
               >
-                {copiedCoupon === activeDeviceOffer.couponCode ? "کپی شد ✓" : "کد: " + activeDeviceOffer.couponCode}
+                {copiedCoupon === activeDeviceOffer.couponCode
+                  ? "کپی شد ✓"
+                  : "کد: " + activeDeviceOffer.couponCode}
               </button>
             )}
             {activeDeviceOffer.ctaText && (
@@ -401,7 +491,9 @@ export default function Header() {
                   />
                 ) : null}
                 {brandName ? (
-                  <span className="font-black whitespace-nowrap">{brandName}</span>
+                  <span className="font-black whitespace-nowrap">
+                    {brandName}
+                  </span>
                 ) : null}
               </Link>
 
@@ -412,18 +504,23 @@ export default function Header() {
                 >
                   {menuItems.map((item: any) => {
                     const isActive = pathname === item.url;
-                    const hasSub = Array.isArray(item.children) && item.children.length > 0;
+                    const hasSub =
+                      Array.isArray(item.children) && item.children.length > 0;
                     return (
                       <div key={item.id} className="relative group py-2">
                         <Link
                           href={item.url}
                           className={
                             "hover:text-[var(--text-primary)] transition whitespace-nowrap flex items-center gap-1 " +
-                            (isActive ? "text-[var(--accent-blue)] font-black" : "")
+                            (isActive
+                              ? "text-[var(--accent-blue)] font-black"
+                              : "")
                           }
                         >
                           <span>{item.title}</span>
-                          {hasSub && <span className="text-[9px] opacity-70">▼</span>}
+                          {hasSub && (
+                            <span className="text-[9px] opacity-70">▼</span>
+                          )}
                         </Link>
 
                         {hasSub && (
@@ -437,19 +534,20 @@ export default function Header() {
                                   >
                                     {sub2.title}
                                   </Link>
-                                  {Array.isArray(sub2.children) && sub2.children.length > 0 && (
-                                    <div className="pr-3 border-r border-[var(--card-border)] space-y-0.5">
-                                      {sub2.children.map((sub3: any) => (
-                                        <Link
-                                          key={sub3.id}
-                                          href={sub3.url || "/products"}
-                                          className="block px-2.5 py-1.5 rounded-lg hover:bg-[var(--input-bg)] text-[var(--text-secondary)] hover:text-[var(--accent-blue)] text-[11px] transition"
-                                        >
-                                          ↳ {sub3.title}
-                                        </Link>
-                                      ))}
-                                    </div>
-                                  )}
+                                  {Array.isArray(sub2.children) &&
+                                    sub2.children.length > 0 && (
+                                      <div className="pr-3 border-r border-[var(--card-border)] space-y-0.5">
+                                        {sub2.children.map((sub3: any) => (
+                                          <Link
+                                            key={sub3.id}
+                                            href={sub3.url || "/products"}
+                                            className="block px-2.5 py-1.5 rounded-lg hover:bg-[var(--input-bg)] text-[var(--text-secondary)] hover:text-[var(--accent-blue)] text-[11px] transition"
+                                          >
+                                            ↳ {sub3.title}
+                                          </Link>
+                                        ))}
+                                      </div>
+                                    )}
                                 </div>
                               ))}
                             </div>
@@ -480,7 +578,10 @@ export default function Header() {
                 <span>👤</span>
                 {userLabel ? (
                   isPhoneLabel ? (
-                    <span className="font-mono font-bold tracking-tight" dir="ltr">
+                    <span
+                      className="font-mono font-bold tracking-tight"
+                      dir="ltr"
+                    >
                       {userLabel}
                     </span>
                   ) : (
@@ -525,7 +626,10 @@ export default function Header() {
       {showDeviceOffer && <div className="h-7 w-full" />}
 
       {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-x-0 top-[88px] z-30 px-3" dir="rtl">
+        <div
+          className="md:hidden fixed inset-x-0 top-[88px] z-30 px-3"
+          dir="rtl"
+        >
           <div className="rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl p-4 space-y-1 max-h-[75vh] overflow-y-auto">
             <Link
               href={userLabel ? "/account" : "/login"}
@@ -534,7 +638,9 @@ export default function Header() {
             >
               <span className="text-base">👤</span>
               <span>
-                {userLabel ? "پنل کاربری (" + userLabel + ")" : "ورود / ثبت‌نام سریع"}
+                {userLabel
+                  ? "پنل کاربری (" + userLabel + ")"
+                  : "ورود / ثبت‌نام سریع"}
               </span>
             </Link>
 

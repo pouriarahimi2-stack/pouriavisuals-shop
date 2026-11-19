@@ -1,6 +1,7 @@
+// File Path: app/checkout/page.tsx
 "use client";
-import SecurityCaptchaBox from "@/components/SecurityCaptchaBox";
 
+import SecurityCaptchaBox from "@/components/SecurityCaptchaBox";
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,10 +17,15 @@ const CHECKOUT_DRAFT_KEY = "axon_checkout_form_draft_v2027";
 interface StoreFinancialRules {
   postShippingCost: number;
   tipaxShippingCost: number;
+  defaultShippingCost: number;
   freeShippingThreshold: number;
   vatPercent: number;
   allowGuestCheckout: boolean;
   autoSendOrderSms: boolean;
+  codEnabled: boolean;
+  supportCardNumber: string;
+  supportCardHolder: string;
+  currencyLabel: string;
 }
 
 function parseExactNumber(val: any, fallback: number): number {
@@ -51,24 +57,65 @@ function extractFinancialRulesFromPayload(raw: any): StoreFinancialRules | null 
 
   let foundPost: number | undefined;
   let foundTipax: number | undefined;
+  let foundDefaultShip: number | undefined;
+  let foundFreeThreshold: number | undefined;
   let foundVat: number | undefined;
+  let foundGuest: boolean | undefined;
+  let foundSms: boolean | undefined;
+  let foundCod: boolean | undefined;
+  let foundCardNum: string | undefined;
+  let foundCardHolder: string | undefined;
+  let foundCurrency: string | undefined;
 
   for (const obj of candidates) {
     if (foundPost === undefined && obj.postShippingCost !== undefined)
       foundPost = parseExactNumber(obj.postShippingCost, 120000);
     if (foundTipax === undefined && obj.tipaxShippingCost !== undefined)
       foundTipax = parseExactNumber(obj.tipaxShippingCost, 150000);
+    if (foundDefaultShip === undefined && obj.defaultShippingCost !== undefined)
+      foundDefaultShip = parseExactNumber(obj.defaultShippingCost, 0);
+    if (
+      foundFreeThreshold === undefined &&
+      (obj.freeShippingThreshold !== undefined ||
+        obj.free_shipping_threshold !== undefined)
+    ) {
+      foundFreeThreshold = parseExactNumber(
+        obj.freeShippingThreshold ?? obj.free_shipping_threshold,
+        0
+      );
+    }
     if (foundVat === undefined && obj.vatPercent !== undefined)
       foundVat = parseExactNumber(obj.vatPercent, 10);
+    if (
+      foundGuest === undefined &&
+      typeof obj.allowGuestCheckout === "boolean"
+    )
+      foundGuest = obj.allowGuestCheckout;
+    if (foundSms === undefined && typeof obj.autoSendOrderSms === "boolean")
+      foundSms = obj.autoSendOrderSms;
+    if (foundCod === undefined && typeof obj.codEnabled === "boolean")
+      foundCod = obj.codEnabled;
+    if (foundCardNum === undefined && obj.supportCardNumber !== undefined)
+      foundCardNum = String(obj.supportCardNumber || "").trim();
+    if (foundCardHolder === undefined && obj.supportCardHolder !== undefined)
+      foundCardHolder = String(obj.supportCardHolder || "").trim();
+    if (foundCurrency === undefined && obj.currencyLabel !== undefined)
+      foundCurrency = String(obj.currencyLabel || "تومان").trim();
   }
 
   return {
     postShippingCost: foundPost !== undefined ? foundPost : 120000,
     tipaxShippingCost: foundTipax !== undefined ? foundTipax : 150000,
-    freeShippingThreshold: 0,
+    defaultShippingCost: foundDefaultShip !== undefined ? foundDefaultShip : 0,
+    freeShippingThreshold:
+      foundFreeThreshold !== undefined ? foundFreeThreshold : 0,
     vatPercent: foundVat !== undefined ? foundVat : 10,
-    allowGuestCheckout: true,
-    autoSendOrderSms: true,
+    allowGuestCheckout: foundGuest !== undefined ? foundGuest : true,
+    autoSendOrderSms: foundSms !== undefined ? foundSms : true,
+    codEnabled: foundCod !== undefined ? foundCod : false,
+    supportCardNumber: foundCardNum || "",
+    supportCardHolder: foundCardHolder || "",
+    currencyLabel: foundCurrency || "تومان",
   };
 }
 
@@ -92,7 +139,10 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [notes, setNotes] = useState("");
-  const [shippingMethod, setShippingMethod] = useState<"post" | "tipax" | null>(null);
+  const [shippingMethod, setShippingMethod] = useState<"post" | "tipax" | null>(
+    null
+  );
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean>(true);
 
   const allowedShipping = React.useMemo(() => {
     const items = (cartItems || []) as any[];
@@ -106,8 +156,12 @@ export default function CheckoutPage() {
         .toLowerCase()
         .trim();
     };
-    const hasTipaxOnly = items.some((item: any) => getShippingType(item) === "tipax");
-    const hasPostOnly = items.some((item: any) => getShippingType(item) === "post");
+    const hasTipaxOnly = items.some(
+      (item: any) => getShippingType(item) === "tipax"
+    );
+    const hasPostOnly = items.some(
+      (item: any) => getShippingType(item) === "post"
+    );
     if (hasTipaxOnly && !hasPostOnly) return "tipax_only" as const;
     if (hasPostOnly && !hasTipaxOnly) return "post_only" as const;
     return "both" as const;
@@ -119,34 +173,42 @@ export default function CheckoutPage() {
     } else if (allowedShipping === "post_only" && shippingMethod !== "post") {
       setShippingMethod("post");
     }
-  }, [allowedShipping]);
+  }, [allowedShipping, shippingMethod]);
 
   const [couponInput, setCouponInput] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
-  const [couponMsg, setCouponMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [couponMsg, setCouponMsg] = useState<{
+    type: "ok" | "err";
+    text: string;
+  } | null>(null);
 
   const [financialRules, setFinancialRules] = useState<StoreFinancialRules>({
     postShippingCost: 120000,
     tipaxShippingCost: 150000,
+    defaultShippingCost: 0,
     freeShippingThreshold: 0,
     vatPercent: 10,
     allowGuestCheckout: true,
     autoSendOrderSms: true,
+    codEnabled: false,
+    supportCardNumber: "",
+    supportCardHolder: "",
+    currencyLabel: "تومان",
   });
 
   const [otpModalOpen, setOtpModalOpen] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [verifiedToken, setVerifiedToken] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
-  const [isOtpRequestLocked, setIsOtpRequestLocked] = useState(false); // قفل امنیتی جلوگیری از دابل کلیک
+  const [isOtpRequestLocked, setIsOtpRequestLocked] = useState(false);
   const [captchaVerified, setCaptchaVerified] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fetchLiveStoreRules = useCallback(async () => {
     try {
       const [settingsRes, siteInfoRes] = await Promise.allSettled([
-        fetch("/api/admin/settings", { cache: "no-store" }),
-        fetch("/api/site-info", { cache: "no-store" }),
+        fetch("/api/admin/settings?t=" + Date.now(), { cache: "no-store" }),
+        fetch("/api/site-info?t=" + Date.now(), { cache: "no-store" }),
       ]);
       if (settingsRes.status === "fulfilled" && settingsRes.value.ok) {
         const sJson = await settingsRes.value.json();
@@ -166,6 +228,13 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     fetchLiveStoreRules();
+    try {
+      const userSess = localStorage.getItem("axon_user_session");
+      setIsUserLoggedIn(Boolean(userSess));
+    } catch {
+      setIsUserLoggedIn(false);
+    }
+
     const channel = supabase
       .channel("realtime-checkout-store-settings")
       .on(
@@ -185,15 +254,27 @@ export default function CheckoutPage() {
     };
   }, [fetchLiveStoreRules]);
 
+  const qualifiesForFreeShipping =
+    financialRules.freeShippingThreshold > 0 &&
+    finalPayable >= financialRules.freeShippingThreshold;
+
   let shippingCost = 0;
-  if (finalPayable > 0) {
-    if (shippingMethod === "post") shippingCost = financialRules.postShippingCost;
+  if (finalPayable > 0 && !qualifiesForFreeShipping) {
+    if (shippingMethod === "post")
+      shippingCost = financialRules.postShippingCost;
     else if (shippingMethod === "tipax") shippingCost = 0;
   }
 
   const invoice = PricingEngine.calculateInvoiceBreakdown(cartItems);
-  const vatAmount = invoice.totalVatAmount;
+  const vatAmount =
+    financialRules.vatPercent <= 0
+      ? 0
+      : financialRules.vatPercent === 10 && invoice.totalVatAmount > 0
+      ? invoice.totalVatAmount
+      : Math.round((finalPayable * financialRules.vatPercent) / 100);
+
   const grandTotal = Math.max(0, finalPayable + vatAmount + shippingCost);
+  const currency = financialRules.currencyLabel || "تومان";
 
   const provinceList = Object.keys(IRAN_PROVINCES_CITIES).sort();
   const cityList: string[] =
@@ -201,7 +282,8 @@ export default function CheckoutPage() {
 
   const handleProvinceChange = (val: string) => {
     setProvince(val);
-    const cities: string[] = (IRAN_PROVINCES_CITIES as Record<string, string[]>)[val] || [];
+    const cities: string[] =
+      (IRAN_PROVINCES_CITIES as Record<string, string[]>)[val] || [];
     if (cities.length > 0) setCity(cities[0]);
     else setCity("");
   };
@@ -250,7 +332,17 @@ export default function CheckoutPage() {
         })
       );
     } catch {}
-  }, [firstName, lastName, phone, province, city, address, postalCode, notes, shippingMethod]);
+  }, [
+    firstName,
+    lastName,
+    phone,
+    province,
+    city,
+    address,
+    postalCode,
+    notes,
+    shippingMethod,
+  ]);
 
   const handleApplyCoupon = async () => {
     if (!couponInput.trim()) return;
@@ -261,17 +353,29 @@ export default function CheckoutPage() {
       const cleanPhone = phone
         .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 1776))
         .replace(/\D/g, "");
-        
-      const res = await applyCoupon(couponInput.trim().toUpperCase(), cleanPhone);
+
+      const res = await applyCoupon(
+        couponInput.trim().toUpperCase(),
+        cleanPhone
+      );
       if (res?.success) {
         soundEngine.playSuccess();
-        setCouponMsg({ type: "ok", text: res.message || "کد تخفیف با موفقیت اعمال شد." });
+        setCouponMsg({
+          type: "ok",
+          text: res.message || "کد تخفیف با موفقیت اعمال شد.",
+        });
         setCouponInput("");
       } else {
-        setCouponMsg({ type: "err", text: res?.message || "کد تخفیف معتبر نیست یا منقضی شده است." });
+        setCouponMsg({
+          type: "err",
+          text: res?.message || "کد تخفیف معتبر نیست یا منقضی شده است.",
+        });
       }
     } catch {
-      setCouponMsg({ type: "err", text: "خطا در برقراری ارتباط و بررسی کد تخفیف." });
+      setCouponMsg({
+        type: "err",
+        text: "خطا در برقراری ارتباط و بررسی کد تخفیف.",
+      });
     } finally {
       setCouponLoading(false);
     }
@@ -341,22 +445,29 @@ export default function CheckoutPage() {
   };
 
   const handlePrimaryCheckoutClick = async (e: React.FormEvent) => {
-    // جلوگیری قوی‌تر از ارسال فرم و حباب شدن رویدادها
     e.preventDefault();
     e.stopPropagation();
 
-    // جلوگیری از دابل کلیک و درخواست‌های همزمان
     if (isOtpRequestLocked || submitting) return;
 
     soundEngine.playClick();
     setErrorMsg(null);
+
+    if (!financialRules.allowGuestCheckout && !isUserLoggedIn) {
+      setErrorMsg(
+        "طبق قوانین فروشگاه، برای ثبت سفارش ابتدا باید وارد حساب کاربری خود شوید."
+      );
+      return;
+    }
 
     const cleanPhone = phone
       .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 1776))
       .replace(/\D/g, "");
 
     if (!firstName.trim() || !lastName.trim()) {
-      setErrorMsg("لطفاً نام و نام خانوادگی گیرنده را به صورت جداگانه وارد نمایید.");
+      setErrorMsg(
+        "لطفاً نام و نام خانوادگی گیرنده را به صورت جداگانه وارد نمایید."
+      );
       return;
     }
     if (cleanPhone.length !== 11) {
@@ -372,11 +483,15 @@ export default function CheckoutPage() {
       return;
     }
     if (!shippingMethod) {
-      setErrorMsg("لطفاً نوع روش ارسال (پست پیشتاز یا تیپاکس) را انتخاب نمایید.");
+      setErrorMsg(
+        "لطفاً نوع روش ارسال (پست پیشتاز یا تیپاکس) را انتخاب نمایید."
+      );
       return;
     }
     if (!captchaVerified) {
-      setErrorMsg("لطفاً ابتدا کد امنیتی ضد ربات (کادر تصویر امنیتی) را به درستی وارد نمایید.");
+      setErrorMsg(
+        "لطفاً ابتدا کد امنیتی ضد ربات (کادر تصویر امنیتی) را به درستی وارد نمایید."
+      );
       return;
     }
     if (cartItems.length === 0) {
@@ -389,10 +504,9 @@ export default function CheckoutPage() {
       return;
     }
 
-    // فعال کردن قفل درخواست پیامک
     setSubmitting(true);
     setIsOtpRequestLocked(true);
-    
+
     try {
       const otpRes = await fetch("/api/send-otp", {
         method: "POST",
@@ -400,7 +514,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({ phone: cleanPhone, action: "send" }),
       });
       const otpJson = await otpRes.json();
-      
+
       if (otpRes.ok && otpJson.success) {
         setOtpModalOpen(true);
       } else {
@@ -410,7 +524,6 @@ export default function CheckoutPage() {
       setErrorMsg("خطا در ارتباط با سرویس پیامک.");
     } finally {
       setSubmitting(false);
-      // باز کردن قفل پس از ۵ ثانیه برای جلوگیری از ارسال‌های پشت سر هم
       setTimeout(() => {
         setIsOtpRequestLocked(false);
       }, 5000);
@@ -420,7 +533,7 @@ export default function CheckoutPage() {
   const handleVerifyOtpAndPay = async (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (submitting) return;
 
     soundEngine.playClick();
@@ -433,7 +546,11 @@ export default function CheckoutPage() {
       const vRes = await fetch("/api/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: cleanPhone, code: otpCode.trim(), action: "verify" }),
+        body: JSON.stringify({
+          phone: cleanPhone,
+          code: otpCode.trim(),
+          action: "verify",
+        }),
       });
       const vJson = await vRes.json();
 
@@ -462,7 +579,30 @@ export default function CheckoutPage() {
             🛡️ تکمیل مشخصات گیرنده و پرداخت امن
           </h1>
         </div>
+        {financialRules.freeShippingThreshold > 0 && (
+          <div className="px-3.5 py-1.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-xs font-black">
+            {qualifiesForFreeShipping
+              ? "🎉 تبریک! سفارش شما مشمول ارسال رایگان شد"
+              : `🚚 ارسال رایگان برای سفارش‌های بالای ${formatPrice(
+                  financialRules.freeShippingThreshold
+                )} ${currency}`}
+          </div>
+        )}
       </div>
+
+      {!financialRules.allowGuestCheckout && !isUserLoggedIn && (
+        <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-bold flex flex-wrap items-center justify-between gap-2">
+          <span>
+            ⚠️ ثبت سفارش مهمان غیرفعال است. لطفاً ابتدا وارد حساب کاربری خود شوید:
+          </span>
+          <Link
+            href="/login"
+            className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-black"
+          >
+            ورود به حساب کاربری ←
+          </Link>
+        </div>
+      )}
 
       {errorMsg && (
         <div className="p-4 rounded-2xl bg-rose-500/15 text-rose-500 text-xs font-bold animate-fadeIn">
@@ -470,7 +610,10 @@ export default function CheckoutPage() {
         </div>
       )}
 
-      <form onSubmit={handlePrimaryCheckoutClick} className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+      <form
+        onSubmit={handlePrimaryCheckoutClick}
+        className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6"
+      >
         <div className="space-y-5">
           <div className="p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
             <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
@@ -489,7 +632,9 @@ export default function CheckoutPage() {
                 />
               </div>
               <div>
-                <label className="block mb-1.5 font-bold">نام خانوادگی گیرنده *</label>
+                <label className="block mb-1.5 font-bold">
+                  نام خانوادگی گیرنده *
+                </label>
                 <input
                   type="text"
                   required
@@ -500,7 +645,9 @@ export default function CheckoutPage() {
                 />
               </div>
               <div>
-                <label className="block mb-1.5 font-bold">شماره تلفن همراه *</label>
+                <label className="block mb-1.5 font-bold">
+                  شماره تلفن همراه *
+                </label>
                 <input
                   type="tel"
                   required
@@ -515,14 +662,18 @@ export default function CheckoutPage() {
                 />
               </div>
               <div>
-                <label className="block mb-1.5 font-bold">کد پستی ۱۰ رقمی *</label>
+                <label className="block mb-1.5 font-bold">
+                  کد پستی ۱۰ رقمی *
+                </label>
                 <input
                   type="text"
                   required
                   dir="ltr"
                   maxLength={10}
                   value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, ""))}
+                  onChange={(e) =>
+                    setPostalCode(e.target.value.replace(/\D/g, ""))
+                  }
                   placeholder="0000000000"
                   className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-center outline-none focus:border-[var(--accent-blue)]"
                 />
@@ -617,7 +768,11 @@ export default function CheckoutPage() {
                     <span className="font-black text-sm">📦 پست پیشتاز</span>
                   </div>
                   <div className="pr-7 font-bold text-emerald-600 text-xs">
-                    هزینه ثابت + تحویل درب منزل
+                    {qualifiesForFreeShipping
+                      ? "رایگان (شامل طرح ارسال رایگان)"
+                      : `${formatPrice(
+                          financialRules.postShippingCost
+                        )} ${currency} — تحویل درب منزل`}
                   </div>
                 </label>
               )}
@@ -647,6 +802,18 @@ export default function CheckoutPage() {
                 </label>
               )}
             </div>
+
+            {financialRules.codEnabled && financialRules.supportCardNumber && (
+              <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-[11px] font-bold space-y-1">
+                <div>💳 اطلاعات کارت رسمی جهت هماهنگی کارت‌به‌کارت:</div>
+                <div className="font-mono text-xs" dir="ltr">
+                  {financialRules.supportCardNumber}{" "}
+                  {financialRules.supportCardHolder
+                    ? `(${financialRules.supportCardHolder})`
+                    : ""}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -674,21 +841,30 @@ export default function CheckoutPage() {
                     />
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-[12px] truncate">{item.title || item.name}</div>
+                    <div className="font-bold text-[12px] truncate">
+                      {item.title || item.name}
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5 text-[var(--text-secondary)]">
                       <span>
-                        تعداد: <span className="font-mono font-bold">{item.quantity || 1}</span>
+                        تعداد:{" "}
+                        <span className="font-mono font-bold">
+                          {item.quantity || 1}
+                        </span>
                       </span>
                       {item.selectedColor && (
                         <span>
-                          رنگ: <span className="font-bold">{item.selectedColor}</span>
+                          رنگ:{" "}
+                          <span className="font-bold">{item.selectedColor}</span>
                         </span>
                       )}
                     </div>
                   </div>
                   <div className="font-mono font-black text-[var(--accent-blue)] whitespace-nowrap text-[11px]">
                     {typeof formatPrice === "function"
-                      ? formatPrice((item.discount_price || item.price || 0) * (item.quantity || 1))
+                      ? formatPrice(
+                          (item.discount_price || item.price || 0) *
+                            (item.quantity || 1)
+                        )
                       : (
                           (item.discount_price || item.price || 0) *
                           (item.quantity || 1)
@@ -700,10 +876,12 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {/* کادر ثبت کد تخفیف اختصاصی و سراسری */}
+          {/* کادر ثبت کد تخفیف */}
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
             <div className="flex items-center justify-between">
-              <span className="font-black text-xs text-[var(--text-primary)]">🏷️ کد تخفیف دارید؟</span>
+              <span className="font-black text-xs text-[var(--text-primary)]">
+                🏷️ کد تخفیف دارید؟
+              </span>
               {appliedCoupon && (
                 <span className="text-[10px] px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-500 font-bold">
                   اعمال‌شده ✓
@@ -736,7 +914,11 @@ export default function CheckoutPage() {
                     type="text"
                     dir="ltr"
                     value={couponInput}
-                    onChange={(e) => setCouponInput(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ""))}
+                    onChange={(e) =>
+                      setCouponInput(
+                        e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "")
+                      )
+                    }
                     placeholder="AXON-CJZU"
                     className="flex-1 min-w-[80px] px-3.5 py-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-black uppercase outline-none focus:border-[var(--accent-blue)] text-xs"
                   />
@@ -768,18 +950,26 @@ export default function CheckoutPage() {
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
             <div className="flex justify-between">
               <span>مجموع اقلام:</span>
-              <span className="font-mono">{formatPrice(totalPrice)} تومان</span>
+              <span className="font-mono">
+                {formatPrice(totalPrice)} {currency}
+              </span>
             </div>
             {discountAmount > 0 && (
               <div className="flex justify-between text-emerald-500 font-bold">
                 <span>تخفیف کوپن:</span>
-                <span className="font-mono">- {formatPrice(discountAmount)} تومان</span>
+                <span className="font-mono">
+                  - {formatPrice(discountAmount)} {currency}
+                </span>
               </div>
             )}
             {vatAmount > 0 && (
               <div className="flex justify-between text-slate-500 text-[10px]">
-                <span>شامل مالیات بر ارزش افزوده ({financialRules.vatPercent}٪):</span>
-                <span className="font-mono">{formatPrice(vatAmount)} تومان</span>
+                <span>
+                  شامل مالیات بر ارزش افزوده ({financialRules.vatPercent}٪):
+                </span>
+                <span className="font-mono">
+                  {formatPrice(vatAmount)} {currency}
+                </span>
               </div>
             )}
             <div className="flex justify-between">
@@ -794,29 +984,32 @@ export default function CheckoutPage() {
               </span>
               <span
                 className={`font-mono ${
-                  shippingMethod === "tipax" ? "text-amber-500" : "text-emerald-500"
+                  shippingMethod === "tipax"
+                    ? "text-amber-500"
+                    : "text-emerald-500"
                 }`}
               >
                 {!shippingMethod
                   ? "---"
                   : shippingMethod === "tipax"
                   ? "پس‌کرایه 🚚"
-                  : formatPrice(shippingCost) + " تومان"}
+                  : qualifiesForFreeShipping
+                  ? "رایگان 🎉"
+                  : formatPrice(shippingCost) + " " + currency}
               </span>
             </div>
             <div className="pt-2.5 border-t border-[var(--card-border)] flex justify-between items-center text-sm">
               <span className="font-black">مبلغ قابل پرداخت:</span>
               <span className="font-mono font-black text-[var(--accent-blue)]">
-                {formatPrice(grandTotal)} تومان
+                {formatPrice(grandTotal)} {currency}
               </span>
             </div>
           </div>
-          
+
           <SecurityCaptchaBox onVerifyChange={setCaptchaVerified} />
-          
+
           <button
             type="submit"
-            // دکمه فقط در صورتی فعال است که قفلی وجود نداشته باشد
             disabled={submitting || !captchaVerified || isOtpRequestLocked}
             className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs sm:text-sm shadow-xl cursor-pointer transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -839,7 +1032,9 @@ export default function CheckoutPage() {
             onClick={(e) => e.stopPropagation()}
             className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-5 text-center text-xs"
           >
-            <p className="font-bold text-sm">کد تایید ارسال‌شده به {phone} را وارد کنید</p>
+            <p className="font-bold text-sm">
+              کد تایید ارسال‌شده به {phone} را وارد کنید
+            </p>
             <input
               type="text"
               inputMode="numeric"

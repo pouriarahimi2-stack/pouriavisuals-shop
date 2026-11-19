@@ -1,5 +1,6 @@
-"use client";
 // File Path: components/admin/AdminHealthGuard.tsx
+"use client";
+
 import React, { useEffect, useState, useCallback } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 
@@ -15,7 +16,9 @@ export default function AdminHealthGuard() {
     setChecking(true);
     const start = performance.now();
     try {
-      const res = await fetch("/api/site-info", { cache: "no-store" });
+      const res = await fetch("/api/admin/settings?t=" + Date.now(), {
+        cache: "no-store",
+      });
       const elapsed = Math.max(14, Math.round(performance.now() - start));
       setLatencyMs(elapsed);
       setDbStatus(res.ok ? "healthy" : "degraded");
@@ -80,7 +83,10 @@ export default function AdminHealthGuard() {
           }
         >
           <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
-          <span>دیتابیس Supabase: {dbStatus === "healthy" ? "متصل و فعال" : "در حال بررسی"}</span>
+          <span>
+            دیتابیس Supabase:{" "}
+            {dbStatus === "healthy" ? "متصل و فعال" : "در حال بررسی"}
+          </span>
         </span>
 
         <span className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-[var(--accent-blue)]">

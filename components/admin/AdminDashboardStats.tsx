@@ -1,43 +1,60 @@
 // File Path: components/admin/AdminDashboardStats.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { formatPrice } from "@/lib/formatters";
 
-interface SourceStat { views: number; sharePercent: number; }
+interface SourceStat {
+  views: number;
+  sharePercent: number;
+}
 interface SourceStats {
   totalViews: number;
-  google:   SourceStat;
-  torob:    SourceStat;
-  direct:   SourceStat;
+  google: SourceStat;
+  torob: SourceStat;
+  direct: SourceStat;
   referral: SourceStat;
 }
 
 export default function AdminDashboardStats() {
   const [stats, setStats] = useState({
-    totalProducts: 0, totalOrders: 0, pendingOrders: 0, totalSales: 0,
-    inventoryValuation: 0, lowStockCount: 0, unreadMessages: 0,
-    totalCustomers: 0, vipCustomersCount: 0, totalPosts: 0,
-    totalNews: 0, activeCoupons: 0,
+    totalProducts: 0,
+    totalOrders: 0,
+    pendingOrders: 0,
+    totalSales: 0,
+    inventoryValuation: 0,
+    lowStockCount: 0,
+    unreadMessages: 0,
+    totalCustomers: 0,
+    vipCustomersCount: 0,
+    totalPosts: 0,
+    totalNews: 0,
+    activeCoupons: 0,
   });
-  const [recentOrders, setRecentOrders]   = useState<any[]>([]);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [latestBackupNum, setLatestBackupNum] = useState<number>(101);
-  const [loading, setLoading]             = useState(true);
-  const [sourceStats, setSourceStats]     = useState<SourceStats | null>(null);
-  const [deviceStats, setDeviceStats]     = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [sourceStats, setSourceStats] = useState<SourceStats | null>(null);
+  const [deviceStats, setDeviceStats] = useState<any>(null);
 
-  const fetchLiveStats = async () => {
+  const fetchLiveStats = useCallback(async () => {
     try {
       const [res, bkpRes, analyticsRes] = await Promise.all([
-        fetch("/api/admin/dashboard-stats", { cache: "no-store" }),
-        fetch("/api/cron/backup", { cache: "no-store" }).catch(() => null),
-        fetch("/api/analytics/device",  { cache: "no-store" }).catch(() => null),
+        fetch("/api/admin/dashboard-stats?t=" + Date.now(), {
+          cache: "no-store",
+        }),
+        fetch("/api/cron/backup?t=" + Date.now(), { cache: "no-store" }).catch(
+          () => null
+        ),
+        fetch("/api/analytics/device?t=" + Date.now(), {
+          cache: "no-store",
+        }).catch(() => null),
       ]);
       const json = await res.json();
-      if (json.success) {
+      if (json.success && json.stats) {
         setStats(json.stats);
         setRecentOrders(json.recentOrders || []);
       }
@@ -48,23 +65,41 @@ export default function AdminDashboardStats() {
       if (analyticsRes && analyticsRes.ok) {
         const aJson = await analyticsRes.json();
         if (aJson.sources) setSourceStats(aJson.sources);
-        if (aJson.stats)   setDeviceStats(aJson.stats);
+        if (aJson.stats) setDeviceStats(aJson.stats);
       }
-    } catch (e) { console.error("Dashboard stats error:", e); }
-    finally { setLoading(false); }
-  };
+    } catch (e) {
+      console.error("Dashboard stats error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchLiveStats();
 
-    const chOrders = supabase.channel("live-dash-orders-cdc")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, fetchLiveStats)
+    const chOrders = supabase
+      .channel("live-dash-orders-cdc")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        fetchLiveStats
+      )
       .subscribe();
-    const chProds = supabase.channel("live-dash-prods-cdc")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, fetchLiveStats)
+    const chProds = supabase
+      .channel("live-dash-prods-cdc")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        fetchLiveStats
+      )
       .subscribe();
-    const chMsgs = supabase.channel("live-dash-msgs-cdc")
-      .on("postgres_changes", { event: "*", schema: "public", table: "contact_messages" }, fetchLiveStats)
+    const chMsgs = supabase
+      .channel("live-dash-msgs-cdc")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "contact_messages" },
+        fetchLiveStats
+      )
       .subscribe();
 
     return () => {
@@ -72,84 +107,221 @@ export default function AdminDashboardStats() {
       supabase.removeChannel(chProds);
       supabase.removeChannel(chMsgs);
     };
-  }, []);
+  }, [fetchLiveStats]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "paid":      return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">پرداخت شده ✓</span>;
-      case "shipped":   return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-500/15 text-blue-400 border border-blue-500/30">تحویل به پست 🚚</span>;
-      case "delivered": return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-500/15 text-purple-400 border border-purple-500/30">تحویل شده</span>;
-      case "cancelled": return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500/15 text-rose-500 border border-rose-500/30">لغو شده</span>;
-      default:          return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/15 text-amber-500 border border-amber-500/30 animate-pulse">در انتظار</span>;
+      case "paid":
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+            پرداخت شده ✓
+          </span>
+        );
+      case "shipped":
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-500/15 text-blue-400 border border-blue-500/30">
+            تحویل به پست 🚚
+          </span>
+        );
+      case "delivered":
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-500/15 text-purple-400 border border-purple-500/30">
+            تحویل شده
+          </span>
+        );
+      case "cancelled":
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500/15 text-rose-500 border border-rose-500/30">
+            لغو شده
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/15 text-amber-500 border border-amber-500/30 animate-pulse">
+            در انتظار
+          </span>
+        );
     }
   };
 
   return (
-    <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
+    <div
+      className="space-y-6 font-sans select-text text-[var(--text-primary)]"
+      dir="rtl"
+    >
       {/* سربرگ */}
-      <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4">
+      <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-blue-500/25">📊</div>
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-blue-500/25 shrink-0">
+            📊
+          </div>
           <div>
-            <h2 className="text-base sm:text-lg font-black">داشبورد تحلیلی هوشمند و مرکز فرماندهی بلادرنگ آکسون</h2>
+            <h2 className="text-base sm:text-lg font-black">
+              داشبورد تحلیلی هوشمند و مرکز فرماندهی بلادرنگ آکسون
+            </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
-              پایش بلادرنگ دیتابیس با وب‌سوکت CDC و پشتیبان‌گیری خودکار روزانه (#{latestBackupNum})
+              پایش بلادرنگ دیتابیس با وب‌سوکت CDC و پشتیبان‌گیری خودکار روزانه (#
+              {latestBackupNum})
             </p>
           </div>
         </div>
-        <button onClick={() => { soundEngine.playClick(); fetchLiveStats(); }}
-          className="px-5 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer flex items-center gap-2 shadow-sm">
-          <span>🔄</span><span>استعلام لحظه‌ای</span>
+        <button
+          type="button"
+          onClick={() => {
+            soundEngine.playClick();
+            fetchLiveStats();
+          }}
+          className="px-5 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer flex items-center gap-2 shadow-sm"
+        >
+          <span>🔄</span>
+          <span>بروزرسانی آمار</span>
         </button>
       </div>
 
-      {/* ۱. شاخص‌های اصلی */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 text-xs">
+      {/* ۱. ردیف اول شاخص‌های اصلی (فروش، سفارش‌ها، انبار، پیام‌ها) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm hover:border-emerald-500 transition">
           <div className="flex items-center justify-between text-[var(--text-secondary)] font-bold">
             <span>گردش مالی و فروش کل</span>
-            <span className="p-2 rounded-2xl bg-emerald-500/10 text-emerald-500 text-sm">💳</span>
+            <span className="p-2 rounded-2xl bg-emerald-500/10 text-emerald-500 text-sm">
+              💳
+            </span>
           </div>
-          <div className="text-sm md:text-xl font-black font-mono text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
-            {loading ? "..." : formatPrice(stats.totalSales)} <span className="text-xs font-normal">تومان</span>
+          <div
+            className="text-base md:text-xl font-black font-mono text-emerald-600 dark:text-emerald-400"
+            suppressHydrationWarning
+          >
+            {loading ? "..." : formatPrice(stats.totalSales)}{" "}
+            <span className="text-xs font-normal">تومان</span>
           </div>
-          <span className="text-[10px] text-slate-400 font-medium block">تراکنش‌های تاییدشده در دیتابیس</span>
+          <span className="text-[10px] text-slate-400 font-medium block">
+            تراکنش‌های تاییدشده در دیتابیس
+          </span>
         </div>
 
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm hover:border-indigo-500 transition">
           <div className="flex items-center justify-between text-[var(--text-secondary)] font-bold">
             <span>سفارش‌ها و فاکتورها</span>
-            <span className="p-2 rounded-2xl bg-indigo-500/10 text-indigo-500 text-sm">📄</span>
+            <span className="p-2 rounded-2xl bg-indigo-500/10 text-indigo-500 text-sm">
+              📄
+            </span>
           </div>
           <div className="text-2xl font-black font-mono text-indigo-400">
-            {loading ? "..." : stats.totalOrders} <span className="text-xs font-bold text-[var(--text-secondary)]">سفارش</span>
+            {loading ? "..." : stats.totalOrders.toLocaleString("fa-IR")}{" "}
+            <span className="text-xs font-bold text-[var(--text-secondary)]">
+              سفارش
+            </span>
           </div>
-          <span className="text-[10px] text-amber-500 font-bold block">
-            {stats.pendingOrders} فاکتور در انتظار پردازش و ارسال
-          </span>
+          <Link
+            href="/admin/orders"
+            className="text-[10px] text-amber-500 font-bold block hover:underline"
+          >
+            {stats.pendingOrders.toLocaleString("fa-IR")} فاکتور در انتظار پردازش و ارسال ←
+          </Link>
         </div>
 
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm hover:border-amber-500 transition">
           <div className="flex items-center justify-between text-[var(--text-secondary)] font-bold">
             <span>موجودی بحرانی انبار</span>
-            <span className="p-2 rounded-2xl bg-amber-500/10 text-amber-500 text-sm">⚠️</span>
+            <span className="p-2 rounded-2xl bg-amber-500/10 text-amber-500 text-sm">
+              ⚠️
+            </span>
           </div>
           <div className="text-2xl font-black font-mono text-amber-500">
-            {loading ? "..." : stats.lowStockCount} <span className="text-xs font-bold text-[var(--text-secondary)]">کالا</span>
+            {loading ? "..." : stats.lowStockCount.toLocaleString("fa-IR")}{" "}
+            <span className="text-xs font-bold text-[var(--text-secondary)]">
+              کالا
+            </span>
           </div>
-          <span className="text-[10px] text-slate-400 font-medium block">کالاهای با موجودی کمتر از حد بحرانی</span>
+          <Link
+            href="/admin/inventory"
+            className="text-[10px] text-slate-400 hover:text-amber-400 font-medium block"
+          >
+            کالاهای با موجودی کمتر از حد بحرانی ←
+          </Link>
         </div>
 
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm hover:border-rose-500 transition">
           <div className="flex items-center justify-between text-[var(--text-secondary)] font-bold">
             <span>پیام‌های خوانده‌نشده</span>
-            <span className="p-2 rounded-2xl bg-rose-500/10 text-rose-500 text-sm">💬</span>
+            <span className="p-2 rounded-2xl bg-rose-500/10 text-rose-500 text-sm">
+              💬
+            </span>
           </div>
           <div className="text-2xl font-black font-mono text-rose-400">
-            {loading ? "..." : stats.unreadMessages}
+            {loading ? "..." : stats.unreadMessages.toLocaleString("fa-IR")}
           </div>
-          <Link href="/admin/messages" className="text-[10px] text-rose-400 font-bold block hover:underline">
+          <Link
+            href="/admin/messages"
+            className="text-[10px] text-rose-400 font-bold block hover:underline"
+          >
             مشاهده پیام‌ها →
+          </Link>
+        </div>
+      </div>
+
+      {/* ردیف دوم شاخص‌های تکمیلی (کاتالوگ، ارزش انبار، مشتریان CRM، تخفیف‌ها و محتوا) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-between">
+          <div>
+            <span className="text-[var(--text-secondary)] font-bold block">
+              تعداد کل محصولات کاتالوگ
+            </span>
+            <span className="font-mono font-black text-base text-[var(--accent-blue)] mt-1 block">
+              {stats.totalProducts.toLocaleString("fa-IR")} محصول فعال
+            </span>
+          </div>
+          <Link
+            href="/admin/products"
+            className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold hover:border-[var(--accent-blue)]"
+          >
+            کاتالوگ
+          </Link>
+        </div>
+
+        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-between">
+          <div>
+            <span className="text-[var(--text-secondary)] font-bold block">
+              ارزش ریالی موجودی انبار
+            </span>
+            <span className="font-mono font-black text-base text-emerald-500 mt-1 block">
+              {formatPrice(stats.inventoryValuation)} تومان
+            </span>
+          </div>
+          <span className="text-xl">🏛️</span>
+        </div>
+
+        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-between">
+          <div>
+            <span className="text-[var(--text-secondary)] font-bold block">
+              خریداران یکتا و مشتریان VIP
+            </span>
+            <span className="font-mono font-black text-base text-purple-400 mt-1 block">
+              {stats.totalCustomers.toLocaleString("fa-IR")} نفر ({stats.vipCustomersCount} VIP)
+            </span>
+          </div>
+          <Link
+            href="/admin/customers"
+            className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold hover:border-purple-400"
+          >
+            CRM
+          </Link>
+        </div>
+
+        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-between">
+          <div>
+            <span className="text-[var(--text-secondary)] font-bold block">
+              کوپن‌های فعال / مقالات و اخبار
+            </span>
+            <span className="font-mono font-black text-base text-sky-400 mt-1 block">
+              {stats.activeCoupons} کوپن | {stats.totalPosts + stats.totalNews} محتوا
+            </span>
+          </div>
+          <Link
+            href="/admin/coupons"
+            className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold hover:border-sky-400"
+          >
+            مدیریت
           </Link>
         </div>
       </div>
@@ -157,63 +329,92 @@ export default function AdminDashboardStats() {
       {/* ─── ۲. مانیتورینگ منبع ترافیک ─── */}
       <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
         <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-3">
-          <span className="p-2 rounded-xl bg-blue-500/10 text-blue-400 text-base">🔎</span>
-          <h3 className="font-black text-sm text-blue-400">مانیتورینگ منبع ترافیک ورودی</h3>
-          <span className="mr-auto text-[10px] text-[var(--text-secondary)]">
-            ${sourceStats ? sourceStats.totalViews.toLocaleString("fa-IR") + " بازدید کل" : "در حال بارگذاری..."}
+          <span className="p-2 rounded-xl bg-blue-500/10 text-blue-400 text-base">
+            🔎
+          </span>
+          <h3 className="font-black text-sm text-blue-400">
+            مانیتورینگ منبع ترافیک ورودی
+          </h3>
+          <span className="mr-auto text-[11px] font-bold text-[var(--text-secondary)]">
+            {sourceStats
+              ? `${sourceStats.totalViews.toLocaleString("fa-IR")} بازدید کل`
+              : "در حال بارگذاری..."}
           </span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { key: "google",   label: "گوگل / جستجو", icon: "🔍", color: "blue" },
-            { key: "torob",    label: "ترب",           icon: "🛒", color: "orange" },
-            { key: "direct",   label: "مستقیم",        icon: "🔗", color: "emerald" },
-            { key: "referral", label: "ارجاع دیگر",    icon: "↗️", color: "purple" },
+            { key: "google", label: "گوگل / جستجو", icon: "🔍", color: "blue" },
+            { key: "torob", label: "ترب", icon: "🛒", color: "orange" },
+            { key: "direct", label: "مستقیم", icon: "🔗", color: "emerald" },
+            { key: "referral", label: "ارجاع دیگر", icon: "↗️", color: "purple" },
           ].map(({ key, label, icon, color }) => {
-            const s = sourceStats?.[key as keyof SourceStats] as SourceStat | undefined;
+            const s = sourceStats?.[key as keyof SourceStats] as
+              | SourceStat
+              | undefined;
             const pct = s?.sharePercent ?? 0;
             const colorMap: Record<string, string> = {
-              blue:    "bg-blue-500/10 text-blue-400 border-blue-500/30",
-              orange:  "bg-orange-500/10 text-orange-400 border-orange-500/30",
-              emerald: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
-              purple:  "bg-purple-500/10 text-purple-400 border-purple-500/30",
+              blue: "bg-blue-500/10 text-blue-400 border-blue-500/30",
+              orange: "bg-orange-500/10 text-orange-400 border-orange-500/30",
+              emerald:
+                "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+              purple: "bg-purple-500/10 text-purple-400 border-purple-500/30",
             };
             const barMap: Record<string, string> = {
-              blue: "bg-blue-500", orange: "bg-orange-500",
-              emerald: "bg-emerald-500", purple: "bg-purple-500",
+              blue: "bg-blue-500",
+              orange: "bg-orange-500",
+              emerald: "bg-emerald-500",
+              purple: "bg-purple-500",
             };
             return (
-              <div key={key} className={"p-4 rounded-2xl border space-y-2 " + colorMap[color]}>
+              <div
+                key={key}
+                className={"p-4 rounded-2xl border space-y-2 " + colorMap[color]}
+              >
                 <div className="flex items-center gap-1.5 font-black">
-                  <span>{icon}</span><span>{label}</span>
+                  <span>{icon}</span>
+                  <span>{label}</span>
                 </div>
                 <div className="text-2xl font-black font-mono">{pct}٪</div>
                 <div className="w-full h-1.5 rounded-full bg-black/10 overflow-hidden">
-                  <div className={"h-full rounded-full transition-all " + barMap[color]} style={{ width: pct + "%" }} />
+                  <div
+                    className={"h-full rounded-full transition-all " + barMap[color]}
+                    style={{ width: pct + "%" }}
+                  />
                 </div>
-                <div className="text-[10px] opacity-70">{(s?.views ?? 0).toLocaleString("fa-IR")} بازدید</div>
+                <div className="text-[10px] opacity-75 font-bold">
+                  {(s?.views ?? 0).toLocaleString("fa-IR")} بازدید
+                </div>
               </div>
             );
           })}
         </div>
 
-        {/* device breakdown */}
+        {/* توزیع بر اساس دستگاه */}
         {deviceStats && (
           <div className="pt-4 border-t border-[var(--card-border)] space-y-3">
-            <h4 className="font-black text-xs text-[var(--text-secondary)]">توزیع بر اساس دستگاه:</h4>
+            <h4 className="font-black text-xs text-[var(--text-secondary)]">
+              توزیع بازدیدکنندگان بر اساس دستگاه:
+            </h4>
             <div className="grid grid-cols-3 gap-3">
               {[
-                { key: "mobile",  label: "موبایل",  icon: "📱" },
-                { key: "desktop", label: "دسکتاپ",  icon: "🖥️" },
-                { key: "tablet",  label: "تبلت",    icon: "📟" },
+                { key: "mobile", label: "موبایل", icon: "📱" },
+                { key: "desktop", label: "دسکتاپ", icon: "🖥️" },
+                { key: "tablet", label: "تبلت", icon: "📟" },
               ].map(({ key, label, icon }) => {
                 const d = deviceStats[key as "mobile" | "desktop" | "tablet"];
                 return (
-                  <div key={key} className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center space-y-1">
+                  <div
+                    key={key}
+                    className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center space-y-1"
+                  >
                     <div className="text-lg">{icon}</div>
-                    <div className="font-black text-sm">{d?.sharePercent ?? 0}٪</div>
-                    <div className="text-[10px] text-[var(--text-secondary)]">{label}</div>
+                    <div className="font-black text-sm">
+                      {d?.sharePercent ?? 0}٪
+                    </div>
+                    <div className="text-[10px] text-[var(--text-secondary)]">
+                      {label} ({(d?.views ?? 0).toLocaleString("fa-IR")} بازدید)
+                    </div>
                   </div>
                 );
               })}
@@ -225,28 +426,46 @@ export default function AdminDashboardStats() {
       {/* ─── ۳. سفارش‌های اخیر ─── */}
       {recentOrders.length > 0 && (
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
-          <h3 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
-            🕐 آخرین سفارش‌های ثبت‌شده
-          </h3>
+          <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
+            <h3 className="font-black text-sm text-[var(--accent-blue)]">
+              🕐 آخرین سفارش‌های ثبت‌شده ({recentOrders.length})
+            </h3>
+            <Link
+              href="/admin/orders"
+              className="text-xs font-bold text-blue-400 hover:underline"
+            >
+              مدیریت کامل سفارش‌ها →
+            </Link>
+          </div>
           <div className="space-y-2 max-h-72 overflow-y-auto">
             {recentOrders.slice(0, 8).map((o: any) => (
-              <div key={o.id} className="flex items-center justify-between p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-black text-[var(--accent-blue)]">#{String(o.id).slice(-6).toUpperCase()}</span>
-                  <span className="text-[var(--text-secondary)] truncate max-w-[120px]">{o.customer_name || "مشتری"}</span>
+              <div
+                key={o.id}
+                className="flex items-center justify-between p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="font-mono font-black text-[var(--accent-blue)]">
+                    #{String(o.id).slice(-6).toUpperCase()}
+                  </span>
+                  <span className="font-bold text-[var(--text-primary)] truncate max-w-[140px]">
+                    {o.customerName || o.customer_name || "مشتری گرامی"}
+                  </span>
+                  {o.phone && (
+                    <span className="hidden sm:inline font-mono text-[10px] text-[var(--text-secondary)]">
+                      ({o.phone})
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   {getStatusBadge(o.status || "pending")}
                   <span className="font-mono font-black text-emerald-500">
-                    {formatPrice(o.final_amount || o.total_amount || 0)}
+                    {formatPrice(o.amount ?? o.final_amount ?? o.total_amount ?? 0)}{" "}
+                    تومان
                   </span>
                 </div>
               </div>
             ))}
           </div>
-          <Link href="/admin/orders" className="block text-center text-xs font-bold text-blue-400 hover:underline pt-1">
-            مشاهده همه سفارش‌ها →
-          </Link>
         </div>
       )}
     </div>

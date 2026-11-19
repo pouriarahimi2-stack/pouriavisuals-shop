@@ -1,6 +1,7 @@
-"use client";
 // File Path: components/LayoutShell.tsx
-import React from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -14,19 +15,39 @@ import { useSiteInfo } from "@/context/SiteInfoContext";
 import MaintenancePage from "@/app/maintenance/page";
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const isAdminRoute = pathname?.startsWith("/admin");
+  const pathname = usePathname() || "/";
+  const isAdminRoute = pathname.startsWith("/admin");
   const { siteInfo } = useSiteInfo();
+  const [hasAdminCookie, setHasAdminCookie] = useState(false);
 
-  const sysMaint =
-    siteInfo?.homepage_layout_config?.auth_security_config?.system_settings?.maintenance_mode;
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      setHasAdminCookie(document.cookie.includes("admin_logged_in=true"));
+    }
+  }, [pathname]);
+
+  const layoutCfg = siteInfo?.homepage_layout_config || {};
+  const sys =
+    siteInfo?.settings ||
+    siteInfo?.system_settings ||
+    layoutCfg?.system_settings ||
+    {};
+
+  const rawMaint =
+    Boolean(sys.maintenanceMode) ||
+    (siteInfo?.maintenance_mode &&
+      siteInfo.maintenance_mode !== "none" &&
+      siteInfo.maintenance_mode !== "false");
+
+  const allowAdminBypass =
+    sys.maintenanceAdminBypass !== false && hasAdminCookie;
+
   const isMaintenanceActive =
     !isAdminRoute &&
     pathname !== "/maintenance" &&
-    ((siteInfo?.maintenance_mode &&
-      siteInfo.maintenance_mode !== "none" &&
-      siteInfo.maintenance_mode !== "false") ||
-      sysMaint === true);
+    pathname !== "/login" &&
+    rawMaint &&
+    !allowAdminBypass;
 
   if (isMaintenanceActive) return <MaintenancePage />;
 

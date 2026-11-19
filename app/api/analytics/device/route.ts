@@ -23,7 +23,8 @@ let lastPersistTimestamp = 0;
 function detectDeviceFromUA(ua: string): "mobile" | "tablet" | "desktop" {
   const l = (ua || "").toLowerCase();
   if (/ipad|tablet|playbook|silk|(android(?!.*mobile))/i.test(l)) return "tablet";
-  if (/mobile|iphone|ipod|android.*mobile|windows phone|blackberry/i.test(l)) return "mobile";
+  if (/mobile|iphone|ipod|android.*mobile|windows phone|blackberry/i.test(l))
+    return "mobile";
   return "desktop";
 }
 
@@ -52,36 +53,42 @@ export async function GET() {
   try {
     const [siteRow, ordersRes] = await Promise.all([
       getMasterSiteInfoRow(),
-      supabaseAdmin
-        .from("orders")
-        .select("id, final_amount, total_amount, status, payment_status, created_at")
-        .limit(300),
+      supabaseAdmin.from("orders").select("*").limit(300),
     ]);
 
-    const storedAnalytics = siteRow?.homepage_layout_config?.device_analytics || {};
-    const storedSources = siteRow?.homepage_layout_config?.source_analytics || {};
+    const storedAnalytics =
+      siteRow?.homepage_layout_config?.device_analytics || {};
+    const storedSources =
+      siteRow?.homepage_layout_config?.source_analytics || {};
     const orders = (ordersRes.data || []).filter(
       (o: any) => o.status !== "cancelled" && o.payment_status !== "failed"
     );
 
-    const mobViews = Number(storedAnalytics?.mobile?.views || 0) + memDeviceStats.mobile.views;
-    const tabViews = Number(storedAnalytics?.tablet?.views || 0) + memDeviceStats.tablet.views;
-    const deskViews = Number(storedAnalytics?.desktop?.views || 0) + memDeviceStats.desktop.views;
+    const mobViews =
+      Number(storedAnalytics?.mobile?.views || 0) + memDeviceStats.mobile.views;
+    const tabViews =
+      Number(storedAnalytics?.tablet?.views || 0) + memDeviceStats.tablet.views;
+    const deskViews =
+      Number(storedAnalytics?.desktop?.views || 0) +
+      memDeviceStats.desktop.views;
 
     const rawTotalViews = mobViews + tabViews + deskViews;
     const totalOrders = orders.length;
 
     const mobOrders = Math.max(
-      Number(storedAnalytics?.mobile?.orders || 0) + memDeviceStats.mobile.orders,
+      Number(storedAnalytics?.mobile?.orders || 0) +
+        memDeviceStats.mobile.orders,
       Math.round(totalOrders * 0.72)
     );
     const deskOrders = Math.max(
-      Number(storedAnalytics?.desktop?.orders || 0) + memDeviceStats.desktop.orders,
+      Number(storedAnalytics?.desktop?.orders || 0) +
+        memDeviceStats.desktop.orders,
       Math.max(0, totalOrders - mobOrders)
     );
-    const tabOrders = Number(storedAnalytics?.tablet?.orders || 0) + memDeviceStats.tablet.orders;
+    const tabOrders =
+      Number(storedAnalytics?.tablet?.orders || 0) +
+      memDeviceStats.tablet.orders;
 
-    // محاسبه دقیق درصد سهم هر دستگاه (در صورت صفر بودن بازدید اولیه، نمایش توزیع استاندارد پایه)
     let mobShare = 72;
     let deskShare = 22;
     let tabShare = 6;
@@ -92,11 +99,15 @@ export async function GET() {
       deskShare = Math.max(0, 100 - mobShare - tabShare);
     }
 
-    const googleViews = Number(storedSources?.google || 0) + memSourceStats.google;
+    const googleViews =
+      Number(storedSources?.google || 0) + memSourceStats.google;
     const torobViews = Number(storedSources?.torob || 0) + memSourceStats.torob;
-    const directViews = Number(storedSources?.direct || 0) + memSourceStats.direct;
-    const referralViews = Number(storedSources?.referral || 0) + memSourceStats.referral;
-    const rawTotalSrc = googleViews + torobViews + directViews + referralViews;
+    const directViews =
+      Number(storedSources?.direct || 0) + memSourceStats.direct;
+    const referralViews =
+      Number(storedSources?.referral || 0) + memSourceStats.referral;
+    const rawTotalSrc =
+      googleViews + torobViews + directViews + referralViews;
 
     let googleShare = 54;
     let torobShare = 21;
@@ -107,7 +118,10 @@ export async function GET() {
       googleShare = Math.round((googleViews / rawTotalSrc) * 100);
       torobShare = Math.round((torobViews / rawTotalSrc) * 100);
       directShare = Math.round((directViews / rawTotalSrc) * 100);
-      referralShare = Math.max(0, 100 - googleShare - torobShare - directShare);
+      referralShare = Math.max(
+        0,
+        100 - googleShare - torobShare - directShare
+      );
     }
 
     return NextResponse.json(
@@ -118,7 +132,11 @@ export async function GET() {
           totalOrders,
           mobile: { views: mobViews, orders: mobOrders, sharePercent: mobShare },
           tablet: { views: tabViews, orders: tabOrders, sharePercent: tabShare },
-          desktop: { views: deskViews, orders: deskOrders, sharePercent: deskShare },
+          desktop: {
+            views: deskViews,
+            orders: deskOrders,
+            sharePercent: deskShare,
+          },
         },
         sources: {
           totalViews: rawTotalSrc,
@@ -131,7 +149,10 @@ export async function GET() {
       { headers: { "Cache-Control": "no-store, max-age=0" } }
     );
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: err.message },
+      { status: 500 }
+    );
   }
 }
 
@@ -140,7 +161,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const ua = req.headers.get("user-agent") || "";
     const device: "mobile" | "tablet" | "desktop" =
-      body.device === "mobile" || body.device === "tablet" || body.device === "desktop"
+      body.device === "mobile" ||
+      body.device === "tablet" ||
+      body.device === "desktop"
         ? body.device
         : detectDeviceFromUA(ua);
 
@@ -154,7 +177,6 @@ export async function POST(req: NextRequest) {
       memSourceStats[src] = (memSourceStats[src] || 0) + 1;
     }
 
-    // ذخیره‌سازی دوره‌ای در دیتابیس (هر ۳۰ ثانیه یا در هنگام ثبت سفارش)
     const now = Date.now();
     if (eventType === "order" || now - lastPersistTimestamp > 30_000) {
       lastPersistTimestamp = now;
@@ -167,19 +189,37 @@ export async function POST(req: NextRequest) {
 
           const nextDev = {
             mobile: {
-              views: Number(prevDev?.mobile?.views || 0) + memDeviceStats.mobile.views,
-              cartAdds: Number(prevDev?.mobile?.cartAdds || 0) + memDeviceStats.mobile.cartAdds,
-              orders: Number(prevDev?.mobile?.orders || 0) + memDeviceStats.mobile.orders,
+              views:
+                Number(prevDev?.mobile?.views || 0) +
+                memDeviceStats.mobile.views,
+              cartAdds:
+                Number(prevDev?.mobile?.cartAdds || 0) +
+                memDeviceStats.mobile.cartAdds,
+              orders:
+                Number(prevDev?.mobile?.orders || 0) +
+                memDeviceStats.mobile.orders,
             },
             tablet: {
-              views: Number(prevDev?.tablet?.views || 0) + memDeviceStats.tablet.views,
-              cartAdds: Number(prevDev?.tablet?.cartAdds || 0) + memDeviceStats.tablet.cartAdds,
-              orders: Number(prevDev?.tablet?.orders || 0) + memDeviceStats.tablet.orders,
+              views:
+                Number(prevDev?.tablet?.views || 0) +
+                memDeviceStats.tablet.views,
+              cartAdds:
+                Number(prevDev?.tablet?.cartAdds || 0) +
+                memDeviceStats.tablet.cartAdds,
+              orders:
+                Number(prevDev?.tablet?.orders || 0) +
+                memDeviceStats.tablet.orders,
             },
             desktop: {
-              views: Number(prevDev?.desktop?.views || 0) + memDeviceStats.desktop.views,
-              cartAdds: Number(prevDev?.desktop?.cartAdds || 0) + memDeviceStats.desktop.cartAdds,
-              orders: Number(prevDev?.desktop?.orders || 0) + memDeviceStats.desktop.orders,
+              views:
+                Number(prevDev?.desktop?.views || 0) +
+                memDeviceStats.desktop.views,
+              cartAdds:
+                Number(prevDev?.desktop?.cartAdds || 0) +
+                memDeviceStats.desktop.cartAdds,
+              orders:
+                Number(prevDev?.desktop?.orders || 0) +
+                memDeviceStats.desktop.orders,
             },
           };
 
@@ -190,7 +230,6 @@ export async function POST(req: NextRequest) {
             referral: Number(prevSrc?.referral || 0) + memSourceStats.referral,
           };
 
-          // صفر کردن شمارنده‌های حافظه موقت پس از انتقال به دیتابیس
           memDeviceStats.mobile = { views: 0, cartAdds: 0, orders: 0 };
           memDeviceStats.tablet = { views: 0, cartAdds: 0, orders: 0 };
           memDeviceStats.desktop = { views: 0, cartAdds: 0, orders: 0 };

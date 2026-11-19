@@ -1,5 +1,6 @@
-"use client";
 // File Path: components/LivePageSectionsRenderer.tsx
+"use client";
+
 import React, { useEffect, useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
@@ -59,14 +60,20 @@ export default function LivePageSectionsRenderer({
 
   const fetchSections = useCallback(async () => {
     try {
-      const res = await fetch("/api/theme-builder", { cache: "no-store" });
+      const res = await fetch("/api/theme-builder?t=" + Date.now(), {
+        cache: "no-store",
+      });
       if (!res.ok) return;
       const json = await res.json();
       const list = json?.config?.customPageSections;
       if (Array.isArray(list)) {
         setSections(list);
-        if (list.some((s: any) => s.type === "product_showcase" && s.enabled !== false)) {
-          fetch("/api/products", { cache: "no-store" })
+        if (
+          list.some(
+            (s: any) => s.type === "product_showcase" && s.enabled !== false
+          )
+        ) {
+          fetch("/api/products?t=" + Date.now(), { cache: "no-store" })
             .then((r) => r.json())
             .then((pJson) => {
               const pList = pJson.products || pJson.data || [];
@@ -110,10 +117,16 @@ export default function LivePageSectionsRenderer({
         const filteredProducts = products
           .filter((p) => {
             if (sec.categoryFilter && sec.categoryFilter !== "all") {
-              if (String(p.category || "").trim() !== sec.categoryFilter.trim()) return false;
+              if (
+                String(p.category || "").trim() !== sec.categoryFilter.trim()
+              )
+                return false;
             }
             if (sec.onlyDiscounted) {
-              return Number(p.discount_price || 0) > 0 && Number(p.discount_price) < Number(p.price);
+              return (
+                Number(p.discount_price || 0) > 0 &&
+                Number(p.discount_price) < Number(p.price)
+              );
             }
             return true;
           })
@@ -129,14 +142,14 @@ export default function LivePageSectionsRenderer({
             className={"rounded-3xl px-5 sm:px-8 transition-all " + cardSurfaceClass}
           >
             {sec.type === "hero_banner" && (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6 items-center">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 items-center">
                 <div className="lg:col-span-7 space-y-4 text-right">
                   {sec.badgeText && (
                     <span className="inline-block px-3.5 py-1 rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-400 text-xs font-black">
                       {sec.badgeText}
                     </span>
                   )}
-                  <h2 className="text-sm md:text-xl sm:text-3xl font-black text-[var(--text-primary)] leading-tight">
+                  <h2 className="text-base sm:text-2xl lg:text-3xl font-black text-[var(--text-primary)] leading-tight">
                     {sec.title}
                   </h2>
                   {sec.subtitle && (
@@ -180,10 +193,12 @@ export default function LivePageSectionsRenderer({
                     {sec.title}
                   </h2>
                   {sec.subtitle && (
-                    <p className="text-xs text-[var(--text-secondary)]">{sec.subtitle}</p>
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      {sec.subtitle}
+                    </p>
                   )}
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {(sec.items || []).map((item, i) => (
                     <div
                       key={i}
@@ -218,11 +233,13 @@ export default function LivePageSectionsRenderer({
                         {sec.badgeText}
                       </span>
                     )}
-                    <h2 className="text-base sm:text-sm md:text-xl font-black text-[var(--text-primary)] mt-1">
+                    <h2 className="text-base sm:text-xl font-black text-[var(--text-primary)] mt-1">
                       {sec.title}
                     </h2>
                     {sec.subtitle && (
-                      <p className="text-xs text-[var(--text-secondary)]">{sec.subtitle}</p>
+                      <p className="text-xs text-[var(--text-secondary)]">
+                        {sec.subtitle}
+                      </p>
                     )}
                   </div>
                   <Link
@@ -233,9 +250,11 @@ export default function LivePageSectionsRenderer({
                   </Link>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {filteredProducts.map((prod: any) => {
-                    const finalPrice = Number(prod.discount_price || prod.price || 0);
+                    const finalPrice = Number(
+                      prod.discount_price || prod.price || 0
+                    );
                     return (
                       <Link
                         key={prod.id}
@@ -272,11 +291,13 @@ export default function LivePageSectionsRenderer({
             {sec.type === "comparison_table" && (
               <div className="space-y-4">
                 <div className="space-y-1">
-                  <h2 className="text-base sm:text-sm md:text-xl font-black text-[var(--text-primary)]">
+                  <h2 className="text-base sm:text-xl font-black text-[var(--text-primary)]">
                     {sec.title}
                   </h2>
                   {sec.subtitle && (
-                    <p className="text-xs text-[var(--text-secondary)]">{sec.subtitle}</p>
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      {sec.subtitle}
+                    </p>
                   )}
                 </div>
                 <div className="overflow-x-auto rounded-2xl border border-[var(--card-border)]">
@@ -294,7 +315,9 @@ export default function LivePageSectionsRenderer({
                           <td className="p-3.5 font-black text-[var(--text-primary)]">
                             {item.title}
                           </td>
-                          <td className="p-3.5 text-[var(--text-secondary)]">{item.desc}</td>
+                          <td className="p-3.5 text-[var(--text-secondary)]">
+                            {item.desc}
+                          </td>
                           <td className="p-3.5">
                             <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 font-black text-[11px]">
                               {item.badge || "✓ تضمین‌شده"}
@@ -311,11 +334,13 @@ export default function LivePageSectionsRenderer({
             {sec.type === "faq_accordion" && (
               <div className="space-y-4">
                 <div className="text-center space-y-1">
-                  <h2 className="text-base sm:text-sm md:text-xl font-black text-[var(--text-primary)]">
+                  <h2 className="text-base sm:text-xl font-black text-[var(--text-primary)]">
                     {sec.title}
                   </h2>
                   {sec.subtitle && (
-                    <p className="text-xs text-[var(--text-secondary)]">{sec.subtitle}</p>
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      {sec.subtitle}
+                    </p>
                   )}
                 </div>
                 <div className="space-y-2.5 max-w-3xl mx-auto">
@@ -337,7 +362,9 @@ export default function LivePageSectionsRenderer({
                           className="w-full p-4 text-right font-black text-xs sm:text-sm text-[var(--text-primary)] flex items-center justify-between cursor-pointer"
                         >
                           <span>{item.title}</span>
-                          <span className="text-sky-400">{isOpen ? "−" : "+"}</span>
+                          <span className="text-sky-400">
+                            {isOpen ? "−" : "+"}
+                          </span>
                         </button>
                         {isOpen && (
                           <div className="px-4 pb-4 text-xs text-[var(--text-secondary)] leading-relaxed border-t border-[var(--card-border)] pt-3">
@@ -354,7 +381,7 @@ export default function LivePageSectionsRenderer({
             {sec.type === "custom_html" && (
               <div className="space-y-3">
                 {sec.title && (
-                  <h2 className="text-base sm:text-sm md:text-xl font-black text-[var(--text-primary)]">
+                  <h2 className="text-base sm:text-xl font-black text-[var(--text-primary)]">
                     {sec.title}
                   </h2>
                 )}
@@ -362,7 +389,10 @@ export default function LivePageSectionsRenderer({
                   <div
                     className="text-xs leading-relaxed"
                     dangerouslySetInnerHTML={{
-                      __html: sec.customHtml.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, ""),
+                      __html: sec.customHtml.replace(
+                        /<script[\s\S]*?>[\s\S]*?<\/script>/gi,
+                        ""
+                      ),
                     }}
                   />
                 )}
@@ -372,18 +402,20 @@ export default function LivePageSectionsRenderer({
             {(sec.type === "countdown_offer" ||
               sec.type === "trust_badges" ||
               sec.type === "glass_callout") && (
-              <div className="flex flex-col md:flex-row items-center justify-between gap-2 md:gap-4">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                 <div className="space-y-1.5 text-center md:text-right">
                   {sec.badgeText && (
                     <span className="inline-block px-3 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[11px] font-black">
                       {sec.badgeText}
                     </span>
                   )}
-                  <h3 className="text-base sm:text-sm md:text-xl font-black text-[var(--text-primary)]">
+                  <h3 className="text-base sm:text-xl font-black text-[var(--text-primary)]">
                     {sec.title}
                   </h3>
                   {sec.subtitle && (
-                    <p className="text-xs text-[var(--text-secondary)]">{sec.subtitle}</p>
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      {sec.subtitle}
+                    </p>
                   )}
                 </div>
                 {sec.ctaText && (

@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
 import { useCart } from "@/context/CartContext";
+import { useSiteInfo } from "@/context/SiteInfoContext";
 import { supabase } from "@/lib/supabase";
 
 const STORAGE_KEY = "axon_live_chat_customer_session_v1";
@@ -22,6 +23,7 @@ interface ChatMessageItem {
 }
 
 export default function ContactDock() {
+  const { siteInfo } = useSiteInfo();
   const [isOpen, setIsOpen] = useState(false);
   const [chatConfig, setChatConfig] = useState({
     svg: "",
@@ -92,9 +94,9 @@ export default function ContactDock() {
 
       try {
         const res = await fetch(
-          `/api/live-chat?sessionId=${encodeURIComponent(activeSid)}&token=${encodeURIComponent(
-            activeTok
-          )}&t=${Date.now()}`,
+          `/api/live-chat?sessionId=${encodeURIComponent(
+            activeSid
+          )}&token=${encodeURIComponent(activeTok)}&t=${Date.now()}`,
           { cache: "no-store" }
         );
         if (res.status === 404) {
@@ -138,7 +140,6 @@ export default function ContactDock() {
     loadConfig();
     window.addEventListener("theme_builder_updated", loadConfig);
 
-    // بازیابی نشست قبلی کاربر از حافظه مرورگر
     try {
       const savedRaw = localStorage.getItem(STORAGE_KEY);
       if (savedRaw) {
@@ -180,9 +181,13 @@ export default function ContactDock() {
 
     const ch = supabase
       .channel("axon-customer-live-chat-" + sessionId)
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
-        syncCustomerSession();
-      })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "site_info" },
+        () => {
+          syncCustomerSession();
+        }
+      )
       .subscribe();
 
     const interval = setInterval(() => {
@@ -285,7 +290,8 @@ export default function ContactDock() {
 
   const handleSendCustomerMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sessionId || !chatToken || (!msgText.trim() && !attachmentData)) return;
+    if (!sessionId || !chatToken || (!msgText.trim() && !attachmentData))
+      return;
 
     setErrorMsg("");
     soundEngine.playClick();
@@ -323,9 +329,16 @@ export default function ContactDock() {
     }
   };
 
-  const currentSize = isMobile ? chatConfig.sizeMob : chatConfig.sizeDesk;
+  const sysSettings =
+    siteInfo?.settings ||
+    siteInfo?.system_settings ||
+    siteInfo?.homepage_layout_config?.system_settings ||
+    {};
 
+  if (sysSettings.floatingChatEnabled === false) return null;
   if (isCartOpen) return null;
+
+  const currentSize = isMobile ? chatConfig.sizeMob : chatConfig.sizeDesk;
 
   return (
     <>
@@ -375,12 +388,13 @@ export default function ContactDock() {
           dir="rtl"
         >
           <div className="w-full h-full sm:w-[400px] sm:h-[620px] bg-[var(--modal-bg)] sm:rounded-[2rem] shadow-2xl flex flex-col border border-[var(--card-border)] overflow-hidden">
-            {/* هدر پنجره چت زنده */}
             <div className="p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
                 <div>
-                  <div className="font-black text-sm">پشتیبانی آنلاین آکسون کور</div>
+                  <div className="font-black text-sm">
+                    پشتیبانی آنلاین آکسون کور
+                  </div>
                   <div className="text-[10px] text-white/80 font-medium">
                     پاسخگویی مستقیم کارشناسان فروش و فنی
                   </div>
@@ -402,7 +416,6 @@ export default function ContactDock() {
             )}
 
             {!sessionId ? (
-              /* فرم شروع گفتگوی زنده */
               <form
                 onSubmit={handleStartChat}
                 className="flex-1 p-5 overflow-y-auto flex flex-col justify-between space-y-4 text-xs"
@@ -484,7 +497,9 @@ export default function ContactDock() {
                     disabled={submitting}
                     className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-lg hover:opacity-95 transition cursor-pointer disabled:opacity-50"
                   >
-                    {submitting ? "در حال اتصال به کارشناس..." : "شروع گفتگوی زنده ←"}
+                    {submitting
+                      ? "در حال اتصال به کارشناس..."
+                      : "شروع گفتگوی زنده ←"}
                   </button>
                   <div className="text-center">
                     <Link
@@ -498,7 +513,6 @@ export default function ContactDock() {
                 </div>
               </form>
             ) : (
-              /* محیط گفتگوی زنده فعال */
               <>
                 <div className="px-4 py-2 bg-[var(--input-bg)] border-b border-[var(--card-border)] flex items-center justify-between text-[10px] text-[var(--text-secondary)]">
                   <span>
@@ -526,7 +540,9 @@ export default function ContactDock() {
                         key={m.id}
                         className={
                           "flex flex-col max-w-[85%] " +
-                          (isCustomer ? "mr-auto items-end" : "ml-auto items-start")
+                          (isCustomer
+                            ? "mr-auto items-end"
+                            : "ml-auto items-start")
                         }
                       >
                         <span className="text-[10px] font-bold text-slate-400 mb-1">
@@ -553,7 +569,9 @@ export default function ContactDock() {
                           )}
                           {m.attachmentUrl && (
                             <div className="pt-1">
-                              {String(m.attachmentUrl).startsWith("data:image/") ? (
+                              {String(m.attachmentUrl).startsWith(
+                                "data:image/"
+                              ) ? (
                                 <img
                                   src={m.attachmentUrl}
                                   alt=""
@@ -627,7 +645,9 @@ export default function ContactDock() {
                   />
                   <button
                     type="submit"
-                    disabled={submitting || (!msgText.trim() && !attachmentData)}
+                    disabled={
+                      submitting || (!msgText.trim() && !attachmentData)
+                    }
                     className="px-4 py-3 rounded-xl bg-[var(--accent-blue)] text-white font-black cursor-pointer disabled:opacity-50 shrink-0"
                   >
                     ارسال

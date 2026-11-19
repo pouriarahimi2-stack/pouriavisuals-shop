@@ -1,53 +1,38 @@
 // File Path: app/manifest.ts
 import type { MetadataRoute } from "next";
-import { supabaseAdmin } from "@/lib/supabaseServer";
+import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import { normalizeSystemSettings } from "@/lib/systemSettings";
 
 export const dynamic = "force-dynamic";
 
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
   let siteName = "آکسون کور | فروشگاه تخصصی تکنولوژی";
-  let shortName = "آکسون";
-  let description = "فروشگاه آنلاین جدیدترین کالاهای تکنولوژی، گجت‌های هوشمند و تجهیزات دیجیتال در ایران";
+  let shortName = "آکسون کور";
+  let description =
+    "فروشگاه آنلاین جدیدترین کالاهای تکنولوژی، گجت‌های هوشمند و تجهیزات دیجیتال در ایران";
   let themeColor = "#0284c7";
   let backgroundColor = "#07090e";
   let faviconUrl = "/favicon.ico";
 
   try {
-    const { data: row } = await supabaseAdmin
-      .from("site_info")
-      .select("homepage_layout_config, site_name, description, favicon_url")
-      .limit(1)
-      .maybeSingle();
-
+    const row = await getMasterSiteInfoRow();
     if (row) {
       const layout = row.homepage_layout_config || {};
       const tb = layout.theme_builder_config || {};
-      const persisted = layout._persisted_identity || {};
+      const sys = normalizeSystemSettings(layout, row);
 
-      const resolvedName =
-        tb.globalHeader?.brandName ||
-        persisted.site_name ||
-        row.site_name ||
-        null;
-
-      if (resolvedName) {
-        siteName = String(resolvedName);
-        shortName = siteName.split("|")[0].trim() || shortName;
+      if (sys.site_name) {
+        siteName = sys.tagline ? `${sys.site_name} | ${sys.tagline}` : sys.site_name;
+        shortName = sys.site_name.split("|")[0].trim() || shortName;
       }
 
-      const resolvedDesc =
-        tb.globalFooter?.brandDescription ||
-        persisted.description ||
-        row.description ||
-        null;
-      if (resolvedDesc) description = String(resolvedDesc);
+      if (sys.meta_description || sys.description) {
+        description = sys.meta_description || sys.description;
+      }
 
-      const resolvedFavicon =
-        tb.globalHeader?.faviconUrl ||
-        persisted.favicon_url ||
-        row.favicon_url ||
-        null;
-      if (resolvedFavicon) faviconUrl = String(resolvedFavicon);
+      if (sys.apple_touch_icon_url || sys.favicon_url) {
+        faviconUrl = sys.apple_touch_icon_url || sys.favicon_url;
+      }
 
       if (layout.primaryColor || tb.primaryColor) {
         themeColor = String(layout.primaryColor || tb.primaryColor);
@@ -56,9 +41,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
         backgroundColor = String(layout.backgroundColor || tb.backgroundColor);
       }
     }
-  } catch {
-    // اگر DB در دسترس نبود، fallback ها استفاده می‌شند
-  }
+  } catch {}
 
   return {
     name: siteName,

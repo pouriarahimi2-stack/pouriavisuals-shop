@@ -1,38 +1,46 @@
 // File Path: app/sitemap.ts
 import { MetadataRoute } from "next";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import { normalizeSystemSettings } from "@/lib/systemSettings";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  let baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir").replace(/\/+$/, "");
+  let baseUrl = (
+    process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir"
+  ).replace(/\/+$/, "");
   const fallbackDate = new Date("2025-01-01T00:00:00Z");
 
   let siteLastModified: Date = fallbackDate;
   let backupModularPagesMap: Record<string, any> = {};
 
   try {
-    const { data: siteRow } = await supabaseAdmin
-      .from("site_info")
-      .select("updated_at, created_at, homepage_layout_config")
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const siteRow = await getMasterSiteInfoRow();
+    if (siteRow) {
+      const sys = normalizeSystemSettings(
+        siteRow.homepage_layout_config || {},
+        siteRow
+      );
 
-    if (siteRow?.updated_at) {
-      siteLastModified = new Date(siteRow.updated_at);
-    } else if (siteRow?.created_at) {
-      siteLastModified = new Date(siteRow.created_at);
-    }
+      // اگر سایت از دید موتورهای جستجو مخفی شده باشد، نقشه سایت خالی برمی‌گردد
+      if (sys.noIndex || sys.disallowRobots) {
+        return [];
+      }
 
-    const customCanonical =
-      siteRow?.homepage_layout_config?.seo_technical_config?.canonicalBaseUrl;
-    if (typeof customCanonical === "string" && customCanonical.startsWith("http")) {
-      baseUrl = customCanonical.trim().replace(/\/+$/, "");
-    }
+      if (sys.canonicalBaseUrl && sys.canonicalBaseUrl.startsWith("http")) {
+        baseUrl = sys.canonicalBaseUrl;
+      }
 
-    if (siteRow?.homepage_layout_config?.modular_pages_map) {
-      backupModularPagesMap = siteRow.homepage_layout_config.modular_pages_map;
+      if (siteRow.updated_at) {
+        siteLastModified = new Date(siteRow.updated_at);
+      } else if (siteRow.created_at) {
+        siteLastModified = new Date(siteRow.created_at);
+      }
+
+      if (siteRow.homepage_layout_config?.modular_pages_map) {
+        backupModularPagesMap = siteRow.homepage_layout_config.modular_pages_map;
+      }
     }
   } catch {}
 
@@ -122,7 +130,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         blogRoutes = postsRes.data
           .filter((b: any) => b.is_published !== false)
           .map((b: any) => ({
-            url: `${baseUrl}/blog/${b.slug || b.id}`,
+            url: `${baseUrl}/blog/${encodeURIComponent(b.slug || b.id)}`,
             lastModified: b.updated_at
               ? new Date(b.updated_at)
               : b.created_at
@@ -137,7 +145,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         newsRoutes = newsRes.data
           .filter((n: any) => n.is_published !== false && n.slug)
           .map((n: any) => ({
-            url: `${baseUrl}/news/${n.slug}`,
+            url: `${baseUrl}/news/${encodeURIComponent(n.slug)}`,
             lastModified: n.updated_at
               ? new Date(n.updated_at)
               : n.created_at
@@ -158,6 +166,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         "admin",
         "login",
         "checkout",
+        "account",
+        "my-orders",
+        "payment",
+        "maintenance",
       ]);
       const addedSlugs = new Set<string>();
 
@@ -172,8 +184,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           ) {
             addedSlugs.add(cleanSlug);
             modularPageRoutes.push({
-              url: `${baseUrl}/${cleanSlug}`,
-              lastModified: p.updated_at ? new Date(p.updated_at) : siteLastModified,
+              url: `${baseUrl}/${encodeURIComponent(cleanSlug)}`,
+              lastModified: p.updated_at
+                ? new Date(p.updated_at)
+                : siteLastModified,
               changeFrequency: "weekly" as const,
               priority: 0.75,
             });
@@ -181,25 +195,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         });
       }
 
-      Object.entries(backupModularPagesMap).forEach(([slugKey, pageObj]: [string, any]) => {
-        const cleanSlug = String(slugKey || "").trim().toLowerCase();
-        if (
-          cleanSlug &&
-          pageObj &&
-          !pageObj._deleted &&
-          pageObj.is_published !== false &&
-          !reservedSlugs.has(cleanSlug) &&
-          !addedSlugs.has(cleanSlug)
-        ) {
-          addedSlugs.add(cleanSlug);
-          modularPageRoutes.push({
-            url: `${baseUrl}/${cleanSlug}`,
-            lastModified: pageObj.updated_at ? new Date(pageObj.updated_at) : siteLastModified,
-            changeFrequency: "weekly" as const,
-            priority: 0.75,
-          });
+      Object.entries(backupModularPagesMap).forEach(
+        ([slugKey, pageObj]: [string, any]) => {
+          const cleanSlug = String(slugKey || "").trim().toLowerCase();
+          if (
+            cleanSlug &&
+            pageObj &&
+            !pageObj._deleted &&
+            pageObj.is_published !== false &&
+            !reservedSlugs.has(cleanSlug) &&
+            !addedSlugs.has(cleanSlug)
+          ) {
+            addedSlugs.add(cleanSlug);
+            modularPageRoutes.push({
+              url: `${baseUrl}/${encodeURIComponent(cleanSlug)}`,
+              lastModified: pageObj.updated_at
+                ? new Date(pageObj.updated_at)
+                : siteLastModified,
+              changeFrequency: "weekly" as const,
+              priority: 0.75,
+            });
+          }
         }
-      });
+      );
     }
   } catch {}
 

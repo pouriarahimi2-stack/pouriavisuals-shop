@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { unpackProductRow } from "@/lib/productUnpacker";
+import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import { normalizeSystemSettings } from "@/lib/systemSettings";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -96,10 +98,26 @@ async function getRelatedPosts(currentId: string) {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
-  const post = await getPost(id);
+  const [post, siteRow] = await Promise.all([
+    getPost(id),
+    getMasterSiteInfoRow(),
+  ]);
+  const sys = normalizeSystemSettings(
+    siteRow?.homepage_layout_config || {},
+    siteRow
+  );
+  const baseUrl = (sys.canonicalBaseUrl || "https://axoncore.ir").replace(
+    /\/+$/,
+    ""
+  );
+  const siteName = sys.site_name || "آکسون کور";
+  const allowIndex = !sys.noIndex;
 
   if (!post) {
-    return { title: "مقاله یافت نشد | مجله تخصصی آکسون کور" };
+    return {
+      title: `مقاله یافت نشد | مجله تخصصی ${siteName}`,
+      robots: { index: false, follow: false },
+    };
   }
 
   const title = post.title || "مقاله تخصصی تکنولوژی و دیجیتال";
@@ -110,12 +128,19 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const desc =
     post.meta_description ||
     cleanContentText.slice(0, 155) ||
-    "بررسی و راهنمای تخصصی خرید محصولات دیجیتال و تکنولوژی در مجله آکسون کور.";
-  const canonicalUrl = "https://axoncore.ir/blog/" + encodeURIComponent(post.slug || post.id);
+    `بررسی و راهنمای تخصصی خرید محصولات دیجیتال و تکنولوژی در مجله ${siteName}.`;
+  const canonicalUrl = `${baseUrl}/blog/${encodeURIComponent(
+    post.slug || post.id
+  )}`;
 
   return {
-    title: title + " | مجله تخصصی آکسون کور",
+    title: `${title} | مجله تخصصی ${siteName}`,
     description: desc,
+    robots: {
+      index: allowIndex,
+      follow: allowIndex,
+      googleBot: { index: allowIndex, follow: allowIndex },
+    },
     alternates: {
       canonical: canonicalUrl,
     },
@@ -123,27 +148,41 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title,
       description: desc,
       url: canonicalUrl,
+      siteName,
       type: "article",
       publishedTime: post.created_at,
       modifiedTime: post.updated_at || post.created_at,
-      images: [post.image_url || "https://axoncore.ir/placeholder.png"],
+      images: [post.image_url || `${baseUrl}/placeholder.png`],
     },
   };
 }
 
 export default async function BlogPostPage({ params }: PageProps) {
   const { id } = await params;
-  const post = await getPost(id);
+  const [post, siteRow] = await Promise.all([
+    getPost(id),
+    getMasterSiteInfoRow(),
+  ]);
 
   if (!post) notFound();
+
+  const sys = normalizeSystemSettings(
+    siteRow?.homepage_layout_config || {},
+    siteRow
+  );
 
   const [linkedProduct, relatedPosts] = await Promise.all([
     getLinkedProductFromContent(post.content || ""),
     getRelatedPosts(String(post.id)),
   ]);
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir";
-  const postUrl = baseUrl + "/blog/" + encodeURIComponent(post.slug || post.id);
+  const baseUrl = (
+    sys.canonicalBaseUrl ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    "https://axoncore.ir"
+  ).replace(/\/+$/, "");
+  const siteName = sys.site_name || "آکسون کور | Axon Core";
+  const postUrl = `${baseUrl}/blog/${encodeURIComponent(post.slug || post.id)}`;
   const readingMinutes = estimateReadingMinutes(post.content);
 
   const cleanDesc =
@@ -159,19 +198,21 @@ export default async function BlogPostPage({ params }: PageProps) {
     "@type": "Article",
     headline: post.title,
     description: cleanDesc,
-    image: [post.image_url || baseUrl + "/placeholder.png"],
+    image: [post.image_url || `${baseUrl}/placeholder.png`],
     datePublished: post.created_at,
     dateModified: post.updated_at || post.created_at,
     author: {
       "@type": "Person",
-      name: post.author || "کارشناس فنی آکسون کور",
+      name: post.author || `کارشناس فنی ${siteName}`,
     },
     publisher: {
       "@type": "Organization",
-      name: "آکسون کور | Axon Core",
+      name: siteName,
       logo: {
         "@type": "ImageObject",
-        url: baseUrl + "/favicon.ico",
+        url: sys.favicon_url?.startsWith("http")
+          ? sys.favicon_url
+          : `${baseUrl}${sys.favicon_url || "/favicon.ico"}`,
       },
     },
     mainEntityOfPage: {
@@ -194,7 +235,7 @@ export default async function BlogPostPage({ params }: PageProps) {
         "@type": "ListItem",
         position: 2,
         name: "مجله تخصصی",
-        item: baseUrl + "/blog",
+        item: `${baseUrl}/blog`,
       },
       {
         "@type": "ListItem",
@@ -224,7 +265,10 @@ export default async function BlogPostPage({ params }: PageProps) {
           خانه
         </Link>
         <span>/</span>
-        <Link href="/blog" className="hover:text-[var(--accent-blue)] transition">
+        <Link
+          href="/blog"
+          className="hover:text-[var(--accent-blue)] transition"
+        >
           مجله تخصصی
         </Link>
         <span>/</span>
@@ -243,13 +287,15 @@ export default async function BlogPostPage({ params }: PageProps) {
           </span>
         </div>
 
-        <h1 className="text-xl sm:text-3xl lg:text-4xl font-black leading-snug">{post.title}</h1>
+        <h1 className="text-xl sm:text-3xl lg:text-4xl font-black leading-snug">
+          {post.title}
+        </h1>
 
         <div className="flex flex-wrap items-center gap-4 text-xs text-[var(--text-secondary)] font-medium">
           <span>
             ✍️ نویسنده:{" "}
             <strong className="text-[var(--text-primary)]">
-              {post.author || "تحریریه فنی آکسون کور"}
+              {post.author || `تحریریه فنی ${siteName}`}
             </strong>
           </span>
           <span>•</span>
@@ -274,7 +320,6 @@ export default async function BlogPostPage({ params }: PageProps) {
         </div>
       )}
 
-      {/* محتوای اصلی مقاله سئو */}
       <div
         className="rounded-3xl sm:rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-5 sm:p-10 shadow-sm leading-loose text-sm sm:text-base text-[var(--text-primary)] font-medium space-y-4 text-justify prose dark:prose-invert max-w-none [&_h2]:text-lg [&_h2]:sm:text-xl [&_h2]:font-black [&_h2]:text-[var(--accent-blue)] [&_h2]:mt-6 [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-black [&_h3]:mt-5 [&_h3]:mb-2 [&_ul]:list-disc [&_ul]:pr-5 [&_ul]:space-y-1.5 [&_a]:text-[var(--accent-blue)] [&_a]:underline"
         dangerouslySetInnerHTML={{
@@ -305,7 +350,6 @@ export default async function BlogPostPage({ params }: PageProps) {
         }}
       />
 
-      {/* کارت خرید مستقیم محصول مرتبط در صورت اتصال مقاله به کالا */}
       {linkedProduct && (
         <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-sky-500/10 via-indigo-500/10 to-emerald-500/10 border-2 border-[var(--accent-blue)]/40 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-5">
           <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-right">
@@ -322,12 +366,13 @@ export default async function BlogPostPage({ params }: PageProps) {
                 {linkedProduct.title}
               </h3>
               <p className="text-xs text-[var(--text-secondary)]">
-                {linkedProduct.warranty || "۱۸ ماه گارانتی اصالت طلایی آکسون کور"}
+                {linkedProduct.warranty ||
+                  "۱۸ ماه گارانتی اصالت طلایی آکسون کور"}
               </p>
               <div className="text-sm font-black text-[var(--accent-blue)] font-mono">
-                {Number(linkedProduct.discount_price || linkedProduct.price || 0).toLocaleString(
-                  "fa-IR"
-                )}{" "}
+                {Number(
+                  linkedProduct.discount_price || linkedProduct.price || 0
+                ).toLocaleString("fa-IR")}{" "}
                 تومان
               </div>
             </div>
@@ -342,7 +387,6 @@ export default async function BlogPostPage({ params }: PageProps) {
         </div>
       )}
 
-      {/* مقالات مرتبط جهت تقویت لینک‌سازی داخلی سئو */}
       {relatedPosts.length > 0 && (
         <section className="space-y-4 pt-4">
           <h3 className="text-sm sm:text-base font-black text-[var(--accent-blue)]">
@@ -363,7 +407,9 @@ export default async function BlogPostPage({ params }: PageProps) {
                       className="w-full h-28 object-cover rounded-xl border border-[var(--card-border)]"
                     />
                   )}
-                  <h4 className="text-xs font-black line-clamp-2 leading-relaxed">{rp.title}</h4>
+                  <h4 className="text-xs font-black line-clamp-2 leading-relaxed">
+                    {rp.title}
+                  </h4>
                 </div>
                 <span className="text-[10px] font-bold text-[var(--accent-blue)]">
                   مطالعه مقاله ←
@@ -380,7 +426,8 @@ export default async function BlogPostPage({ params }: PageProps) {
             نیاز به مشاوره تخصصی جهت خرید محصولات دیجیتال دارید؟
           </h4>
           <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            کارشناسان آکسون کور آماده پاسخگویی و راهنمایی تخصصی شما برای انتخاب بهترین تجهیزات هستند.
+            کارشناسان {siteName} آماده پاسخگویی و راهنمایی تخصصی شما برای انتخاب
+            بهترین تجهیزات هستند.
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">

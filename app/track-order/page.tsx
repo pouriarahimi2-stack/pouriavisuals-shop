@@ -1,3 +1,4 @@
+// File Path: app/track-order/page.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -9,27 +10,40 @@ export default function TrackOrderPage() {
   const [orderId, setOrderId] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
-  const [order, setOrder] = useState<any | null>(null);
+  const [orders, setOrders] = useState<any[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleTrack = async (e: React.FormEvent) => {
     e.preventDefault();
     soundEngine.playClick();
     setErrorMsg(null);
-    setOrder(null);
+    setOrders([]);
+
+    const cleanQuery = orderId.trim() || phone.trim();
+    if (!cleanQuery) {
+      setErrorMsg("لطفاً شماره سفارش یا شماره تلفن همراه را وارد نمایید.");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const res = await fetch("/api/orders/track", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: orderId.trim() || phone.trim() }),
+        body: JSON.stringify({ query: cleanQuery }),
       });
 
       const json = await res.json();
-      if (res.ok && json.success && Array.isArray(json.orders) && json.orders.length > 0) {
+      if (
+        res.ok &&
+        json.success &&
+        Array.isArray(json.orders) &&
+        json.orders.length > 0
+      ) {
         soundEngine.playSuccess();
-        setOrder(json.orders[0]);
+        setOrders(json.orders);
       } else {
         setErrorMsg("سفارشی با اطلاعات وارد شده در سامانه یافت نشد.");
       }
@@ -43,24 +57,60 @@ export default function TrackOrderPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "paid":
-        return <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-xs">پرداخت شده / آماده ارسال</span>;
+      case "processing":
+        return (
+          <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+            پرداخت شده / آماده ارسال ✓
+          </span>
+        );
       case "shipped":
-        return <span className="px-3 py-1 rounded-full bg-blue-500/15 text-blue-500 font-bold text-xs">تحویل به شرکت پست 🚚</span>;
+        return (
+          <span className="px-3 py-1 rounded-full bg-blue-500/15 text-blue-500 font-bold text-xs">
+            تحویل به شرکت پست 🚚
+          </span>
+        );
       case "delivered":
-        return <span className="px-3 py-1 rounded-full bg-purple-500/15 text-purple-500 font-bold text-xs">تحویل مشتری شد</span>;
+        return (
+          <span className="px-3 py-1 rounded-full bg-purple-500/15 text-purple-500 font-bold text-xs">
+            تحویل مشتری شد 🎉
+          </span>
+        );
       case "cancelled":
-        return <span className="px-3 py-1 rounded-full bg-rose-500/15 text-rose-500 font-bold text-xs">لغو شده</span>;
+      case "failed":
+        return (
+          <span className="px-3 py-1 rounded-full bg-rose-500/15 text-rose-500 font-bold text-xs">
+            لغو شده
+          </span>
+        );
       default:
-        return <span className="px-3 py-1 rounded-full bg-amber-500/15 text-amber-500 font-bold text-xs">در انتظار بررسی</span>;
+        return (
+          <span className="px-3 py-1 rounded-full bg-amber-500/15 text-amber-500 font-bold text-xs">
+            در انتظار بررسی
+          </span>
+        );
     }
   };
 
   return (
-    <div className="min-h-[80vh] py-12 px-4 max-w-3xl mx-auto space-y-8 font-sans select-text text-[var(--text-primary)]" dir="rtl">
+    <div
+      className="min-h-[80vh] py-10 px-4 max-w-3xl mx-auto space-y-8 font-sans select-text text-[var(--text-primary)]"
+      dir="rtl"
+    >
+      <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-bold">
+        <Link href="/" className="hover:underline">
+          خانه
+        </Link>
+        <span>/</span>
+        <span className="text-[var(--text-primary)]">رهگیری وضعیت سفارش</span>
+      </div>
+
       <div className="text-center space-y-2">
-        <h1 className="text-2xl sm:text-3xl font-black">📦 رهگیری آنلاین وضعیت سفارش</h1>
+        <h1 className="text-xl sm:text-3xl font-black">
+          📦 رهگیری آنلاین وضعیت سفارش
+        </h1>
         <p className="text-xs text-[var(--text-secondary)] font-medium">
-          شماره سفارش یا تلفن همراه خریدار را جهت مشاهده وضعیت صدور بارنامه وارد نمایید.
+          شماره سفارش یا تلفن همراه خریدار را جهت مشاهده وضعیت صدور بارنامه وارد
+          نمایید.
         </p>
       </div>
 
@@ -68,26 +118,32 @@ export default function TrackOrderPage() {
         onSubmit={handleTrack}
         className="p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4"
       >
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-[var(--text-secondary)]">شماره یا شناسه فاکتور:</label>
+            <label className="block text-xs font-bold text-[var(--text-secondary)]">
+              شماره یا شناسه فاکتور:
+            </label>
             <input
               type="text"
+              dir="ltr"
               value={orderId}
               onChange={(e) => setOrderId(e.target.value)}
-              placeholder="مثال: AXON-..."
-              className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
+              placeholder="AXN-123456"
+              className="w-full px-4 py-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] text-center"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-[var(--text-secondary)]">یا شماره تلفن همراه خریدار:</label>
+            <label className="block text-xs font-bold text-[var(--text-secondary)]">
+              یا شماره تلفن همراه خریدار:
+            </label>
             <input
               type="tel"
               dir="ltr"
+              maxLength={11}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="0912..."
-              className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] text-center"
+              placeholder="09123456789"
+              className="w-full px-4 py-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] text-center"
             />
           </div>
         </div>
@@ -107,29 +163,81 @@ export default function TrackOrderPage() {
         )}
       </form>
 
-      {order && (
-        <div className="p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 animate-fadeIn text-xs">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
-            <div>
-              <span className="text-[var(--text-secondary)]">سفارش بنام:</span>
-              <span className="font-black text-sm text-[var(--text-primary)] mr-2">{order.customer_name}</span>
-            </div>
-            <div>{getStatusBadge(order.payment_status || order.status)}</div>
-          </div>
+      {orders.length > 0 && (
+        <div className="space-y-4">
+          {orders.map((ord) => {
+            const codeLabel =
+              ord.order_number || String(ord.id).slice(0, 8).toUpperCase();
+            return (
+              <div
+                key={ord.id}
+                className="p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 animate-fadeIn text-xs"
+              >
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="font-mono font-black text-sm text-[var(--accent-blue)]">
+                      #{codeLabel}
+                    </span>
+                    <span className="text-[var(--text-secondary)]">•</span>
+                    <span className="font-black text-sm text-[var(--text-primary)]">
+                      {ord.customer_name || "خریدار محترم"}
+                    </span>
+                  </div>
+                  <div>{getStatusBadge(ord.status || ord.payment_status)}</div>
+                </div>
 
-          {order.tracking_code && (
-            <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex justify-between items-center">
-              <span className="font-bold text-blue-500">کد رهگیری پست پیشتاز:</span>
-              <span className="font-mono font-black text-sm text-blue-600 dark:text-blue-300 tracking-widest">{order.tracking_code}</span>
-            </div>
-          )}
+                {Array.isArray(ord.items) && ord.items.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {ord.items.map((it: any, idx: number) => (
+                      <span
+                        key={idx}
+                        className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[11px]"
+                      >
+                        {it.title || it.name} × {it.quantity || 1}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
-          <div className="flex justify-between items-center pt-2">
-            <span className="font-bold text-[var(--text-secondary)]">مبلغ کل فاکتور:</span>
-            <span className="font-mono font-black text-emerald-500 text-base" suppressHydrationWarning>
-              {formatPrice(order.total_price || order.final_amount)} تومان
-            </span>
-          </div>
+                {ord.tracking_code && (
+                  <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex flex-wrap justify-between items-center gap-2">
+                    <span className="font-bold text-blue-500">
+                      کد رهگیری مرسوله:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(ord.tracking_code);
+                        soundEngine.playSuccess();
+                        setCopiedId(ord.id);
+                        setTimeout(() => setCopiedId(null), 2000);
+                      }}
+                      className="font-mono font-black text-sm text-blue-600 dark:text-blue-300 tracking-widest cursor-pointer hover:underline"
+                    >
+                      {copiedId === ord.id
+                        ? "✓ کپی شد"
+                        : ord.tracking_code}
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-2 border-t border-[var(--card-border)]">
+                  <span className="font-bold text-[var(--text-secondary)]">
+                    مبلغ کل فاکتور:
+                  </span>
+                  <span
+                    className="font-mono font-black text-emerald-500 text-base"
+                    suppressHydrationWarning
+                  >
+                    {formatPrice(
+                      Number(ord.final_amount || ord.total_price || ord.total_amount || 0)
+                    )}{" "}
+                    تومان
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

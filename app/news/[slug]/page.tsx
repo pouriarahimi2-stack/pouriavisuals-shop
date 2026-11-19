@@ -6,6 +6,8 @@ import { notFound } from "next/navigation";
 import sanitizeHtml from "sanitize-html";
 import TableOfContents from "@/components/TableOfContents";
 import { unpackProductRow } from "@/lib/productUnpacker";
+import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import { normalizeSystemSettings } from "@/lib/systemSettings";
 import { formatPrice } from "@/lib/formatters";
 
 export const dynamic = "force-dynamic";
@@ -86,16 +88,41 @@ async function fetchNewsBySlugOrId(rawSlugOrId: string) {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const article = await fetchNewsBySlugOrId(slug);
+  const [article, siteRow] = await Promise.all([
+    fetchNewsBySlugOrId(slug),
+    getMasterSiteInfoRow(),
+  ]);
+  const sys = normalizeSystemSettings(
+    siteRow?.homepage_layout_config || {},
+    siteRow
+  );
+  const baseUrl = (sys.canonicalBaseUrl || "https://axoncore.ir").replace(
+    /\/+$/,
+    ""
+  );
+  const siteName = sys.site_name || "آکسون کور";
+  const allowIndex = !sys.noIndex;
 
-  if (!article) return { title: "خبر مورد نظر یافت نشد | آکسون کور" };
-  const canonicalUrl =
-    "https://axoncore.ir/news/" + encodeURIComponent(article.slug || article.id);
+  if (!article) {
+    return {
+      title: `خبر مورد نظر یافت نشد | ${siteName}`,
+      robots: { index: false, follow: false },
+    };
+  }
+
+  const canonicalUrl = `${baseUrl}/news/${encodeURIComponent(
+    article.slug || article.id
+  )}`;
 
   return {
-    title: article.title + " | رادار فناوری آکسون کور",
+    title: `${article.title} | رادار فناوری ${siteName}`,
     description: article.summary || article.title,
     keywords: Array.isArray(article.tags) ? article.tags : [],
+    robots: {
+      index: allowIndex,
+      follow: allowIndex,
+      googleBot: { index: allowIndex, follow: allowIndex },
+    },
     alternates: {
       canonical: canonicalUrl,
     },
@@ -103,7 +130,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: article.title,
       description: article.summary || article.title,
       url: canonicalUrl,
-      images: [article.image_url || "https://axoncore.ir/placeholder.png"],
+      siteName,
+      images: [article.image_url || `${baseUrl}/placeholder.png`],
       type: "article",
     },
   };
@@ -111,9 +139,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function NewsDetailPage({ params }: Props) {
   const { slug } = await params;
-  const article = await fetchNewsBySlugOrId(slug);
+  const [article, siteRow] = await Promise.all([
+    fetchNewsBySlugOrId(slug),
+    getMasterSiteInfoRow(),
+  ]);
 
   if (!article) notFound();
+
+  const sys = normalizeSystemSettings(
+    siteRow?.homepage_layout_config || {},
+    siteRow
+  );
 
   const [{ data: rawProds }, { data: recentNews }] = await Promise.all([
     supabaseAdmin
@@ -132,9 +168,10 @@ export default async function NewsDetailPage({ params }: Props) {
   const relatedProducts = (rawProds || []).map(unpackProductRow);
   const cleanHtml = sanitizeNewsHtml(article.content || "");
 
-  // فیلتر کردن تیترهای یکتا برای بخش اخبار اخیر
   const uniqueRecentNews: any[] = [];
-  const seenRecentTitles = new Set<string>([String(article.title || "").trim().toLowerCase()]);
+  const seenRecentTitles = new Set<string>([
+    String(article.title || "").trim().toLowerCase(),
+  ]);
   for (const rn of recentNews || []) {
     const key = String(rn.title || "").trim().toLowerCase();
     if (!seenRecentTitles.has(key) && uniqueRecentNews.length < 3) {
@@ -143,28 +180,37 @@ export default async function NewsDetailPage({ params }: Props) {
     }
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir";
-  const newsUrl = baseUrl + "/news/" + encodeURIComponent(article.slug || article.id);
+  const baseUrl = (
+    sys.canonicalBaseUrl ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    "https://axoncore.ir"
+  ).replace(/\/+$/, "");
+  const siteName = sys.site_name || "آکسون کور | Axon Core";
+  const newsUrl = `${baseUrl}/news/${encodeURIComponent(
+    article.slug || article.id
+  )}`;
 
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
     headline: article.title,
     description: article.summary || article.title,
-    image: [article.image_url || baseUrl + "/placeholder.png"],
+    image: [article.image_url || `${baseUrl}/placeholder.png`],
     datePublished: article.published_at || article.created_at,
     dateModified: article.updated_at || article.created_at,
     author: {
       "@type": "Organization",
-      name: article.source_name || "رادار فناوری آکسون کور",
+      name: article.source_name || `رادار فناوری ${siteName}`,
     },
     publisher: {
       "@type": "Organization",
-      name: "آکسون کور | Axon Core",
+      name: siteName,
       url: baseUrl,
       logo: {
         "@type": "ImageObject",
-        url: baseUrl + "/favicon.ico",
+        url: sys.favicon_url?.startsWith("http")
+          ? sys.favicon_url
+          : `${baseUrl}${sys.favicon_url || "/favicon.ico"}`,
       },
     },
     mainEntityOfPage: {
@@ -187,7 +233,7 @@ export default async function NewsDetailPage({ params }: Props) {
         "@type": "ListItem",
         position: 2,
         name: "رادار اخبار تکنولوژی",
-        item: baseUrl + "/news",
+        item: `${baseUrl}/news`,
       },
       {
         "@type": "ListItem",
@@ -217,7 +263,10 @@ export default async function NewsDetailPage({ params }: Props) {
           خانه
         </Link>
         <span>/</span>
-        <Link href="/news" className="hover:text-[var(--accent-blue)] transition">
+        <Link
+          href="/news"
+          className="hover:text-[var(--accent-blue)] transition"
+        >
           رادار اخبار تکنولوژی
         </Link>
         <span>/</span>
@@ -231,11 +280,15 @@ export default async function NewsDetailPage({ params }: Props) {
           <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-black">
             📡 گزارش تحلیلی فناوری
           </span>
-          <span className="text-slate-400 font-mono">منبع: {article.source_name}</span>
+          <span className="text-slate-400 font-mono">
+            منبع: {article.source_name}
+          </span>
           <span className="text-slate-400">•</span>
           <span className="text-slate-400 font-mono">
             📅{" "}
-            {new Date(article.published_at || article.created_at).toLocaleDateString("fa-IR")}
+            {new Date(
+              article.published_at || article.created_at
+            ).toLocaleDateString("fa-IR")}
           </span>
         </div>
 
@@ -254,11 +307,12 @@ export default async function NewsDetailPage({ params }: Props) {
 
       {article.summary && (
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs sm:text-sm font-bold leading-relaxed text-[var(--text-secondary)] shadow-sm">
-          💡 <strong className="text-[var(--accent-blue)]">چکیده گزارش:</strong> {article.summary}
+          💡{" "}
+          <strong className="text-[var(--accent-blue)]">چکیده گزارش:</strong>{" "}
+          {article.summary}
         </div>
       )}
 
-      {/* فهرست دسترسی سریع به سرفصل‌های خبر */}
       <TableOfContents contentHtml={cleanHtml} />
 
       <div
@@ -266,13 +320,12 @@ export default async function NewsDetailPage({ params }: Props) {
         className="blog-content p-6 sm:p-10 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md prose dark:prose-invert max-w-none text-xs sm:text-base leading-loose space-y-4 text-justify [&_h2]:text-base [&_h2]:sm:text-xl [&_h2]:font-black [&_h2]:text-[var(--accent-blue)] [&_h2]:mt-6 [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:sm:text-base [&_h3]:font-black [&_h3]:mt-4 [&_a]:text-[var(--accent-blue)] [&_a]:underline"
       />
 
-      {/* ویترین محصولات مرتبط کاتالوگ در انتهای خبر */}
       {relatedProducts.length > 0 && (
         <section className="p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--accent-blue)]/40 shadow-xl space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] pb-3">
             <div>
               <h2 className="text-sm sm:text-lg font-black text-[var(--accent-blue)]">
-                🛍️ محصولات منتخب مرتبط در کاتالوگ آکسون کور
+                🛍️ محصولات منتخب مرتبط در کاتالوگ {siteName}
               </h2>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                 خرید مستقیم با تضمین اصالت فیزیکی و ارسال سریع پیشتاز به سراسر کشور
@@ -303,7 +356,9 @@ export default async function NewsDetailPage({ params }: Props) {
                         className="w-full h-full object-contain group-hover:scale-105 transition"
                       />
                     </div>
-                    <h3 className="font-black line-clamp-2 leading-relaxed">{p.title}</h3>
+                    <h3 className="font-black line-clamp-2 leading-relaxed">
+                      {p.title}
+                    </h3>
                   </div>
                   <div className="pt-2.5 border-t border-[var(--card-border)] flex items-center justify-between">
                     <span className="font-mono font-black text-emerald-500">
@@ -320,7 +375,6 @@ export default async function NewsDetailPage({ params }: Props) {
         </section>
       )}
 
-      {/* سایر اخبار مرتبط */}
       {uniqueRecentNews.length > 0 && (
         <section className="space-y-3">
           <h3 className="font-black text-sm text-[var(--text-secondary)]">
@@ -342,14 +396,16 @@ export default async function NewsDetailPage({ params }: Props) {
 
       <div className="pt-4 border-t border-[var(--card-border)] flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap gap-2">
-          {(Array.isArray(article.tags) ? article.tags : []).map((tag: string, i: number) => (
-            <span
-              key={i}
-              className="px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-slate-400"
-            >
-              #{tag}
-            </span>
-          ))}
+          {(Array.isArray(article.tags) ? article.tags : []).map(
+            (tag: string, i: number) => (
+              <span
+                key={i}
+                className="px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-slate-400"
+              >
+                #{tag}
+              </span>
+            )
+          )}
         </div>
         <Link
           href="/news"

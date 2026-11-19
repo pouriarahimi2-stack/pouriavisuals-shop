@@ -2,29 +2,59 @@
 import React from "react";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import BlogArchiveClient, { BlogPostItem } from "@/components/BlogArchiveClient";
+import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import { normalizeSystemSettings } from "@/lib/systemSettings";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-  title: "مجله تخصصی فناوری، نقد و بررسی و راهنمای خرید | آکسون کور",
-  description:
-    "جدیدترین مقالات تخصصی، جداول مقایسه فنی و راهنمای جامع خرید تجهیزات دیجیتال، سخت‌افزار و گجت‌های هوشمند در مجله آکسون کور.",
-  alternates: {
-    canonical: "https://axoncore.ir/blog",
-  },
-  openGraph: {
-    title: "مجله تخصصی فناوری و راهنمای خرید | آکسون کور",
-    description:
-      "مقالات تخصصی، نقد و بررسی و راهنمای خرید تجهیزات دیجیتال و گجت‌های هوشمند در آکسون کور.",
-    url: "https://axoncore.ir/blog",
-    type: "website",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const siteRow = await getMasterSiteInfoRow();
+  const sys = normalizeSystemSettings(
+    siteRow?.homepage_layout_config || {},
+    siteRow
+  );
+  const baseUrl = (sys.canonicalBaseUrl || "https://axoncore.ir").replace(
+    /\/+$/,
+    ""
+  );
+  const siteName = sys.site_name || "آکسون کور";
+  const allowIndex = !sys.noIndex;
+
+  return {
+    title: `مجله تخصصی فناوری، نقد و بررسی و راهنمای خرید | ${siteName}`,
+    description: `جدیدترین مقالات تخصصی، جداول مقایسه فنی و راهنمای جامع خرید تجهیزات دیجیتال، سخت‌افزار و گجت‌های هوشمند در مجله ${siteName}.`,
+    robots: {
+      index: allowIndex,
+      follow: allowIndex,
+      googleBot: { index: allowIndex, follow: allowIndex },
+    },
+    alternates: {
+      canonical: `${baseUrl}/blog`,
+    },
+    openGraph: {
+      title: `مجله تخصصی فناوری و راهنمای خرید | ${siteName}`,
+      description: `مقالات تخصصی، نقد و بررسی و راهنمای خرید تجهیزات دیجیتال و گجت‌های هوشمند در ${siteName}.`,
+      url: `${baseUrl}/blog`,
+      siteName,
+      type: "website",
+    },
+  };
+}
 
 export default async function BlogPage() {
   let posts: BlogPostItem[] = [];
+  const siteRow = await getMasterSiteInfoRow();
+  const sys = normalizeSystemSettings(
+    siteRow?.homepage_layout_config || {},
+    siteRow
+  );
+  const baseUrl = (sys.canonicalBaseUrl || "https://axoncore.ir").replace(
+    /\/+$/,
+    ""
+  );
+  const siteName = sys.site_name || "آکسون کور | Axon Core";
 
   try {
     if (supabaseAdmin) {
@@ -64,14 +94,13 @@ export default async function BlogPage() {
   const blogJsonLd = {
     "@context": "https://schema.org",
     "@type": "Blog",
-    name: "مجله تخصصی فناوری و کالای دیجیتال آکسون کور",
-    url: "https://axoncore.ir/blog",
-    description:
-      "مرجع مقالات تخصصی، نقد و بررسی و راهنمای خرید تجهیزات تکنولوژی و گجت‌های هوشمند",
+    name: `مجله تخصصی فناوری و کالای دیجیتال ${siteName}`,
+    url: `${baseUrl}/blog`,
+    description: `مرجع مقالات تخصصی، نقد و بررسی و راهنمای خرید تجهیزات تکنولوژی و گجت‌های هوشمند`,
     publisher: {
       "@type": "Organization",
-      name: "آکسون کور | Axon Core",
-      url: "https://axoncore.ir",
+      name: siteName,
+      url: baseUrl,
     },
   };
 
@@ -95,7 +124,8 @@ export default async function BlogPage() {
           مجله تخصصی فناوری و راهنمای خرید کالای دیجیتال
         </h1>
         <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium max-w-2xl mx-auto leading-relaxed">
-          بررسی‌های تخصصی، جداول مقایسه فنی و راهنمای انتخاب بهترین تجهیزات دیجیتال و گجت‌های هوشمند با تضمین اصالت
+          بررسی‌های تخصصی، جداول مقایسه فنی و راهنمای انتخاب بهترین تجهیزات
+          دیجیتال و گجت‌های هوشمند با تضمین اصالت
         </p>
       </div>
 

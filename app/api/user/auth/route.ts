@@ -2,7 +2,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { scryptSync, randomBytes, timingSafeEqual, randomUUID } from "crypto";
-import { signCustomerPayload, CUSTOMER_COOKIE_NAME } from "@/lib/customerSession";
+import {
+  signCustomerPayload,
+  verifyCustomerPayload,
+  CUSTOMER_COOKIE_NAME,
+} from "@/lib/customerSession";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +56,10 @@ export async function POST(req: NextRequest) {
       const pw = String(password || "").trim();
       if (cp.length !== 11 || !cp.startsWith("09") || !pw) {
         return NextResponse.json(
-          { success: false, message: "شماره همراه ۱۱ رقمی و کلمه عبور الزامی است." },
+          {
+            success: false,
+            message: "شماره همراه ۱۱ رقمی و کلمه عبور الزامی است.",
+          },
           { status: 400 }
         );
       }
@@ -65,7 +72,11 @@ export async function POST(req: NextRequest) {
 
       if (ex) {
         return NextResponse.json(
-          { success: false, message: "این شماره قبلاً ثبت شده است. لطفاً از تب رمز عبور وارد شوید." },
+          {
+            success: false,
+            message:
+              "این شماره قبلاً ثبت شده است. لطفاً از تب رمز عبور وارد شوید.",
+          },
           { status: 400 }
         );
       }
@@ -107,12 +118,10 @@ export async function POST(req: NextRequest) {
         if (!e2 && c2) {
           createdRecord = c2;
         } else {
-          // اگر جدول customers ستون دیگری نیاز داشت، در crm_customers نیز ثبت شود
           createdRecord = { id: generatedId, phone: cp, username: cleanUser };
         }
       }
 
-      // همگام‌سازی با جدول مشتریان پنل ادمین (CRM)
       try {
         await supabaseAdmin.from("crm_customers").upsert([
           {
@@ -148,13 +157,23 @@ export async function POST(req: NextRequest) {
       const cleanIdPhone = cleanPhone(id);
       const pw = String(password || "").trim();
       if (!id || !pw) {
-        return NextResponse.json({ success: false, message: "مشخصات ورود ناقص است." }, { status: 400 });
+        return NextResponse.json(
+          { success: false, message: "مشخصات ورود ناقص است." },
+          { status: 400 }
+        );
       }
 
       const { data: customer } = await supabaseAdmin
         .from("customers")
         .select("*")
-        .or("phone.eq." + (cleanIdPhone || id) + ",username.eq." + id + ",email.eq." + id.toLowerCase())
+        .or(
+          "phone.eq." +
+            (cleanIdPhone || id) +
+            ",username.eq." +
+            id +
+            ",email.eq." +
+            id.toLowerCase()
+        )
         .maybeSingle();
 
       if (!customer || !verifyPwd(pw, customer.password_hash || "")) {
@@ -172,29 +191,63 @@ export async function POST(req: NextRequest) {
         name: customer.username || customer.phone,
       };
       const token = await signCustomerPayload(userObj);
-      const r = NextResponse.json({ success: true, message: "ورود موفق.", user: userObj });
+      const r = NextResponse.json({
+        success: true,
+        message: "ورود موفق.",
+        user: userObj,
+      });
       setCookie(r, token);
       return r;
     }
 
     if (action === "check") {
       const cookieVal = req.cookies.get(CUSTOMER_COOKIE_NAME)?.value;
-      if (!cookieVal) return NextResponse.json({ success: false, message: "لاگین نشده." });
-      return NextResponse.json({ success: true });
+      const verified = await verifyCustomerPayload(cookieVal);
+      if (!verified) {
+        return NextResponse.json({ success: false, message: "لاگین نشده." });
+      }
+      return NextResponse.json({ success: true, user: verified });
     }
 
-    return NextResponse.json({ success: false, message: "عملیات نامعتبر." }, { status: 400 });
+    return NextResponse.json(
+      { success: false, message: "عملیات نامعتبر." },
+      { status: 400 }
+    );
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: err.message },
+      { status: 500 }
+    );
   }
 }
 
 export async function GET(req: NextRequest) {
   try {
     const cookieVal = req.cookies.get(CUSTOMER_COOKIE_NAME)?.value;
-    if (!cookieVal) return NextResponse.json({ success: false, user: null });
-    return NextResponse.json({ success: true });
+    const verified = await verifyCustomerPayload(cookieVal);
+    if (!verified) {
+      return NextResponse.json({
+        success: false,
+        authenticated: false,
+        user: null,
+      });
+    }
+    return NextResponse.json({
+      success: true,
+      authenticated: true,
+      user: {
+        id: verified.id,
+        phone: verified.phone,
+        username: verified.username,
+        email: verified.email,
+        name: verified.name || verified.username,
+      },
+    });
   } catch {
-    return NextResponse.json({ success: false, user: null });
+    return NextResponse.json({
+      success: false,
+      authenticated: false,
+      user: null,
+    });
   }
 }

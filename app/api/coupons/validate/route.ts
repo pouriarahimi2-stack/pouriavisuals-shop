@@ -14,10 +14,9 @@ function toEnglishText(str: string): string {
     .toUpperCase();
 }
 
-// تابع کمکی برای استخراج IP در صورت نبود سشن معتبر
 function getClientIp(req: NextRequest) {
   const forwarded = req.headers.get("x-forwarded-for");
-  const ip = forwarded ? forwarded.split(",")[0] : req.headers.get("x-real-ip");
+  const ip = forwarded ? forwarded.split(",")[0].trim() : req.headers.get("x-real-ip");
   return ip || "unknown-ip";
 }
 
@@ -27,22 +26,45 @@ export async function POST(req: NextRequest) {
     const code = toEnglishText(body.code || body.couponCode || "");
     const cartTotal = Number(body.cartTotal || body.subtotal || body.total || 0);
     const items: any[] = Array.isArray(body.items) ? body.items : [];
-    const customerPhone = body.customerPhone ? toEnglishText(String(body.customerPhone)) : null;
+    const cleanPhone = body.customerPhone
+      ? toEnglishText(String(body.customerPhone)).replace(/\D/g, "")
+      : "";
 
     if (!code) {
       return NextResponse.json(
-        { success: false, valid: false, message: "لطفاً کد تخفیف را وارد نمایید." },
+        {
+          success: false,
+          valid: false,
+          message: "لطفاً کد تخفیف را وارد نمایید.",
+        },
         { status: 400 }
       );
     }
 
-    // --- بخش امنیتی ۱: تعیین هویت کاربر (موبایل یا IP) ---
-    // اگر از سمت کلاینت شماره موبایل ارسال شده بود (مثلا در مرحله نهایی تسویه حساب) از آن استفاده میکنیم
-    // در غیر این صورت IP کلاینت را به عنوان شناسه یکتای دستگاه در نظر میگیریم.
-    const userIdentifier = customerPhone || getClientIp(req);
+    const userIdentifier = cleanPhone || getClientIp(req);
 
-    // --- بخش امنیتی ۲: بررسی استفاده قبلی در دیتابیس (سفارشات موفق) ---
-    // بررسی میکنیم آیا سفارشی با این شماره موبایل/IP و این کد تخفیف ثبت شده که وضعیت آن لغو شده (cancelled) نباشد
+    // بررسی استفاده قبلی از کد تخفیف هم بر اساس شماره موبایل و هم شناسه کاربر
+    if (cleanPhone.length === 11) {
+      const { data: usedByPhone } = await supabaseAdmin
+        .from("orders")
+        .select("id")
+        .eq("coupon_code", code)
+        .eq("phone", cleanPhone)
+        .neq("status", "cancelled")
+        .limit(1);
+
+      if (usedByPhone && usedByPhone.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            valid: false,
+            message: "شما پیش از این از این کد تخفیف استفاده کرده‌اید.",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     const { data: previousOrders, error: orderCheckError } = await supabaseAdmin
       .from("orders")
       .select("id")
@@ -53,12 +75,15 @@ export async function POST(req: NextRequest) {
 
     if (!orderCheckError && previousOrders && previousOrders.length > 0) {
       return NextResponse.json(
-        { success: false, valid: false, message: "شما پیش از این از این کد تخفیف استفاده کرده‌اید." },
+        {
+          success: false,
+          valid: false,
+          message: "شما پیش از این از این کد تخفیف استفاده کرده‌اید.",
+        },
         { status: 403 }
       );
     }
 
-    // --- ادامه منطق اعتبارسنجی استاندارد کوپن ---
     const { data: coupon } = await supabaseAdmin
       .from("coupons")
       .select("*")
@@ -67,7 +92,11 @@ export async function POST(req: NextRequest) {
 
     if (!coupon || coupon.is_active === false) {
       return NextResponse.json(
-        { success: false, valid: false, message: "کد تخفیف وارد شده نامعتبر یا غیرفعال است." },
+        {
+          success: false,
+          valid: false,
+          message: "کد تخفیف وارد شده نامعتبر یا غیرفعال است.",
+        },
         { status: 404 }
       );
     }
@@ -75,14 +104,22 @@ export async function POST(req: NextRequest) {
     const nowMs = Date.now();
     if (coupon.starts_at && new Date(coupon.starts_at).getTime() > nowMs) {
       return NextResponse.json(
-        { success: false, valid: false, message: "زمان استفاده از این کد تخفیف هنوز آغاز نشده است." },
+        {
+          success: false,
+          valid: false,
+          message: "زمان استفاده از این کد تخفیف هنوز آغاز نشده است.",
+        },
         { status: 400 }
       );
     }
 
     if (coupon.expires_at && new Date(coupon.expires_at).getTime() < nowMs) {
       return NextResponse.json(
-        { success: false, valid: false, message: "مهلت استفاده از این کد تخفیف به پایان رسیده است." },
+        {
+          success: false,
+          valid: false,
+          message: "مهلت استفاده از این کد تخفیف به پایان رسیده است.",
+        },
         { status: 400 }
       );
     }
@@ -91,12 +128,18 @@ export async function POST(req: NextRequest) {
     const usedCount = Number(coupon.times_used ?? coupon.used_count ?? 0);
     if (usageLimit > 0 && usedCount >= usageLimit) {
       return NextResponse.json(
-        { success: false, valid: false, message: "ظرفیت مجاز استفاده از این کد تخفیف تکمیل شده است." },
+        {
+          success: false,
+          valid: false,
+          message: "ظرفیت مجاز استفاده از این کد تخفیف تکمیل شده است.",
+        },
         { status: 400 }
       );
     }
 
-    const minOrder = Number(coupon.min_order_amount ?? coupon.min_purchase ?? 0);
+    const minOrder = Number(
+      coupon.min_order_amount ?? coupon.min_purchase ?? 0
+    );
     if (minOrder > 0 && cartTotal > 0 && cartTotal < minOrder) {
       return NextResponse.json(
         {
@@ -112,7 +155,11 @@ export async function POST(req: NextRequest) {
     }
 
     let applicableTotal = cartTotal;
-    if (coupon.target_type === "category" && coupon.target_id && items.length > 0) {
+    if (
+      coupon.target_type === "category" &&
+      coupon.target_id &&
+      items.length > 0
+    ) {
       const targetItems = items.filter(
         (it) => String(it.category) === String(coupon.target_id)
       );
@@ -121,7 +168,8 @@ export async function POST(req: NextRequest) {
           {
             success: false,
             valid: false,
-            message: "این کد تخفیف مختص دسته‌بندی دیگری است و شامل اقلام فعلی سبد شما نمی‌شود.",
+            message:
+              "این کد تخفیف مخصوص دسته‌بندی دیگری است و شامل اقلام فعلی سبد شما نمی‌شود.",
           },
           { status: 400 }
         );
@@ -133,16 +181,23 @@ export async function POST(req: NextRequest) {
             Math.max(1, Number(it.quantity || 1)),
         0
       );
-    } else if (coupon.target_type === "product" && coupon.target_id && items.length > 0) {
+    } else if (
+      coupon.target_type === "product" &&
+      coupon.target_id &&
+      items.length > 0
+    ) {
       const targetItems = items.filter(
-        (it) => String(it.id || it.productId || it.product_id) === String(coupon.target_id)
+        (it) =>
+          String(it.id || it.productId || it.product_id) ===
+          String(coupon.target_id)
       );
       if (targetItems.length === 0) {
         return NextResponse.json(
           {
             success: false,
             valid: false,
-            message: "این کد تخفیف مختص کالای دیگری است و شامل اقلام فعلی سبد شما نمی‌شود.",
+            message:
+              "این کد تخفیف مختص کالای دیگری است و شامل اقلام فعلی سبد شما نمی‌شود.",
           },
           { status: 400 }
         );
@@ -156,17 +211,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const discountType = String(coupon.discount_type || coupon.type || "percent");
+    const discountType = String(
+      coupon.discount_type || coupon.type || "percent"
+    );
     const discountValue = Number(
-      coupon.discount_value ?? coupon.value ?? coupon.discount_percent ?? coupon.discount_amount ?? 0
+      coupon.discount_value ??
+        coupon.value ??
+        coupon.discount_percent ??
+        coupon.discount_amount ??
+        0
     );
 
     let discountAmount =
       discountType === "percent"
         ? Math.round((applicableTotal * discountValue) / 100)
-        : Math.min(applicableTotal > 0 ? applicableTotal : discountValue, discountValue);
+        : Math.min(
+            applicableTotal > 0 ? applicableTotal : discountValue,
+            discountValue
+          );
 
-    const maxDiscount = Number(coupon.max_discount || coupon.max_discount_amount || 0);
+    const maxDiscount = Number(
+      coupon.max_discount || coupon.max_discount_amount || 0
+    );
     if (maxDiscount > 0 && discountAmount > maxDiscount) {
       discountAmount = maxDiscount;
     }
@@ -198,7 +264,11 @@ export async function POST(req: NextRequest) {
     );
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, valid: false, message: err.message || "خطا در بررسی کد تخفیف." },
+      {
+        success: false,
+        valid: false,
+        message: err.message || "خطا در بررسی کد تخفیف.",
+      },
       { status: 500 }
     );
   }

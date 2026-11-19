@@ -1,3 +1,4 @@
+// File Path: lib/customerSession.ts
 export interface CustomerSessionPayload {
   id: string;
   phone: string;
@@ -13,9 +14,14 @@ export const CUSTOMER_COOKIE_NAME = "customer_session_token";
 const SESSION_EXPIRY_SECONDS = 30 * 24 * 60 * 60; // 30 days
 
 function getCustomerSecretKey(): string {
-  const secret = process.env.CUSTOMER_JWT_SECRET || process.env.ADMIN_SESSION_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secret =
+    process.env.CUSTOMER_JWT_SECRET ||
+    process.env.ADMIN_SESSION_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!secret || secret.trim().length < 16) {
-    throw new Error("FATAL SECURITY ERROR: CUSTOMER_JWT_SECRET is missing. Refusing to boot insecurely.");
+    throw new Error(
+      "FATAL SECURITY ERROR: CUSTOMER_JWT_SECRET is missing. Refusing to boot insecurely."
+    );
   }
   return secret.trim();
 }
@@ -61,16 +67,22 @@ async function getCryptoKey(usage: "sign" | "verify"): Promise<CryptoKey> {
 }
 
 export async function signCustomerPayload(
-  data: Omit<CustomerSessionPayload, "iat" | "exp" | "sid"> & { expSeconds?: number; sid?: string }
+  data: Omit<CustomerSessionPayload, "iat" | "exp" | "sid"> & {
+    expSeconds?: number;
+    sid?: string;
+  }
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const expSeconds = data.expSeconds || SESSION_EXPIRY_SECONDS;
-  const sid = data.sid || "csid_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
+  const sid =
+    data.sid ||
+    "csid_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
 
   const payload: CustomerSessionPayload = {
     id: data.id,
     phone: data.phone,
     username: data.username,
+    name: data.name || data.username,
     email: data.email,
     sid,
     iat: now,
@@ -78,15 +90,23 @@ export async function signCustomerPayload(
   };
 
   const header = { alg: "HS256", typ: "JWT" };
-  const unsignedToken = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(payload))}`;
+  const unsignedToken = `${base64UrlEncode(
+    JSON.stringify(header)
+  )}.${base64UrlEncode(JSON.stringify(payload))}`;
 
   const key = await getCryptoKey("sign");
   const enc = new TextEncoder();
-  const signatureBuffer = await crypto.subtle.sign("HMAC", key, enc.encode(unsignedToken));
+  const signatureBuffer = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    enc.encode(unsignedToken)
+  );
   return `${unsignedToken}.${bufferToBase64Url(signatureBuffer)}`;
 }
 
-export async function verifyCustomerPayload(token: string | null | undefined): Promise<CustomerSessionPayload | null> {
+export async function verifyCustomerPayload(
+  token: string | null | undefined
+): Promise<CustomerSessionPayload | null> {
   if (!token || typeof token !== "string") return null;
   const parts = token.split(".");
   if (parts.length !== 3) return null;
@@ -107,7 +127,9 @@ export async function verifyCustomerPayload(token: string | null | undefined): P
     );
 
     if (!isValid) return null;
-    const payload: CustomerSessionPayload = JSON.parse(base64UrlDecode(encodedPayload));
+    const payload: CustomerSessionPayload = JSON.parse(
+      base64UrlDecode(encodedPayload)
+    );
     if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) return null;
     return payload;
   } catch {

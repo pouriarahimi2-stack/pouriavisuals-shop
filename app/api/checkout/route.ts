@@ -4,14 +4,17 @@ import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyPhoneTokenSignature } from "@/app/api/send-otp/route";
 import { verifyCustomerToken, CUSTOMER_COOKIE_NAME } from "@/lib/customerSession";
 import { normalizeSystemSettings } from "@/lib/systemSettings";
-import { sendOtpPatternDetailed } from "@/lib/otpService"; // اصلاح: استفاده از پترن رسمی
+import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import { logAuditEvent } from "@/lib/auditLogger";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
 
 function getClientIp(req: NextRequest) {
   const forwarded = req.headers.get("x-forwarded-for");
-  return forwarded ? forwarded.split(",")[0] : req.headers.get("x-real-ip") || "unknown-ip";
+  return forwarded
+    ? forwarded.split(",")[0].trim()
+    : req.headers.get("x-real-ip") || "127.0.0.1";
 }
 
 export async function POST(req: NextRequest) {
@@ -20,20 +23,33 @@ export async function POST(req: NextRequest) {
     const customer = body.customer || {};
     const items = Array.isArray(body.items) ? body.items : [];
 
-    const fullName = String(customer.fullName || body.customer_name || "خریدار محترم").trim();
+    const fullName = String(
+      customer.fullName || body.customer_name || "خریدار محترم"
+    ).trim();
     const cleanPhone = String(customer.phone || body.phone || "")
       .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
       .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
       .replace(/\D/g, "");
-    const province = String(customer.province || body.province || "تهران").trim();
+    const province = String(
+      customer.province || body.province || "تهران"
+    ).trim();
     const city = String(customer.city || body.city || "تهران").trim();
     const address = String(customer.address || body.address || "").trim();
-    const postalCode = String(customer.postalCode || body.postal_code || "").replace(/\D/g, "");
+    const postalCode = String(
+      customer.postalCode || body.postal_code || ""
+    ).replace(/\D/g, "");
     const notes = String(customer.notes || body.notes || "").trim();
 
     if (!cleanPhone || cleanPhone.length !== 11 || !cleanPhone.startsWith("09")) {
       return NextResponse.json(
         { success: false, message: "شماره موبایل ۱۱ رقمی معتبر الزامی است." },
+        { status: 400 }
+      );
+    }
+
+    if (!address || address.length < 5) {
+      return NextResponse.json(
+        { success: false, message: "وارد کردن نشانی دقیق پستی الزامی است." },
         { status: 400 }
       );
     }
@@ -45,22 +61,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: siteRow } = await supabaseAdmin
-      .from("site_info")
-      .select("homepage_layout_config")
-      .limit(1)
-      .maybeSingle();
+    const siteRow = await getMasterSiteInfoRow();
+    const sysRules = normalizeSystemSettings(
+      siteRow?.homepage_layout_config,
+      siteRow
+    );
 
-    const sysRules = normalizeSystemSettings(siteRow?.homepage_layout_config);
+    if (sysRules.maintenanceMode) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "فروشگاه موقتاً در حالت تعمیرات و بروزرسانی است و امکان ثبت سفارش وجود ندارد.",
+        },
+        { status: 503 }
+      );
+    }
 
     const otpTokenFromBody = String(body.otpVerificationToken || "").trim();
-    const otpTokenFromCookie = req.cookies.get("axon_verified_phone_token")?.value || "";
-    const customerSessionCookie = req.cookies.get(CUSTOMER_COOKIE_NAME)?.value || "";
+    const otpTokenFromCookie =
+      req.cookies.get("axon_verified_phone_token")?.value || "";
+    const customerSessionCookie =
+      req.cookies.get(CUSTOMER_COOKIE_NAME)?.value || "";
 
     let isCustomerLoggedIn = false;
     if (customerSessionCookie) {
       const custSession = await verifyCustomerToken(customerSessionCookie);
-      if (custSession && String(custSession.phone).replace(/\D/g, "") === cleanPhone) {
+      if (
+        custSession &&
+        String(custSession.phone).replace(/\D/g, "") === cleanPhone
+      ) {
         isCustomerLoggedIn = true;
       }
     }
@@ -69,7 +99,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "ثبت سفارش مهمان در حال حاضر غیرفعال است. لطفاً ابتدا وارد حساب کاربری خود شوید.",
+          message:
+            "ثبت سفارش مهمان در حال حاضر غیرفعال است. لطفاً ابتدا وارد حساب کاربری خود شوید.",
         },
         { status: 403 }
       );
@@ -90,15 +121,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const couponCode = body.couponCode ? String(body.couponCode).trim().toUpperCase() : null;
-    const userIdentifier = cleanPhone || getClientIp(req);
+    const couponCode = body.couponCode
+      ? String(body.couponCode).trim().toUpperCase()
+      : null;
+    const clientIp = getClientIp(req);
+    const userIdentifier = cleanPhone || clientIp;
 
     if (couponCode) {
       const { data: previousOrders, error: orderCheckError } = await supabaseAdmin
         .from("orders")
         .select("id")
         .eq("coupon_code", couponCode)
-        .eq("phone", cleanPhone) 
+        .eq("phone", cleanPhone)
         .neq("status", "cancelled")
         .limit(1);
 
@@ -106,7 +140,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            message: "شما با این شماره موبایل پیش از این از کد تخفیف وارد شده استفاده کرده‌اید.",
+            message:
+              "شما با این شماره موبایل پیش از این از کد تخفیف وارد شده استفاده کرده‌اید.",
           },
           { status: 403 }
         );
@@ -116,14 +151,25 @@ export async function POST(req: NextRequest) {
     const productIds = Array.from(
       new Set(
         items
-          .map((it: any) => String(it.id || it.productId || it.product_id || ""))
+          .map((it: any) =>
+            String(it.id || it.productId || it.product_id || "").trim()
+          )
           .filter(Boolean)
       )
     );
 
+    if (productIds.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "اقلام سبد خرید معتبر نیستند." },
+        { status: 400 }
+      );
+    }
+
     const { data: dbProducts } = await supabaseAdmin
       .from("products")
-      .select("id, title, name, price, discount_price, purchase_price, stock, is_available, category")
+      .select(
+        "id, title, name, price, discount_price, purchase_price, stock, is_available, category, shipping_type"
+      )
       .in("id", productIds);
 
     const dbProdMap = new Map<string, any>();
@@ -131,53 +177,85 @@ export async function POST(req: NextRequest) {
 
     let verifiedSubtotal = 0;
     const verifiedItems: any[] = [];
+    let requiresTipaxOnly = false;
+    let requiresPostOnly = false;
 
     for (const item of items) {
-      const prodId = String(item.id || item.productId || item.product_id || "");
+      const prodId = String(
+        item.id || item.productId || item.product_id || ""
+      ).trim();
       const qty = Math.max(1, Math.min(99, Number(item.quantity || 1)));
       const dbProd = prodId ? dbProdMap.get(prodId) : null;
 
-      if (dbProd) {
-        const availableStock =
-          dbProd.stock !== undefined && dbProd.stock !== null ? Number(dbProd.stock) : 10;
-        if (dbProd.is_available === false || availableStock < qty) {
-          return NextResponse.json(
-            {
-              success: false,
-              message:
-                "موجودی کالای «" +
-                (dbProd.title || dbProd.name || item.title) +
-                "» در انبار کافی نیست (موجودی فعلی: " +
-                Math.max(0, availableStock) +
-                " عدد).",
-            },
-            { status: 400 }
-          );
-        }
-
-        const dbDiscount = Number(dbProd.discount_price || 0);
-        const dbRegular = Number(dbProd.price || 0);
-        const unitPrice = dbDiscount > 0 && dbDiscount < dbRegular ? dbDiscount : dbRegular;
-
-        verifiedSubtotal += unitPrice * qty;
-        verifiedItems.push({
-          ...item,
-          id: String(dbProd.id),
-          productId: String(dbProd.id),
-          title: dbProd.title || dbProd.name || item.title,
-          quantity: qty,
-          price: unitPrice,
-          category: dbProd.category,
-        });
-      } else {
-        const fallbackPrice = Number(item.discountPrice ?? item.discount_price ?? item.price ?? 0);
-        verifiedSubtotal += fallbackPrice * qty;
-        verifiedItems.push({
-          ...item,
-          quantity: qty,
-          price: fallbackPrice,
-        });
+      // امنیت مطلق: رد کردن هر کالایی که در دیتابیس وجود ندارد (جلوگیری از دستکاری قیمت)
+      if (!dbProd) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "یکی از کالاهای سبد خرید در کاتالوگ فروشگاه یافت نشد یا حذف شده است. لطفاً سبد خرید را بروزرسانی کنید.",
+          },
+          { status: 400 }
+        );
       }
+
+      const availableStock =
+        dbProd.stock !== undefined && dbProd.stock !== null
+          ? Number(dbProd.stock)
+          : 0;
+      if (dbProd.is_available === false || availableStock < qty) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "موجودی کالای «" +
+              (dbProd.title || dbProd.name || item.title) +
+              "» در انبار کافی نیست (موجودی فعلی: " +
+              Math.max(0, availableStock) +
+              " عدد).",
+          },
+          { status: 400 }
+        );
+      }
+
+      const shipType = String(dbProd.shipping_type || "both")
+        .toLowerCase()
+        .trim();
+      if (shipType === "tipax") requiresTipaxOnly = true;
+      if (shipType === "post") requiresPostOnly = true;
+
+      const dbDiscount = Number(dbProd.discount_price || 0);
+      const dbRegular = Number(dbProd.price || 0);
+      const unitPrice =
+        dbDiscount > 0 && dbDiscount < dbRegular ? dbDiscount : dbRegular;
+
+      verifiedSubtotal += unitPrice * qty;
+      verifiedItems.push({
+        id: String(dbProd.id),
+        productId: String(dbProd.id),
+        title: dbProd.title || dbProd.name || item.title,
+        quantity: qty,
+        price: unitPrice,
+        category: dbProd.category,
+        selectedColor: item.selectedColor || undefined,
+      });
+    }
+
+    // تشخیص روش ارسال معتبر در سمت سرور
+    const rawShippingMethod = String(
+      body.shippingMethod ||
+        (address.includes("[ارسال با تیپاکس]") ? "tipax" : "post")
+    )
+      .toLowerCase()
+      .trim();
+
+    let resolvedShippingMethod: "post" | "tipax" =
+      rawShippingMethod === "tipax" ? "tipax" : "post";
+
+    if (requiresTipaxOnly && !requiresPostOnly) {
+      resolvedShippingMethod = "tipax";
+    } else if (requiresPostOnly && !requiresTipaxOnly) {
+      resolvedShippingMethod = "post";
     }
 
     let verifiedDiscount = 0;
@@ -192,31 +270,52 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       const nowMs = Date.now();
-      const notStarted = couponRow?.starts_at && new Date(couponRow.starts_at).getTime() > nowMs;
-      const isExpired = couponRow?.expires_at && new Date(couponRow.expires_at).getTime() < nowMs;
+      const notStarted =
+        couponRow?.starts_at &&
+        new Date(couponRow.starts_at).getTime() > nowMs;
+      const isExpired =
+        couponRow?.expires_at &&
+        new Date(couponRow.expires_at).getTime() < nowMs;
       const limitReached =
         couponRow?.usage_limit &&
         Number(couponRow.usage_limit) > 0 &&
-        Number(couponRow.times_used ?? couponRow.used_count ?? 0) >= Number(couponRow.usage_limit);
-      const minSpend = Number(couponRow?.min_order_amount ?? couponRow?.min_purchase ?? 0);
+        Number(couponRow.times_used ?? couponRow.used_count ?? 0) >=
+          Number(couponRow.usage_limit);
+      const minSpend = Number(
+        couponRow?.min_order_amount ?? couponRow?.min_purchase ?? 0
+      );
 
-      if (couponRow && !notStarted && !isExpired && !limitReached && verifiedSubtotal >= minSpend) {
+      if (
+        couponRow &&
+        !notStarted &&
+        !isExpired &&
+        !limitReached &&
+        verifiedSubtotal >= minSpend
+      ) {
         let targetSubtotal = verifiedSubtotal;
         if (couponRow.target_type === "category" && couponRow.target_id) {
           const matching = verifiedItems.filter(
             (vi) => String(vi.category) === String(couponRow.target_id)
           );
-          targetSubtotal = matching.reduce((acc, vi) => acc + vi.price * vi.quantity, 0);
+          targetSubtotal = matching.reduce(
+            (acc, vi) => acc + vi.price * vi.quantity,
+            0
+          );
         } else if (couponRow.target_type === "product" && couponRow.target_id) {
           const matching = verifiedItems.filter(
             (vi) => String(vi.id || vi.productId) === String(couponRow.target_id)
           );
-          targetSubtotal = matching.reduce((acc, vi) => acc + vi.price * vi.quantity, 0);
+          targetSubtotal = matching.reduce(
+            (acc, vi) => acc + vi.price * vi.quantity,
+            0
+          );
         }
 
         if (targetSubtotal > 0) {
           validCouponRow = couponRow;
-          const dtype = String(couponRow.discount_type || couponRow.type || "percent");
+          const dtype = String(
+            couponRow.discount_type || couponRow.type || "percent"
+          );
           const dval = Number(
             couponRow.discount_value ??
               couponRow.value ??
@@ -226,7 +325,9 @@ export async function POST(req: NextRequest) {
           );
           if (dtype === "percent") {
             verifiedDiscount = Math.round((targetSubtotal * dval) / 100);
-            const maxDisc = Number(couponRow.max_discount || couponRow.max_discount_amount || 0);
+            const maxDisc = Number(
+              couponRow.max_discount || couponRow.max_discount_amount || 0
+            );
             if (maxDisc > 0 && verifiedDiscount > maxDisc) {
               verifiedDiscount = maxDisc;
             }
@@ -239,14 +340,20 @@ export async function POST(req: NextRequest) {
 
     const afterDiscount = Math.max(0, verifiedSubtotal - verifiedDiscount);
 
-    const shippingCost =
-      afterDiscount <= 0
-        ? 0
-        : sysRules.defaultShippingCost <= 0
-        ? 0
-        : sysRules.freeShippingThreshold > 0 && afterDiscount >= sysRules.freeShippingThreshold
-        ? 0
-        : sysRules.defaultShippingCost;
+    // محاسبه دقیق هزینه ارسال در سمت سرور مطابق تنظیمات کلان پنل مدیریت
+    const qualifiesForFreeShipping =
+      sysRules.freeShippingThreshold > 0 &&
+      afterDiscount >= sysRules.freeShippingThreshold;
+
+    let shippingCost = 0;
+    if (afterDiscount > 0 && !qualifiesForFreeShipping) {
+      if (resolvedShippingMethod === "post") {
+        shippingCost = Number(sysRules.postShippingCost || 0);
+      } else {
+        // تیپاکس به صورت پس‌کرایه محاسبه می‌شود و به مبلغ فاکتور آنلاین اضافه نمی‌گردد
+        shippingCost = 0;
+      }
+    }
 
     const vatPercent = sysRules.vatPercent;
     const vatAmount =
@@ -261,7 +368,8 @@ export async function POST(req: NextRequest) {
 
     const shortCode = Math.floor(100000 + Math.random() * 900000).toString();
     const orderNumber = "AXN-" + shortCode;
-    const trackingCode = "TRK-" + Date.now().toString().slice(-6) + "-" + shortCode.slice(0, 3);
+    const trackingCode =
+      "TRK-" + Date.now().toString().slice(-6) + "-" + shortCode.slice(0, 3);
     const fullAddress =
       province +
       "، " +
@@ -282,16 +390,16 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (recentDuplicate) {
-      let estimatedCurrentTotal = items.reduce((acc: number, it: any) => acc + Number(it.price || 0) * Number(it.quantity || 1), 0);
-      if (Math.abs(Number(recentDuplicate.final_amount) - estimatedCurrentTotal) < 500000) {
-         return NextResponse.json({
+      if (Math.abs(Number(recentDuplicate.final_amount) - finalAmount) <= 100) {
+        return NextResponse.json({
           success: true,
           order: recentDuplicate,
-          message: "✓ سفارش شما پیش از این ثبت شده و در حال انتقال به درگاه است.",
+          message:
+            "✓ سفارش شما پیش از این ثبت شده و در حال انتقال به درگاه است.",
         });
       }
     }
-    
+
     const generatedUuid = randomUUID();
     const orderPayload: Record<string, any> = {
       id: generatedUuid,
@@ -305,6 +413,9 @@ export async function POST(req: NextRequest) {
       items: verifiedItems,
       total_amount: verifiedSubtotal,
       discount_amount: verifiedDiscount,
+      vat_percent: vatPercent,
+      vat_amount: vatAmount,
+      shipping_cost: shippingCost,
       final_amount: finalAmount,
       coupon_code: validCouponRow ? validCouponRow.code : null,
       user_identifier: userIdentifier,
@@ -347,13 +458,15 @@ export async function POST(req: NextRequest) {
 
     if (savedOrder && validCouponRow) {
       try {
-        const currentUsed = Number(validCouponRow.times_used ?? validCouponRow.used_count ?? 0);
+        const currentUsed = Number(
+          validCouponRow.times_used ?? validCouponRow.used_count ?? 0
+        );
         await supabaseAdmin
           .from("coupons")
-          .update({ 
-             times_used: currentUsed + 1, 
-             used_count: currentUsed + 1,
-             updated_at: new Date().toISOString()
+          .update({
+            times_used: currentUsed + 1,
+            used_count: currentUsed + 1,
+            updated_at: new Date().toISOString(),
           })
           .eq("id", validCouponRow.id);
       } catch (e) {
@@ -368,7 +481,7 @@ export async function POST(req: NextRequest) {
       if (!prodRow) continue;
 
       try {
-        const currentStock = Number(prodRow.stock ?? 10);
+        const currentStock = Number(prodRow.stock ?? 0);
         const nextStock = Math.max(0, currentStock - qty);
         await supabaseAdmin
           .from("products")
@@ -381,13 +494,18 @@ export async function POST(req: NextRequest) {
 
         await supabaseAdmin.from("inventory_logs").insert([
           {
-            id: "sale_" + Date.now() + "_" + Math.random().toString(36).slice(2, 5),
+            id:
+              "sale_" +
+              Date.now() +
+              "_" +
+              Math.random().toString(36).slice(2, 5),
             product_id: String(prodRow.id),
             product_title: prodRow.title || prodRow.name || item.title,
             change_type: "sale",
             quantity: qty,
             cost_price: Number(
-              prodRow.purchase_price || Math.round(Number(prodRow.price || 0) * 0.7)
+              prodRow.purchase_price ||
+                Math.round(Number(prodRow.price || 0) * 0.7)
             ),
             supplier: "فروش آنلاین سایت",
             reference_note: "کسر خودکار بابت فاکتور " + orderNumber,
@@ -413,11 +531,21 @@ export async function POST(req: NextRequest) {
       ]);
     } catch {}
 
-    // اصلاح: ارسال هوشمندانه پیامکِ شماره سفارش (فقط در صورتی که خطا ندهد)
-    //if (sysRules.autoSendOrderSms) {
-      // استفاده از الگو تا کد نامربوط ارسال نشود
-      //sendOtpPatternDetailed({ mobile: cleanPhone, code: shortCode }).catch(() => {});
-    //}
+    await logAuditEvent({
+      action: "CREATE_CUSTOMER_ORDER",
+      target_resource: "orders:" + orderNumber,
+      target_id: String(savedOrder.id),
+      admin_username: "customer:" + cleanPhone,
+      ip_address: clientIp,
+      details: {
+        orderNumber,
+        finalAmount,
+        shippingMethod: resolvedShippingMethod,
+        shippingCost,
+        vatAmount,
+        couponCode: validCouponRow?.code || null,
+      },
+    });
 
     return NextResponse.json({
       success: true,
@@ -434,7 +562,7 @@ export async function POST(req: NextRequest) {
         tracking_code: savedOrder.tracking_code || trackingCode,
       },
       orderId: savedOrder.id,
-      orderNumber: savedOrder.order_number,
+      orderNumber: savedOrder.order_number || orderNumber,
     });
   } catch (err: any) {
     return NextResponse.json(

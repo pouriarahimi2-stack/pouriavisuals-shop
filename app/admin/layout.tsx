@@ -13,10 +13,76 @@ import { supabase } from "@/lib/supabase";
 
 const SUPERADMIN_THEME_STORAGE_KEY = "axon_superadmin_panel_theme_v2026";
 
+const LIGHT_MODE_OVERRIDES_CSS = `
+  #axon-admin-shell[data-admin-theme="light"] {
+    --bg-primary: #f1f5f9 !important;
+    --bg-secondary: #e2e8f0 !important;
+    --modal-bg: #ffffff !important;
+    --input-bg: #f8fafc !important;
+    --card-border: #cbd5e1 !important;
+    --text-primary: #0f172a !important;
+    --text-secondary: #475569 !important;
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+  }
+  #axon-admin-shell[data-admin-theme="light"] [class*="bg-[#0"],
+  #axon-admin-shell[data-admin-theme="light"] [class*="bg-[#1"],
+  #axon-admin-shell[data-admin-theme="light"] .bg-slate-950,
+  #axon-admin-shell[data-admin-theme="light"] .bg-slate-900,
+  #axon-admin-shell[data-admin-theme="light"] .bg-zinc-900,
+  #axon-admin-shell[data-admin-theme="light"] .bg-gray-900 {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+  }
+  #axon-admin-shell[data-admin-theme="light"] .bg-slate-800,
+  #axon-admin-shell[data-admin-theme="light"] .bg-zinc-800 {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+  }
+  #axon-admin-shell[data-admin-theme="light"] .text-slate-200,
+  #axon-admin-shell[data-admin-theme="light"] .text-slate-300,
+  #axon-admin-shell[data-admin-theme="light"] .text-zinc-200,
+  #axon-admin-shell[data-admin-theme="light"] .text-zinc-300 {
+    color: #334155 !important;
+  }
+  #axon-admin-shell[data-admin-theme="light"] .border-slate-800,
+  #axon-admin-shell[data-admin-theme="light"] .border-slate-700,
+  #axon-admin-shell[data-admin-theme="light"] .border-zinc-800 {
+    border-color: #cbd5e1 !important;
+  }
+`;
+
+const DARK_MODE_OVERRIDES_CSS = `
+  #axon-admin-shell[data-admin-theme="dark"] {
+    --bg-primary: #07090e !important;
+    --bg-secondary: #0b0f17 !important;
+    --modal-bg: #0f141f !important;
+    --input-bg: #161d2b !important;
+    --card-border: #1e293b !important;
+    --text-primary: #f8fafc !important;
+    --text-secondary: #94a3b8 !important;
+    background-color: #07090e !important;
+    color: #f8fafc !important;
+  }
+`;
+
 function applyAdminDomTheme(mode: "dark" | "light") {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const body = document.body;
+
+  let styleTag = document.getElementById(
+    "axon-admin-theme-overrides"
+  ) as HTMLStyleElement | null;
+  if (!styleTag) {
+    styleTag = document.createElement("style");
+    styleTag.id = "axon-admin-theme-overrides";
+    document.head.appendChild(styleTag);
+  }
+  styleTag.textContent =
+    mode === "light" ? LIGHT_MODE_OVERRIDES_CSS : DARK_MODE_OVERRIDES_CSS;
 
   if (mode === "light") {
     root.classList.remove("dark");
@@ -69,25 +135,38 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   } | null>(null);
   const [activeTheme, setActiveTheme] = useState<"dark" | "light">("dark");
 
+  const isPublicAuthRoute =
+    pathname.startsWith("/admin/login") || pathname.startsWith("/admin/setup");
+
   const syncAdminSessionAndTheme = useCallback(async () => {
+    if (isPublicAuthRoute) return;
     try {
-      const res = await fetch("/api/admin/auth?t=" + Date.now(), { cache: "no-store" });
+      const res = await fetch("/api/admin/auth?t=" + Date.now(), {
+        cache: "no-store",
+      });
+      if (res.status === 401 || res.status === 403) {
+        router.replace("/admin/login");
+        return;
+      }
       if (!res.ok) return;
       const json = await res.json();
-      if (json.authenticated && json.user) {
-        setAdminUser(json.user);
-        const dbTheme: "dark" | "light" =
-          json.user.ui_theme === "light" ? "light" : "dark";
-
-        if (json.user.role === "superadmin" && typeof window !== "undefined") {
-          localStorage.setItem(SUPERADMIN_THEME_STORAGE_KEY, dbTheme);
-        }
-
-        setActiveTheme(dbTheme);
-        applyAdminDomTheme(dbTheme);
+      if (!json.authenticated || !json.user) {
+        router.replace("/admin/login");
+        return;
       }
+
+      setAdminUser(json.user);
+      const dbTheme: "dark" | "light" =
+        json.user.ui_theme === "light" ? "light" : "dark";
+
+      if (json.user.role === "superadmin" && typeof window !== "undefined") {
+        localStorage.setItem(SUPERADMIN_THEME_STORAGE_KEY, dbTheme);
+      }
+
+      setActiveTheme(dbTheme);
+      applyAdminDomTheme(dbTheme);
     } catch {}
-  }, []);
+  }, [isPublicAuthRoute, router]);
 
   const pushLiveTelemetry = useCallback(
     (payload: {
@@ -123,7 +202,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   );
 
   useEffect(() => {
-    const channelId = "axon-admin-layout-sync-" + Math.random().toString(36).slice(2, 8);
+    if (isPublicAuthRoute) return;
+    const channelId =
+      "axon-admin-layout-sync-" + Math.random().toString(36).slice(2, 8);
     const ch = supabase
       .channel(channelId)
       .on(
@@ -138,10 +219,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [syncAdminSessionAndTheme]);
+  }, [isPublicAuthRoute, syncAdminSessionAndTheme]);
 
   useEffect(() => {
-    if (pathname.startsWith("/admin/login") || pathname.startsWith("/admin/setup")) return;
+    if (isPublicAuthRoute) return;
 
     pushLiveTelemetry({
       eventType: "page_view",
@@ -165,10 +246,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (!target) return;
       const btn = target.closest("button, a");
       if (!btn) return;
-      const text = (btn.textContent || btn.getAttribute("title") || "").trim().slice(0, 70);
+      const text = (btn.textContent || btn.getAttribute("title") || "")
+        .trim()
+        .slice(0, 70);
       if (!text) return;
 
-      const isTabSwitch = /^[🧭🏛📑🌳⚡🏭📦📈🎯✏️📡💻📊📋🔍🚀📚🤖]*\s*[۱۱۲۳۴۵12345]\./.test(text);
+      const isTabSwitch = /^[🧭🏛📑🌳⚡🏭📦📈🎯✏️📡💻📊📋🔍🚀📚🤖]*\s*[۱۱۲۳۴۵12345]\./.test(
+        text
+      );
       if (isTabSwitch) {
         pushLiveTelemetry({
           eventType: "tab_switch",
@@ -177,7 +262,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           method: "TAB",
           details: "📑 تغییر تب به: «" + text + "»",
         });
-      } else if (!text.includes("خروج امن") && !text.includes("استریم بلادرنگ")) {
+      } else if (
+        !text.includes("خروج امن") &&
+        !text.includes("استریم بلادرنگ")
+      ) {
         pushLiveTelemetry({
           eventType: "click_action",
           path: pathname,
@@ -202,7 +290,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           eventType: "search_filter",
           path: pathname,
           method: "INPUT",
-          details: `🔍 ورود/انتخاب مقدار «${val.slice(0, 40)}» در (${placeholder.slice(0, 35)})`,
+          details: `🔍 ورود/انتخاب مقدار «${val.slice(
+            0,
+            40
+          )}» در (${placeholder.slice(0, 35)})`,
         });
       }, 900);
     };
@@ -216,20 +307,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       document.removeEventListener("click", handleGlobalClick, true);
       document.removeEventListener("change", handleGlobalInput, true);
     };
-  }, [pathname, pushLiveTelemetry]);
+  }, [pathname, isPublicAuthRoute, pushLiveTelemetry]);
 
   useEffect(() => {
-    if (pathname.startsWith("/admin/login") || pathname.startsWith("/admin/setup")) return;
+    if (isPublicAuthRoute) return;
     syncAdminSessionAndTheme();
 
     const onCustomThemeEvent = (e: any) => {
-      const nextMode: "dark" | "light" = e?.detail === "light" ? "light" : "dark";
+      const nextMode: "dark" | "light" =
+        e?.detail === "light" ? "light" : "dark";
       setActiveTheme(nextMode);
       applyAdminDomTheme(nextMode);
     };
 
     const onFocus = () => syncAdminSessionAndTheme();
-    const interval = setInterval(() => { if (document.visibilityState === 'visible') syncAdminSessionAndTheme(); }, 25000);
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") syncAdminSessionAndTheme();
+    }, 25000);
 
     window.addEventListener("axon_admin_theme_changed", onCustomThemeEvent);
     window.addEventListener("focus", onFocus);
@@ -239,9 +333,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       window.removeEventListener("axon_admin_theme_changed", onCustomThemeEvent);
       window.removeEventListener("focus", onFocus);
     };
-  }, [pathname, syncAdminSessionAndTheme]);
+  }, [isPublicAuthRoute, syncAdminSessionAndTheme]);
 
-  if (pathname.startsWith("/admin/login") || pathname.startsWith("/admin/setup")) {
+  if (isPublicAuthRoute) {
     return <>{children}</>;
   }
 
@@ -250,7 +344,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const handleToggleSuperAdminTheme = async () => {
     if (!isSuperAdmin) return;
     soundEngine.playClick();
-    const nextTheme: "dark" | "light" = activeTheme === "dark" ? "light" : "dark";
+    const nextTheme: "dark" | "light" =
+      activeTheme === "dark" ? "light" : "dark";
     setActiveTheme(nextTheme);
     applyAdminDomTheme(nextTheme);
 
@@ -293,66 +388,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div
       id="axon-admin-shell"
       data-admin-theme={activeTheme}
+      suppressHydrationWarning
       className="min-h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-text transition-colors duration-300"
       dir="rtl"
     >
-      <style>{
-        activeTheme === "light"
-          ? `
-        #axon-admin-shell[data-admin-theme="light"] {
-          --bg-primary: #f1f5f9 !important;
-          --bg-secondary: #e2e8f0 !important;
-          --modal-bg: #ffffff !important;
-          --input-bg: #f8fafc !important;
-          --card-border: #cbd5e1 !important;
-          --text-primary: #0f172a !important;
-          --text-secondary: #475569 !important;
-          background-color: #f1f5f9 !important;
-          color: #0f172a !important;
-        }
-        #axon-admin-shell[data-admin-theme="light"] [class*="bg-[#0"],
-        #axon-admin-shell[data-admin-theme="light"] [class*="bg-[#1"],
-        #axon-admin-shell[data-admin-theme="light"] .bg-slate-950,
-        #axon-admin-shell[data-admin-theme="light"] .bg-slate-900,
-        #axon-admin-shell[data-admin-theme="light"] .bg-zinc-900,
-        #axon-admin-shell[data-admin-theme="light"] .bg-gray-900 {
-          background-color: #ffffff !important;
-          color: #0f172a !important;
-          border-color: #cbd5e1 !important;
-        }
-        #axon-admin-shell[data-admin-theme="light"] .bg-slate-800,
-        #axon-admin-shell[data-admin-theme="light"] .bg-zinc-800 {
-          background-color: #f1f5f9 !important;
-          color: #0f172a !important;
-          border-color: #cbd5e1 !important;
-        }
-        #axon-admin-shell[data-admin-theme="light"] .text-slate-200,
-        #axon-admin-shell[data-admin-theme="light"] .text-slate-300,
-        #axon-admin-shell[data-admin-theme="light"] .text-zinc-200,
-        #axon-admin-shell[data-admin-theme="light"] .text-zinc-300 {
-          color: #334155 !important;
-        }
-        #axon-admin-shell[data-admin-theme="light"] .border-slate-800,
-        #axon-admin-shell[data-admin-theme="light"] .border-slate-700,
-        #axon-admin-shell[data-admin-theme="light"] .border-zinc-800 {
-          border-color: #cbd5e1 !important;
-        }
-      `
-          : `
-        #axon-admin-shell[data-admin-theme="dark"] {
-          --bg-primary: #07090e !important;
-          --bg-secondary: #0b0f17 !important;
-          --modal-bg: #0f141f !important;
-          --input-bg: #161d2b !important;
-          --card-border: #1e293b !important;
-          --text-primary: #f8fafc !important;
-          --text-secondary: #94a3b8 !important;
-          background-color: #07090e !important;
-          color: #f8fafc !important;
-        }
-      `
-      }</style>
-
       <header className="w-full px-4 sm:px-6 py-3 bg-[var(--modal-bg)] border-b border-[var(--card-border)] flex flex-wrap items-center justify-between gap-3 shadow-md z-30">
         <div className="flex items-center gap-3">
           <span className="text-sm sm:text-base font-black text-[var(--accent-blue)]">
@@ -382,7 +421,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               title="تغییر تم پنل مدیریت (ویژه مدیر ارشد)"
             >
               <span>{activeTheme === "dark" ? "☀️" : "🌙"}</span>
-              <span>{activeTheme === "dark" ? "رفتن به تم روشن" : "رفتن به تم تیره"}</span>
+              <span>
+                {activeTheme === "dark" ? "رفتن به تم روشن" : "رفتن به تم تیره"}
+              </span>
             </button>
           )}
 

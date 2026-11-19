@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
 
 export default function MaintenancePage() {
   const [title, setTitle] = useState("بروزرسانی زیرساخت فنی آکسون کور");
@@ -62,8 +61,8 @@ export default function MaintenancePage() {
         )}
 
         <div className="space-y-2">
-          <span className="px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[11px] font-black">
-            {siteName} — حالت تعمیرات و ارتقای فنی
+          <span className="px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[11px] font-black">
+            {siteName} — بروزرسانی و ارتقای فنی
           </span>
           <h1 className="text-lg sm:text-2xl font-black text-[var(--accent-blue)] pt-1">
             {title}
@@ -119,19 +118,16 @@ export default function MaintenancePage() {
           </div>
         )}
 
-        <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            href="/"
-            className="px-5 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition"
+        <div className="pt-2 flex items-center justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href = "/";
+            }}
+            className="px-6 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-black transition cursor-pointer"
           >
             🔄 بررسی مجدد وضعیت سایت
-          </Link>
-          <Link
-            href="/admin"
-            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black transition shadow-lg"
-          >
-            🛡️ ورود مدیر سیستم
-          </Link>
+          </button>
         </div>
       </div>
     </div>

@@ -5,15 +5,23 @@ import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { soundEngine } from "@/lib/soundEngine";
-import { siteInfoService, DEFAULT_AUTH_SECURITY_CONFIG, AuthSecurityConfig } from "@/services/siteInfoService";
+import {
+  siteInfoService,
+  DEFAULT_AUTH_SECURITY_CONFIG,
+  AuthSecurityConfig,
+} from "@/services/siteInfoService";
 import { themeEngine } from "@/lib/themeEngine";
 import { supabase } from "@/lib/supabase";
 
 export default function UserLoginPage() {
   const router = useRouter();
 
-  const [authMode, setAuthMode] = useState<"phone_check" | "otp" | "password" | "register">("phone_check");
-  const [securityConfig, setSecurityConfig] = useState<AuthSecurityConfig>(DEFAULT_AUTH_SECURITY_CONFIG);
+  const [authMode, setAuthMode] = useState<
+    "phone_check" | "otp" | "password" | "register"
+  >("phone_check");
+  const [, setSecurityConfig] = useState<AuthSecurityConfig>(
+    DEFAULT_AUTH_SECURITY_CONFIG
+  );
   const [otpLength, setOtpLength] = useState<number>(4);
 
   const [phone, setPhone] = useState("");
@@ -32,7 +40,9 @@ export default function UserLoginPage() {
   const [regPassword, setRegPassword] = useState("");
   const [regConfirmPassword, setRegConfirmPassword] = useState("");
 
-  const [animPhase, setAnimPhase] = useState<"idle" | "merging" | "verified">("idle");
+  const [animPhase, setAnimPhase] = useState<"idle" | "merging" | "verified">(
+    "idle"
+  );
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -43,7 +53,8 @@ export default function UserLoginPage() {
     if (info && info.auth_security_config) {
       const sec = info.auth_security_config;
       setSecurityConfig(sec);
-      const len = (sec.userDeck && sec.userDeck.otpLength) ? sec.userDeck.otpLength : 4;
+      const rawLen = Number(sec.userDeck?.otpLength || 4);
+      const len = Math.min(8, Math.max(4, rawLen));
       setOtpLength(len);
       setDigits((prev) => (prev.length === len ? prev : Array(len).fill("")));
     }
@@ -105,14 +116,18 @@ export default function UserLoginPage() {
         setPhone(clean);
         setDigits(Array(otpLength).fill(""));
         setAuthMode("otp");
-        setSuccessMessage(data.message || ("کد تایید به شماره " + clean + " ارسال گردید."));
+        setSuccessMessage(
+          data.message || "کد تایید به شماره " + clean + " ارسال گردید."
+        );
         setTimeout(() => {
           const firstEl = inputRefs.current[0];
           if (firstEl) firstEl.focus();
         }, 100);
         return true;
       } else {
-        setErrorMessage(data.message || data.error || "خطا در ارسال کد تایید پیامکی.");
+        setErrorMessage(
+          data.message || data.error || "خطا در ارسال کد تایید پیامکی."
+        );
         return false;
       }
     } catch {
@@ -148,11 +163,15 @@ export default function UserLoginPage() {
       if (data.exists) {
         setIdentifier(clean);
         setAuthMode("password");
-        setSuccessMessage("شماره شما در سیستم ثبت است. لطفاً کلمه عبور را وارد فرمایید:");
+        setSuccessMessage(
+          "شماره شما در سیستم ثبت است. لطفاً کلمه عبور را وارد فرمایید:"
+        );
       } else {
         setRegPhone(clean);
         setAuthMode("register");
-        setSuccessMessage("حساب کاربری یافت نشد. لطفاً اطلاعات حساب خود را تکمیل کنید:");
+        setSuccessMessage(
+          "حساب کاربری یافت نشد. لطفاً اطلاعات حساب خود را تکمیل کنید:"
+        );
       }
     } catch {
       await requestOtpCode(clean);
@@ -182,7 +201,10 @@ export default function UserLoginPage() {
     }
   };
 
-  const handleDigitKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleDigitKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => {
     if (e.key === "Backspace" && !digits[index] && index > 0) {
       setFocusedIndex(index - 1);
       const prevEl = inputRefs.current[index - 1];
@@ -207,9 +229,14 @@ export default function UserLoginPage() {
       const data = await res.json();
 
       if (res.ok && (data.verified === true || data.success === true)) {
-        const userObj = data.user || { phone: cleanPhone, token: data.token || "USER-VERIFIED" };
+        const userObj = data.user || {
+          phone: cleanPhone,
+          token: data.token || "USER-VERIFIED",
+        };
         localStorage.setItem("axon_user_session", JSON.stringify(userObj));
-        window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: userObj }));
+        window.dispatchEvent(
+          new CustomEvent("user_auth_changed", { detail: userObj })
+        );
 
         setTimeout(() => {
           soundEngine.playSuccess();
@@ -222,7 +249,11 @@ export default function UserLoginPage() {
       } else {
         setTimeout(() => {
           setAnimPhase("idle");
-          setErrorMessage(data.message || data.error || "کد تایید پیامکی نادرست یا منقضی شده است.");
+          setErrorMessage(
+            data.message ||
+              data.error ||
+              "کد تایید پیامکی نادرست یا منقضی شده است."
+          );
           setDigits(Array(otpLength).fill(""));
           setFocusedIndex(0);
           const firstEl = inputRefs.current[0];
@@ -233,7 +264,9 @@ export default function UserLoginPage() {
     } catch {
       setTimeout(() => {
         setAnimPhase("idle");
-        setErrorMessage("خطا در ارتباط با سرور احراز هویت. لطفاً مجدداً تلاش کنید.");
+        setErrorMessage(
+          "خطا در ارتباط با سرور احراز هویت. لطفاً مجدداً تلاش کنید."
+        );
         setDigits(Array(otpLength).fill(""));
         setFocusedIndex(0);
         const firstEl = inputRefs.current[0];
@@ -254,14 +287,20 @@ export default function UserLoginPage() {
       const res = await fetch("/api/user/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "login_credentials", identifier: identifier.trim(), password }),
+        body: JSON.stringify({
+          action: "login_credentials",
+          identifier: identifier.trim(),
+          password,
+        }),
       });
       const data = await res.json();
 
       if (res.ok && data.success) {
         soundEngine.playSuccess();
         localStorage.setItem("axon_user_session", JSON.stringify(data.user));
-        window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: data.user }));
+        window.dispatchEvent(
+          new CustomEvent("user_auth_changed", { detail: data.user })
+        );
         setAnimPhase("verified");
         setTimeout(() => router.push("/"), 1800);
       } else {
@@ -310,7 +349,9 @@ export default function UserLoginPage() {
       if (res.ok && data.success) {
         soundEngine.playSuccess();
         localStorage.setItem("axon_user_session", JSON.stringify(data.user));
-        window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: data.user }));
+        window.dispatchEvent(
+          new CustomEvent("user_auth_changed", { detail: data.user })
+        );
         setAnimPhase("verified");
         setTimeout(() => router.push("/"), 1800);
       } else {
@@ -346,8 +387,12 @@ export default function UserLoginPage() {
                 ✓
               </div>
               <div className="text-center space-y-1">
-                <h3 className="text-2xl font-black text-emerald-400">ورود تایید شد</h3>
-                <p className="text-xs text-slate-300">در حال انتقال به صفحه اصلی...</p>
+                <h3 className="text-2xl font-black text-emerald-400">
+                  ورود تایید شد
+                </h3>
+                <p className="text-xs text-slate-300">
+                  در حال انتقال به صفحه اصلی...
+                </p>
               </div>
             </div>
           ) : (
@@ -434,9 +479,14 @@ export default function UserLoginPage() {
 
               <div className="my-auto py-2">
                 {authMode === "phone_check" && (
-                  <form onSubmit={handlePhoneCheck} className="space-y-4 text-xs">
+                  <form
+                    onSubmit={handlePhoneCheck}
+                    className="space-y-4 text-xs"
+                  >
                     <div>
-                      <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">شماره موبایل *</label>
+                      <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                        شماره موبایل *
+                      </label>
                       <input
                         type="tel"
                         required
@@ -459,9 +509,14 @@ export default function UserLoginPage() {
                 )}
 
                 {authMode === "password" && (
-                  <form onSubmit={handlePasswordLogin} className="space-y-3.5 text-xs">
+                  <form
+                    onSubmit={handlePasswordLogin}
+                    className="space-y-3.5 text-xs"
+                  >
                     <div>
-                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">شماره همراه یا نام کاربری:</label>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        شماره همراه یا نام کاربری:
+                      </label>
                       <input
                         type="text"
                         required
@@ -471,7 +526,9 @@ export default function UserLoginPage() {
                       />
                     </div>
                     <div>
-                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">کلمه عبور امنیتی *</label>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        کلمه عبور امنیتی *
+                      </label>
                       <div className="relative">
                         <input
                           type={showPassword ? "text" : "password"}
@@ -497,23 +554,26 @@ export default function UserLoginPage() {
                     >
                       {loading ? "در حال ورود..." : "ورود به حساب کاربری ←"}
                     </button>
-                    {identifier && /^09\d{9}$/.test(identifier.replace(/\D/g, "")) && (
-                      <button
-                        type="button"
-                        disabled={loading}
-                        onClick={() => requestOtpCode(identifier)}
-                        className="w-full py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold text-[var(--accent-blue)] transition cursor-pointer"
-                      >
-                        ورود با کد تایید یکبار مصرف پیامکی (OTP) 💬
-                      </button>
-                    )}
+                    {identifier &&
+                      /^09\d{9}$/.test(identifier.replace(/\D/g, "")) && (
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={() => requestOtpCode(identifier)}
+                          className="w-full py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold text-[var(--accent-blue)] transition cursor-pointer"
+                        >
+                          ورود با کد تایید یکبار مصرف پیامکی (OTP) 💬
+                        </button>
+                      )}
                   </form>
                 )}
 
                 {authMode === "register" && (
                   <form onSubmit={handleRegister} className="space-y-2.5 text-xs">
                     <div>
-                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">شماره موبایل *</label>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        شماره موبایل *
+                      </label>
                       <input
                         type="tel"
                         required
@@ -525,7 +585,9 @@ export default function UserLoginPage() {
                       />
                     </div>
                     <div>
-                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام کاربری دلخواه *</label>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        نام کاربری دلخواه *
+                      </label>
                       <input
                         type="text"
                         required
@@ -536,7 +598,9 @@ export default function UserLoginPage() {
                       />
                     </div>
                     <div>
-                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">ایمیل (اختیاری)</label>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        ایمیل (اختیاری)
+                      </label>
                       <input
                         type="email"
                         dir="ltr"
@@ -546,9 +610,11 @@ export default function UserLoginPage() {
                         className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-center outline-none focus:border-[var(--accent-blue)]"
                       />
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div>
-                        <label className="block mb-1 font-bold text-[var(--text-secondary)]">کلمه عبور *</label>
+                        <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                          کلمه عبور *
+                        </label>
                         <input
                           type="password"
                           required
@@ -558,12 +624,16 @@ export default function UserLoginPage() {
                         />
                       </div>
                       <div>
-                        <label className="block mb-1 font-bold text-[var(--text-secondary)]">تکرار رمز *</label>
+                        <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                          تکرار رمز *
+                        </label>
                         <input
                           type="password"
                           required
                           value={regConfirmPassword}
-                          onChange={(e) => setRegConfirmPassword(e.target.value)}
+                          onChange={(e) =>
+                            setRegConfirmPassword(e.target.value)
+                          }
                           className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none focus:border-[var(--accent-blue)]"
                         />
                       </div>
@@ -580,12 +650,18 @@ export default function UserLoginPage() {
 
                 {authMode === "otp" && (
                   <div className="space-y-5">
-                    <div className="w-full flex justify-center items-center h-24" dir="ltr">
+                    <div
+                      className="w-full flex justify-center items-center h-24"
+                      dir="ltr"
+                    >
                       <div className="flex items-center justify-center flex-wrap gap-1.5 sm:gap-2">
                         {digits.map((digit, idx) => (
                           <div
                             key={idx}
-                            style={{ width: slotWidthPx + "px", height: slotHeightPx + "px" }}
+                            style={{
+                              width: slotWidthPx + "px",
+                              height: slotHeightPx + "px",
+                            }}
                             className="relative shrink-0 flex items-center justify-center"
                           >
                             <input
@@ -597,11 +673,14 @@ export default function UserLoginPage() {
                               maxLength={1}
                               value={digit}
                               onFocus={() => setFocusedIndex(idx)}
-                              onChange={(e) => handleDigitChange(idx, e.target.value)}
+                              onChange={(e) =>
+                                handleDigitChange(idx, e.target.value)
+                              }
                               onKeyDown={(e) => handleDigitKeyDown(idx, e)}
                               className={
                                 "w-full h-full rounded-2xl bg-[var(--input-bg)] border text-center font-mono font-black text-xl sm:text-2xl outline-none transition-all " +
-                                (focusedIndex === idx || activeSparkIndex === idx
+                                (focusedIndex === idx ||
+                                activeSparkIndex === idx
                                   ? "border-[var(--accent-blue)] shadow-[0_0_15px_rgba(2,132,199,0.3)] scale-105"
                                   : "border-[var(--card-border)]")
                               }
@@ -637,7 +716,10 @@ export default function UserLoginPage() {
               </div>
 
               <div className="pt-4 border-t border-[var(--card-border)] text-center text-xs">
-                <Link href="/" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition">
+                <Link
+                  href="/"
+                  className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition"
+                >
                   ← بازگشت به صفحه اصلی فروشگاه
                 </Link>
               </div>

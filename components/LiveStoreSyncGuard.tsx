@@ -1,7 +1,7 @@
 // File Path: components/LiveStoreSyncGuard.tsx
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useSiteInfo } from "@/context/SiteInfoContext";
@@ -11,6 +11,8 @@ export default function LiveStoreSyncGuard() {
   const pathname = usePathname() || "/";
   const router = useRouter();
   const { siteInfo } = useSiteInfo();
+  const [verifiedAdminChecked, setVerifiedAdminChecked] = useState(false);
+  const [isVerifiedAdmin, setIsVerifiedAdmin] = useState(false);
 
   const applyLiveStyles = useCallback((styleRow: any) => {
     if (!styleRow || typeof styleRow !== "object" || typeof document === "undefined")
@@ -43,6 +45,27 @@ export default function LiveStoreSyncGuard() {
       styleTag.textContent = String(styleRow.custom_css || "");
     }
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/auth?t=" + Date.now(), { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (active) {
+          setIsVerifiedAdmin(Boolean(json?.authenticated && json?.user));
+          setVerifiedAdminChecked(true);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setIsVerifiedAdmin(false);
+          setVerifiedAdminChecked(true);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [pathname]);
 
   useEffect(() => {
     if (
@@ -92,24 +115,23 @@ export default function LiveStoreSyncGuard() {
       if (fav) applyFaviconToDOM(String(fav));
     }
 
+    if (!verifiedAdminChecked) return;
+
     const isAdminRoute =
       pathname.startsWith("/admin") ||
       pathname.startsWith("/api") ||
       pathname.startsWith("/login");
     const isMaintenancePage = pathname.startsWith("/maintenance");
 
-    const hasAdminCookie =
-      typeof document !== "undefined" &&
-      document.cookie.includes("admin_logged_in=true");
     const allowAdminBypass =
-      sys.maintenanceAdminBypass !== false && hasAdminCookie;
+      sys.maintenanceAdminBypass !== false && isVerifiedAdmin;
 
     if (isMaintenance && !isAdminRoute && !isMaintenancePage && !allowAdminBypass) {
       router.replace("/maintenance");
     } else if (!isMaintenance && isMaintenancePage) {
       router.replace("/");
     }
-  }, [siteInfo, pathname, router]);
+  }, [siteInfo, pathname, router, verifiedAdminChecked, isVerifiedAdmin]);
 
   useEffect(() => {
     const chStyles = supabase

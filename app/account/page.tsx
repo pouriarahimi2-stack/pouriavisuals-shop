@@ -1,3 +1,4 @@
+// File Path: app/account/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense, useCallback } from "react";
@@ -57,7 +58,9 @@ function parseCleanAddressAndTax(rawAddress: string): {
 } {
   const str = String(rawAddress || "");
   const match = str.match(/\[مالیات\s*(\d+)%:\s*(\d+)\s*تومان\]/);
-  const cleanAddress = str.replace(/\s*\[مالیات\s*\d+%:\s*\d+\s*تومان\]/g, "").trim();
+  const cleanAddress = str
+    .replace(/\s*\[مالیات\s*\d+%:\s*\d+\s*تومان\]/g, "")
+    .trim();
 
   if (match) {
     return {
@@ -86,9 +89,8 @@ function computeOrderFinancialBreakdown(ord: CustomerOrder) {
   const afterDiscount = Math.max(0, subtotal - discount);
   const finalTotal = Number(ord.final_amount || ord.total_amount || subtotal);
 
-  const { cleanAddress, extractedVatPercent, extractedVatAmount } = parseCleanAddressAndTax(
-    ord.address || ""
-  );
+  const { cleanAddress, extractedVatPercent, extractedVatAmount } =
+    parseCleanAddressAndTax(ord.address || "");
 
   let vatAmount =
     ord.vat_amount !== undefined
@@ -104,7 +106,8 @@ function computeOrderFinancialBreakdown(ord: CustomerOrder) {
       ? extractedVatPercent
       : 10;
 
-  let shippingCost = ord.shipping_cost !== undefined ? Number(ord.shipping_cost) : 0;
+  let shippingCost =
+    ord.shipping_cost !== undefined ? Number(ord.shipping_cost) : 0;
 
   const diff = Math.max(0, finalTotal - afterDiscount);
   if (vatAmount === 0 && shippingCost === 0 && diff > 0) {
@@ -152,7 +155,9 @@ function AccountDashboardContent() {
 
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedOrder, setSelectedOrder] = useState<CustomerOrder | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<CustomerOrder | null>(
+    null
+  );
   const [copiedCode, setCopiedCode] = useState(false);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
@@ -165,7 +170,7 @@ function AccountDashboardContent() {
   const [savingProfile, setSavingProfile] = useState(false);
 
   const syncUserDisplayName = useCallback(
-    (orderList: CustomerOrder[], currentUserObj: { phone?: string; name?: string; full_name?: string; username?: string; province?: string; city?: string; address?: string; postalCode?: string }) => {
+    (orderList: CustomerOrder[], currentUserObj: any) => {
       if (!currentUserObj) return;
       const latestNamedOrder = orderList.find(
         (o) =>
@@ -176,10 +181,15 @@ function AccountDashboardContent() {
       );
 
       if (latestNamedOrder) {
-        const { cleanAddress } = parseCleanAddressAndTax(latestNamedOrder.address || "");
+        const { cleanAddress } = parseCleanAddressAndTax(
+          latestNamedOrder.address || ""
+        );
         setProfName((prev) => prev || latestNamedOrder.customer_name);
         setProfAddress((prev) => prev || cleanAddress);
-        if (latestNamedOrder.province && IRAN_PROVINCES_CITIES[latestNamedOrder.province]) {
+        if (
+          latestNamedOrder.province &&
+          IRAN_PROVINCES_CITIES[latestNamedOrder.province]
+        ) {
           setProfProvince(latestNamedOrder.province);
         }
         if (latestNamedOrder.city) {
@@ -198,7 +208,9 @@ function AccountDashboardContent() {
           setUser(enriched);
           try {
             localStorage.setItem("axon_user_session", JSON.stringify(enriched));
-            window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: enriched }));
+            window.dispatchEvent(
+              new CustomEvent("user_auth_changed", { detail: enriched })
+            );
           } catch {}
         }
       }
@@ -220,7 +232,9 @@ function AccountDashboardContent() {
           { cache: "no-store" }
         );
         const json = await res.json();
-        const list: CustomerOrder[] = Array.isArray(json.orders) ? json.orders : [];
+        const list: CustomerOrder[] = Array.isArray(json.orders)
+          ? json.orders
+          : [];
 
         setOrders(list);
         syncUserDisplayName(list, currentUserObj || user);
@@ -240,7 +254,9 @@ function AccountDashboardContent() {
         if (list.length > 0) {
           setSelectedOrder((prev) => {
             if (!prev) return list[0];
-            const updatedPrev = list.find((o) => String(o.id) === String(prev.id));
+            const updatedPrev = list.find(
+              (o) => String(o.id) === String(prev.id)
+            );
             return updatedPrev || list[0];
           });
         } else {
@@ -261,10 +277,18 @@ function AccountDashboardContent() {
     let parsedUser: any = null;
 
     try {
-      const draftRaw = localStorage.getItem("axon_checkout_form_draft_v2026");
+      const draftRaw =
+        localStorage.getItem("axon_checkout_form_draft_v2027") ||
+        localStorage.getItem("axon_checkout_form_draft_v2026");
       if (draftRaw) {
         const draft = JSON.parse(draftRaw);
-        if (draft.fullName) setProfName(draft.fullName);
+        if (draft.firstName || draft.lastName) {
+          setProfName(
+            `${draft.firstName || ""} ${draft.lastName || ""}`.trim()
+          );
+        } else if (draft.fullName) {
+          setProfName(draft.fullName);
+        }
         if (draft.province && IRAN_PROVINCES_CITIES[draft.province]) {
           setProfProvince(draft.province);
         }
@@ -311,15 +335,19 @@ function AccountDashboardContent() {
 
     const channel = supabase
       .channel("realtime-customer-account-orders")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
-        if (activePhone) fetchCustomerOrders(activePhone, parsedUser);
-      })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => {
+          if (activePhone) fetchCustomerOrders(activePhone, parsedUser);
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [highlightOrderId]);
+  }, [highlightOrderId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = async () => {
     soundEngine.playClick();
@@ -328,19 +356,28 @@ function AccountDashboardContent() {
     } catch {}
     if (typeof window !== "undefined") {
       localStorage.removeItem("axon_user_session");
-      window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: null }));
+      window.dispatchEvent(
+        new CustomEvent("user_auth_changed", { detail: null })
+      );
     }
     router.push("/login");
   };
 
-  const handleCancelPendingOrder = async (ord: CustomerOrder, e?: React.MouseEvent) => {
+  const handleCancelPendingOrder = async (
+    ord: CustomerOrder,
+    e?: React.MouseEvent
+  ) => {
     if (e) e.stopPropagation();
-    if (!confirm("آیا از لغو و حذف این سفارش پرداخت‌نشده اطمینان دارید؟")) return;
+    if (!confirm("آیا از لغو و حذف این سفارش پرداخت‌نشده اطمینان دارید؟"))
+      return;
     soundEngine.playClick();
     setDeletingOrderId(ord.id);
 
     try {
-      const cleanPhone = String(user?.phone || ord.phone || "").replace(/\D/g, "");
+      const cleanPhone = String(user?.phone || ord.phone || "").replace(
+        /\D/g,
+        ""
+      );
       const res = await fetch(
         "/api/orders/track?id=" +
           encodeURIComponent(ord.id) +
@@ -372,6 +409,10 @@ function AccountDashboardContent() {
 
     try {
       const cleanPhone = String(user?.phone || "").replace(/\D/g, "");
+      const nameParts = profName.trim().split(" ");
+      const firstNamePart = nameParts[0] || "";
+      const lastNamePart = nameParts.slice(1).join(" ") || "";
+
       const updatedUser = {
         ...(user || {}),
         phone: cleanPhone,
@@ -383,21 +424,25 @@ function AccountDashboardContent() {
         postalCode: profPostalCode.trim(),
       };
 
+      const draftPayload = JSON.stringify({
+        firstName: firstNamePart,
+        lastName: lastNamePart,
+        fullName: profName.trim(),
+        phone: cleanPhone,
+        province: profProvince,
+        city: profCity,
+        address: profAddress.trim(),
+        postalCode: profPostalCode.trim(),
+        notes: "",
+      });
+
       localStorage.setItem("axon_user_session", JSON.stringify(updatedUser));
-      localStorage.setItem(
-        "axon_checkout_form_draft_v2026",
-        JSON.stringify({
-          fullName: profName.trim(),
-          phone: cleanPhone,
-          province: profProvince,
-          city: profCity,
-          address: profAddress.trim(),
-          postalCode: profPostalCode.trim(),
-          notes: "",
-        })
-      );
+      localStorage.setItem("axon_checkout_form_draft_v2027", draftPayload);
+      localStorage.setItem("axon_checkout_form_draft_v2026", draftPayload);
       setUser(updatedUser);
-      window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: updatedUser }));
+      window.dispatchEvent(
+        new CustomEvent("user_auth_changed", { detail: updatedUser })
+      );
 
       await fetch("/api/orders/track", {
         method: "PATCH",
@@ -449,10 +494,20 @@ function AccountDashboardContent() {
       };
     }
     if (st === "picking" || st === "packing") {
-      return { text: "در حال پردازش انبار 🏭", cls: "bg-blue-500/15 text-blue-500 border-blue-500/30", step: 2, isUnpaid: false };
+      return {
+        text: "در حال پردازش انبار 🏭",
+        cls: "bg-blue-500/15 text-blue-500 border-blue-500/30",
+        step: 2,
+        isUnpaid: false,
+      };
     }
     if (st === "ready") {
-      return { text: "آماده ارسال 📦", cls: "bg-orange-500/15 text-orange-500 border-orange-500/30", step: 2, isUnpaid: false };
+      return {
+        text: "آماده ارسال 📦",
+        cls: "bg-orange-500/15 text-orange-500 border-orange-500/30",
+        step: 2,
+        isUnpaid: false,
+      };
     }
     if (st === "paid" || paySt === "paid" || st === "processing") {
       return {
@@ -480,7 +535,8 @@ function AccountDashboardContent() {
           <span className="text-4xl block">🔐</span>
           <h1 className="text-lg font-black">ورود به حساب کاربری</h1>
           <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-            برای مشاهده سوابق خرید، فاکتورها و کد پیگیری پستی، لطفاً وارد حساب کاربری خود شوید.
+            برای مشاهده سوابق خرید، فاکتورها و کد پیگیری پستی، لطفاً وارد حساب
+            کاربری خود شوید.
           </p>
           <Link
             href="/login"
@@ -506,19 +562,21 @@ function AccountDashboardContent() {
       className="max-w-6xl mx-auto px-4 py-8 sm:py-12 font-sans select-text text-[var(--text-primary)] space-y-6"
       dir="rtl"
     >
-      {/* هدر حساب کاربری */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-sm md:text-xl font-black shadow-lg shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xl font-black shadow-lg shrink-0">
             👤
           </div>
           <div>
-            <h1 className="text-base sm:text-sm md:text-xl font-black">
+            <h1 className="text-base sm:text-xl font-black">
               حساب کاربری و پیگیری سفارشات — {displayName}
             </h1>
             <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
               شماره همراه تاییدشده:{" "}
-              <strong className="font-mono text-[var(--accent-blue)]" dir="ltr">
+              <strong
+                className="font-mono text-[var(--accent-blue)]"
+                dir="ltr"
+              >
                 {user?.phone || "---"}
               </strong>
             </p>
@@ -588,14 +646,15 @@ function AccountDashboardContent() {
         >
           <div className="border-b border-[var(--card-border)] pb-3">
             <h2 className="font-black text-sm text-[var(--accent-blue)]">
-              ✏️ ویرایش مشخصات گیرنده و نشانی پیش‌‌فرض ارسال
+              ✏️ ویرایش مشخصات گیرنده و نشانی پیش‌فرض ارسال
             </h2>
             <p className="text-[11px] text-[var(--text-secondary)] mt-1">
-              این اطلاعات برای ثبت سریع‌تر سفارش‌های بعدی و نمایش نام شما در بالای سایت استفاده می‌شود.
+              این اطلاعات برای ثبت سریع‌تر سفارش‌های بعدی و نمایش نام شما در
+              بالای سایت استفاده می‌شود.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
                 نام و نام خانوادگی *
@@ -624,7 +683,9 @@ function AccountDashboardContent() {
             </div>
 
             <div>
-              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">استان</label>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                استان
+              </label>
               <select
                 value={profProvince}
                 onChange={(e) => {
@@ -644,7 +705,9 @@ function AccountDashboardContent() {
             </div>
 
             <div>
-              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">شهر</label>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                شهر
+              </label>
               <select
                 value={profCity}
                 onChange={(e) => setProfCity(e.target.value)}
@@ -692,18 +755,23 @@ function AccountDashboardContent() {
             disabled={savingProfile}
             className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-xl cursor-pointer transition hover:opacity-90 disabled:opacity-50"
           >
-            {savingProfile ? "در حال ذخیره مشخصات..." : "💾 ذخیره مشخصات و نشانی پیش‌فرض"}
+            {savingProfile
+              ? "در حال ذخیره مشخصات..."
+              : "💾 ذخیره مشخصات و نشانی پیش‌فرض"}
           </button>
         </form>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6 text-xs">
-          {/* ستون راست: لیست سفارشات ثبت‌شده با دکمه‌های مستقیم پرداخت/حذف روی هر کارت ناتمام */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
           <div className="lg:col-span-5 p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3 h-fit">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
-              <h2 className="font-black text-sm">📦 سفارش‌های ثبت‌شده شما ({orders.length})</h2>
+              <h2 className="font-black text-sm">
+                📦 سفارش‌های ثبت‌شده شما ({orders.length})
+              </h2>
               <button
                 type="button"
-                onClick={() => user?.phone && fetchCustomerOrders(user.phone, user)}
+                onClick={() =>
+                  user?.phone && fetchCustomerOrders(user.phone, user)
+                }
                 className="px-2.5 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold cursor-pointer"
               >
                 🔄 بروزرسانی
@@ -716,7 +784,9 @@ function AccountDashboardContent() {
               </div>
             ) : orders.length === 0 ? (
               <div className="py-12 text-center text-slate-400 space-y-3">
-                <p className="font-bold">هنوز سفارشی با این شماره ثبت نشده است.</p>
+                <p className="font-bold">
+                  هنوز سفارشی با این شماره ثبت نشده است.
+                </p>
                 <Link
                   href="/products"
                   className="inline-block px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black"
@@ -730,7 +800,9 @@ function AccountDashboardContent() {
                   const badge = getOrderStateMeta(ord);
                   const isSelected = selectedOrder?.id === ord.id;
                   const shortOrderCode = formatReadableOrderCode(ord);
-                  const ordFinalAmt = Number(ord.final_amount || ord.total_amount || 0);
+                  const ordFinalAmt = Number(
+                    ord.final_amount || ord.total_amount || 0
+                  );
 
                   return (
                     <div
@@ -755,7 +827,8 @@ function AccountDashboardContent() {
                         </span>
                         <span
                           className={
-                            "px-2.5 py-1 rounded-xl border text-[10px] font-black " + badge.cls
+                            "px-2.5 py-1 rounded-xl border text-[10px] font-black " +
+                            badge.cls
                           }
                         >
                           {badge.text}
@@ -764,7 +837,8 @@ function AccountDashboardContent() {
 
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="text-[var(--text-secondary)]">
-                          📅 {new Date(ord.created_at).toLocaleDateString("fa-IR")}
+                          📅{" "}
+                          {new Date(ord.created_at).toLocaleDateString("fa-IR")}
                         </span>
                         <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
                           {ordFinalAmt.toLocaleString("fa-IR")} تومان
@@ -772,13 +846,17 @@ function AccountDashboardContent() {
                       </div>
 
                       <div className="pt-1.5 border-t border-[var(--card-border)] flex items-center justify-between text-[10px]">
-                        <span className="text-[var(--text-secondary)]">کد رهگیری:</span>
-                        <span className="font-mono font-black text-[var(--accent-blue)]" dir="ltr">
+                        <span className="text-[var(--text-secondary)]">
+                          کد رهگیری:
+                        </span>
+                        <span
+                          className="font-mono font-black text-[var(--accent-blue)]"
+                          dir="ltr"
+                        >
                           {ord.tracking_code || shortOrderCode}
                         </span>
                       </div>
 
-                      {/* دکمه‌های مستقیم پرداخت و حذف روی خود کارت سفارش ناتمام */}
                       {badge.isUnpaid && (
                         <div
                           className="pt-2 border-t border-[var(--card-border)] flex items-center gap-2"
@@ -803,7 +881,9 @@ function AccountDashboardContent() {
                             onClick={(e) => handleCancelPendingOrder(ord, e)}
                             className="py-2 px-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white font-black text-[11px] transition cursor-pointer disabled:opacity-50"
                           >
-                            {deletingOrderId === ord.id ? "..." : "🗑️ لغو و حذف"}
+                            {deletingOrderId === ord.id
+                              ? "..."
+                              : "🗑️ لغو و حذف"}
                           </button>
                         </div>
                       )}
@@ -814,7 +894,6 @@ function AccountDashboardContent() {
             )}
           </div>
 
-          {/* ستون چپ: جزئیات کامل فاکتور، ریز مالیات ۱۰٪ و ارسال، و دکمه‌های عملیاتی */}
           <div className="lg:col-span-7 p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 h-fit">
             {selectedOrder && selectedBreakdown && selectedMeta ? (
               <>
@@ -831,7 +910,9 @@ function AccountDashboardContent() {
                     </h3>
                     <span className="text-[11px] text-[var(--text-secondary)] block mt-1">
                       زمان ثبت سفارش:{" "}
-                      {new Date(selectedOrder.created_at).toLocaleString("fa-IR")}
+                      {new Date(selectedOrder.created_at).toLocaleString(
+                        "fa-IR"
+                      )}
                     </span>
                   </div>
 
@@ -856,9 +937,8 @@ function AccountDashboardContent() {
                   </button>
                 </div>
 
-                {/* نوار گرافیکی مراحل پردازش و ارسال سفارش */}
                 {selectedMeta.step > 0 && (
-                  <div className="grid grid-cols-4 gap-2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center text-[10px] font-bold">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center text-[10px] font-bold">
                     {[
                       { id: 1, label: "۱. ثبت فاکتور" },
                       { id: 2, label: "۲. تایید و بسته‌بندی" },
@@ -883,64 +963,77 @@ function AccountDashboardContent() {
                   </div>
                 )}
 
-                {/* اطلاعات گیرنده و نشانی پستی تمیز (بدون تگ اضافه مالیات) */}
                 <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2 leading-relaxed">
                   <div className="flex flex-wrap justify-between gap-2">
                     <div>
-                      <strong className="text-[var(--text-secondary)]">تحویل‌گیرنده:</strong>{" "}
-                      <span className="font-black">{selectedOrder.customer_name}</span>
+                      <strong className="text-[var(--text-secondary)]">
+                        تحویل‌گیرنده:
+                      </strong>{" "}
+                      <span className="font-black">
+                        {selectedOrder.customer_name}
+                      </span>
                     </div>
                     <div>
-                      <strong className="text-[var(--text-secondary)]">شماره تماس:</strong>{" "}
+                      <strong className="text-[var(--text-secondary)]">
+                        شماره تماس:
+                      </strong>{" "}
                       <span className="font-mono font-bold" dir="ltr">
                         {selectedOrder.phone}
                       </span>
                     </div>
                   </div>
                   <div>
-                    <strong className="text-[var(--text-secondary)]">نشانی ارسال مرسوله:</strong>{" "}
-                    <span className="font-bold">{selectedBreakdown.cleanAddress}</span>
+                    <strong className="text-[var(--text-secondary)]">
+                      نشانی ارسال مرسوله:
+                    </strong>{" "}
+                    <span className="font-bold">
+                      {selectedBreakdown.cleanAddress}
+                    </span>
                   </div>
                 </div>
 
-                {/* لیست اقلام سفارش */}
                 <div className="space-y-2">
                   <h4 className="font-black text-xs text-[var(--accent-blue)]">
                     اقلام خریداری‌شده در این سفارش:
                   </h4>
                   <div className="space-y-2">
-                    {(Array.isArray(selectedOrder.items) ? selectedOrder.items : []).map(
-                      (item: { title?: string; name?: string; discount_price?: number; discountPrice?: number; price?: number; quantity?: number }, idx: number) => (
-                        <div
-                          key={idx}
-                          className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3"
-                        >
-                          <div>
-                            <div className="font-black">
-                              {item.title || item.name || "کالای دیجیتال"}
-                            </div>
-                            <span className="text-[10px] font-mono text-[var(--text-secondary)]">
-                              تعداد: {item.quantity || 1} عدد
-                            </span>
+                    {(Array.isArray(selectedOrder.items)
+                      ? selectedOrder.items
+                      : []
+                    ).map((item: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3"
+                      >
+                        <div>
+                          <div className="font-black">
+                            {item.title || item.name || "کالای دیجیتال"}
                           </div>
-                          <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
-                            {(
-                              Number(
-                                item.discount_price || item.discountPrice || item.price || 0
-                              ) * Number(item.quantity || 1)
-                            ).toLocaleString("fa-IR")}{" "}
-                            تومان
+                          <span className="text-[10px] font-mono text-[var(--text-secondary)]">
+                            تعداد: {item.quantity || 1} عدد
                           </span>
                         </div>
-                      )
-                    )}
+                        <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                          {(
+                            Number(
+                              item.discount_price ||
+                                item.discountPrice ||
+                                item.price ||
+                                0
+                            ) * Number(item.quantity || 1)
+                          ).toLocaleString("fa-IR")}{" "}
+                          تومان
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                {/* جدول تفکیک کامل صورتحساب (مجموع اقلام + ارسال رایگان + مالیات ۱۰٪ + جمع کل) */}
                 <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
                   <div className="flex justify-between items-center">
-                    <span className="text-[var(--text-secondary)] font-bold">مجموع اقلام:</span>
+                    <span className="text-[var(--text-secondary)] font-bold">
+                      مجموع اقلام:
+                    </span>
                     <span className="font-mono font-bold">
                       {selectedBreakdown.subtotal.toLocaleString("fa-IR")} تومان
                     </span>
@@ -950,7 +1043,8 @@ function AccountDashboardContent() {
                     <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
                       <span className="font-bold">کسر کد تخفیف:</span>
                       <span className="font-mono font-bold">
-                        -{selectedBreakdown.discount.toLocaleString("fa-IR")} تومان
+                        -{selectedBreakdown.discount.toLocaleString("fa-IR")}{" "}
+                        تومان
                       </span>
                     </div>
                   )}
@@ -962,7 +1056,8 @@ function AccountDashboardContent() {
                     <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
                       {selectedBreakdown.shippingCost === 0
                         ? "رایگان ✓"
-                        : selectedBreakdown.shippingCost.toLocaleString("fa-IR") + " تومان"}
+                        : selectedBreakdown.shippingCost.toLocaleString("fa-IR") +
+                          " تومان"}
                     </span>
                   </div>
 
@@ -972,7 +1067,8 @@ function AccountDashboardContent() {
                         مالیات بر ارزش افزوده ({selectedBreakdown.vatPercent}٪):
                       </span>
                       <span className="font-mono font-bold">
-                        +{selectedBreakdown.vatAmount.toLocaleString("fa-IR")} تومان
+                        +{selectedBreakdown.vatAmount.toLocaleString("fa-IR")}{" "}
+                        تومان
                       </span>
                     </div>
                   )}
@@ -980,12 +1076,12 @@ function AccountDashboardContent() {
                   <div className="pt-2.5 border-t border-[var(--card-border)] flex items-center justify-between text-sm font-black">
                     <span>مبلغ کل فاکتور:</span>
                     <span className="font-mono text-base text-emerald-600 dark:text-emerald-400">
-                      {selectedBreakdown.finalTotal.toLocaleString("fa-IR")} تومان
+                      {selectedBreakdown.finalTotal.toLocaleString("fa-IR")}{" "}
+                      تومان
                     </span>
                   </div>
                 </div>
 
-                {/* دکمه‌های پرداخت آنلاین یا لغو برای سفارش‌های در انتظار پرداخت */}
                 {selectedMeta.isUnpaid && (
                   <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
                     <Link
@@ -993,7 +1089,9 @@ function AccountDashboardContent() {
                         "/checkout/payment?orderId=" +
                         encodeURIComponent(selectedOrder.id) +
                         "&amount=" +
-                        encodeURIComponent(String(selectedBreakdown.finalTotal)) +
+                        encodeURIComponent(
+                          String(selectedBreakdown.finalTotal)
+                        ) +
                         "&phone=" +
                         encodeURIComponent(selectedOrder.phone || "")
                       }
@@ -1004,7 +1102,9 @@ function AccountDashboardContent() {
                     <button
                       type="button"
                       disabled={deletingOrderId === selectedOrder.id}
-                      onClick={(e) => handleCancelPendingOrder(selectedOrder, e)}
+                      onClick={(e) =>
+                        handleCancelPendingOrder(selectedOrder, e)
+                      }
                       className="px-5 py-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white font-black transition cursor-pointer disabled:opacity-50"
                     >
                       {deletingOrderId === selectedOrder.id
@@ -1016,7 +1116,8 @@ function AccountDashboardContent() {
               </>
             ) : (
               <div className="py-16 text-center text-slate-400 font-bold">
-                یک سفارش را از لیست سمت راست جهت مشاهده جزئیات و کد پیگیری انتخاب کنید.
+                یک سفارش را از لیست سمت راست جهت مشاهده جزئیات و کد پیگیری
+                انتخاب کنید.
               </div>
             )}
           </div>

@@ -1,5 +1,6 @@
-"use client";
 // File Path: components/ProductCard.tsx
+"use client";
+
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/formatters";
@@ -24,6 +25,76 @@ interface ProductCardProps {
   };
 }
 
+// کش اشتراکی در سطح ماژول برای جلوگیری از ارسال ۲۴ درخواست تکراری و ۲۴ کانال WebSocket هم‌زمان
+let sharedCouponsCache: any[] | null = null;
+let sharedCouponsPromise: Promise<any[]> | null = null;
+let sharedChannelRefCount = 0;
+let sharedChannelInstance: any = null;
+const couponSubscribers = new Set<() => void>();
+
+async function getSharedPublicCoupons(forceRefresh = false): Promise<any[]> {
+  if (!forceRefresh && sharedCouponsCache !== null) {
+    return sharedCouponsCache;
+  }
+  if (!forceRefresh && sharedCouponsPromise) {
+    return sharedCouponsPromise;
+  }
+
+  sharedCouponsPromise = fetch(`/api/public/coupons?t=${Date.now()}`, {
+    cache: "no-store",
+  })
+    .then((r) => (r.ok ? r.json() : { coupons: [] }))
+    .then((json): any[] => {
+      const list: any[] = Array.isArray(json.coupons) ? json.coupons : [];
+      sharedCouponsCache = list;
+      return list;
+    })
+    .catch((): any[] => {
+      sharedCouponsCache = [];
+      return [];
+    })
+    .finally(() => {
+      sharedCouponsPromise = null;
+    });
+
+  return sharedCouponsPromise;
+}
+
+function subscribeSharedCoupons(listener: () => void) {
+  couponSubscribers.add(listener);
+  sharedChannelRefCount++;
+
+  if (sharedChannelRefCount === 1) {
+    const refreshAll = () => {
+      getSharedPublicCoupons(true).then(() => {
+        couponSubscribers.forEach((fn) => fn());
+      });
+    };
+
+    sharedChannelInstance = supabase
+      .channel("shared-product-cards-coupons")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "coupons" },
+        refreshAll
+      )
+      .subscribe();
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("coupons_updated", refreshAll);
+    }
+  }
+
+  return () => {
+    couponSubscribers.delete(listener);
+    sharedChannelRefCount = Math.max(0, sharedChannelRefCount - 1);
+    if (sharedChannelRefCount === 0 && sharedChannelInstance) {
+      supabase.removeChannel(sharedChannelInstance);
+      sharedChannelInstance = null;
+    }
+  };
+}
+
 function getImg(p: ProductCardProps["product"]): string {
   if (Array.isArray(p.images) && p.images.length > 0) {
     const f = p.images[0];
@@ -39,21 +110,22 @@ export default function ProductCard({ product }: ProductCardProps) {
   const basePrice = Number(product.price || 0);
   const discountVal = product.discount_price || product.discountPrice;
   const finalPrice =
-    discountVal && Number(discountVal) > 0 ? Number(discountVal) : basePrice;
+    discountVal && Number(discountVal) > 0 && Number(discountVal) < basePrice
+      ? Number(discountVal)
+      : basePrice;
   const discPct =
-    discountVal && basePrice > 0
+    discountVal && basePrice > 0 && Number(discountVal) < basePrice
       ? Math.round((1 - Number(discountVal) / basePrice) * 100)
       : 0;
   const [imgSrc, setImgSrc] = useState(getImg(product));
-  
-  // منطق اصلی و دست‌نخورده برای نمایش موجودی بر اساس کدهای اولیه پروژه
-  const isLowStock =
-    product.stock !== undefined &&
-    product.stock > 0 &&
-    product.stock <= 3;
-  const isOutOfStock = product.stock === 0;
 
-  // استیت‌های مربوط به نمایش هوشمند برچسب تخفیف
+  const numericStock =
+    product.stock !== undefined && product.stock !== null
+      ? Number(product.stock)
+      : 10;
+  const isLowStock = numericStock > 0 && numericStock <= 3;
+  const isOutOfStock = numericStock <= 0;
+
   const [targetedCoupon, setTargetedCoupon] = useState<{
     code: string;
     label: string;
@@ -61,60 +133,74 @@ export default function ProductCard({ product }: ProductCardProps) {
   } | null>(null);
   const [copiedCoupon, setCopiedCoupon] = useState(false);
 
-  const fetchApplicableCoupons = useCallback(async () => {
-    try {
-      // استفاده از timestamp برای جلوگیری کامل از کش شدن در سطح مرورگر و سرور
-      const res = await fetch(`/api/public/coupons?t=${Date.now()}`, { cache: "no-store" });
-      if (!res.ok) return;
-      const json = await res.json();
-      const allActive = json.coupons || [];
-
-      // پنهان‌سازی کوپن‌ها برای کاربری که از آن‌ها در پرداخت موفق استفاده کرده است (UX Hide)
+  const computeApplicableCoupon = useCallback(
+    (allActive: any[]) => {
       let usedLocal: string[] = [];
-      try { usedLocal = JSON.parse(localStorage.getItem("axon_used_coupons") || "[]"); } catch {}
-      
-      const list = allActive.filter((c: any) => !usedLocal.includes(c.code));
+      try {
+        usedLocal = JSON.parse(
+          localStorage.getItem("axon_used_coupons") || "[]"
+        );
+      } catch {}
 
+      const list = allActive.filter((c: any) => !usedLocal.includes(c.code));
       const prodId = String(product.id);
       const prodCategory = String(product.category || "").trim();
 
-      // اولویت اول: کوپن اختصاصی همین محصول
       const specific = list.find(
-        (c: any) => c.target_type === "product" && String(c.target_id) === prodId
+        (c: any) =>
+          c.target_type === "product" && String(c.target_id) === prodId
       );
-
       if (specific) {
         const isPct = (specific.discount_type || specific.type) === "percent";
-        const val = Number(specific.discount_percent ?? specific.value ?? specific.discount_value ?? 0);
+        const val = Number(
+          specific.discount_percent ??
+            specific.value ??
+            specific.discount_value ??
+            0
+        );
         setTargetedCoupon({
           code: specific.code,
-          label: isPct ? `${val}٪ اختصاصی` : `${val.toLocaleString("fa-IR")} ت اختصاصی`,
+          label: isPct
+            ? `${val}٪ اختصاصی`
+            : `${val.toLocaleString("fa-IR")} ت اختصاصی`,
           isProductSpecific: true,
         });
         return;
       }
 
-      // اولویت دوم: کوپن مخصوص دسته‌بندی این محصول
       const catCoupon = list.find(
-        (c: any) => c.target_type === "category" && String(c.target_id).trim() === prodCategory
+        (c: any) =>
+          c.target_type === "category" &&
+          String(c.target_id).trim() === prodCategory
       );
-
       if (catCoupon) {
         const isPct = (catCoupon.discount_type || catCoupon.type) === "percent";
-        const val = Number(catCoupon.discount_percent ?? catCoupon.value ?? catCoupon.discount_value ?? 0);
+        const val = Number(
+          catCoupon.discount_percent ??
+            catCoupon.value ??
+            catCoupon.discount_value ??
+            0
+        );
         setTargetedCoupon({
           code: catCoupon.code,
-          label: isPct ? `${val}٪ دسته‌بندی` : `${val.toLocaleString("fa-IR")} ت دسته‌بندی`,
+          label: isPct
+            ? `${val}٪ دسته‌بندی`
+            : `${val.toLocaleString("fa-IR")} ت دسته‌بندی`,
           isProductSpecific: false,
         });
         return;
       }
 
-      // اولویت سوم: کوپن سراسری همه محصولات
       const globalCoupon = list.find((c: any) => c.target_type === "all");
       if (globalCoupon) {
-        const isPct = (globalCoupon.discount_type || globalCoupon.type) === "percent";
-        const val = Number(globalCoupon.discount_percent ?? globalCoupon.value ?? globalCoupon.discount_value ?? 0);
+        const isPct =
+          (globalCoupon.discount_type || globalCoupon.type) === "percent";
+        const val = Number(
+          globalCoupon.discount_percent ??
+            globalCoupon.value ??
+            globalCoupon.discount_value ??
+            0
+        );
         setTargetedCoupon({
           code: globalCoupon.code,
           label: isPct ? `${val}٪ با کد` : `${val.toLocaleString("fa-IR")} ت با کد`,
@@ -124,32 +210,24 @@ export default function ProductCard({ product }: ProductCardProps) {
       }
 
       setTargetedCoupon(null);
-    } catch {
-      setTargetedCoupon(null);
-    }
-  }, [product.id, product.category]);
+    },
+    [product.id, product.category]
+  );
 
   useEffect(() => {
-    fetchApplicableCoupons();
-
-    const channel = supabase
-      .channel(`realtime-product-card-${product.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "coupons" },
-        () => {
-          fetchApplicableCoupons();
-        }
-      )
-      .subscribe();
-
-    window.addEventListener("coupons_updated", fetchApplicableCoupons);
-
-    return () => {
-      window.removeEventListener("coupons_updated", fetchApplicableCoupons);
-      supabase.removeChannel(channel);
+    let mounted = true;
+    const sync = () => {
+      getSharedPublicCoupons(false).then((list) => {
+        if (mounted) computeApplicableCoupon(list);
+      });
     };
-  }, [fetchApplicableCoupons, product.id]);
+    sync();
+    const unsub = subscribeSharedCoupons(sync);
+    return () => {
+      mounted = false;
+      unsub();
+    };
+  }, [computeApplicableCoupon]);
 
   const handleCopyCoupon = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -204,7 +282,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           )}
           {isLowStock && (
             <span className="badge-capsule badge-warning absolute top-2.5 left-2.5 text-[9px]">
-              تنها {product.stock}
+              تنها {numericStock}
             </span>
           )}
           {isOutOfStock && (
@@ -261,7 +339,9 @@ export default function ProductCard({ product }: ProductCardProps) {
               >
                 <span>🏷️</span>
                 <span>{copiedCoupon ? "کپی شد ✓" : targetedCoupon.code}</span>
-                <span className="font-sans font-bold">({targetedCoupon.label})</span>
+                <span className="font-sans font-bold">
+                  ({targetedCoupon.label})
+                </span>
               </button>
             )}
           </div>
@@ -280,7 +360,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         style={{ borderTop: "1px solid var(--glass-border)" }}
       >
         <div className="flex items-center justify-between mb-2.5">
-          {discountVal && Number(discountVal) > 0 ? (
+          {discPct > 0 ? (
             <div className="space-y-0.5">
               <span
                 className="line-through text-[9px] sm:text-[10px] block"
@@ -307,7 +387,10 @@ export default function ProductCard({ product }: ProductCardProps) {
             </span>
           )}
         </div>
-        <AddToCartButton product={{ ...product, image: imgSrc }} showCounter={false} />
+        <AddToCartButton
+          product={{ ...product, image: imgSrc }}
+          showCounter={false}
+        />
       </div>
     </div>
   );

@@ -20,7 +20,6 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
     if (sys.noIndex || sys.disallowRobots) {
       return {
         rules: { userAgent: "*", disallow: "/" },
-        sitemap: `${baseUrl}/sitemap.xml`,
       };
     }
   } catch {}
@@ -57,6 +56,7 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
           "/my-orders/",
           "/payment",
           "/payment/",
+          "/maintenance",
         ],
       },
       {
@@ -69,6 +69,7 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
           "/account/",
           "/my-orders/",
           "/payment/",
+          "/maintenance",
         ],
       },
     ],

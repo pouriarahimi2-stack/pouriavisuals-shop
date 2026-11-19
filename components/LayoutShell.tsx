@@ -18,13 +18,25 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
   const pathname = usePathname() || "/";
   const isAdminRoute = pathname.startsWith("/admin");
   const { siteInfo } = useSiteInfo();
-  const [hasAdminCookie, setHasAdminCookie] = useState(false);
+  const [isVerifiedAdmin, setIsVerifiedAdmin] = useState(false);
 
   useEffect(() => {
-    if (typeof document !== "undefined") {
-      setHasAdminCookie(document.cookie.includes("admin_logged_in=true"));
-    }
-  }, [pathname]);
+    if (isAdminRoute) return;
+    let active = true;
+    fetch("/api/admin/auth?t=" + Date.now(), { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (active) {
+          setIsVerifiedAdmin(Boolean(json?.authenticated && json?.user));
+        }
+      })
+      .catch(() => {
+        if (active) setIsVerifiedAdmin(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isAdminRoute, pathname]);
 
   const layoutCfg = siteInfo?.homepage_layout_config || {};
   const sys =
@@ -40,7 +52,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
       siteInfo.maintenance_mode !== "false");
 
   const allowAdminBypass =
-    sys.maintenanceAdminBypass !== false && hasAdminCookie;
+    sys.maintenanceAdminBypass !== false && isVerifiedAdmin;
 
   const isMaintenanceActive =
     !isAdminRoute &&

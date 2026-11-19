@@ -11,7 +11,6 @@ import { supabaseAdmin } from "@/lib/supabaseServer";
 import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
 import { normalizeSystemSettings } from "@/lib/systemSettings";
 import RealtimeGlobalListener from "@/components/RealtimeGlobalListener";
-import MobileBottomNav from "@/components/MobileBottomNav";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -214,7 +213,6 @@ export default async function RootLayout({
               <div className="pb-20 md:pb-0">{children}</div>
             </LayoutShell>
             <LiveStoreSyncGuard />
-            <MobileBottomNav />
           </SiteInfoProvider>
         </CartProvider>
       </body>

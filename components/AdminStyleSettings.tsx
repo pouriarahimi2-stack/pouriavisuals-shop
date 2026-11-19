@@ -132,7 +132,6 @@ export function AdminStyleSettings() {
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      {/* نوار ناوبری یکپارچه استودیوی طراحی */}
       <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="flex flex-wrap items-center gap-2">
           <Link
@@ -159,7 +158,7 @@ export function AdminStyleSettings() {
         </div>
       </div>
 
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 md:gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>✨</span> مدیریت هویت بصری، تایپوگرافی و استایل‌ساز پیشرفته CSS
@@ -188,12 +187,12 @@ export function AdminStyleSettings() {
       {loading ? (
         <div className="p-12 text-center text-xs text-slate-400 font-bold">در حال بارگذاری موتور استایل...</div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-cols-2 md:grid-cols-3 lg:grid-cols-42 gap-3 md:gap-6 text-xs">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 text-xs">
           <form
             onSubmit={handleSaveStyles}
             className="lg:col-span-7 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5"
           >
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-2 md:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
               <div>
                 <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
                   رنگ اصلی برند (Primary Accent):
@@ -341,7 +340,6 @@ export function AdminStyleSettings() {
             </button>
           </form>
 
-          {/* پیش‌نمایش زنده در ۳ پلتفرم به ترتیب اولویت: دسکتاپ، موبایل، تبلت */}
           <div className="lg:col-span-5 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col justify-between space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] pb-3">
               <h3 className="font-black text-sm">پیش‌نمایش زنده ریسپانسیو</h3>

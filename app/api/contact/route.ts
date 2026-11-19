@@ -9,6 +9,7 @@ import {
   createApiSuccess,
 } from "@/lib/validationGuard";
 import { smsService } from "@/services/smsService";
+import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,10 @@ export async function GET(req: NextRequest) {
   try {
     const session = await verifyAdminSession(req);
     if (!session) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+      return NextResponse.json(
+        { success: false, message: "دسترسی غیرمجاز." },
+        { status: 401 }
+      );
     }
 
     const { data: messages, error } = await supabaseAdmin
@@ -26,7 +30,9 @@ export async function GET(req: NextRequest) {
 
     if (error) throw error;
     const list = Array.isArray(messages) ? messages : [];
-    const unreadCount = list.filter((m: any) => !m.is_read || m.status === "pending").length;
+    const unreadCount = list.filter(
+      (m: any) => !m.is_read || m.status === "pending"
+    ).length;
 
     return NextResponse.json(
       { success: true, data: list, unreadCount },
@@ -43,9 +49,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const fullName = sanitizeInput(body?.full_name || body?.fullName);
+    const fullName = sanitizeInput(
+      body?.full_name || body?.fullName || body?.name
+    );
     const rawPhone = String(body?.phone || "")
       .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+      .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
       .trim();
     const subject = sanitizeInput(body?.subject || "مشاوره تخصصی و پشتیبانی");
     const message = sanitizeInput(body?.message);
@@ -55,7 +64,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (!validatePhoneNumber(rawPhone)) {
-      return createApiError("شماره موبایل وارد شده باید ۱۱ رقمی و با ۰۹ شروع شود.", 400);
+      return createApiError(
+        "شماره موبایل وارد شده باید ۱۱ رقمی و با ۰۹ شروع شود.",
+        400
+      );
     }
 
     if (!message || message.length < 5) {
@@ -64,9 +76,16 @@ export async function POST(req: NextRequest) {
 
     const cleanPhone = rawPhone.replace(/\D/g, "");
     const nowIso = new Date().toISOString();
+    const msgId = randomUUID();
+    const combinedMessage =
+      subject && subject !== "مشاوره تخصصی و پشتیبانی"
+        ? `[موضوع: ${subject}]\n${message}`
+        : message;
 
-    const { error } = await supabaseAdmin.from("contact_messages").insert([
+    // تلاش لایه‌ای برای تطابق ۱۰۰٪ با هر ساختار ستون‌های جدول contact_messages در Supabase
+    const candidatePayloads: Record<string, any>[] = [
       {
+        id: msgId,
         full_name: fullName,
         phone: cleanPhone,
         subject,
@@ -75,9 +94,58 @@ export async function POST(req: NextRequest) {
         is_read: false,
         created_at: nowIso,
       },
-    ]);
+      {
+        id: msgId,
+        full_name: fullName,
+        phone: cleanPhone,
+        message: combinedMessage,
+        status: "pending",
+        is_read: false,
+        created_at: nowIso,
+      },
+      {
+        id: msgId,
+        name: fullName,
+        phone: cleanPhone,
+        subject,
+        message,
+        status: "pending",
+        created_at: nowIso,
+      },
+      {
+        full_name: fullName,
+        phone: cleanPhone,
+        message: combinedMessage,
+      },
+      {
+        name: fullName,
+        phone: cleanPhone,
+        message: combinedMessage,
+      },
+    ];
 
-    if (error) throw error;
+    let insertedOk = false;
+    let lastError: any = null;
+
+    for (const payload of candidatePayloads) {
+      const { error } = await supabaseAdmin
+        .from("contact_messages")
+        .insert([payload]);
+      if (!error) {
+        insertedOk = true;
+        break;
+      }
+      lastError = error;
+    }
+
+    if (!insertedOk) {
+      console.error("Contact DB Insert Error:", lastError);
+      return createApiError(
+        lastError?.message || "خطا در ثبت پیام در پایگاه داده.",
+        500
+      );
+    }
+
     return createApiSuccess(
       null,
       "پیام شما با موفقیت ثبت شد و کارشناسان آکسون کور به زودی پاسخگوی شما خواهند بود."
@@ -92,7 +160,10 @@ export async function PATCH(req: NextRequest) {
   try {
     const session = await verifyAdminSession(req);
     if (!session) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+      return NextResponse.json(
+        { success: false, message: "دسترسی غیرمجاز." },
+        { status: 401 }
+      );
     }
 
     const body = await req.json();
@@ -129,7 +200,7 @@ export async function PATCH(req: NextRequest) {
           await smsService.sendSMS(
             cleanPhone,
             "کاربر گرامی " +
-              (updated.full_name || "") +
+              (updated.full_name || updated.name || "") +
               "، پاسخ مدیریت آکسون کور به تیکت شما: " +
               String(admin_reply).trim()
           );
@@ -149,7 +220,10 @@ export async function PATCH(req: NextRequest) {
       data: updated,
     });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: err.message },
+      { status: 500 }
+    );
   }
 }
 
@@ -157,7 +231,10 @@ export async function PUT(req: NextRequest) {
   try {
     const session = await verifyAdminSession(req);
     if (!session) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+      return NextResponse.json(
+        { success: false, message: "دسترسی غیرمجاز." },
+        { status: 401 }
+      );
     }
 
     const body = await req.json();
@@ -170,7 +247,9 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
+    const updateData: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
     if (is_read !== undefined) updateData.is_read = Boolean(is_read);
     if (message !== undefined) updateData.message = message;
     if (admin_reply !== undefined) updateData.admin_reply = admin_reply;
@@ -182,9 +261,15 @@ export async function PUT(req: NextRequest) {
       .eq("id", id);
 
     if (error) throw error;
-    return NextResponse.json({ success: true, message: "✓ تغییرات با موفقیت ذخیره شد." });
+    return NextResponse.json({
+      success: true,
+      message: "✓ تغییرات با موفقیت ذخیره شد.",
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: err.message },
+      { status: 500 }
+    );
   }
 }
 
@@ -192,7 +277,10 @@ export async function DELETE(req: NextRequest) {
   try {
     const session = await verifyAdminSession(req);
     if (!session) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+      return NextResponse.json(
+        { success: false, message: "دسترسی غیرمجاز." },
+        { status: 401 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -205,11 +293,20 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const { error } = await supabaseAdmin.from("contact_messages").delete().eq("id", id);
+    const { error } = await supabaseAdmin
+      .from("contact_messages")
+      .delete()
+      .eq("id", id);
 
     if (error) throw error;
-    return NextResponse.json({ success: true, message: "✓ تیکت با موفقیت حذف شد." });
+    return NextResponse.json({
+      success: true,
+      message: "✓ تیکت با موفقیت حذف شد.",
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: err.message },
+      { status: 500 }
+    );
   }
 }

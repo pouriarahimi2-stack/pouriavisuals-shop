@@ -118,9 +118,7 @@ export default function LiveStoreSyncGuard() {
     if (!verifiedAdminChecked) return;
 
     const isAdminRoute =
-      pathname.startsWith("/admin") ||
-      pathname.startsWith("/api") ||
-      pathname.startsWith("/login");
+      pathname.startsWith("/admin") || pathname.startsWith("/api");
     const isMaintenancePage = pathname.startsWith("/maintenance");
 
     const allowAdminBypass =

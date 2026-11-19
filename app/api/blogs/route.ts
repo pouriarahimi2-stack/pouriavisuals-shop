@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
+import { unpackProductRow } from "@/lib/productUnpacker";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,104 @@ function normalizeSlug(raw: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+// تولید خودکار مقالات سئو از روی کالاهای واقعی فروشگاه در صورتی که مجله خالی باشد
+async function ensureCatalogSeoArticles(): Promise<any[]> {
+  try {
+    const { data: rawProds } = await supabaseAdmin
+      .from("products")
+      .select("*")
+      .eq("is_available", true)
+      .order("created_at", { ascending: false })
+      .limit(4);
+
+    const prods = (rawProds || []).map(unpackProductRow);
+    if (prods.length === 0) return [];
+
+    const nowIso = new Date().toISOString();
+    const generatedPosts = prods.map((p: any, idx: number) => {
+      const prodTitle = p.title || p.name || "محصول تخصصی";
+      const prodCat = p.category || "راهنمای خرید و بررسی تخصصی";
+      const prodBrand = p.brand || "Axon Core";
+      const prodWarranty =
+        p.warranty || "۱۸ ماه گارانتی اصالت و سلامت فیزیکی طلایی";
+      const prodPrice = Number(p.discount_price || p.price || 0);
+      const priceText =
+        prodPrice > 0
+          ? `${prodPrice.toLocaleString("fa-IR")} تومان`
+          : "قیمت روز رقابتی";
+      const prodUrl = `/products/${p.id}`;
+
+      const contentHtml = `
+<article class="space-y-6 leading-relaxed">
+  <h2>بررسی تخصصی، مشخصات فنی و راهنمای خرید ${prodTitle}</h2>
+  <p>انتخاب و خرید <strong>${prodTitle}</strong> در دسته‌بندی <strong>${prodCat}</strong> نیازمند بررسی دقیق کیفیت ساخت، استانداردهای ایمنی، دوام قطعات و گارانتی معتبر است. در این مقاله از مجله تخصصی آکسون کور، تمامی ویژگی‌های فنی و ارزش خرید این محصول را بررسی می‌کنیم.</p>
+
+  <h3>چرا ${prodTitle} ارزش خرید بالایی دارد؟</h3>
+  <p>محصول <strong>${prodTitle}</strong> با استانداردهای کیفی برند <strong>${prodBrand}</strong> طراحی شده و با پوشش <strong>${prodWarranty}</strong> عرضه می‌گردد. کیفیت متریال به‌کاررفته و پایداری عملکرد در استفاده طولانی‌مدت، این مدل را به یکی از محبوب‌ترین گزینه‌های کاتالوگ تبدیل کرده است.</p>
+
+  <h3>جدول مشخصات کلیدی و شرایط عرضه در آکسون کور</h3>
+  <div style="overflow-x:auto;margin:16px 0;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="background:rgba(2,132,199,0.12);">
+          <th style="padding:12px;border:1px solid rgba(148,163,184,0.25);text-align:right;">شاخص بررسی</th>
+          <th style="padding:12px;border:1px solid rgba(148,163,184,0.25);text-align:right;">مشخصات در فروشگاه آکسون کور</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">عنوان محصول</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prodTitle}</td></tr>
+        <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">دسته‌بندی</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prodCat}</td></tr>
+        <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">ضمانت و اصالت</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prodWarranty}</td></tr>
+        <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">قیمت روز</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${priceText}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>سوالات متداول پیش از خرید ${prodTitle}</h3>
+  <p><strong>آیا این کالا اورجینال و دارای گارانتی است؟</strong><br/>بله، تمامی کالاهای موجود در آکسون کور با ${prodWarranty} و ضمانت سلامت فیزیکی ارسال می‌شوند.</p>
+
+  <div style="margin-top:24px;padding:20px;border-radius:20px;background:linear-gradient(135deg,rgba(2,132,199,0.15),rgba(79,70,229,0.12));border:1px solid rgba(56,189,248,0.35);">
+    <h4 style="margin:0 0 8px 0;font-weight:900;color:#38bdf8;">🛍️ مشاهده مشخصات و خرید آنلاین ${prodTitle}</h4>
+    <p style="margin:0 0 14px 0;font-size:13px;">برای ثبت سفارش مستقیم <strong>${prodTitle}</strong> با قیمت <strong>${priceText}</strong> و ارسال سریع پیشتاز کلیک کنید:</p>
+    <a href="${prodUrl}" style="display:inline-block;padding:10px 22px;border-radius:14px;background:#0284c7;color:#ffffff;font-weight:900;text-decoration:none;font-size:13px;">خرید مستقیم ${prodTitle} ←</a>
+  </div>
+</article>`.trim();
+
+      return {
+        id: randomUUID(),
+        title: `بررسی تخصصی و راهنمای خرید ${prodTitle}`,
+        slug:
+          (normalizeSlug(prodTitle) || "product-guide") +
+          "-guide-" +
+          (idx + 1),
+        content: contentHtml,
+        category: prodCat,
+        image_url:
+          p.image && p.image !== "/placeholder.png"
+            ? p.image
+            : "/placeholder.png",
+        meta_description:
+          `بررسی تخصصی، جدول مشخصات و راهنمای خرید ${prodTitle} با بهترین قیمت روز (${priceText}) و گارانتی اصالت در آکسون کور.`.slice(
+            0,
+            155
+          ),
+        is_published: true,
+        created_at: nowIso,
+        updated_at: nowIso,
+      };
+    });
+
+    const { data: inserted } = await supabaseAdmin
+      .from("posts")
+      .insert(generatedPosts)
+      .select();
+
+    return Array.isArray(inserted) ? inserted : generatedPosts;
+  } catch {
+    return [];
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -59,7 +158,11 @@ export async function GET(req: NextRequest) {
 
     if (error) throw error;
 
-    const allPosts = Array.isArray(posts) ? posts : [];
+    let allPosts = Array.isArray(posts) ? posts : [];
+    if (allPosts.length === 0) {
+      allPosts = await ensureCatalogSeoArticles();
+    }
+
     const filtered = onlyPublished
       ? allPosts.filter((p: any) => p.is_published !== false)
       : allPosts;
@@ -80,12 +183,14 @@ export async function POST(req: NextRequest) {
   try {
     const session = await verifyAdminSession(req);
     if (!session) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+      return NextResponse.json(
+        { success: false, message: "دسترسی غیرمجاز." },
+        { status: 401 }
+      );
     }
 
     const body = await req.json();
 
-    // اکشن تغییر سریع وضعیت انتشار مقاله
     if (body.action === "toggle_publish" && body.id) {
       const { data: updated, error } = await supabaseAdmin
         .from("posts")
@@ -118,15 +223,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const baseSlug = normalizeSlug(body.slug || title) || "article-" + Date.now().toString().slice(-5);
-    const img = String(body.imageUrl || body.image_url || "/placeholder.png").trim();
+    const baseSlug =
+      normalizeSlug(body.slug || title) ||
+      "article-" + Date.now().toString().slice(-5);
+    const img = String(
+      body.imageUrl || body.image_url || "/placeholder.png"
+    ).trim();
     const cleanTextExcerpt = content
       .replace(/<[^>]*>/g, " ")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 155);
     const metaDesc = String(
-      body.metaDescription || body.meta_description || cleanTextExcerpt || title
+      body.metaDescription ||
+        body.meta_description ||
+        cleanTextExcerpt ||
+        title
     ).trim();
 
     const isPublished =
@@ -165,7 +277,6 @@ export async function POST(req: NextRequest) {
         post: updated,
       });
     } else {
-      // بررسی یکتا بودن نامک (Slug) پیش از درج مقاله جدید
       const { data: existingSlug } = await supabaseAdmin
         .from("posts")
         .select("id")
@@ -197,7 +308,10 @@ export async function POST(req: NextRequest) {
       });
     }
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: err.message },
+      { status: 500 }
+    );
   }
 }
 
@@ -209,7 +323,10 @@ export async function DELETE(req: NextRequest) {
   try {
     const session = await verifyAdminSession(req);
     if (!session) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+      return NextResponse.json(
+        { success: false, message: "دسترسی غیرمجاز." },
+        { status: 401 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -225,8 +342,14 @@ export async function DELETE(req: NextRequest) {
     const { error } = await supabaseAdmin.from("posts").delete().eq("id", id);
     if (error) throw error;
 
-    return NextResponse.json({ success: true, message: "✓ مقاله با موفقیت حذف شد." });
+    return NextResponse.json({
+      success: true,
+      message: "✓ مقاله با موفقیت حذف شد.",
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: err.message },
+      { status: 500 }
+    );
   }
 }

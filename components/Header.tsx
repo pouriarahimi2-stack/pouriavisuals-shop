@@ -62,10 +62,15 @@ export default function Header() {
   const [couponAnnouncements, setCouponAnnouncements] = useState<
     ActiveAnnouncement[]
   >([]);
+  const [activeCouponCodes, setActiveCouponCodes] = useState<Set<string>>(
+    new Set()
+  );
+  const [couponsLoaded, setCouponsLoaded] = useState(false);
   const [activeAnnIndex, setActiveAnnIndex] = useState(0);
 
   const rawHeaderLogo =
-    sysSettings.logo_url !== undefined && String(sysSettings.logo_url).trim() !== ""
+    sysSettings.logo_url !== undefined &&
+    String(sysSettings.logo_url).trim() !== ""
       ? String(sysSettings.logo_url)
       : themeHeader.logoUrl !== undefined
       ? String(themeHeader.logoUrl)
@@ -81,7 +86,15 @@ export default function Header() {
       });
       if (res.ok) {
         const json = await res.json();
-        const activeCoupons = json.coupons || [];
+        const activeCoupons = Array.isArray(json.coupons) ? json.coupons : [];
+
+        setActiveCouponCodes(
+          new Set(
+            activeCoupons.map((c: any) =>
+              String(c.code || "").trim().toUpperCase()
+            )
+          )
+        );
 
         let usedLocal: string[] = [];
         try {
@@ -123,10 +136,12 @@ export default function Header() {
 
         setCouponAnnouncements(validList);
       }
-    } catch {}
+    } catch {
+    } finally {
+      setCouponsLoaded(true);
+    }
   }, []);
 
-  // ترکیب اعلان سراسری تنظیمات کلان با اعلان‌های کوپن‌های فعال
   const customAnnouncementText = String(
     sysSettings.header_announcement ??
       themeHeader.announcementText ??
@@ -142,18 +157,32 @@ export default function Header() {
   const announcements: ActiveAnnouncement[] = React.useMemo(() => {
     const merged: ActiveAnnouncement[] = [];
     if (isCustomAnnouncementEnabled && customAnnouncementText) {
-      merged.push({
-        id: "global-site-announcement",
-        code: "",
-        text: customAnnouncementText,
-        targetType: "global",
-      });
+      // اگر متن اعلان حاوی کد تخفیفی (مثل TECH-1A51) باشد که در کوپن‌های فعال وجود ندارد، نمایش داده نشود
+      const codeMatch = customAnnouncementText.match(
+        /کد\s*[«"']?([A-Z0-9_-]{3,20})[»"']?/i
+      );
+      const referencedCode = codeMatch?.[1]?.toUpperCase() || "";
+      const isStaleDeletedCoupon =
+        Boolean(referencedCode) &&
+        couponsLoaded &&
+        !activeCouponCodes.has(referencedCode);
+
+      if (!isStaleDeletedCoupon) {
+        merged.push({
+          id: "global-site-announcement",
+          code: "",
+          text: customAnnouncementText,
+          targetType: "global",
+        });
+      }
     }
     return [...merged, ...couponAnnouncements];
   }, [
     isCustomAnnouncementEnabled,
     customAnnouncementText,
     couponAnnouncements,
+    couponsLoaded,
+    activeCouponCodes,
   ]);
 
   useEffect(() => {
@@ -231,7 +260,8 @@ export default function Header() {
       if (draftRaw) {
         const draft = JSON.parse(draftRaw);
         if (draft?.firstName || draft?.lastName) {
-          resolvedName = `${draft.firstName || ""} ${draft.lastName || ""}`.trim();
+          resolvedName =
+            `${draft.firstName || ""} ${draft.lastName || ""}`.trim();
         } else if (draft?.fullName && String(draft.fullName).trim().length > 1) {
           resolvedName = String(draft.fullName).trim();
         }

@@ -54,10 +54,10 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
   const allowAdminBypass =
     sys.maintenanceAdminBypass !== false && isVerifiedAdmin;
 
+  // در زمان فعال بودن حالت تعمیرات، تمام صفحات فروشگاه از جمله /login و /account برای کاربران عادی قفل می‌شوند
   const isMaintenanceActive =
     !isAdminRoute &&
     pathname !== "/maintenance" &&
-    pathname !== "/login" &&
     rawMaint &&
     !allowAdminBypass;
 

@@ -1,19 +1,31 @@
 // File Path: app/products/page.tsx
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  Suspense,
+} from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Search, Check, RotateCcw } from "lucide-react";
 import ProductCard from "@/components/ProductCard";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
 
-export default function ProductsCatalogPage() {
+function ProductsCatalogContent() {
+  const searchParams = useSearchParams();
+  const urlCategoryParam = searchParams.get("category") || "";
+
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState(
+    urlCategoryParam || "all"
+  );
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [onlyDiscounted, setOnlyDiscounted] = useState(false);
   const [sortBy, setSortBy] = useState<
@@ -21,6 +33,12 @@ export default function ProductsCatalogPage() {
   >("newest");
   const [minPrice, setMinPrice] = useState<number | "">("");
   const [maxPrice, setMaxPrice] = useState<number | "">("");
+
+  useEffect(() => {
+    if (urlCategoryParam) {
+      setSelectedCategory(urlCategoryParam);
+    }
+  }, [urlCategoryParam]);
 
   const loadProducts = useCallback(async () => {
     try {
@@ -177,14 +195,26 @@ export default function ProductsCatalogPage() {
           خانه
         </Link>
         <span>/</span>
-        <span className="text-[var(--text-primary)]">کاتالوگ رسمی کالاها</span>
+        <Link href="/products" className="hover:underline">
+          کاتالوگ کالاها
+        </Link>
+        {selectedCategory !== "all" && (
+          <>
+            <span>/</span>
+            <span className="text-[var(--accent-blue)]">
+              {selectedCategory}
+            </span>
+          </>
+        )}
       </div>
 
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[var(--card-border)]">
           <div>
             <h1 className="text-lg sm:text-2xl font-black">
-              کاتالوگ کالاها و تجهیزات هوشمند
+              {selectedCategory !== "all"
+                ? `دسته‌بندی: ${selectedCategory}`
+                : "کاتالوگ کالاها و تجهیزات هوشمند"}
             </h1>
             <span className="text-xs text-[var(--text-secondary)] font-bold mt-1 block">
               نمایش {filteredProducts.length.toLocaleString("fa-IR")} محصول از
@@ -248,7 +278,6 @@ export default function ProductsCatalogPage() {
             </div>
           </div>
 
-          {/* گرید استاندارد ۳ ستونی برای فیلتر وضعیت، بازه قیمت و مرتب‌سازی */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-[var(--card-border)] items-center">
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -366,5 +395,19 @@ export default function ProductsCatalogPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ProductsCatalogPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-xs font-bold text-[var(--text-secondary)]">
+          در حال بارگذاری کاتالوگ محصولات...
+        </div>
+      }
+    >
+      <ProductsCatalogContent />
+    </Suspense>
   );
 }

@@ -1,7 +1,7 @@
 // File Path: components/Header.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart } from "@/context/CartContext";
@@ -26,6 +26,23 @@ interface ActiveAnnouncement {
   code: string;
   text: string;
   targetType: string;
+}
+
+interface SearchCatalogProduct {
+  id: string;
+  title: string;
+  category: string;
+  price: number;
+  discount_price?: number | null;
+  image: string;
+  stock: number;
+}
+
+interface SearchBlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  category: string;
 }
 
 export default function Header() {
@@ -67,6 +84,138 @@ export default function Header() {
   );
   const [couponsLoaded, setCouponsLoaded] = useState(false);
   const [activeAnnIndex, setActiveAnnIndex] = useState(0);
+
+  // استیت‌های جستجوی زنده (Predictive Live Search)
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchProducts, setSearchProducts] = useState<SearchCatalogProduct[]>(
+    []
+  );
+  const [searchPosts, setSearchPosts] = useState<SearchBlogPost[]>([]);
+  const [searchIndexLoaded, setSearchIndexLoaded] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  const loadSearchIndex = useCallback(async () => {
+    if (searchIndexLoaded || searchLoading) return;
+    setSearchLoading(true);
+    try {
+      const [prodRes, blogRes] = await Promise.allSettled([
+        fetch("/api/products?t=" + Date.now(), { cache: "no-store" }),
+        fetch("/api/blogs?published=true&t=" + Date.now(), { cache: "no-store" }),
+      ]);
+
+      if (prodRes.status === "fulfilled" && prodRes.value.ok) {
+        const pJson = await prodRes.value.json();
+        const rawList = Array.isArray(pJson.data)
+          ? pJson.data
+          : Array.isArray(pJson.products)
+          ? pJson.products
+          : [];
+        setSearchProducts(
+          rawList.map((p: any) => ({
+            id: String(p.id),
+            title: String(p.title || p.name || "کالای دیجیتال"),
+            category: String(p.category || "کالای دیجیتال"),
+            price: Number(p.price || 0),
+            discount_price:
+              p.discount_price && Number(p.discount_price) > 0
+                ? Number(p.discount_price)
+                : null,
+            image: resolveSafeUrl(p.image || p.image_url) || "/placeholder.png",
+            stock:
+              p.stock !== undefined && p.stock !== null ? Number(p.stock) : 10,
+          }))
+        );
+      }
+
+      if (blogRes.status === "fulfilled" && blogRes.value.ok) {
+        const bJson = await blogRes.value.json();
+        const rawPosts = Array.isArray(bJson.posts)
+          ? bJson.posts
+          : Array.isArray(bJson.data)
+          ? bJson.data
+          : [];
+        setSearchPosts(
+          rawPosts.map((b: any) => ({
+            id: String(b.id),
+            title: String(b.title || "مقاله تخصصی"),
+            slug: String(b.slug || b.id),
+            category: String(b.category || "مجله تخصصی"),
+          }))
+        );
+      }
+      setSearchIndexLoaded(true);
+    } catch {
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [searchIndexLoaded, searchLoading]);
+
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q.length < 2) {
+      return {
+        products: searchProducts.slice(0, 4),
+        categories: [] as string[],
+        posts: [] as SearchBlogPost[],
+        isSuggested: true,
+      };
+    }
+
+    const matchedProducts = searchProducts
+      .filter(
+        (p) =>
+          p.title.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q)
+      )
+      .slice(0, 6);
+
+    const catSet = new Set<string>();
+    searchProducts.forEach((p) => {
+      if (p.category.toLowerCase().includes(q)) {
+        catSet.add(p.category);
+      }
+    });
+
+    const matchedPosts = searchPosts
+      .filter(
+        (b) =>
+          b.title.toLowerCase().includes(q) ||
+          b.category.toLowerCase().includes(q)
+      )
+      .slice(0, 3);
+
+    return {
+      products: matchedProducts,
+      categories: Array.from(catSet).slice(0, 4),
+      posts: matchedPosts,
+      isSuggested: false,
+    };
+  }, [searchQuery, searchProducts, searchPosts]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(e.target as Node)
+      ) {
+        setSearchOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSearchOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   const rawHeaderLogo =
     sysSettings.logo_url !== undefined &&
@@ -154,10 +303,9 @@ export default function Header() {
     sysSettings.header_announcement_enabled !== false &&
     themeHeader.showAnnouncement !== false;
 
-  const announcements: ActiveAnnouncement[] = React.useMemo(() => {
+  const announcements: ActiveAnnouncement[] = useMemo(() => {
     const merged: ActiveAnnouncement[] = [];
     if (isCustomAnnouncementEnabled && customAnnouncementText) {
-      // اگر متن اعلان حاوی کد تخفیفی (مثل TECH-1A51) باشد که در کوپن‌های فعال وجود ندارد، نمایش داده نشود
       const codeMatch = customAnnouncementText.match(
         /کد\s*[«"']?([A-Z0-9_-]{3,20})[»"']?/i
       );
@@ -313,6 +461,7 @@ export default function Header() {
 
   useEffect(() => {
     setMobileMenuOpen(false);
+    setSearchOpen(false);
   }, [pathname]);
 
   const toggleTheme = () => {
@@ -389,6 +538,7 @@ export default function Header() {
   return (
     <>
       <div
+        ref={searchContainerRef}
         className="fixed top-0 inset-x-0 z-40 flex flex-col items-center pointer-events-none"
         dir="rtl"
       >
@@ -495,12 +645,12 @@ export default function Header() {
                   : baseHeight + "px",
             }}
             className={
-              "mx-auto w-full px-4 sm:px-8 transition-all duration-300 flex items-center justify-between gap-4 border shadow-xl backdrop-blur-2xl " +
+              "mx-auto w-full px-4 sm:px-6 transition-all duration-300 flex items-center justify-between gap-3 border shadow-xl backdrop-blur-2xl " +
               (isCapsule ? "rounded-full" : "rounded-2xl") +
               " glass-header"
             }
           >
-            <div className="flex items-center gap-6 sm:gap-8">
+            <div className="flex items-center gap-4 lg:gap-6 min-w-0">
               <Link
                 href="/"
                 onClick={() => soundEngine.playClick()}
@@ -530,7 +680,7 @@ export default function Header() {
               {headerCfg.menu?.show !== false && (
                 <nav
                   style={{ fontSize: menuFontSize + "px" }}
-                  className="hidden md:flex items-center gap-5 lg:gap-6 font-bold text-[var(--text-secondary)]"
+                  className="hidden lg:flex items-center gap-4 xl:gap-5 font-bold text-[var(--text-secondary)]"
                 >
                   {menuItems.map((item: any) => {
                     const isActive = pathname === item.url;
@@ -590,7 +740,60 @@ export default function Header() {
               )}
             </div>
 
+            {/* نوار جستجوی زنده دسکتاپ و تبلت */}
+            <div className="hidden md:flex items-center flex-1 max-w-xs xl:max-w-sm mx-2">
+              <div className="relative w-full">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onFocus={() => {
+                    setSearchOpen(true);
+                    loadSearchIndex();
+                  }}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    if (!searchOpen) setSearchOpen(true);
+                    loadSearchIndex();
+                  }}
+                  placeholder="🔍 جستجو در کالاها، برند و مقالات..."
+                  className="w-full py-2 px-4 pl-8 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] focus:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] outline-none transition"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      searchInputRef.current?.focus();
+                    }}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div className="flex items-center gap-2 shrink-0">
+              {/* دکمه جستجوی سریع در موبایل */}
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playClick();
+                  const next = !searchOpen;
+                  setSearchOpen(next);
+                  if (next) {
+                    loadSearchIndex();
+                    setTimeout(() => searchInputRef.current?.focus(), 60);
+                  }
+                }}
+                className="md:hidden w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-xs transition cursor-pointer"
+                title="جستجو در محصولات"
+                aria-label="جستجو"
+              >
+                🔍
+              </button>
+
               <button
                 type="button"
                 onClick={toggleTheme}
@@ -603,7 +806,7 @@ export default function Header() {
               <Link
                 href={userLabel ? "/account" : "/login"}
                 onClick={() => soundEngine.playClick()}
-                className="hidden sm:flex px-4 py-2 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] transition items-center gap-1.5 max-w-[220px]"
+                className="hidden sm:flex px-4 py-2 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] transition items-center gap-1.5 max-w-[200px]"
               >
                 <span>👤</span>
                 {userLabel ? (
@@ -642,13 +845,153 @@ export default function Header() {
                   soundEngine.playClick();
                   setMobileMenuOpen(!mobileMenuOpen);
                 }}
-                className="md:hidden w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-sm font-bold transition cursor-pointer hover:border-[var(--accent-blue)]"
+                className="lg:hidden w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-sm font-bold transition cursor-pointer hover:border-[var(--accent-blue)]"
                 aria-label="منوی ناوبری"
               >
                 {mobileMenuOpen ? "✕" : "☰"}
               </button>
             </div>
           </div>
+
+          {/* پنجره نتایج زنده جستجو (Predictive Live Search Dropdown) */}
+          {searchOpen && (
+            <div className="max-w-3xl mx-auto mt-2.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl p-4 sm:p-5 space-y-4 text-xs animate-fadeIn">
+              {/* فیلد جستجو در نمای موبایل */}
+              <div className="md:hidden relative">
+                <input
+                  type="text"
+                  autoFocus
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="نام کالا، دسته‌بندی یا مقاله را بنویسید..."
+                  className="w-full p-3 pl-9 rounded-2xl bg-[var(--input-bg)] border border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] outline-none"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text-secondary)] cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {searchLoading ? (
+                <div className="py-8 text-center text-[var(--text-secondary)] font-bold">
+                  در حال بارگذاری کاتالوگ جستجو...
+                </div>
+              ) : (
+                <>
+                  {searchResults.categories.length > 0 && (
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-black text-[var(--accent-blue)] block">
+                        📂 دسته‌بندی‌های مرتبط:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {searchResults.categories.map((cat) => (
+                          <Link
+                            key={cat}
+                            href={`/products?category=${encodeURIComponent(cat)}`}
+                            onClick={() => {
+                              soundEngine.playClick();
+                              setSearchOpen(false);
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold transition"
+                          >
+                            {cat}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black text-[var(--accent-blue)]">
+                        {searchResults.isSuggested
+                          ? "🔥 جدیدترین کالاهای پیشنهادی:"
+                          : `🛍️ کالاهای منطبق (${searchResults.products.length.toLocaleString("fa-IR")} مورد):`}
+                      </span>
+                      <Link
+                        href="/products"
+                        onClick={() => setSearchOpen(false)}
+                        className="text-[11px] font-bold text-[var(--text-secondary)] hover:text-[var(--accent-blue)]"
+                      >
+                        مشاهده همه کالاها ←
+                      </Link>
+                    </div>
+
+                    {searchResults.products.length === 0 ? (
+                      <div className="p-6 rounded-2xl bg-[var(--input-bg)] text-center text-[var(--text-secondary)] font-bold">
+                        کالایی با عبارت «{searchQuery}» یافت نشد.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                        {searchResults.products.map((prod) => {
+                          const effectivePrice =
+                            prod.discount_price || prod.price;
+                          return (
+                            <Link
+                              key={prod.id}
+                              href={`/products/${prod.id}`}
+                              onClick={() => {
+                                soundEngine.playClick();
+                                setSearchOpen(false);
+                              }}
+                              className="p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition flex items-center gap-3"
+                            >
+                              <img
+                                src={prod.image}
+                                alt={prod.title}
+                                className="w-12 h-12 rounded-xl object-contain bg-[var(--modal-bg)] p-1 border border-[var(--card-border)] shrink-0"
+                              />
+                              <div className="min-w-0 flex-1 space-y-0.5">
+                                <div className="font-black text-xs text-[var(--text-primary)] truncate">
+                                  {prod.title}
+                                </div>
+                                <div className="text-[10px] text-[var(--text-secondary)]">
+                                  {prod.category}
+                                </div>
+                                <div className="font-mono font-black text-[11px] text-emerald-500">
+                                  {prod.stock <= 0
+                                    ? "ناموجود"
+                                    : `${effectivePrice.toLocaleString("fa-IR")} تومان`}
+                                </div>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {searchResults.posts.length > 0 && (
+                    <div className="space-y-2 pt-2 border-t border-[var(--card-border)]">
+                      <span className="text-[11px] font-black text-indigo-400 block">
+                        📚 مقالات و راهنماهای مرتبط در مجله:
+                      </span>
+                      <div className="space-y-1.5">
+                        {searchResults.posts.map((post) => (
+                          <Link
+                            key={post.id}
+                            href={`/blog/${encodeURIComponent(post.slug)}`}
+                            onClick={() => {
+                              soundEngine.playClick();
+                              setSearchOpen(false);
+                            }}
+                            className="block p-2.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-transparent font-bold truncate transition"
+                          >
+                            📄 {post.title}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </header>
       </div>
 
@@ -657,7 +1000,7 @@ export default function Header() {
 
       {mobileMenuOpen && (
         <div
-          className="md:hidden fixed inset-x-0 top-[88px] z-30 px-3"
+          className="lg:hidden fixed inset-x-0 top-[88px] z-30 px-3"
           dir="rtl"
         >
           <div className="rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl p-4 space-y-1 max-h-[75vh] overflow-y-auto">

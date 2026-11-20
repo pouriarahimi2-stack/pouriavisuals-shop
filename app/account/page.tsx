@@ -153,11 +153,25 @@ function AccountDashboardContent() {
     postalCode?: string;
   } | null>(null);
 
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [sellerInfo, setSellerInfo] = useState<{
+    siteName: string;
+    phone: string;
+    address: string;
+    postalCode: string;
+  }>({
+    siteName: "فروشگاه تخصصی آکسون کور | Axon Core",
+    phone: "",
+    address: "",
+    postalCode: "",
+  });
+
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<CustomerOrder | null>(
     null
   );
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
@@ -168,6 +182,21 @@ function AccountDashboardContent() {
   const [profAddress, setProfAddress] = useState("");
   const [profPostalCode, setProfPostalCode] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
+
+  const fetchWalletBalance = useCallback(async (phoneVal: string) => {
+    const cleanPhone = String(phoneVal || "").replace(/\D/g, "");
+    if (!cleanPhone) return;
+    try {
+      const res = await fetch(
+        `/api/user/wallet?phone=${encodeURIComponent(cleanPhone)}&t=${Date.now()}`,
+        { cache: "no-store" }
+      );
+      if (res.ok) {
+        const json = await res.json();
+        setWalletBalance(Math.max(0, Number(json.balance || 0)));
+      }
+    } catch {}
+  }, []);
 
   const syncUserDisplayName = useCallback(
     (orderList: CustomerOrder[], currentUserObj: any) => {
@@ -228,7 +257,10 @@ function AccountDashboardContent() {
 
       try {
         const res = await fetch(
-          "/api/orders/track?phone=" + encodeURIComponent(cleanPhone),
+          "/api/orders/track?phone=" +
+            encodeURIComponent(cleanPhone) +
+            "&t=" +
+            Date.now(),
           { cache: "no-store" }
         );
         const json = await res.json();
@@ -272,6 +304,24 @@ function AccountDashboardContent() {
   );
 
   useEffect(() => {
+    fetch("/api/site-info?t=" + Date.now(), { cache: "no-store" })
+      .then((r) => r.json())
+      .then((json) => {
+        const sys = json?.settings || json?.system_settings || {};
+        setSellerInfo({
+          siteName:
+            sys.site_name ||
+            json?.site_name ||
+            "فروشگاه تخصصی آکسون کور | Axon Core",
+          phone: sys.phone || json?.phone || "",
+          address: sys.address || json?.address || "",
+          postalCode: sys.postal_code || json?.postal_code || "",
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     let activePhone = "";
     let parsedUser: any = null;
@@ -312,6 +362,7 @@ function AccountDashboardContent() {
 
     if (activePhone) {
       fetchCustomerOrders(activePhone, parsedUser);
+      fetchWalletBalance(activePhone);
     } else {
       fetch("/api/user/session", { cache: "no-store" })
         .then((r) => r.json())
@@ -323,6 +374,7 @@ function AccountDashboardContent() {
             }
             if (json.user.phone) {
               fetchCustomerOrders(json.user.phone, json.user);
+              fetchWalletBalance(json.user.phone);
             } else {
               setLoading(false);
             }
@@ -340,6 +392,13 @@ function AccountDashboardContent() {
         { event: "*", schema: "public", table: "orders" },
         () => {
           if (activePhone) fetchCustomerOrders(activePhone, parsedUser);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "customer_wallets" },
+        () => {
+          if (activePhone) fetchWalletBalance(activePhone);
         }
       )
       .subscribe();
@@ -562,28 +621,60 @@ function AccountDashboardContent() {
       className="max-w-6xl mx-auto px-4 py-8 sm:py-12 font-sans select-text text-[var(--text-primary)] space-y-6"
       dir="rtl"
     >
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xl font-black shadow-lg shrink-0">
-            👤
+      {/* هدر حساب کاربری + کارت موجودی کیف پول */}
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xl font-black shadow-lg shrink-0">
+              👤
+            </div>
+            <div>
+              <h1 className="text-base sm:text-xl font-black">
+                حساب کاربری و پیگیری سفارشات — {displayName}
+              </h1>
+              <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+                شماره همراه تاییدشده:{" "}
+                <strong
+                  className="font-mono text-[var(--accent-blue)]"
+                  dir="ltr"
+                >
+                  {user?.phone || "---"}
+                </strong>
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-base sm:text-xl font-black">
-              حساب کاربری و پیگیری سفارشات — {displayName}
-            </h1>
-            <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-              شماره همراه تاییدشده:{" "}
-              <strong
-                className="font-mono text-[var(--accent-blue)]"
-                dir="ltr"
+
+          {/* کارت موجودی کیف پول مشتری */}
+          <div className="w-full md:w-auto px-4 py-3 rounded-2xl bg-gradient-to-l from-emerald-500/15 via-teal-500/10 to-sky-500/10 border border-emerald-500/30 flex items-center justify-between md:justify-end gap-4">
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl">👛</span>
+              <div>
+                <div className="text-[11px] font-bold text-[var(--text-secondary)]">
+                  موجودی کیف پول اعتباری شما:
+                </div>
+                <div className="font-mono font-black text-sm sm:text-base text-emerald-500">
+                  {walletBalance.toLocaleString("fa-IR")}{" "}
+                  <span className="text-[11px] font-sans">تومان</span>
+                </div>
+              </div>
+            </div>
+            {user?.phone && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playClick();
+                  fetchWalletBalance(user.phone!);
+                }}
+                title="بروزرسانی موجودی کیف پول"
+                className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-emerald-500 text-xs cursor-pointer transition"
               >
-                {user?.phone || "---"}
-              </strong>
-            </p>
+                🔄
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto text-xs font-bold">
+        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-[var(--card-border)] text-xs font-bold">
           <button
             type="button"
             onClick={() => {
@@ -626,7 +717,7 @@ function AccountDashboardContent() {
           <button
             type="button"
             onClick={handleLogout}
-            className="px-4 py-2.5 rounded-2xl bg-rose-500/15 text-rose-500 border border-rose-500/30 hover:bg-rose-500 hover:text-white transition cursor-pointer"
+            className="px-4 py-2.5 rounded-2xl bg-rose-500/15 text-rose-500 border border-rose-500/30 hover:bg-rose-500 hover:text-white transition cursor-pointer mr-auto"
           >
             خروج از حساب
           </button>
@@ -664,7 +755,7 @@ function AccountDashboardContent() {
                 required
                 value={profName}
                 onChange={(e) => setProfName(e.target.value)}
-                placeholder="مثال: پوریا رحیمی"
+                placeholder="نام و نام خانوادگی"
                 className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
               />
             </div>
@@ -916,25 +1007,38 @@ function AccountDashboardContent() {
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const codeToCopy =
-                        selectedOrder.tracking_code ||
-                        formatReadableOrderCode(selectedOrder);
-                      navigator.clipboard?.writeText(codeToCopy);
-                      soundEngine.playSuccess();
-                      setCopiedCode(true);
-                      setTimeout(() => setCopiedCode(false), 2000);
-                    }}
-                    className="px-4 py-2 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-black text-xs cursor-pointer transition hover:bg-emerald-500/25"
-                  >
-                    {copiedCode
-                      ? "✓ کد رهگیری کپی شد"
-                      : "کد پیگیری خرید: " +
-                        (selectedOrder.tracking_code ||
-                          formatReadableOrderCode(selectedOrder))}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEngine.playClick();
+                        setInvoiceModalOpen(true);
+                      }}
+                      className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[var(--accent-blue)] font-black text-xs cursor-pointer transition"
+                    >
+                      🖨️ مشاهده و چاپ فاکتور رسمی
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const codeToCopy =
+                          selectedOrder.tracking_code ||
+                          formatReadableOrderCode(selectedOrder);
+                        navigator.clipboard?.writeText(codeToCopy);
+                        soundEngine.playSuccess();
+                        setCopiedCode(true);
+                        setTimeout(() => setCopiedCode(false), 2000);
+                      }}
+                      className="px-3.5 py-2 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-black text-xs cursor-pointer transition hover:bg-emerald-500/25"
+                    >
+                      {copiedCode
+                        ? "✓ کد رهگیری کپی شد"
+                        : "کد پیگیری: " +
+                          (selectedOrder.tracking_code ||
+                            formatReadableOrderCode(selectedOrder))}
+                    </button>
+                  </div>
                 </div>
 
                 {selectedMeta.step > 0 && (
@@ -1120,6 +1224,209 @@ function AccountDashboardContent() {
                 انتخاب کنید.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* مدال فاکتور رسمی قابل چاپ A4 */}
+      {invoiceModalOpen && selectedOrder && selectedBreakdown && selectedMeta && (
+        <div
+          onClick={() => setInvoiceModalOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fadeIn"
+          dir="rtl"
+        >
+          <div
+            id="axon-printable-invoice"
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-3xl w-full max-h-[92vh] overflow-y-auto bg-white text-slate-900 rounded-3xl p-6 sm:p-10 shadow-2xl space-y-6 text-xs border border-slate-300"
+          >
+            {/* هدر فاکتور رسمی */}
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b-2 border-slate-800 pb-4">
+              <div className="space-y-1">
+                <h2 className="text-lg sm:text-xl font-black text-slate-900">
+                  صورتحساب رسمی فروش کالا و خدمات
+                </h2>
+                <div className="font-bold text-slate-600">
+                  فروشنده: {sellerInfo.siteName}
+                </div>
+                {sellerInfo.phone && (
+                  <div className="font-mono text-[11px] text-slate-500">
+                    تلفن پشتیبانی: {sellerInfo.phone}
+                  </div>
+                )}
+              </div>
+
+              <div className="text-left space-y-1 bg-slate-100 p-3 rounded-2xl border border-slate-300">
+                <div className="font-mono font-black text-sm">
+                  شماره فاکتور: #{formatReadableOrderCode(selectedOrder)}
+                </div>
+                <div className="font-mono text-[11px] text-slate-600">
+                  تاریخ صدور:{" "}
+                  {new Date(selectedOrder.created_at).toLocaleDateString("fa-IR")}
+                </div>
+                <div className="font-bold text-[11px]">
+                  وضعیت:{" "}
+                  <span
+                    className={
+                      selectedMeta.isUnpaid
+                        ? "text-amber-600"
+                        : "text-emerald-700"
+                    }
+                  >
+                    {selectedMeta.text}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* مشخصات خریدار و فروشنده */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200 leading-relaxed">
+              <div className="space-y-1">
+                <div className="font-black text-slate-800 border-b border-slate-200 pb-1">
+                  مشخصات فروشنده
+                </div>
+                <div>نام واحد تجاری: {sellerInfo.siteName}</div>
+                {sellerInfo.address && <div>نشانی: {sellerInfo.address}</div>}
+                {sellerInfo.postalCode && (
+                  <div className="font-mono">کد پستی: {sellerInfo.postalCode}</div>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <div className="font-black text-slate-800 border-b border-slate-200 pb-1">
+                  مشخصات خریدار / تحویل‌گیرنده
+                </div>
+                <div>نام و نام خانوادگی: {selectedOrder.customer_name}</div>
+                <div className="font-mono">تلفن همراه: {selectedOrder.phone}</div>
+                <div>نشانی: {selectedBreakdown.cleanAddress}</div>
+                {selectedOrder.postal_code && (
+                  <div className="font-mono">
+                    کد پستی: {selectedOrder.postal_code}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* جدول اقلام فاکتور */}
+            <div className="overflow-x-auto border border-slate-300 rounded-2xl">
+              <table className="w-full text-right border-collapse text-xs">
+                <thead className="bg-slate-800 text-white">
+                  <tr>
+                    <th className="p-3">ردیف</th>
+                    <th className="p-3">شرح کالا</th>
+                    <th className="p-3 text-center">تعداد</th>
+                    <th className="p-3 text-center">مبلغ واحد (تومان)</th>
+                    <th className="p-3 text-left">مبلغ کل (تومان)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {(Array.isArray(selectedOrder.items)
+                    ? selectedOrder.items
+                    : []
+                  ).map((item: any, idx: number) => {
+                    const unit = Number(
+                      item.discount_price ||
+                        item.discountPrice ||
+                        item.price ||
+                        0
+                    );
+                    const qty = Math.max(1, Number(item.quantity || 1));
+                    return (
+                      <tr key={idx}>
+                        <td className="p-3 font-mono">{idx + 1}</td>
+                        <td className="p-3 font-bold">
+                          {item.title || item.name || "کالای دیجیتال"}
+                          {item.selectedColor ? ` (${item.selectedColor})` : ""}
+                        </td>
+                        <td className="p-3 text-center font-mono">{qty}</td>
+                        <td className="p-3 text-center font-mono">
+                          {unit.toLocaleString("fa-IR")}
+                        </td>
+                        <td className="p-3 text-left font-mono font-bold">
+                          {(unit * qty).toLocaleString("fa-IR")}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* جمع‌بندی مالی فاکتور */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 pt-2">
+              <div className="text-[11px] text-slate-500 space-y-1">
+                <div>
+                  کد رهگیری سامانه:{" "}
+                  <span className="font-mono font-bold text-slate-800">
+                    {selectedOrder.tracking_code ||
+                      formatReadableOrderCode(selectedOrder)}
+                  </span>
+                </div>
+                <div>این صورتحساب به صورت سیستمی صادر شده و معتبر است.</div>
+              </div>
+
+              <div className="w-full sm:w-72 p-4 rounded-2xl bg-slate-100 border border-slate-300 space-y-2">
+                <div className="flex justify-between">
+                  <span>جمع کل اقلام:</span>
+                  <span className="font-mono font-bold">
+                    {selectedBreakdown.subtotal.toLocaleString("fa-IR")} تومان
+                  </span>
+                </div>
+                {selectedBreakdown.discount > 0 && (
+                  <div className="flex justify-between text-emerald-700">
+                    <span>تخفیف اعمال‌شده:</span>
+                    <span className="font-mono font-bold">
+                      -{selectedBreakdown.discount.toLocaleString("fa-IR")} تومان
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span>هزینه ارسال:</span>
+                  <span className="font-mono font-bold">
+                    {selectedBreakdown.shippingCost === 0
+                      ? "رایگان"
+                      : `${selectedBreakdown.shippingCost.toLocaleString(
+                          "fa-IR"
+                        )} تومان`}
+                  </span>
+                </div>
+                {selectedBreakdown.vatAmount > 0 && (
+                  <div className="flex justify-between">
+                    <span>مالیات ({selectedBreakdown.vatPercent}٪):</span>
+                    <span className="font-mono font-bold">
+                      +{selectedBreakdown.vatAmount.toLocaleString("fa-IR")} تومان
+                    </span>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-slate-300 flex justify-between font-black text-sm text-slate-900">
+                  <span>مبلغ قابل پرداخت / کل:</span>
+                  <span className="font-mono">
+                    {selectedBreakdown.finalTotal.toLocaleString("fa-IR")} تومان
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* دکمه‌های عملیات چاپ و بستن */}
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 print:hidden">
+              <button
+                type="button"
+                onClick={() => setInvoiceModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold cursor-pointer"
+              >
+                بستن پنجره
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playClick();
+                  window.print();
+                }}
+                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black shadow-lg cursor-pointer"
+              >
+                🖨️ چاپ فاکتور / ذخیره PDF
+              </button>
+            </div>
           </div>
         </div>
       )}

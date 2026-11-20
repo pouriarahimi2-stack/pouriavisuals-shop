@@ -14,6 +14,62 @@ const PRIVATE_NOINDEX_PREFIXES = [
   "/maintenance",
 ];
 
+interface RedirectRuleItem {
+  fromPath: string;
+  toPath: string;
+  statusCode: 301 | 302;
+}
+
+let cachedRedirectRules: RedirectRuleItem[] = [];
+let redirectCacheExpiresAt = 0;
+
+function normalizeRoutePath(p: string): string {
+  const clean = String(p || "").trim();
+  if (!clean || clean === "/") return "/";
+  return clean.replace(/\/+$/, "");
+}
+
+async function getActiveRedirectRules(origin: string): Promise<RedirectRuleItem[]> {
+  const now = Date.now();
+  if (now < redirectCacheExpiresAt) {
+    return cachedRedirectRules;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1500);
+    const res = await fetch(`${origin}/api/site-info`, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      const json = await res.json();
+      const layoutCfg =
+        json?.homepage_layout_config ||
+        json?.data?.homepage_layout_config ||
+        {};
+      const rules = layoutCfg?.seo_technical_config?.redirectRules;
+      if (Array.isArray(rules)) {
+        cachedRedirectRules = rules
+          .filter((r: any) => r && r.fromPath && r.toPath)
+          .map((r: any) => ({
+            fromPath: normalizeRoutePath(String(r.fromPath)),
+            toPath: String(r.toPath).trim(),
+            statusCode: Number(r.statusCode) === 302 ? 302 : 301,
+          }));
+      }
+    }
+  } catch {
+    // در صورت تایم‌اوت، درخواست بدون وقفه عبور می‌کند
+  } finally {
+    redirectCacheExpiresAt = now + 60_000;
+  }
+
+  return cachedRedirectRules;
+}
+
 function withSecurityHeaders(res: NextResponse, pathname: string): NextResponse {
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("X-Frame-Options", "SAMEORIGIN");
@@ -27,7 +83,10 @@ function withSecurityHeaders(res: NextResponse, pathname: string): NextResponse 
 
   if (PRIVATE_NOINDEX_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
     res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    res.headers.set(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, max-age=0"
+    );
   }
 
   return res;
@@ -78,13 +137,20 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // ۲. عبور امن ربات‌های موتور جستجو و ترب فقط در مسیرهای عمومی فروشگاه
-  const userAgent = req.headers.get("user-agent") || "";
-  const isSearchBot = /torob|emalls|googlebot|bingbot|yandex|baiduspider/i.test(
-    userAgent
-  );
-  if (isSearchBot) {
-    return withSecurityHeaders(NextResponse.next(), pathname);
+  // ۲. اجرای زنده قوانین ریدایرکت ۳۰۱ و ۳۰۲ تعریف‌شده در پنل سئو (/admin/seo)
+  if (!pathname.startsWith("/api") && req.method === "GET") {
+    const normalizedPath = normalizeRoutePath(pathname);
+    const rules = await getActiveRedirectRules(req.nextUrl.origin);
+    const matchedRule = rules.find((r) => r.fromPath === normalizedPath);
+    if (matchedRule && matchedRule.toPath !== normalizedPath) {
+      const targetUrl = matchedRule.toPath.startsWith("http")
+        ? new URL(matchedRule.toPath)
+        : new URL(matchedRule.toPath, req.url);
+      return withSecurityHeaders(
+        NextResponse.redirect(targetUrl, matchedRule.statusCode),
+        pathname
+      );
+    }
   }
 
   return withSecurityHeaders(NextResponse.next(), pathname);

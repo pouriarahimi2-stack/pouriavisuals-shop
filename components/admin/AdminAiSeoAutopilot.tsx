@@ -43,7 +43,17 @@ export default function AdminAiSeoAutopilot() {
     totalOrganicClicks: 0,
     totalImpressions: 0,
     contentGapCount: 0,
+    isLiveGsc: false,
+    gscClientEmail: "",
+    gscSiteUrl: "sc-domain:axoncore.ir",
+    gscError: null as string | null,
   });
+
+  // استیت‌های فرم اتصال زنده Google Search Console
+  const [gscPanelOpen, setGscPanelOpen] = useState(false);
+  const [gscSiteUrlInput, setGscSiteUrlInput] = useState("sc-domain:axoncore.ir");
+  const [gscJsonInput, setGscJsonInput] = useState("");
+  const [savingGsc, setSavingGsc] = useState(false);
 
   const [generating, setGenerating] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState("");
@@ -83,7 +93,12 @@ export default function AdminAiSeoAutopilot() {
             totalOrganicClicks: Number(d.totalOrganicClicks || 0),
             totalImpressions: Number(d.totalImpressions || 0),
             contentGapCount: Number(d.contentGapCount || 0),
+            isLiveGsc: Boolean(d.isLiveGsc),
+            gscClientEmail: String(d.gscClientEmail || ""),
+            gscSiteUrl: String(d.gscSiteUrl || "sc-domain:axoncore.ir"),
+            gscError: d.gscError || null,
           });
+          if (d.gscSiteUrl) setGscSiteUrlInput(String(d.gscSiteUrl));
           setKeywordsList(Array.isArray(d.searchConsoleKeywords) ? d.searchConsoleKeywords : []);
           setContentGapProducts(
             Array.isArray(d.contentGapProducts) ? d.contentGapProducts : []
@@ -116,6 +131,61 @@ export default function AdminAiSeoAutopilot() {
       supabase.removeChannel(postChannel);
     };
   }, [loadProductsAndSeo]);
+
+  const handleSaveGscCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!gscJsonInput.trim()) return;
+    soundEngine.playClick();
+    setSavingGsc(true);
+    setStatusLog(null);
+
+    try {
+      const res = await fetch("/api/ai-seo-autopilot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save_gsc_config",
+          serviceAccountJson: gscJsonInput.trim(),
+          siteUrl: gscSiteUrlInput.trim() || "sc-domain:axoncore.ir",
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        setStatusLog({ type: "success", text: json.message });
+        setGscJsonInput("");
+        setGscPanelOpen(false);
+        await loadProductsAndSeo();
+      } else {
+        setStatusLog({
+          type: "error",
+          text: json.message || "خطا در اتصال به Google Search Console.",
+        });
+      }
+    } catch {
+      setStatusLog({ type: "error", text: "خطا در ارتباط با سرور." });
+    } finally {
+      setSavingGsc(false);
+    }
+  };
+
+  const handleDisconnectGsc = async () => {
+    soundEngine.playClick();
+    setSavingGsc(true);
+    try {
+      const res = await fetch("/api/ai-seo-autopilot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "disconnect_gsc" }),
+      });
+      if (res.ok) {
+        setStatusLog({ type: "info", text: "اتصال سرچ کنسول قطع شد." });
+        await loadProductsAndSeo();
+      }
+    } finally {
+      setSavingGsc(false);
+    }
+  };
 
   const handleProductSelectChange = (prodId: string) => {
     soundEngine.playClick();
@@ -165,12 +235,12 @@ export default function AdminAiSeoAutopilot() {
     });
 
     try {
-      await new Promise((r) => setTimeout(r, 450));
+      await new Promise((r) => setTimeout(r, 400));
       setStatusLog({
         type: "info",
         text: "۲. در حال تدوین ساختار هدینگ‌های H2/H3، جدول مشخصات فنی و سوالات متداول سئو...",
       });
-      await new Promise((r) => setTimeout(r, 450));
+      await new Promise((r) => setTimeout(r, 400));
       setStatusLog({
         type: "info",
         text: "۳. در حال نگارش مقاله تخصصی و تزریق کارت خرید مستقیم محصول در انتهای مقاله...",
@@ -215,41 +285,159 @@ export default function AdminAiSeoAutopilot() {
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xl">🤖</span>
             <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)]">
               موتور خودمختار سئو، سرچ‌کنسول و قیف فروش مستقیم (AI Growth Engine)
             </h2>
+            {metrics.isLiveGsc ? (
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-black">
+                🟢 متصل به Google Search Console زنده
+              </span>
+            ) : (
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-black">
+                🟡 حالت تخمین هوشمند (بدون اتصال GSC)
+              </span>
+            )}
           </div>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
             نگارش خودکار مقالات بررسی تخصصی همراه با جدول مشخصات فنی واقعی کالا، سوالات متداول و باکس خرید مستقیم محصول
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => handleStartAutopilotCycle()}
-          disabled={generating}
-          className="w-full sm:w-auto justify-center px-6 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 text-white font-black text-xs transition shadow-xl cursor-pointer disabled:opacity-50 flex items-center gap-2 shrink-0"
-        >
-          <span>
-            {generating
-              ? "⏳ در حال نگارش و انتشار مقاله..."
-              : "🚀 شروع چرخه خودکار نگارش و فروش"}
-          </span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.playClick();
+              setGscPanelOpen(!gscPanelOpen);
+            }}
+            className="px-4 py-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-black transition cursor-pointer"
+          >
+            {metrics.isLiveGsc ? "⚙️ تنظیمات سرچ کنسول گوگل" : "🔗 اتصال به Google Search Console"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleStartAutopilotCycle()}
+            disabled={generating}
+            className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 text-white font-black text-xs transition shadow-xl cursor-pointer disabled:opacity-50 flex items-center gap-2"
+          >
+            <span>
+              {generating
+                ? "⏳ در حال نگارش و انتشار مقاله..."
+                : "🚀 شروع چرخه خودکار نگارش و فروش"}
+            </span>
+          </button>
+        </div>
       </div>
+
+      {/* پنل تنظیم و اتصال مستقیم Google Search Console Service Account */}
+      {gscPanelOpen && (
+        <form
+          onSubmit={handleSaveGscCredentials}
+          className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border-2 border-[var(--accent-blue)]/40 shadow-xl space-y-4 text-xs animate-fadeIn"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] pb-3">
+            <div>
+              <h3 className="font-black text-sm text-[var(--accent-blue)]">
+                🔗 اتصال رسمی به Google Search Console API (بدون انقضای نشست)
+              </h3>
+              <p className="text-[11px] text-[var(--text-secondary)] mt-1">
+                کافی است فایل JSON مربوط به Service Account را از Google Cloud دریافت کرده، ایمیل آن را در Search Console دسترسی Full بدهید و محتوای JSON را اینجا وارد کنید:
+              </p>
+            </div>
+            {metrics.isLiveGsc && (
+              <button
+                type="button"
+                disabled={savingGsc}
+                onClick={handleDisconnectGsc}
+                className="px-3 py-1.5 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30 font-bold cursor-pointer"
+              >
+                قطع اتصال فعلی
+              </button>
+            )}
+          </div>
+
+          {metrics.gscClientEmail && (
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[11px]">
+              ✓ حساب متصل فعلی: {metrics.gscClientEmail} ({metrics.gscSiteUrl})
+            </div>
+          )}
+
+          {metrics.gscError && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold">
+              ⚠️ {metrics.gscError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                آدرس ملک در سرچ کنسول (Property URL):
+              </label>
+              <input
+                type="text"
+                dir="ltr"
+                required
+                value={gscSiteUrlInput}
+                onChange={(e) => setGscSiteUrlInput(e.target.value)}
+                placeholder="sc-domain:axoncore.ir یا https://axoncore.ir/"
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none focus:border-[var(--accent-blue)]"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                محتوای کامل فایل کلید JSON حساب سرویس گوگل (Service Account Key JSON):
+              </label>
+              <textarea
+                rows={4}
+                dir="ltr"
+                required
+                value={gscJsonInput}
+                onChange={(e) => setGscJsonInput(e.target.value)}
+                placeholder='{"type": "service_account", "client_email": "...@....iam.gserviceaccount.com", "private_key": "-----BEGIN PRIVATE KEY-----\n..."}'
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[11px] outline-none focus:border-[var(--accent-blue)]"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setGscPanelOpen(false)}
+              className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold cursor-pointer"
+            >
+              انصراف
+            </button>
+            <button
+              type="submit"
+              disabled={savingGsc}
+              className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black cursor-pointer disabled:opacity-50"
+            >
+              {savingGsc ? "در حال تست اتصال به گوگل..." : "✓ تست زنده و ذخیره اتصال سرچ کنسول"}
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* کارت‌های آماری سرچ کنسول و شکاف محتوایی */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
         <div className="p-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-between">
           <div>
             <span className="text-[var(--text-secondary)] font-bold block">
-              تخمین ایمپرشن ماهانه (Impressions):
+              {metrics.isLiveGsc
+                ? "ایمپرشن واقعی ۲۸ روز گوگل:"
+                : "تخمین ایمپرشن ماهانه (Impressions):"}
             </span>
-            <span className="text-[10px] text-slate-400">بر اساس کلمات کلیدی کالاهای فعال</span>
+            <span className="text-[10px] text-slate-400">
+              {metrics.isLiveGsc
+                ? "داده‌های زنده Google Search Console"
+                : "بر اساس کلمات کلیدی کالاهای فعال"}
+            </span>
           </div>
           <span className="text-lg font-black font-mono text-sky-400">
             {metrics.totalImpressions.toLocaleString("fa-IR")}
@@ -259,7 +447,9 @@ export default function AdminAiSeoAutopilot() {
         <div className="p-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-between">
           <div>
             <span className="text-[var(--text-secondary)] font-bold block">
-              پتانسیل کلیک ارگانیک (Organic Clicks):
+              {metrics.isLiveGsc
+                ? "کلیک واقعی از جستجوی گوگل:"
+                : "پتانسیل کلیک ارگانیک (Organic Clicks):"}
             </span>
             <span className="text-[10px] text-slate-400">ورودی هدفمند خریداران از گوگل</span>
           </div>
@@ -297,7 +487,6 @@ export default function AdminAiSeoAutopilot() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* ستون راست (۵ ستون): تنظیمات هدف‌گذاری و شکاف محتوایی */}
         <div className="lg:col-span-5 space-y-5 text-xs">
           <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4 shadow-xl">
             <h3 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
@@ -375,7 +564,6 @@ export default function AdminAiSeoAutopilot() {
             </button>
           </div>
 
-          {/* رادار شکاف محتوایی (کالاهایی که هنوز مقاله ندارند) */}
           <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-amber-500/30 space-y-3 shadow-xl">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-2.5">
               <h3 className="font-black text-xs text-amber-400">
@@ -419,15 +607,14 @@ export default function AdminAiSeoAutopilot() {
           </div>
         </div>
 
-        {/* ستون چپ (۷ ستون): جدول کلمات کلیدی سرچ کنسول و مقالات اخیر */}
         <div className="lg:col-span-7 space-y-5 text-xs">
           <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] pb-3">
               <h3 className="font-black text-sm text-[var(--accent-blue)]">
-                📊 رصد هوشمند کلمات کلیدی با فرصت رشد فروش (GSC Intelligence)
+                📊 {metrics.isLiveGsc ? "کلمات کلیدی واقعی جستجوشده در گوگل (Google Search Console)" : "رصد هوشمند کلمات کلیدی با فرصت رشد فروش (GSC Intelligence)"}
               </h3>
               <span className="text-[10px] text-[var(--text-secondary)] font-bold">
-                استخراج‌شده از کاتالوگ محصولات شما
+                {metrics.isLiveGsc ? "داده‌های زنده سرچ کنسول" : "استخراج‌شده از کاتالوگ محصولات شما"}
               </span>
             </div>
 
@@ -490,7 +677,6 @@ export default function AdminAiSeoAutopilot() {
             </div>
           </div>
 
-          {/* لیست آخرین مقالات سئو منتشر شده */}
           <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-2.5">
               <h3 className="font-black text-xs text-emerald-400">

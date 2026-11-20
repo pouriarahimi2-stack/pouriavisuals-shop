@@ -3,10 +3,147 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { unpackProductRow } from "@/lib/productUnpacker";
-import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
-import { randomUUID } from "crypto";
+import { getMasterSiteInfoRow, saveMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import { randomUUID, createSign } from "crypto";
 
 export const dynamic = "force-dynamic";
+
+interface GscStoredConfig {
+  clientEmail: string;
+  privateKey: string;
+  siteUrl: string;
+  connectedAt?: string;
+}
+
+function base64UrlEncodeJson(obj: Record<string, any>): string {
+  return Buffer.from(JSON.stringify(obj))
+    .toString("base64")
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+}
+
+async function fetchLiveGoogleSearchConsoleRows(cfg: GscStoredConfig): Promise<{
+  ok: boolean;
+  rows: Array<{
+    query: string;
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+  }>;
+  error?: string;
+}> {
+  try {
+    const cleanEmail = String(cfg.clientEmail || "").trim();
+    const cleanKey = String(cfg.privateKey || "")
+      .replace(/\\n/g, "\n")
+      .trim();
+    const siteUrl = String(cfg.siteUrl || "sc-domain:axoncore.ir").trim();
+
+    if (!cleanEmail || !cleanKey.includes("BEGIN PRIVATE KEY")) {
+      return { ok: false, rows: [], error: "فرمت ایمیل یا کلید خصوصی Service Account معتبر نیست." };
+    }
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const headerB64 = base64UrlEncodeJson({ alg: "RS256", typ: "JWT" });
+    const claimB64 = base64UrlEncodeJson({
+      iss: cleanEmail,
+      scope: "https://www.googleapis.com/auth/webmasters.readonly",
+      aud: "https://oauth2.googleapis.com/token",
+      exp: nowSec + 3600,
+      iat: nowSec,
+    });
+
+    const unsignedJwt = `${headerB64}.${claimB64}`;
+    const signer = createSign("RSA-SHA256");
+    signer.update(unsignedJwt);
+    signer.end();
+    const signatureB64 = signer
+      .sign(cleanKey)
+      .toString("base64")
+      .replace(/=/g, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_");
+
+    const assertion = `${unsignedJwt}.${signatureB64}`;
+
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion,
+      }).toString(),
+    });
+
+    const tokenJson = await tokenRes.json();
+    if (!tokenRes.ok || !tokenJson.access_token) {
+      return {
+        ok: false,
+        rows: [],
+        error:
+          tokenJson.error_description ||
+          tokenJson.error ||
+          "احراز هویت Google OAuth ناموفق بود.",
+      };
+    }
+
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() - 1);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 29);
+
+    const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
+
+    const gscRes = await fetch(
+      `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(
+        siteUrl
+      )}/searchAnalytics/query`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${tokenJson.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          startDate: fmtDate(startDate),
+          endDate: fmtDate(endDate),
+          dimensions: ["query"],
+          rowLimit: 25,
+        }),
+      }
+    );
+
+    const gscJson = await gscRes.json();
+    if (!gscRes.ok) {
+      return {
+        ok: false,
+        rows: [],
+        error:
+          gscJson?.error?.message ||
+          "دسترسی به این ملک در Search Console تایید نشده است (ایمیل سرویس را به عنوان کاربر در GSC اضافه کنید).",
+      };
+    }
+
+    const rawRows = Array.isArray(gscJson.rows) ? gscJson.rows : [];
+    const mapped = rawRows.map((r: any) => ({
+      query: String(r.keys?.[0] || "").trim(),
+      clicks: Number(r.clicks || 0),
+      impressions: Number(r.impressions || 0),
+      ctr: Number(r.ctr || 0),
+      position: Number(r.position || 0),
+    }));
+
+    return { ok: true, rows: mapped };
+  } catch (err: any) {
+    return {
+      ok: false,
+      rows: [],
+      error: err?.message || "خطا در برقراری ارتباط با Google Search Console API",
+    };
+  }
+}
 
 function buildEnterpriseSeoArticleHtml(params: {
   keyword: string;
@@ -91,15 +228,37 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
-    const [prodsRes, postsRes] = await Promise.all([
+    const [prodsRes, postsRes, siteRow] = await Promise.all([
       supabaseAdmin.from("products").select("*").order("created_at", { ascending: false }),
       supabaseAdmin.from("posts").select("*").order("created_at", { ascending: false }).limit(50),
+      getMasterSiteInfoRow(),
     ]);
 
     const products = (prodsRes.data || []).map(unpackProductRow);
     const posts = postsRes.data || [];
 
-    // تولید کلمات کلیدی هوشمند و تحلیل شکاف محتوایی (Content Gap) بر اساس کالاهای واقعی فروشگاه
+    const layoutCfg = siteRow?.homepage_layout_config || {};
+    const storedGsc: Partial<GscStoredConfig> = layoutCfg.gsc_config || {};
+
+    const effectiveGscConfig: GscStoredConfig | null =
+      (storedGsc.clientEmail && storedGsc.privateKey) ||
+      (process.env.GSC_CLIENT_EMAIL && process.env.GSC_PRIVATE_KEY)
+        ? {
+            clientEmail: storedGsc.clientEmail || process.env.GSC_CLIENT_EMAIL || "",
+            privateKey: storedGsc.privateKey || process.env.GSC_PRIVATE_KEY || "",
+            siteUrl:
+              storedGsc.siteUrl ||
+              process.env.GSC_SITE_URL ||
+              "sc-domain:axoncore.ir",
+          }
+        : null;
+
+    let isLiveGsc = false;
+    let gscError: string | null = null;
+    let totalOrganicClicks = 0;
+    let totalImpressions = 0;
+    let averagePosition = "—";
+
     const searchConsoleKeywords: Array<{
       keyword: string;
       productId: string;
@@ -112,45 +271,115 @@ export async function GET(req: NextRequest) {
       hasExistingArticle: boolean;
     }> = [];
 
-    products.forEach((p: any, idx: number) => {
-      const pName = (p.title || p.name || "").trim();
-      if (!pName) return;
+    if (effectiveGscConfig) {
+      const liveRes = await fetchLiveGoogleSearchConsoleRows(effectiveGscConfig);
+      if (liveRes.ok) {
+        isLiveGsc = true;
+        totalOrganicClicks = liveRes.rows.reduce((s, r) => s + r.clicks, 0);
+        totalImpressions = liveRes.rows.reduce((s, r) => s + r.impressions, 0);
+        if (liveRes.rows.length > 0) {
+          const avgPos =
+            liveRes.rows.reduce((s, r) => s + r.position, 0) / liveRes.rows.length;
+          averagePosition = avgPos.toFixed(1);
+        }
 
-      const hasArticle = posts.some(
-        (post: any) =>
-          String(post.title || "").includes(pName.slice(0, 15)) ||
-          String(post.content || "").includes(`/products/${p.id}`)
-      );
+        liveRes.rows.forEach((row) => {
+          const matchedProd = products.find((p: any) => {
+            const pTitle = String(p.title || p.name || "").toLowerCase();
+            return (
+              pTitle &&
+              row.query
+                .toLowerCase()
+                .split(/\s+/)
+                .some((w) => w.length > 2 && pTitle.includes(w))
+            );
+          });
 
-      const seed = (idx + 1) * 137;
-      const baseImpressions = 1240 + (seed % 2800);
-      const pos = hasArticle ? Number((2.1 + (idx % 4) * 0.7).toFixed(1)) : Number((6.4 + (idx % 7) * 1.1).toFixed(1));
-      const clicks = Math.round(baseImpressions * (hasArticle ? 0.14 : 0.06));
+          const hasArticle = posts.some(
+            (post: any) =>
+              String(post.title || "")
+                .toLowerCase()
+                .includes(row.query.toLowerCase().slice(0, 12)) ||
+              (matchedProd &&
+                String(post.content || "").includes(`/products/${matchedProd.id}`))
+          );
 
-      searchConsoleKeywords.push({
-        keyword: `خرید و قیمت ${pName} با گارانتی اصلی`,
-        productId: String(p.id),
-        productTitle: pName,
-        impressions: baseImpressions,
-        clicks,
-        ctr: ((clicks / baseImpressions) * 100).toFixed(1) + "%",
-        position: pos,
-        intent: "commercial",
-        hasExistingArticle: hasArticle,
+          searchConsoleKeywords.push({
+            keyword: row.query,
+            productId: matchedProd ? String(matchedProd.id) : products[0]?.id || "",
+            productTitle: matchedProd
+              ? matchedProd.title || matchedProd.name
+              : "کل سایت",
+            impressions: row.impressions,
+            clicks: row.clicks,
+            ctr: (row.ctr * 100).toFixed(1) + "%",
+            position: Number(row.position.toFixed(1)),
+            intent:
+              row.query.includes("خرید") || row.query.includes("قیمت")
+                ? "commercial"
+                : "informational",
+            hasExistingArticle: hasArticle,
+          });
+        });
+      } else {
+        gscError = liveRes.error || "خطا در دریافت داده از Google Search Console";
+      }
+    }
+
+    // اگر هنوز به GSC متصل نشده یا کوئری ثبت نشده بود، استخراج فرصت‌های کلیدی از کالاهای کاتالوگ
+    if (searchConsoleKeywords.length === 0) {
+      products.forEach((p: any, idx: number) => {
+        const pName = (p.title || p.name || "").trim();
+        if (!pName) return;
+
+        const hasArticle = posts.some(
+          (post: any) =>
+            String(post.title || "").includes(pName.slice(0, 15)) ||
+            String(post.content || "").includes(`/products/${p.id}`)
+        );
+
+        const seed = (idx + 1) * 137;
+        const baseImpressions = 1240 + (seed % 2800);
+        const pos = hasArticle
+          ? Number((2.1 + (idx % 4) * 0.7).toFixed(1))
+          : Number((6.4 + (idx % 7) * 1.1).toFixed(1));
+        const clicks = Math.round(baseImpressions * (hasArticle ? 0.14 : 0.06));
+
+        searchConsoleKeywords.push({
+          keyword: `خرید و قیمت ${pName} با گارانتی اصلی`,
+          productId: String(p.id),
+          productTitle: pName,
+          impressions: baseImpressions,
+          clicks,
+          ctr: ((clicks / baseImpressions) * 100).toFixed(1) + "%",
+          position: pos,
+          intent: "commercial",
+          hasExistingArticle: hasArticle,
+        });
+
+        searchConsoleKeywords.push({
+          keyword: `بررسی تخصصی و ارزش خرید ${pName}`,
+          productId: String(p.id),
+          productTitle: pName,
+          impressions: Math.round(baseImpressions * 0.75),
+          clicks: Math.round(clicks * 0.7),
+          ctr: "8.4%",
+          position: Number((pos + 1.2).toFixed(1)),
+          intent: "comparison",
+          hasExistingArticle: hasArticle,
+        });
       });
 
-      searchConsoleKeywords.push({
-        keyword: `بررسی تخصصی و ارزش خرید ${pName}`,
-        productId: String(p.id),
-        productTitle: pName,
-        impressions: Math.round(baseImpressions * 0.75),
-        clicks: Math.round(clicks * 0.7),
-        ctr: "8.4%",
-        position: Number((pos + 1.2).toFixed(1)),
-        intent: "comparison",
-        hasExistingArticle: hasArticle,
-      });
-    });
+      if (!isLiveGsc) {
+        totalOrganicClicks =
+          searchConsoleKeywords.reduce((acc, k) => acc + k.clicks, 0) ||
+          products.length * 64;
+        totalImpressions =
+          searchConsoleKeywords.reduce((acc, k) => acc + k.impressions, 0) ||
+          products.length * 820;
+        averagePosition = "4.2";
+      }
+    }
 
     const contentGapProducts = products
       .filter(
@@ -172,16 +401,17 @@ export async function GET(req: NextRequest) {
       {
         success: true,
         data: {
-          totalOrganicClicks:
-            searchConsoleKeywords.reduce((acc, k) => acc + k.clicks, 0) ||
-            products.length * 64,
-          totalImpressions:
-            searchConsoleKeywords.reduce((acc, k) => acc + k.impressions, 0) ||
-            products.length * 820,
+          isLiveGsc,
+          gscError,
+          gscClientEmail: effectiveGscConfig?.clientEmail || "",
+          gscSiteUrl: effectiveGscConfig?.siteUrl || "sc-domain:axoncore.ir",
+          totalOrganicClicks,
+          totalImpressions,
+          averagePosition,
           seoHealthScore: 98,
           contentGapCount: contentGapProducts.length,
           contentGapProducts,
-          searchConsoleKeywords: searchConsoleKeywords.slice(0, 20),
+          searchConsoleKeywords: searchConsoleKeywords.slice(0, 25),
           recentAutopilotPosts: posts.slice(0, 8).map((pt: any) => ({
             id: String(pt.id),
             title: pt.title,
@@ -205,6 +435,89 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+
+    // اکشن ۱: اتصال، تست زنده و ذخیره اعتبارنامه Google Search Console Service Account
+    if (body.action === "save_gsc_config") {
+      let clientEmail = String(body.clientEmail || "").trim();
+      let privateKey = String(body.privateKey || "").trim();
+      const siteUrl = String(body.siteUrl || "sc-domain:axoncore.ir").trim();
+
+      // پشتیبانی از چسباندن کل فایل JSON دانلودشده از Google Cloud
+      if (body.serviceAccountJson) {
+        try {
+          const parsedJson = JSON.parse(String(body.serviceAccountJson));
+          if (parsedJson.client_email) clientEmail = String(parsedJson.client_email).trim();
+          if (parsedJson.private_key) privateKey = String(parsedJson.private_key).trim();
+        } catch {
+          return NextResponse.json(
+            { success: false, message: "فایل JSON وارد شده معتبر نیست." },
+            { status: 400 }
+          );
+        }
+      }
+
+      if (!clientEmail || !privateKey) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "ایمیل Service Account و کلید خصوصی (Private Key) الزامی هستند.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const testResult = await fetchLiveGoogleSearchConsoleRows({
+        clientEmail,
+        privateKey,
+        siteUrl,
+      });
+
+      if (!testResult.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `خطای اتصال به گوگل: ${testResult.error}`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const siteRow = await getMasterSiteInfoRow();
+      const layoutCfg = siteRow?.homepage_layout_config || {};
+      await saveMasterSiteInfoRow(
+        siteRow,
+        {
+          ...layoutCfg,
+          gsc_config: {
+            clientEmail,
+            privateKey,
+            siteUrl,
+            connectedAt: new Date().toISOString(),
+          },
+        },
+        {}
+      );
+
+      return NextResponse.json({
+        success: true,
+        rowsCount: testResult.rows.length,
+        message: `✓ اتصال زنده به Google Search Console با موفقیت برقرار شد و ${testResult.rows.length} عبارت جستجوی واقعی از گوگل دریافت گردید!`,
+      });
+    }
+
+    // اکشن ۲: قطع اتصال سرچ کنسول
+    if (body.action === "disconnect_gsc") {
+      const siteRow = await getMasterSiteInfoRow();
+      const layoutCfg = { ...(siteRow?.homepage_layout_config || {}) };
+      delete layoutCfg.gsc_config;
+      await saveMasterSiteInfoRow(siteRow, layoutCfg, {});
+      return NextResponse.json({
+        success: true,
+        message: "✓ اتصال Google Search Console قطع شد.",
+      });
+    }
+
+    // اکشن ۳: نگارش و انتشار مقاله تخصصی سئو متصل به کالا
     const targetProductId = body.targetProductId || body.productId || "";
     const articleType: "review" | "buying_guide" | "comparison" =
       body.articleType || "buying_guide";
@@ -228,7 +541,6 @@ export async function POST(req: NextRequest) {
           : "راهنمای خرید تجهیزات دیجیتال")
     ).trim();
 
-    // دریافت کلید Gemini از تمامی محل‌های ممکن در دیتابیس و محیط سرور
     const siteRow = await getMasterSiteInfoRow();
     const aiCfg = siteRow?.homepage_layout_config?.ai_provider_config || {};
     const apiKey =
@@ -278,7 +590,6 @@ export async function POST(req: NextRequest) {
       } catch {}
     }
 
-    // اگر کلید API تنظیم نشده بود یا ارتباط خارجی برقرار نشد، استفاده از موتور هوشمند داخلی با مشخصات واقعی کالا
     if (!generatedHtml) {
       generatedHtml = buildEnterpriseSeoArticleHtml({
         keyword,
@@ -293,9 +604,10 @@ export async function POST(req: NextRequest) {
       .replace(/^-+|-+$/g, "")
       .slice(0, 60);
 
-    const articleTitle = keyword.startsWith("بررسی") || keyword.startsWith("راهنمای")
-      ? keyword
-      : `بررسی تخصصی و راهنمای خرید ${keyword}`;
+    const articleTitle =
+      keyword.startsWith("بررسی") || keyword.startsWith("راهنمای")
+        ? keyword
+        : `بررسی تخصصی و راهنمای خرید ${keyword}`;
 
     const metaDescription = targetProduct
       ? `بررسی تخصصی، جدول مشخصات فنی و راهنمای خرید ${targetProduct.title} با بهترین قیمت روز (${Number(

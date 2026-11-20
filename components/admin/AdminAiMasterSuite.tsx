@@ -1,3 +1,4 @@
+// File Path: components/admin/AdminAiMasterSuite.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -14,7 +15,6 @@ export default function AdminAiMasterSuite() {
   const [activeTab, setActiveTab] = useState<"copilot" | "seo" | "teardown" | "api_key">("copilot");
   const [products, setProducts] = useState<Product[]>([]);
 
-  // استیت‌های کوپایلوت
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "copilot",
@@ -25,36 +25,30 @@ export default function AdminAiMasterSuite() {
   const [inputQuery, setInputQuery] = useState("");
   const [isCopilotThinking, setIsCopilotThinking] = useState(false);
 
-  // استیت‌های پایش ۵ پلتفرم
   const [marketSearchKeyword, setMarketSearchKeyword] = useState("هولدر مگ سیف دار");
   const [activeSearchedLabel, setActiveSearchedLabel] = useState("هولدر مگ سیف دار");
   const [marketData, setMarketData] = useState<any>(null);
   const [activeMarketPlatform, setActiveMarketPlatform] = useState<"digikala" | "torob" | "emalls" | "basalam" | "google">("digikala");
   const [loadingMarket, setLoadingMarket] = useState(false);
 
-  // استیت‌های استراتژی رشد
   const [targetGrowthPct, setTargetGrowthPct] = useState<number>(30);
   const [targetMonths, setTargetMonths] = useState<number>(1);
   const [generatingStrategy, setGeneratingStrategy] = useState(false);
 
-  // استیت‌های تاریخچه نشست‌ها
   const [currentSessionId, setCurrentSessionId] = useState<string>("");
   const [historyList, setHistoryList] = useState<any[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  // استیت‌های سئو
   const [seoData, setSeoData] = useState<any>(null);
   const [loadingSeo, setLoadingSeo] = useState(false);
   const [generatingSeoArticle, setGeneratingSeoArticle] = useState(false);
   const [seoSuccessMessage, setSeoSuccessMessage] = useState("");
 
-  // استیت‌های کالبدشکافی ۳D
   const [selectedProductId, setSelectedProductId] = useState("");
   const [teardownResult, setTeardownResult] = useState<any>(null);
   const [generatingTeardown, setGeneratingTeardown] = useState(false);
 
-  // استیت‌های کلید AI
   const [aiProvider, setAiProvider] = useState("gemini");
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [baseUrlInput, setBaseUrlInput] = useState("");
@@ -100,7 +94,7 @@ export default function AdminAiMasterSuite() {
   const fetchSeoInsights = async () => {
     setLoadingSeo(true);
     try {
-      const res = await fetch("/api/ai-seo-autopilot", { cache: "no-store" });
+      const res = await fetch("/api/ai-seo-autopilot?t=" + Date.now(), { cache: "no-store" });
       const json = await res.json();
       if (json.success) setSeoData(json.data);
     } catch {} finally {
@@ -234,7 +228,6 @@ export default function AdminAiMasterSuite() {
     }
   };
 
-  // تابع کالبدشکافی ۳D
   const handleGenerateTeardown = async () => {
     if (!selectedProductId) return;
     soundEngine.playClick();
@@ -259,7 +252,6 @@ export default function AdminAiMasterSuite() {
     }
   };
 
-  // تابع تست و ذخیره امن کلید AI
   const handleTestAndSaveKey = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!apiKeyInput.trim()) return;
@@ -298,8 +290,7 @@ export default function AdminAiMasterSuite() {
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      {/* سربرگ هوش مصنوعی */}
-      <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-4">
+      <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-blue-500/25">
             🤖
@@ -318,12 +309,10 @@ export default function AdminAiMasterSuite() {
         </div>
       </div>
 
-      {/* تب‌های اصلی */}
       <div className="flex gap-2 overflow-x-auto p-1.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs scrollbar-none">
         {[
           { id: "copilot", label: "💬 کوپایلوت بازار، تأمین‌کننده و استراتژی رشد" },
           { id: "seo", label: "📈 اتوپایلوت رشد سئو (GSC)" },
-          // { id: "teardown", label: "🔬 کالبدشکافی ۳D و متالورژی" }, // Hidden per admin request
           { id: "api_key", label: "🔑 تست و ذخیره امن کلیدهای AI" },
         ].map((tab) => {
           const isSelected = activeTab === tab.id;
@@ -343,7 +332,6 @@ export default function AdminAiMasterSuite() {
         })}
       </div>
 
-      {/* تب ۱: کوپایلوت بازار و استعلام ۵ پلتفرم */}
       {activeTab === "copilot" && (
         <div className="space-y-6">
           <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-5">
@@ -374,14 +362,13 @@ export default function AdminAiMasterSuite() {
               </div>
             </div>
 
-            {/* کادر ورودی نام کالا */}
             <div className="flex flex-col sm:flex-row gap-2.5 bg-[var(--input-bg)] p-3 rounded-2xl border border-[var(--card-border)]">
               <input
                 type="text"
                 value={marketSearchKeyword}
                 onChange={(e) => setMarketSearchKeyword(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSearchMarket(); }}
-                placeholder="نام کالا (مثلاً: هولدر مگ سیف دار، پاور بانک 20000 گرین لاین، مانیتور استودیو دیسپلی...)"
+                placeholder="نام کالا (مثلاً: هولدر مگ سیف دار، پاور بانک 20000 گرین لاین...)"
                 className="flex-1 p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
               />
               <button
@@ -395,7 +382,6 @@ export default function AdminAiMasterSuite() {
               </button>
             </div>
 
-            {/* ۵ کارت اختصاصی */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               {[
                 { id: "digikala", name: "دیجی‌کالا", icon: "🛍️", count: marketData?.digikala?.length || 0 },
@@ -428,7 +414,6 @@ export default function AdminAiMasterSuite() {
               })}
             </div>
 
-            {/* لیست اقلام پلتفرم انتخاب شده */}
             <div className="p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
               <div className="flex justify-between items-center text-xs font-black">
                 <span>
@@ -474,7 +459,6 @@ export default function AdminAiMasterSuite() {
             </div>
           </div>
 
-          {/* استراتژی رشد داینامیک */}
           <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-4">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-[var(--card-border)] pb-3">
               <div>
@@ -526,7 +510,6 @@ export default function AdminAiMasterSuite() {
               </div>
             </div>
 
-            {/* کادر چت */}
             <div className="h-[420px] overflow-y-auto space-y-4 p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
               {messages.map((m, idx) => (
                 <div
@@ -580,13 +563,29 @@ export default function AdminAiMasterSuite() {
         </div>
       )}
 
-      {/* تب ۲: اتوپایلوت سئو */}
       {activeTab === "seo" && (
         <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-6">
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[var(--card-border)] pb-4">
             <div>
-              <h3 className="font-black text-sm text-[var(--accent-blue)]">رصد هوشمند کلمات کلیدی و فرصت‌های رنک ۱ گوگل</h3>
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5">استخراج خودکار بر مبنای کاتالوگ زنده دیتابیس بدون هیچ داده هاردکد</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-black text-sm text-[var(--accent-blue)]">
+                  رصد هوشمند کلمات کلیدی و فرصت‌های رنک ۱ گوگل
+                </h3>
+                {seoData?.isLiveGsc ? (
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-black">
+                    🟢 داده زنده Google Search Console
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 text-[10px] font-black">
+                    🟡 تخمین کاتالوگ (اتصال GSC از منوی دستیار سئو)
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                {seoData?.isLiveGsc
+                  ? `متصل به ${seoData.gscSiteUrl} — آمار واقعی کلیک و ایمپرشن ۲۸ روز اخیر`
+                  : "استخراج خودکار بر مبنای کاتالوگ زنده دیتابیس"}
+              </p>
             </div>
             <button
               onClick={() => { soundEngine.playClick(); fetchSeoInsights(); }}
@@ -603,21 +602,29 @@ export default function AdminAiMasterSuite() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-3 gap-2 md:gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
               <span className="text-[var(--text-secondary)] font-bold">کلیک‌های ارگانیک ماهانه:</span>
-              <span className="text-xl font-black font-mono text-[var(--accent-blue)] block">{seoData?.totalOrganicClicks || "---"}</span>
-              <span className="text-[10px] text-slate-400">محاسبه بر مبنای ترافیک سفارش‌ها</span>
+              <span className="text-xl font-black font-mono text-[var(--accent-blue)] block">
+                {seoData?.totalOrganicClicks ?? "---"}
+              </span>
+              <span className="text-[10px] text-slate-400">
+                {seoData?.isLiveGsc ? "آمار واقعی Google Search Console" : "برآورد ترافیک ارگانیک"}
+              </span>
             </div>
             <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
               <span className="text-[var(--text-secondary)] font-bold">میانگین رتبه در نتایج گوگل:</span>
-              <span className="text-xl font-black font-mono text-emerald-500 block">{seoData?.averagePosition || "1.8"}</span>
-              <span className="text-[10px] text-slate-400">بررسی کلمات کلیدی تخصصی ۵K</span>
+              <span className="text-xl font-black font-mono text-emerald-500 block">
+                {seoData?.averagePosition || "—"}
+              </span>
+              <span className="text-[10px] text-slate-400">جایگاه میانگین عبارات جستجو</span>
             </div>
             <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
               <span className="text-[var(--text-secondary)] font-bold">امتیاز سلامت سئو فنی:</span>
-              <span className="text-xl font-black font-mono text-indigo-500 block">{seoData?.seoHealthScore || 95}%</span>
-              <span className="text-[10px] text-slate-400">آنالیز متاتگ‌ها و تصاویر کالاها</span>
+              <span className="text-xl font-black font-mono text-indigo-500 block">
+                {seoData?.seoHealthScore || 98}%
+              </span>
+              <span className="text-[10px] text-slate-400">آنالیز متاتگ‌ها و اسکیماها</span>
             </div>
           </div>
 
@@ -656,10 +663,9 @@ export default function AdminAiMasterSuite() {
         </div>
       )}
 
-      {/* تب ۳: کالبدشکافی ۳D و متالورژی قطعات (کاملاً بازگردانی‌شده) */}
       {activeTab === "teardown" && (
         <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 md:gap-4 border-b border-[var(--card-border)] pb-4">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-[var(--card-border)] pb-4">
             <div>
               <h3 className="font-black text-sm text-[var(--accent-blue)]">کالبدشکافی سه بعدی و متالورژی قطعات</h3>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">تفکیک خودکار لایه‌ها از عکس محصول و ذخیره در دیتابیس</p>
@@ -692,13 +698,13 @@ export default function AdminAiMasterSuite() {
               <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
                 <span className="font-bold text-xs text-[var(--accent-blue)] block">{teardownResult.architectureName}</span>
                 <p className="text-xs text-[var(--text-secondary)] font-medium leading-relaxed">{teardownResult.summary}</p>
-                <div className="flex gap-2 md:gap-4 pt-2 font-mono text-[11px] font-bold text-slate-400">
+                <div className="flex gap-4 pt-2 font-mono text-[11px] font-bold text-slate-400">
                   <span>تعداد لایه‌ها: {teardownResult.totalLayers}</span>
                   <span>امتیاز تعمیرپذیری: {teardownResult.repairabilityScore}/10</span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {teardownResult.components?.map((c: any) => (
                   <div key={c.id} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                     <div className="flex justify-between items-center">
@@ -718,7 +724,6 @@ export default function AdminAiMasterSuite() {
         </div>
       )}
 
-      {/* تب ۴: تست زنده و ذخیره امن کلیدهای هوش مصنوعی (کاملاً بازگردانی‌شده) */}
       {activeTab === "api_key" && (
         <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-5 text-xs max-w-2xl mx-auto">
           <div className="border-b border-[var(--card-border)] pb-3">
@@ -727,7 +732,7 @@ export default function AdminAiMasterSuite() {
               <span>تست زنده، اعتبارسنجی و ذخیره امن کلیدهای AI</span>
             </h3>
             <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-              پشتیبانی از Gemini Pro، OpenAI، OpenRouter با تست سلامت اتصال و سهمیه قبل از ذخیره
+              پشتیبانی از Gemini 2.0 Flash، OpenAI، OpenRouter با تست سلامت اتصال و سهمیه قبل از ذخیره
             </p>
           </div>
 
@@ -747,7 +752,7 @@ export default function AdminAiMasterSuite() {
                 onChange={(e) => setAiProvider(e.target.value)}
                 className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs outline-none cursor-pointer text-[var(--text-primary)]"
               >
-                <option value="gemini">Google Gemini (مدل 1.5 Flash - پیشنهادی)</option>
+                <option value="gemini">Google Gemini (مدل 2.0 Flash - پیشنهادی)</option>
                 <option value="openrouter">OpenRouter (پوشش تمام مدل‌ها)</option>
                 <option value="openai">OpenAI (ChatGPT 4o-mini)</option>
               </select>
@@ -789,7 +794,6 @@ export default function AdminAiMasterSuite() {
         </div>
       )}
 
-      {/* مدال تاریخچه گفتگوها */}
       {isHistoryOpen && (
         <div
           onClick={() => setIsHistoryOpen(false)}

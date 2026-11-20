@@ -1,7 +1,8 @@
 // File Path: components/ProductCompareModal.tsx
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
+import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
 import { formatPrice } from "@/lib/formatters";
 
@@ -9,8 +10,12 @@ export interface CompareProductItem {
   id: string | number;
   title: string;
   price: number;
+  discount_price?: number | null;
   image?: string;
   category?: string;
+  brand?: string;
+  warranty?: string;
+  stock?: number;
   specs?: Record<string, string>;
 }
 
@@ -25,16 +30,21 @@ export default function ProductCompareModal({
   onClose,
   products = [],
 }: ProductCompareModalProps) {
-  if (!isOpen || products.length === 0) return null;
+  const dynamicSpecKeys = useMemo(() => {
+    const keys = new Set<string>();
+    products.forEach((p) => {
+      if (p.specs && typeof p.specs === "object") {
+        Object.keys(p.specs).forEach((k) => {
+          if (k && String(p.specs?.[k] || "").trim()) {
+            keys.add(k);
+          }
+        });
+      }
+    });
+    return Array.from(keys);
+  }, [products]);
 
-  const specKeys = [
-    { key: "resolution", label: "رزولوشن و تراکم پیکسل", defaultVal: "5K Retina (218 PPI)" },
-    { key: "color_gamut", label: "پوشش گاموت رنگ", defaultVal: "99% DCI-P3 (10-bit)" },
-    { key: "brightness", label: "روشنایی پایدار", defaultVal: "600 Nits SDR" },
-    { key: "ports", label: "درگاه‌های ارتباطی", defaultVal: "Thunderbolt 4 / USB4 (96W PD)" },
-    { key: "calibration", label: "کالیبراسیون سخت‌افزاری", defaultVal: "جدول رنگ داخلی 3D LUT" },
-    { key: "panel_type", label: "نوع پنل و فناوری ساخت", defaultVal: "IPS True Tone" },
-  ];
+  if (!isOpen || products.length === 0) return null;
 
   return (
     <div
@@ -45,10 +55,10 @@ export default function ProductCompareModal({
         <header className="p-4 sm:p-6 border-b border-[var(--card-border)] flex items-center justify-between gap-3">
           <div>
             <h3 className="font-black text-sm sm:text-base">
-              جدول مقایسه فنی و تخصصی تجهیزات دیجیتال
+              جدول مقایسه فنی و تخصصی محصولات ({products.length.toLocaleString("fa-IR")} کالا)
             </h3>
             <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-              مقایسه دقیق پارامترهای سخت‌افزاری، کیفیت ساخت و ارزش خرید کالاها
+              مقایسه دقیق مشخصات فنی، گارانتی، وضعیت موجودی و قیمت کالاها
             </p>
           </div>
           <button
@@ -68,40 +78,99 @@ export default function ProductCompareModal({
             <thead>
               <tr className="border-b border-[var(--card-border)]">
                 <th className="p-3 text-right font-black text-[var(--text-secondary)] w-1/4">
-                  پارامتر سخت‌افزاری
+                  مشخصه / ویژگی
                 </th>
-                {products.map((p) => (
-                  <th key={p.id} className="p-3 text-center w-1/3">
-                    <div className="space-y-2 flex flex-col items-center">
-                      <div className="w-16 h-16 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] p-1.5 flex items-center justify-center">
-                        <img
-                          src={p.image || "/placeholder.png"}
-                          alt={p.title}
-                          className="w-full h-full object-contain"
-                        />
+                {products.map((p) => {
+                  const effectivePrice =
+                    p.discount_price && Number(p.discount_price) > 0
+                      ? Number(p.discount_price)
+                      : Number(p.price || 0);
+                  return (
+                    <th key={p.id} className="p-3 text-center">
+                      <div className="space-y-2 flex flex-col items-center">
+                        <div className="w-16 h-16 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] p-1.5 flex items-center justify-center">
+                          <img
+                            src={p.image || "/placeholder.png"}
+                            alt={p.title}
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <Link
+                          href={`/products/${p.id}`}
+                          onClick={onClose}
+                          className="font-bold line-clamp-2 max-w-[180px] hover:text-[var(--accent-blue)] transition"
+                        >
+                          {p.title}
+                        </Link>
+                        <span
+                          className="font-mono font-black text-emerald-500 whitespace-nowrap"
+                          suppressHydrationWarning
+                        >
+                          {formatPrice(effectivePrice)} تومان
+                        </span>
                       </div>
-                      <span className="font-bold line-clamp-2 max-w-[160px]">{p.title}</span>
-                      <span
-                        className="font-mono font-black text-emerald-600 dark:text-emerald-400 whitespace-nowrap"
-                        suppressHydrationWarning
-                      >
-                        {formatPrice(p.price)} ت
-                      </span>
-                    </div>
-                  </th>
-                ))}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--card-border)]">
-              {specKeys.map((item) => (
-                <tr key={item.key} className="hover:bg-[var(--input-bg)]/40 transition">
-                  <td className="p-3 font-bold text-[var(--text-secondary)]">{item.label}</td>
+              <tr className="hover:bg-[var(--input-bg)]/40 transition">
+                <td className="p-3 font-bold text-[var(--text-secondary)]">دسته‌بندی</td>
+                {products.map((p) => (
+                  <td key={p.id} className="p-3 text-center font-bold">
+                    {p.category || "کالای دیجیتال"}
+                  </td>
+                ))}
+              </tr>
+
+              <tr className="hover:bg-[var(--input-bg)]/40 transition">
+                <td className="p-3 font-bold text-[var(--text-secondary)]">برند / سازنده</td>
+                {products.map((p) => (
+                  <td key={p.id} className="p-3 text-center font-bold">
+                    {p.brand || "—"}
+                  </td>
+                ))}
+              </tr>
+
+              <tr className="hover:bg-[var(--input-bg)]/40 transition">
+                <td className="p-3 font-bold text-[var(--text-secondary)]">گارانتی و اصالت</td>
+                {products.map((p) => (
+                  <td key={p.id} className="p-3 text-center font-bold text-sky-400">
+                    {p.warranty || "ضمانت اصالت طلایی"}
+                  </td>
+                ))}
+              </tr>
+
+              <tr className="hover:bg-[var(--input-bg)]/40 transition">
+                <td className="p-3 font-bold text-[var(--text-secondary)]">وضعیت انبار</td>
+                {products.map((p) => {
+                  const inStock = p.stock === undefined || Number(p.stock) > 0;
+                  return (
+                    <td key={p.id} className="p-3 text-center font-black">
+                      <span
+                        className={
+                          inStock ? "text-emerald-500" : "text-rose-500"
+                        }
+                      >
+                        {inStock ? "موجود در انبار ✓" : "ناموجود"}
+                      </span>
+                    </td>
+                  );
+                })}
+              </tr>
+
+              {dynamicSpecKeys.map((specKey) => (
+                <tr key={specKey} className="hover:bg-[var(--input-bg)]/40 transition">
+                  <td className="p-3 font-bold text-[var(--text-secondary)]">
+                    {specKey}
+                  </td>
                   {products.map((p) => (
                     <td
                       key={p.id}
-                      className="p-3 text-center font-medium font-mono text-[11px] text-[var(--text-primary)]"
+                      className="p-3 text-center font-medium text-[11px] text-[var(--text-primary)]"
                     >
-                      {(p.specs && p.specs[item.key]) || item.defaultVal}
+                      {(p.specs && p.specs[specKey]) || "—"}
                     </td>
                   ))}
                 </tr>

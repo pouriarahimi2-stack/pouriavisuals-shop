@@ -169,6 +169,10 @@ export default async function BlogPostPage({ params }: PageProps) {
   const layoutCfg = siteRow?.homepage_layout_config || {};
   const sys = normalizeSystemSettings(layoutCfg, siteRow);
   const blogCfg = layoutCfg?.blog_page_config || {};
+  const postAuthorsMap: Record<string, string> =
+    layoutCfg?.blog_post_authors && typeof layoutCfg.blog_post_authors === "object"
+      ? layoutCfg.blog_post_authors
+      : {};
 
   const [linkedProduct, relatedPosts] = await Promise.all([
     getLinkedProductFromContent(post.content || ""),
@@ -183,6 +187,73 @@ export default async function BlogPostPage({ params }: PageProps) {
   const siteName = sys.site_name || "آکسون کور | Axon Core";
   const postUrl = `${baseUrl}/blog/${encodeURIComponent(post.slug || post.id)}`;
   const readingMinutes = estimateReadingMinutes(post.content);
+
+  // تنظیمات قابل ویرایش تمام بخش‌های صفحه مقاله از پنل مدیریت
+  const showBreadcrumb = blogCfg.showBreadcrumb !== false;
+  const breadcrumbHomeLabel = String(
+    blogCfg.breadcrumbHomeLabel || "خانه"
+  ).trim();
+  const breadcrumbBlogLabel = String(
+    blogCfg.breadcrumbBlogLabel || "مجله تخصصی"
+  ).trim();
+
+  const showReadingTime = blogCfg.showReadingTime !== false;
+  const readingTimePrefix = String(
+    blogCfg.readingTimePrefix || "زمان مطالعه:"
+  ).trim();
+  const readingTimeUnit = String(blogCfg.readingTimeUnit || "دقیقه").trim();
+
+  const showAuthor = blogCfg.showAuthor !== false;
+  const authorPrefix = String(blogCfg.authorPrefix || "نویسنده:").trim();
+  const resolvedAuthor = String(
+    post.author ||
+      postAuthorsMap[String(post.id)] ||
+      blogCfg.defaultAuthorName ||
+      `تحریریه فنی ${siteName}`
+  ).trim();
+
+  const showPublishDate = blogCfg.showPublishDate !== false;
+  const publishDatePrefix = String(
+    blogCfg.publishDatePrefix || "تاریخ انتشار:"
+  ).trim();
+
+  const showFeaturedImage = blogCfg.showFeaturedImage !== false;
+
+  const showLinkedProductCard = blogCfg.showLinkedProductCard !== false;
+  const linkedProductBadge = String(
+    blogCfg.linkedProductBadge || "🛍️ محصول بررسی‌شده در این مقاله"
+  ).trim();
+  const linkedProductButtonText = String(
+    blogCfg.linkedProductButtonText || "مشاهده مشخصات و خرید آنلاین ←"
+  ).trim();
+  const productWarrantyDisplay = String(
+    linkedProduct?.warranty || blogCfg.defaultWarrantyFallback || ""
+  ).trim();
+
+  const showRelatedPosts = blogCfg.showRelatedPosts !== false;
+  const relatedPostsTitle = String(
+    blogCfg.relatedPostsTitle || "📚 سایر مقالات و راهنماهای تخصصی مرتبط"
+  ).trim();
+  const relatedPostLinkText = String(
+    blogCfg.relatedPostLinkText || "مطالعه مقاله ←"
+  ).trim();
+
+  const ctaBoxEnabled = blogCfg.ctaBoxEnabled !== false;
+  const ctaBoxTitle = String(
+    blogCfg.ctaBoxTitle || "نیاز به مشاوره تخصصی جهت خرید محصولات دارید؟"
+  ).trim();
+  const ctaBoxSubtitle = String(
+    blogCfg.ctaBoxSubtitle ||
+      `کارشناسان ${siteName} آماده پاسخگویی و راهنمایی تخصصی شما برای انتخاب بهترین کالا هستند.`
+  ).trim();
+  const ctaButtonText = String(
+    blogCfg.ctaButtonText || "مشاهده کاتالوگ محصولات ←"
+  ).trim();
+  const ctaButtonUrl = String(blogCfg.ctaButtonUrl || "/products").trim();
+  const archiveButtonText = String(
+    blogCfg.archiveButtonText || "آرشیو مجله"
+  ).trim();
+  const archiveButtonUrl = String(blogCfg.archiveButtonUrl || "/blog").trim();
 
   const cleanDesc =
     post.meta_description ||
@@ -202,7 +273,7 @@ export default async function BlogPostPage({ params }: PageProps) {
     dateModified: post.updated_at || post.created_at,
     author: {
       "@type": "Person",
-      name: post.author || `کارشناس فنی ${siteName}`,
+      name: resolvedAuthor,
     },
     publisher: {
       "@type": "Organization",
@@ -227,13 +298,13 @@ export default async function BlogPostPage({ params }: PageProps) {
       {
         "@type": "ListItem",
         position: 1,
-        name: "صفحه اصلی",
+        name: breadcrumbHomeLabel || "صفحه اصلی",
         item: baseUrl,
       },
       {
         "@type": "ListItem",
         position: 2,
-        name: "مجله تخصصی",
+        name: breadcrumbBlogLabel || "مجله تخصصی",
         item: `${baseUrl}/blog`,
       },
       {
@@ -244,27 +315,6 @@ export default async function BlogPostPage({ params }: PageProps) {
       },
     ],
   };
-
-  const productWarrantyDisplay = String(
-    linkedProduct?.warranty || blogCfg.defaultWarrantyFallback || ""
-  ).trim();
-
-  const ctaBoxEnabled = blogCfg.ctaBoxEnabled !== false;
-  const ctaBoxTitle = String(
-    blogCfg.ctaBoxTitle || "نیاز به مشاوره تخصصی پیش از خرید دارید؟"
-  ).trim();
-  const ctaBoxSubtitle = String(
-    blogCfg.ctaBoxSubtitle ||
-      `کارشناسان ${siteName} آماده پاسخگویی و راهنمایی تخصصی شما برای انتخاب بهترین کالا هستند.`
-  ).trim();
-  const ctaButtonText = String(
-    blogCfg.ctaButtonText || "مشاهده کاتالوگ محصولات ←"
-  ).trim();
-  const ctaButtonUrl = String(blogCfg.ctaButtonUrl || "/products").trim();
-  const archiveButtonText = String(
-    blogCfg.archiveButtonText || "آرشیو مجله"
-  ).trim();
-  const showRelatedPosts = blogCfg.showRelatedPosts !== false;
 
   return (
     <article
@@ -280,65 +330,79 @@ export default async function BlogPostPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbJsonLd) }}
       />
 
-      <nav className="flex flex-wrap items-center gap-2 text-xs font-bold text-[var(--text-secondary)]">
-        <Link href="/" className="hover:text-[var(--accent-blue)] transition">
-          خانه
-        </Link>
-        <span>/</span>
-        <Link
-          href="/blog"
-          className="hover:text-[var(--accent-blue)] transition"
-        >
-          مجله تخصصی
-        </Link>
-        <span>/</span>
-        <span className="text-[var(--text-primary)] truncate max-w-[220px] sm:max-w-md">
-          {post.title}
-        </span>
-      </nav>
+      {showBreadcrumb && (
+        <nav className="flex flex-wrap items-center gap-2 text-xs font-bold text-[var(--text-secondary)]">
+          <Link href="/" className="hover:text-[var(--accent-blue)] transition">
+            {breadcrumbHomeLabel}
+          </Link>
+          <span>/</span>
+          <Link
+            href="/blog"
+            className="hover:text-[var(--accent-blue)] transition"
+          >
+            {breadcrumbBlogLabel}
+          </Link>
+          <span>/</span>
+          <span className="text-[var(--text-primary)] truncate max-w-[220px] sm:max-w-md">
+            {post.title}
+          </span>
+        </nav>
+      )}
 
       <header className="space-y-4 border-b border-[var(--card-border)] pb-6">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-xs font-black inline-block">
-            {post.category || "راهنمای خرید و بررسی تخصصی"}
-          </span>
-          <span className="px-3 py-1 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold text-[var(--text-secondary)]">
-            ⏱️ زمان مطالعه: {readingMinutes} دقیقه
-          </span>
+          {post.category && (
+            <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-xs font-black inline-block">
+              {post.category}
+            </span>
+          )}
+          {showReadingTime && (
+            <span className="px-3 py-1 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold text-[var(--text-secondary)]">
+              ⏱️ {readingTimePrefix} {readingMinutes} {readingTimeUnit}
+            </span>
+          )}
         </div>
 
         <h1 className="text-xl sm:text-3xl lg:text-4xl font-black leading-snug">
           {post.title}
         </h1>
 
-        <div className="flex flex-wrap items-center gap-4 text-xs text-[var(--text-secondary)] font-medium">
-          <span>
-            ✍️ نویسنده:{" "}
-            <strong className="text-[var(--text-primary)]">
-              {post.author || `تحریریه فنی ${siteName}`}
-            </strong>
-          </span>
-          <span>•</span>
-          <span>
-            📅 تاریخ انتشار:{" "}
-            {post.created_at
-              ? new Date(post.created_at).toLocaleDateString("fa-IR")
-              : "به‌روزرسانی جدید"}
-          </span>
-        </div>
+        {(showAuthor || showPublishDate) && (
+          <div className="flex flex-wrap items-center gap-4 text-xs text-[var(--text-secondary)] font-medium">
+            {showAuthor && (
+              <span>
+                ✍️ {authorPrefix}{" "}
+                <strong className="text-[var(--text-primary)]">
+                  {resolvedAuthor}
+                </strong>
+              </span>
+            )}
+            {showAuthor && showPublishDate && <span>•</span>}
+            {showPublishDate && (
+              <span>
+                📅 {publishDatePrefix}{" "}
+                {post.created_at
+                  ? new Date(post.created_at).toLocaleDateString("fa-IR")
+                  : "به‌روزرسانی جدید"}
+              </span>
+            )}
+          </div>
+        )}
       </header>
 
-      {post.image_url && post.image_url !== "/placeholder.png" && (
-        <div className="rounded-3xl sm:rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 overflow-hidden shadow-xl">
-          <img
-            src={post.image_url}
-            alt={post.title}
-            width={900}
-            height={480}
-            className="w-full h-auto max-h-[440px] object-cover rounded-2xl sm:rounded-[2rem]"
-          />
-        </div>
-      )}
+      {showFeaturedImage &&
+        post.image_url &&
+        post.image_url !== "/placeholder.png" && (
+          <div className="rounded-3xl sm:rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 overflow-hidden shadow-xl">
+            <img
+              src={post.image_url}
+              alt={post.title}
+              width={900}
+              height={480}
+              className="w-full h-auto max-h-[440px] object-cover rounded-2xl sm:rounded-[2rem]"
+            />
+          </div>
+        )}
 
       <div
         className="rounded-3xl sm:rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-5 sm:p-10 shadow-sm leading-loose text-sm sm:text-base text-[var(--text-primary)] font-medium space-y-4 text-justify prose dark:prose-invert max-w-none [&_h2]:text-lg [&_h2]:sm:text-xl [&_h2]:font-black [&_h2]:text-[var(--accent-blue)] [&_h2]:mt-6 [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-black [&_h3]:mt-5 [&_h3]:mb-2 [&_ul]:list-disc [&_ul]:pr-5 [&_ul]:space-y-1.5 [&_a]:text-[var(--accent-blue)] [&_a]:underline"
@@ -370,7 +434,7 @@ export default async function BlogPostPage({ params }: PageProps) {
         }}
       />
 
-      {linkedProduct && (
+      {showLinkedProductCard && linkedProduct && (
         <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-sky-500/10 via-indigo-500/10 to-emerald-500/10 border-2 border-[var(--accent-blue)]/40 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-5">
           <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-right">
             <img
@@ -379,9 +443,11 @@ export default async function BlogPostPage({ params }: PageProps) {
               className="w-24 h-24 rounded-2xl object-cover border border-[var(--card-border)] bg-[var(--modal-bg)] shrink-0"
             />
             <div className="space-y-1.5">
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-black">
-                🛍️ محصول بررسی‌شده در این مقاله
-              </span>
+              {linkedProductBadge && (
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-black">
+                  {linkedProductBadge}
+                </span>
+              )}
               <h3 className="text-sm sm:text-base font-black text-[var(--text-primary)]">
                 {linkedProduct.title}
               </h3>
@@ -403,16 +469,18 @@ export default async function BlogPostPage({ params }: PageProps) {
             href={`/products/${linkedProduct.id}`}
             className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black shadow-lg hover:opacity-90 transition text-center shrink-0"
           >
-            مشاهده مشخصات و خرید آنلاین ←
+            {linkedProductButtonText}
           </Link>
         </div>
       )}
 
       {showRelatedPosts && relatedPosts.length > 0 && (
         <section className="space-y-4 pt-4">
-          <h3 className="text-sm sm:text-base font-black text-[var(--accent-blue)]">
-            📚 سایر مقالات و راهنماهای تخصصی مرتبط
-          </h3>
+          {relatedPostsTitle && (
+            <h3 className="text-sm sm:text-base font-black text-[var(--accent-blue)]">
+              {relatedPostsTitle}
+            </h3>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {relatedPosts.map((rp: any) => (
               <Link
@@ -432,9 +500,11 @@ export default async function BlogPostPage({ params }: PageProps) {
                     {rp.title}
                   </h4>
                 </div>
-                <span className="text-[10px] font-bold text-[var(--accent-blue)]">
-                  مطالعه مقاله ←
-                </span>
+                {relatedPostLinkText && (
+                  <span className="text-[10px] font-bold text-[var(--accent-blue)]">
+                    {relatedPostLinkText}
+                  </span>
+                )}
               </Link>
             ))}
           </div>
@@ -466,7 +536,7 @@ export default async function BlogPostPage({ params }: PageProps) {
             )}
             {archiveButtonText && (
               <Link
-                href="/blog"
+                href={archiveButtonUrl || "/blog"}
                 className="flex-1 sm:flex-initial px-4 py-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition text-center"
               >
                 {archiveButtonText}

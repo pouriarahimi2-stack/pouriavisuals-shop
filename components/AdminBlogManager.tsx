@@ -13,6 +13,7 @@ export interface BlogPostItem {
   slug: string;
   content: string;
   category?: string;
+  author?: string;
   image_url?: string;
   meta_description?: string;
   is_published: boolean;
@@ -31,6 +32,277 @@ interface CatalogProductItem {
   specs?: Record<string, any>;
 }
 
+interface TableRowBlock {
+  label: string;
+  value: string;
+}
+
+interface FaqItemBlock {
+  question: string;
+  answer: string;
+}
+
+interface StructuredArticleBlocks {
+  introHeading: string;
+  introBody: string;
+  whyHeading: string;
+  whyBody: string;
+  tableHeading: string;
+  tableCol1Header: string;
+  tableCol2Header: string;
+  tableRows: TableRowBlock[];
+  faqHeading: string;
+  faqItems: FaqItemBlock[];
+  inArticleCtaEnabled: boolean;
+  inArticleCtaTitle: string;
+  inArticleCtaText: string;
+  inArticleCtaButtonText: string;
+  inArticleCtaUrl: string;
+}
+
+function stripTags(html: string): string {
+  return String(html || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+}
+
+function parseArticleHtmlToBlocks(html: string): StructuredArticleBlocks {
+  const raw = String(html || "");
+
+  // 1. استخراج H2 اول و پاراگراف مقدمه
+  const h2Match = raw.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
+  const introHeading = h2Match ? stripTags(h2Match[1]) : "";
+
+  const h3Matches = Array.from(raw.matchAll(/<h3[^>]*>([\s\S]*?)<\/h3>/gi));
+  const firstH3Pos = h3Matches[0]?.index ?? raw.length;
+  const introSlice = raw.slice(
+    h2Match ? (h2Match.index || 0) + h2Match[0].length : 0,
+    firstH3Pos
+  );
+  const introParas = Array.from(introSlice.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi))
+    .map((m) => stripTags(m[1]))
+    .filter(Boolean);
+  const introBody = introParas.join("\n\n");
+
+  // 2. استخراج H3 اول و متن معرفی / ارزش خرید
+  const whyHeading = h3Matches[0] ? stripTags(h3Matches[0][1]) : "";
+  const secondH3Pos = h3Matches[1]?.index ?? raw.length;
+  const whySlice = h3Matches[0]
+    ? raw.slice((h3Matches[0].index || 0) + h3Matches[0][0].length, secondH3Pos)
+    : "";
+  const whyParas = Array.from(whySlice.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi))
+    .map((m) => stripTags(m[1]))
+    .filter(Boolean);
+  const whyListItems = Array.from(whySlice.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi))
+    .map((m) => "• " + stripTags(m[1]))
+    .filter(Boolean);
+  const whyBody = [...whyParas, ...whyListItems].join("\n\n");
+
+  // 3. استخراج جدول مشخصات
+  const tableH3 = h3Matches.find((m) => /جدول|مشخصات|مقایسه/.test(m[1])) || h3Matches[1];
+  const tableHeading = tableH3 ? stripTags(tableH3[1]) : "جدول مشخصات کلیدی";
+  const tableMatch = raw.match(/<table[\s\S]*?<\/table>/i);
+  let tableCol1Header = "شاخص بررسی";
+  let tableCol2Header = "مشخصات در فروشگاه آکسون کور";
+  const tableRows: TableRowBlock[] = [];
+
+  if (tableMatch) {
+    const thMatches = Array.from(
+      tableMatch[0].matchAll(/<th[^>]*>([\s\S]*?)<\/th>/gi)
+    );
+    if (thMatches[0]) tableCol1Header = stripTags(thMatches[0][1]) || tableCol1Header;
+    if (thMatches[1]) tableCol2Header = stripTags(thMatches[1][1]) || tableCol2Header;
+
+    const trMatches = Array.from(
+      tableMatch[0].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)
+    );
+    for (const tr of trMatches) {
+      const tds = Array.from(tr[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi));
+      if (tds.length >= 2) {
+        tableRows.push({
+          label: stripTags(tds[0][1]),
+          value: stripTags(tds[1][1]),
+        });
+      }
+    }
+  }
+
+  // 4. استخراج سوالات متداول (FAQ)
+  const faqH3 = h3Matches.find((m) => /سوال|پرسش|متداول|FAQ/i.test(m[1]));
+  const faqHeading = faqH3
+    ? stripTags(faqH3[1])
+    : "سوالات متداول پیش از خرید";
+  const faqItems: FaqItemBlock[] = [];
+
+  if (faqH3) {
+    const afterFaq = raw.slice((faqH3.index || 0) + faqH3[0].length);
+    const stopIdx = afterFaq.search(/<h[23]|<div[^>]*style=/i);
+    const faqZone = stopIdx >= 0 ? afterFaq.slice(0, stopIdx) : afterFaq;
+    const faqPs = Array.from(faqZone.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi));
+    for (const fp of faqPs) {
+      const strongMatch = fp[1].match(/<strong[^>]*>([\s\S]*?)<\/strong>/i);
+      if (strongMatch) {
+        const qText = stripTags(strongMatch[1]);
+        const restHtml = fp[1]
+          .replace(strongMatch[0], "")
+          .replace(/^(\s*<br\s*\/?>\s*)+/i, "");
+        const aText = stripTags(restHtml);
+        if (qText || aText) {
+          faqItems.push({ question: qText, answer: aText });
+        }
+      }
+    }
+  }
+
+  // 5. استخراج باکس خرید داخل مقاله
+  const ctaDivMatch = raw.match(/<div[^>]*style="[^"]*gradient[^"]*"[\s\S]*?<\/div>/i);
+  const prodAnchorMatch = raw.match(
+    /<a[^>]*href="(\/products\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/i
+  );
+
+  let inArticleCtaEnabled = Boolean(ctaDivMatch || prodAnchorMatch);
+  let inArticleCtaTitle = "";
+  let inArticleCtaText = "";
+  let inArticleCtaButtonText = "خرید مستقیم محصول ←";
+  let inArticleCtaUrl = prodAnchorMatch ? prodAnchorMatch[1] : "/products";
+
+  if (ctaDivMatch) {
+    const h4m = ctaDivMatch[0].match(/<h4[^>]*>([\s\S]*?)<\/h4>/i);
+    const pm = ctaDivMatch[0].match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+    const am = ctaDivMatch[0].match(
+      /<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i
+    );
+    if (h4m) inArticleCtaTitle = stripTags(h4m[1]);
+    if (pm) inArticleCtaText = stripTags(pm[1]);
+    if (am) {
+      inArticleCtaUrl = am[1];
+      inArticleCtaButtonText = stripTags(am[2]);
+    }
+  } else if (prodAnchorMatch) {
+    inArticleCtaButtonText = stripTags(prodAnchorMatch[2]);
+  }
+
+  return {
+    introHeading,
+    introBody,
+    whyHeading,
+    whyBody,
+    tableHeading,
+    tableCol1Header,
+    tableCol2Header,
+    tableRows,
+    faqHeading,
+    faqItems,
+    inArticleCtaEnabled,
+    inArticleCtaTitle,
+    inArticleCtaText,
+    inArticleCtaButtonText,
+    inArticleCtaUrl,
+  };
+}
+
+function serializeBlocksToArticleHtml(blocks: StructuredArticleBlocks): string {
+  const parts: string[] = ['<article class="space-y-6 leading-relaxed">'];
+
+  if (blocks.introHeading.trim()) {
+    parts.push(`  <h2>${blocks.introHeading.trim()}</h2>`);
+  }
+  if (blocks.introBody.trim()) {
+    blocks.introBody
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .forEach((p) => {
+        parts.push(`  <p>${p.replace(/\n/g, "<br/>")}</p>`);
+      });
+  }
+
+  if (blocks.whyHeading.trim()) {
+    parts.push(`  <h3>${blocks.whyHeading.trim()}</h3>`);
+  }
+  if (blocks.whyBody.trim()) {
+    blocks.whyBody
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .forEach((p) => {
+        parts.push(`  <p>${p.replace(/\n/g, "<br/>")}</p>`);
+      });
+  }
+
+  const validRows = blocks.tableRows.filter(
+    (r) => r.label.trim() || r.value.trim()
+  );
+  if (blocks.tableHeading.trim() || validRows.length > 0) {
+    if (blocks.tableHeading.trim()) {
+      parts.push(`  <h3>${blocks.tableHeading.trim()}</h3>`);
+    }
+    if (validRows.length > 0) {
+      const rowsHtml = validRows
+        .map(
+          (r) =>
+            `        <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">${r.label}</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${r.value}</td></tr>`
+        )
+        .join("\n");
+
+      parts.push(
+        `  <div style="overflow-x:auto;margin:16px 0;">\n    <table style="width:100%;border-collapse:collapse;font-size:13px;">\n      <thead>\n        <tr style="background:rgba(2,132,199,0.12);">\n          <th style="padding:12px;border:1px solid rgba(148,163,184,0.25);text-align:right;">${
+          blocks.tableCol1Header || "شاخص بررسی"
+        }</th>\n          <th style="padding:12px;border:1px solid rgba(148,163,184,0.25);text-align:right;">${
+          blocks.tableCol2Header || "مشخصات"
+        }</th>\n        </tr>\n      </thead>\n      <tbody>\n${rowsHtml}\n      </tbody>\n    </table>\n  </div>`
+      );
+    }
+  }
+
+  const validFaqs = blocks.faqItems.filter(
+    (f) => f.question.trim() || f.answer.trim()
+  );
+  if (blocks.faqHeading.trim() || validFaqs.length > 0) {
+    if (blocks.faqHeading.trim()) {
+      parts.push(`  <h3>${blocks.faqHeading.trim()}</h3>`);
+    }
+    validFaqs.forEach((f) => {
+      parts.push(
+        `  <p><strong>${f.question}</strong><br/>${f.answer.replace(
+          /\n/g,
+          "<br/>"
+        )}</p>`
+      );
+    });
+  }
+
+  if (
+    blocks.inArticleCtaEnabled &&
+    (blocks.inArticleCtaTitle.trim() ||
+      blocks.inArticleCtaText.trim() ||
+      blocks.inArticleCtaButtonText.trim())
+  ) {
+    parts.push(
+      `  <div style="margin-top:24px;padding:20px;border-radius:20px;background:linear-gradient(135deg,rgba(2,132,199,0.15),rgba(79,70,229,0.12));border:1px solid rgba(56,189,248,0.35);">\n    ${
+        blocks.inArticleCtaTitle.trim()
+          ? `<h4 style="margin:0 0 8px 0;font-weight:900;color:#38bdf8;">${blocks.inArticleCtaTitle.trim()}</h4>`
+          : ""
+      }\n    ${
+        blocks.inArticleCtaText.trim()
+          ? `<p style="margin:0 0 14px 0;font-size:13px;">${blocks.inArticleCtaText.trim()}</p>`
+          : ""
+      }\n    ${
+        blocks.inArticleCtaButtonText.trim()
+          ? `<a href="${
+              blocks.inArticleCtaUrl.trim() || "/products"
+            }" style="display:inline-block;padding:10px 22px;border-radius:14px;background:#0284c7;color:#ffffff;font-weight:900;text-decoration:none;font-size:13px;">${blocks.inArticleCtaButtonText.trim()}</a>`
+          : ""
+      }\n  </div>`
+    );
+  }
+
+  parts.push("</article>");
+  return parts.join("\n\n");
+}
+
 export function AdminBlogManager() {
   const [posts, setPosts] = useState<BlogPostItem[]>([]);
   const [products, setProducts] = useState<CatalogProductItem[]>([]);
@@ -40,14 +312,47 @@ export function AdminBlogManager() {
   const [rebuilding, setRebuilding] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [previewMode, setPreviewMode] = useState(false);
+
+  // تب ویرایشگر: visual | html | preview
+  const [editorMode, setEditorMode] = useState<"visual" | "html" | "preview">(
+    "visual"
+  );
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
 
-  // تنظیمات سراسری صفحه مقالات و باکس مشاوره پایین صفحه
+  // تنظیمات سراسری تمام اجزای صفحه مقاله
+  const [showBreadcrumb, setShowBreadcrumb] = useState(true);
+  const [breadcrumbHomeLabel, setBreadcrumbHomeLabel] = useState("خانه");
+  const [breadcrumbBlogLabel, setBreadcrumbBlogLabel] = useState("مجله تخصصی");
+  const [showReadingTime, setShowReadingTime] = useState(true);
+  const [readingTimePrefix, setReadingTimePrefix] = useState("زمان مطالعه:");
+  const [readingTimeUnit, setReadingTimeUnit] = useState("دقیقه");
+  const [showAuthor, setShowAuthor] = useState(true);
+  const [authorPrefix, setAuthorPrefix] = useState("نویسنده:");
+  const [defaultAuthorName, setDefaultAuthorName] = useState("");
+  const [showPublishDate, setShowPublishDate] = useState(true);
+  const [publishDatePrefix, setPublishDatePrefix] = useState("تاریخ انتشار:");
+  const [showFeaturedImage, setShowFeaturedImage] = useState(true);
+
+  const [showLinkedProductCard, setShowLinkedProductCard] = useState(true);
+  const [linkedProductBadge, setLinkedProductBadge] = useState(
+    "🛍️ محصول بررسی‌شده در این مقاله"
+  );
+  const [linkedProductButtonText, setLinkedProductButtonText] = useState(
+    "مشاهده مشخصات و خرید آنلاین ←"
+  );
+  const [defaultWarrantyFallback, setDefaultWarrantyFallback] = useState("");
+
+  const [showRelatedPosts, setShowRelatedPosts] = useState(true);
+  const [relatedPostsTitle, setRelatedPostsTitle] = useState(
+    "📚 سایر مقالات و راهنماهای تخصصی مرتبط"
+  );
+  const [relatedPostLinkText, setRelatedPostLinkText] =
+    useState("مطالعه مقاله ←");
+
   const [ctaBoxEnabled, setCtaBoxEnabled] = useState(true);
   const [ctaBoxTitle, setCtaBoxTitle] = useState(
-    "نیاز به مشاوره تخصصی پیش از خرید دارید؟"
+    "نیاز به مشاوره تخصصی جهت خرید محصولات دارید؟"
   );
   const [ctaBoxSubtitle, setCtaBoxSubtitle] = useState(
     "کارشناسان آکسون کور آماده پاسخگویی و راهنمایی تخصصی شما برای انتخاب بهترین کالا هستند."
@@ -57,8 +362,7 @@ export function AdminBlogManager() {
   );
   const [ctaButtonUrl, setCtaButtonUrl] = useState("/products");
   const [archiveButtonText, setArchiveButtonText] = useState("آرشیو مجله");
-  const [defaultWarrantyFallback, setDefaultWarrantyFallback] = useState("");
-  const [showRelatedPosts, setShowRelatedPosts] = useState(true);
+  const [archiveButtonUrl, setArchiveButtonUrl] = useState("/blog");
 
   const [statusMsg, setStatusMsg] = useState<{
     type: "success" | "error";
@@ -67,6 +371,7 @@ export function AdminBlogManager() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
+  const [author, setAuthor] = useState("");
   const [slug, setSlug] = useState("");
   const [category, setCategory] = useState("راهنمای خرید و بررسی تخصصی");
   const [targetKeyword, setTargetKeyword] = useState("");
@@ -74,6 +379,11 @@ export function AdminBlogManager() {
   const [imageUrl, setImageUrl] = useState("");
   const [content, setContent] = useState("");
   const [isPublished, setIsPublished] = useState(true);
+
+  // استیت بلوک‌های بصری مقاله
+  const [blocks, setBlocks] = useState<StructuredArticleBlocks>(() =>
+    parseArticleHtmlToBlocks("")
+  );
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<
@@ -83,6 +393,16 @@ export function AdminBlogManager() {
   const notify = (text: string, type: "success" | "error" = "success") => {
     setStatusMsg({ type, text });
     setTimeout(() => setStatusMsg(null), 5000);
+  };
+
+  const updateBlocksAndSyncHtml = (
+    updater: (prev: StructuredArticleBlocks) => StructuredArticleBlocks
+  ) => {
+    setBlocks((prev) => {
+      const next = updater(prev);
+      setContent(serializeBlocksToArticleHtml(next));
+      return next;
+    });
   };
 
   const fetchPostsAndProducts = useCallback(async () => {
@@ -99,6 +419,47 @@ export function AdminBlogManager() {
 
         const bCfg = bJson.blogPageConfig;
         if (bCfg && typeof bCfg === "object") {
+          if (bCfg.showBreadcrumb !== undefined)
+            setShowBreadcrumb(Boolean(bCfg.showBreadcrumb));
+          if (bCfg.breadcrumbHomeLabel !== undefined)
+            setBreadcrumbHomeLabel(String(bCfg.breadcrumbHomeLabel));
+          if (bCfg.breadcrumbBlogLabel !== undefined)
+            setBreadcrumbBlogLabel(String(bCfg.breadcrumbBlogLabel));
+          if (bCfg.showReadingTime !== undefined)
+            setShowReadingTime(Boolean(bCfg.showReadingTime));
+          if (bCfg.readingTimePrefix !== undefined)
+            setReadingTimePrefix(String(bCfg.readingTimePrefix));
+          if (bCfg.readingTimeUnit !== undefined)
+            setReadingTimeUnit(String(bCfg.readingTimeUnit));
+          if (bCfg.showAuthor !== undefined)
+            setShowAuthor(Boolean(bCfg.showAuthor));
+          if (bCfg.authorPrefix !== undefined)
+            setAuthorPrefix(String(bCfg.authorPrefix));
+          if (bCfg.defaultAuthorName !== undefined)
+            setDefaultAuthorName(String(bCfg.defaultAuthorName));
+          if (bCfg.showPublishDate !== undefined)
+            setShowPublishDate(Boolean(bCfg.showPublishDate));
+          if (bCfg.publishDatePrefix !== undefined)
+            setPublishDatePrefix(String(bCfg.publishDatePrefix));
+          if (bCfg.showFeaturedImage !== undefined)
+            setShowFeaturedImage(Boolean(bCfg.showFeaturedImage));
+
+          if (bCfg.showLinkedProductCard !== undefined)
+            setShowLinkedProductCard(Boolean(bCfg.showLinkedProductCard));
+          if (bCfg.linkedProductBadge !== undefined)
+            setLinkedProductBadge(String(bCfg.linkedProductBadge));
+          if (bCfg.linkedProductButtonText !== undefined)
+            setLinkedProductButtonText(String(bCfg.linkedProductButtonText));
+          if (bCfg.defaultWarrantyFallback !== undefined)
+            setDefaultWarrantyFallback(String(bCfg.defaultWarrantyFallback));
+
+          if (bCfg.showRelatedPosts !== undefined)
+            setShowRelatedPosts(Boolean(bCfg.showRelatedPosts));
+          if (bCfg.relatedPostsTitle !== undefined)
+            setRelatedPostsTitle(String(bCfg.relatedPostsTitle));
+          if (bCfg.relatedPostLinkText !== undefined)
+            setRelatedPostLinkText(String(bCfg.relatedPostLinkText));
+
           if (bCfg.ctaBoxEnabled !== undefined)
             setCtaBoxEnabled(Boolean(bCfg.ctaBoxEnabled));
           if (bCfg.ctaBoxTitle !== undefined)
@@ -111,10 +472,8 @@ export function AdminBlogManager() {
             setCtaButtonUrl(String(bCfg.ctaButtonUrl));
           if (bCfg.archiveButtonText !== undefined)
             setArchiveButtonText(String(bCfg.archiveButtonText));
-          if (bCfg.defaultWarrantyFallback !== undefined)
-            setDefaultWarrantyFallback(String(bCfg.defaultWarrantyFallback));
-          if (bCfg.showRelatedPosts !== undefined)
-            setShowRelatedPosts(Boolean(bCfg.showRelatedPosts));
+          if (bCfg.archiveButtonUrl !== undefined)
+            setArchiveButtonUrl(String(bCfg.archiveButtonUrl));
         }
       }
 
@@ -193,14 +552,32 @@ export function AdminBlogManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "save_blog_settings",
+          showBreadcrumb,
+          breadcrumbHomeLabel,
+          breadcrumbBlogLabel,
+          showReadingTime,
+          readingTimePrefix,
+          readingTimeUnit,
+          showAuthor,
+          authorPrefix,
+          defaultAuthorName,
+          showPublishDate,
+          publishDatePrefix,
+          showFeaturedImage,
+          showLinkedProductCard,
+          linkedProductBadge,
+          linkedProductButtonText,
+          defaultWarrantyFallback,
+          showRelatedPosts,
+          relatedPostsTitle,
+          relatedPostLinkText,
           ctaBoxEnabled,
           ctaBoxTitle,
           ctaBoxSubtitle,
           ctaButtonText,
           ctaButtonUrl,
           archiveButtonText,
-          defaultWarrantyFallback,
-          showRelatedPosts,
+          archiveButtonUrl,
         }),
       });
       const json = await res.json();
@@ -271,53 +648,60 @@ export function AdminBlogManager() {
         ? Object.entries(prod.specs).filter(([k, v]) => k && v)
         : [];
 
-    const tableRows =
+    const initialTableRows: TableRowBlock[] =
       specEntries.length > 0
-        ? specEntries
-            .map(
-              ([k, v]) =>
-                `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">${k}</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${v}</td></tr>`
-            )
-            .join("\n")
+        ? specEntries.map(([k, v]) => ({ label: String(k), value: String(v) }))
         : [
-            `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">دسته‌بندی تخصصی</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prod.category}</td></tr>`,
-            prod.brand
-              ? `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">برند سازنده</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prod.brand}</td></tr>`
-              : "",
+            { label: "عنوان محصول", value: prod.title },
+            { label: "دسته‌بندی تخصصی", value: prod.category },
+            ...(prod.brand
+              ? [{ label: "برند سازنده", value: prod.brand }]
+              : []),
             prod.warranty
-              ? `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">پوشش گارانتی</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prod.warranty}</td></tr>`
-              : `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">تضمین کیفیت</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">بررسی سلامت فیزیکی پیش از ارسال</td></tr>`,
-            `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">قیمت روز در آکسون کور</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prod.price.toLocaleString("fa-IR")} تومان</td></tr>`,
-          ]
-            .filter(Boolean)
-            .join("\n");
+              ? { label: "پوشش گارانتی", value: prod.warranty }
+              : {
+                  label: "تضمین کیفیت",
+                  value: "بررسی سلامت فیزیکی پیش از ارسال",
+                },
+            {
+              label: "قیمت روز در آکسون کور",
+              value: `${prod.price.toLocaleString("fa-IR")} تومان`,
+            },
+          ];
 
-    const autoContent = [
-      `<h2>معرفی و بررسی تخصصی ${prod.title}</h2>`,
-      `<p>اگر به دنبال <strong>${autoKey}</strong> با بررسی کامل مشخصات و بالاترین استاندارد ساخت هستید، <strong>${prod.title}</strong> یکی از گزینه‌های کاربردی موجود در دسته <strong>${prod.category}</strong> به شمار می‌رود که تعادل مناسبی میان کارایی، دوام و ارزش خرید ارائه می‌دهد.</p>`,
-      `<h3>مهم‌ترین ویژگی‌ها و مزایای رقابتی ${prod.title}</h3>`,
-      `<ul>`,
-      `  <li><strong>بررسی سلامت فیزیکی:</strong> تست و کنترل سلامت کالا پیش از بسته‌بندی و ارسال</li>`,
-      `  <li><strong>عملکرد مطمئن:</strong> کارایی پایدار در استفاده‌های روزمره</li>`,
-      prod.warranty
-        ? `  <li><strong>گارانتی معتبر:</strong> عرضه همراه با ${prod.warranty}</li>`
-        : `  <li><strong>ارسال سریع سراسری:</strong> ارسال ایمن از طریق پست پیشتاز یا تیپاکس</li>`,
-      `</ul>`,
-      `<h3>جدول مشخصات و استانداردهای کیفی ${prod.title}</h3>`,
-      `<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:13px;">`,
-      `  <thead><tr style="background:rgba(2,132,199,0.15);"><th style="padding:10px;border:1px solid rgba(148,163,184,0.3);text-align:right;">شاخص بررسی</th><th style="padding:10px;border:1px solid rgba(148,163,184,0.3);text-align:right;">وضعیت در ${prod.title}</th></tr></thead>`,
-      `  <tbody>`,
-      tableRows,
-      `  </tbody>`,
-      `</table>`,
-      `<h3>سوالات متداول خریداران درباره ${prod.title}</h3>`,
-      prod.warranty
-        ? `<p><strong>۱. آیا ${prod.title} دارای گارانتی است؟</strong><br/>بله، این کالا همراه با ${prod.warranty} و تضمین سلامت فیزیکی عرضه می‌گردد.</p>`
-        : `<p><strong>۱. وضعیت سلامت و ارسال ${prod.title} چگونه است؟</strong><br/>تمامی کالاهای آکسون کور پیش از ارسال از نظر سلامت فیزیکی بررسی شده و با بسته‌بندی ایمن ارسال می‌گردند.</p>`,
-      `<h3>خرید مستقیم از کاتالوگ رسمی آکسون کور</h3>`,
-      `<p>شما می‌توانید همین حالا <strong>${prod.title}</strong> را با قیمت ویژه <strong>${prod.price.toLocaleString("fa-IR")} تومان</strong> از طریق لینک زیر سفارش دهید:</p>`,
-      `<p><a href="/products/${prod.id}"><strong>🛍️ مشاهده مشخصات کامل و خرید آنلاین ${prod.title} در فروشگاه آکسون کور ←</strong></a></p>`,
-    ].join("\n\n");
+    const newBlocks: StructuredArticleBlocks = {
+      introHeading: `معرفی و بررسی تخصصی ${prod.title}`,
+      introBody: `اگر به دنبال ${autoKey} با بررسی کامل مشخصات و بالاترین استاندارد ساخت هستید، ${prod.title} یکی از گزینه‌های کاربردی موجود در دسته ${prod.category} به شمار می‌رود که تعادل مناسبی میان کارایی، دوام و ارزش خرید ارائه می‌دهد.`,
+      whyHeading: `چرا ${prod.title} ارزش خرید بالایی دارد؟`,
+      whyBody: prod.brand
+        ? `محصول ${prod.title} از برند ${prod.brand} طراحی شده و پس از بررسی کامل سلامت فیزیکی و بسته‌بندی ایمن به سراسر کشور ارسال می‌گردد.`
+        : `محصول ${prod.title} پس از بررسی کامل سلامت فیزیکی و عملکرد، با بسته‌بندی ایمن به سراسر کشور ارسال می‌گردد.`,
+      tableHeading: `جدول مشخصات کلیدی و شرایط عرضه ${prod.title}`,
+      tableCol1Header: "شاخص بررسی",
+      tableCol2Header: `وضعیت در ${prod.title}`,
+      tableRows: initialTableRows,
+      faqHeading: `سوالات متداول خریداران درباره ${prod.title}`,
+      faqItems: [
+        {
+          question: `۱. وضعیت ضمانت و سلامت ${prod.title} چگونه است؟`,
+          answer: prod.warranty
+            ? `بله، این کالا همراه با ${prod.warranty} و تضمین سلامت فیزیکی عرضه می‌گردد.`
+            : `تمامی کالاهای آکسون کور پیش از ارسال از نظر سلامت فیزیکی بررسی شده و با بسته‌بندی ایمن ارسال می‌گردند.`,
+        },
+        {
+          question: "۲. نحوه ارسال سفارش به چه صورت است؟",
+          answer:
+            "سفارش‌های ثبت‌شده در کوتاه‌ترین زمان پردازش و از طریق پست پیشتاز یا تیپاکس به سراسر کشور ارسال می‌شوند.",
+        },
+      ],
+      inArticleCtaEnabled: true,
+      inArticleCtaTitle: `🛍️ مشاهده مشخصات و خرید آنلاین ${prod.title}`,
+      inArticleCtaText: `برای ثبت سفارش مستقیم ${prod.title} با قیمت ${prod.price.toLocaleString("fa-IR")} تومان و ارسال سریع کلیک کنید:`,
+      inArticleCtaButtonText: `خرید مستقیم ${prod.title} ←`,
+      inArticleCtaUrl: `/products/${prod.id}`,
+    };
+
+    const generatedHtml = serializeBlocksToArticleHtml(newBlocks);
 
     setTargetKeyword(autoKey);
     setTitle(autoTitle);
@@ -325,10 +709,11 @@ export function AdminBlogManager() {
     setCategory(prod.category || "راهنمای خرید و بررسی تخصصی");
     setMetaDescription(autoMeta);
     if (prod.image) setImageUrl(prod.image);
-    if (!editingId || !content.trim()) setContent(autoContent);
+    setBlocks(newBlocks);
+    setContent(generatedHtml);
 
     notify(
-      `✓ ساختار مقاله، جدول مشخصات، متاتگ‌ها و لینک خرید بر اساس اطلاعات واقعی محصول «${prod.title}» تکمیل شد.`
+      `✓ تمامی بخش‌های مقاله (تیترها، متن، جدول مشخصات، سوالات متداول و باکس خرید) بر اساس اطلاعات واقعی محصول «${prod.title}» آماده ویرایش شدند.`
     );
   };
 
@@ -369,27 +754,32 @@ export function AdminBlogManager() {
     setEditingId(null);
     setSelectedProductId("");
     setTitle("");
+    setAuthor("");
     setSlug("");
     setTargetKeyword("");
     setCategory("راهنمای خرید و بررسی تخصصی");
     setMetaDescription("");
     setImageUrl("");
     setContent("");
+    setBlocks(parseArticleHtmlToBlocks(""));
     setIsPublished(true);
-    setPreviewMode(false);
+    setEditorMode("visual");
   };
 
   const handleEditPost = (post: BlogPostItem) => {
     soundEngine.playClick();
     setEditingId(post.id);
     setTitle(post.title || "");
+    setAuthor(post.author || "");
     setSlug(post.slug || "");
     setCategory(post.category || "راهنمای خرید و بررسی تخصصی");
     setMetaDescription(post.meta_description || "");
     setImageUrl(post.image_url || "");
-    setContent(post.content || "");
+    const rawHtml = post.content || "";
+    setContent(rawHtml);
+    setBlocks(parseArticleHtmlToBlocks(rawHtml));
     setIsPublished(post.is_published !== false);
-    setPreviewMode(false);
+    setEditorMode("visual");
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -433,6 +823,7 @@ export function AdminBlogManager() {
         body: JSON.stringify({
           id: editingId || undefined,
           title: title.trim(),
+          author: author.trim(),
           slug: slug.trim() || makeSlug(title),
           category: category.trim() || "راهنمای خرید و بررسی تخصصی",
           image_url: imageUrl.trim() || "/placeholder.png",
@@ -478,54 +869,6 @@ export function AdminBlogManager() {
     }
   };
 
-  const appendHtmlSnippet = (snippet: string) => {
-    soundEngine.playClick();
-    setContent((prev) => (prev.trim() ? prev + "\n\n" + snippet : snippet));
-  };
-
-  const injectComparisonTableSnippet = () => {
-    const selProd =
-      products.find((p) => p.id === selectedProductId) || products[0];
-    const pName = selProd ? selProd.title : "محصول منتخب آکسون کور";
-    const pHref = selProd ? "/products/" + selProd.id : "/products";
-    const warrantyCol = selProd?.warranty || "بررسی سلامت فیزیکی پیش از ارسال";
-    const snippet = [
-      `<h3>جدول مقایسه فنی و ارزش خرید ${pName}</h3>`,
-      `<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:13px;">`,
-      `  <thead><tr style="background:rgba(2,132,199,0.15);"><th style="padding:10px;border:1px solid rgba(148,163,184,0.3);text-align:right;">ویژگی تخصصی</th><th style="padding:10px;border:1px solid rgba(148,163,184,0.3);text-align:right;">وضعیت در آکسون کور</th></tr></thead>`,
-      `  <tbody>`,
-      `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">کیفیت و سلامت فیزیکی</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">تست سلامت فیزیکی پیش از ارسال</td></tr>`,
-      `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">ضمانت / گارانتی</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${warrantyCol}</td></tr>`,
-      `  </tbody>`,
-      `</table>`,
-      `<p><a href="${pHref}"><strong>🛒 مشاهده قیمت روز و خرید مستقیم ${pName} ←</strong></a></p>`,
-    ].join("\n");
-    appendHtmlSnippet(snippet);
-  };
-
-  const injectFaqSnippet = () => {
-    const selProd = products.find((p) => p.id === selectedProductId);
-    const pName = selProd ? selProd.title : title || "این محصول";
-    const warrantyLine = selProd?.warranty
-      ? `بله، این محصول همراه با ${selProd.warranty} و تضمین سلامت فیزیکی عرضه می‌شود.`
-      : `تمامی محصولات عرضه‌شده در آکسون کور پیش از ارسال از نظر سلامت فیزیکی بررسی می‌شوند.`;
-    const snippet = [
-      `<h3>سوالات متداول خریداران درباره ${pName}</h3>`,
-      `<p><strong>۱. وضعیت ضمانت و سلامت ${pName} چگونه است؟</strong><br/>${warrantyLine}</p>`,
-      `<p><strong>۲. نحوه ارسال سفارش به شهرستان‌ها چگونه است؟</strong><br/>تمامی سفارش‌ها در بسته‌بندی ایمن و ضدضربه از طریق پست پیشتاز یا تیپاکس به سراسر ایران ارسال شده و کد رهگیری پیامک می‌گردد.</p>`,
-    ].join("\n");
-    appendHtmlSnippet(snippet);
-  };
-
-  const injectProductCtaBox = () => {
-    const selProd =
-      products.find((p) => p.id === selectedProductId) || products[0];
-    if (!selProd) return;
-    const wPart = selProd.warranty ? ` و ${selProd.warranty}` : "";
-    const snippet = `<div style="margin:20px 0;padding:18px;border-radius:18px;background:rgba(2,132,199,0.12);border:1px solid rgba(56,189,248,0.35);"><h4>🛍️ سفارش آنلاین ${selProd.title}</h4><p>هم‌اکنون می‌توانید <strong>${selProd.title}</strong> را با قیمت <strong>${selProd.price.toLocaleString("fa-IR")} تومان</strong>${wPart} از آکسون کور تهیه کنید:</p><p><a href="/products/${selProd.id}"><strong>🔗 مشاهده مشخصات و خرید مستقیم ${selProd.title} ←</strong></a></p></div>`;
-    appendHtmlSnippet(snippet);
-  };
-
   const wordCount = content
     .replace(/<[^>]*>/g, " ")
     .trim()
@@ -568,10 +911,10 @@ export function AdminBlogManager() {
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📚</span> مدیریت هوشمند مجله، وبلاگ و مقالات سئو
+            <span>📚</span> مدیریت کامل مجله، وبلاگ و ویرایش تمام اجزای صفحه مقاله
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            ویرایش کامل متون مقالات، باکس مشاوره پایین صفحه و بازسازی خودکار مقالات بر اساس مشخصات واقعی کالاها
+            ویرایش بخش‌بندی‌شده متون، جدول مشخصات، سوالات متداول، کارت محصول زیر مقاله، مقالات مرتبط و باکس مشاوره پایین صفحه
           </p>
         </div>
 
@@ -582,9 +925,9 @@ export function AdminBlogManager() {
               soundEngine.playClick();
               setSettingsPanelOpen(!settingsPanelOpen);
             }}
-            className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-black cursor-pointer transition"
+            className="px-4 py-2.5 rounded-2xl bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)] text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-white text-xs font-black cursor-pointer transition"
           >
-            ⚙️ تنظیمات صفحه مقالات و باکس مشاوره
+            ⚙️ تنظیمات کامل تمام اجزای صفحه مقاله
           </button>
 
           <button
@@ -594,7 +937,7 @@ export function AdminBlogManager() {
             className="px-4 py-2.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-400 hover:bg-amber-500 hover:text-slate-950 font-black text-xs transition cursor-pointer disabled:opacity-50"
           >
             {rebuilding
-              ? "⏳ در حال پاکسازی مقالات..."
+              ? "⏳ در حال پاکسازی..."
               : "🧹 اصلاح خودکار مقالات فعلی"}
           </button>
 
@@ -604,9 +947,7 @@ export function AdminBlogManager() {
             onClick={handleGenerateAiSeoPost}
             className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-sky-600 text-white font-black text-xs shadow-lg hover:opacity-90 transition cursor-pointer disabled:opacity-50"
           >
-            {generatingAi
-              ? "⏳ در حال نگارش..."
-              : "🤖 تولید مقاله جدید با AI"}
+            {generatingAi ? "⏳ در حال نگارش..." : "🤖 تولید مقاله با AI"}
           </button>
 
           <Link
@@ -630,108 +971,338 @@ export function AdminBlogManager() {
         </div>
       </div>
 
-      {/* پنل تنظیمات سراسری صفحه مقالات و باکس مشاوره پایین صفحه */}
+      {/* پنل تنظیمات جامع تمام اجزای صفحه مقاله (نوار مسیر، متادیتا، کارت محصول، مقالات مرتبط، باکس مشاوره) */}
       {settingsPanelOpen && (
         <form
           onSubmit={handleSaveBlogPageSettings}
-          className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border-2 border-[var(--accent-blue)]/40 shadow-xl space-y-4 text-xs animate-fadeIn"
+          className="p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border-2 border-[var(--accent-blue)]/50 shadow-2xl space-y-6 text-xs animate-fadeIn"
         >
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] pb-3">
+          <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
             <div>
-              <h2 className="font-black text-sm text-[var(--accent-blue)]">
-                ⚙️ تنظیمات متون ثابت صفحه مقالات و باکس مشاوره پایین صفحه
+              <h2 className="font-black text-sm sm:text-base text-[var(--accent-blue)]">
+                ⚙️ کنترل کامل و یکپارچه تمامی متون و بخش‌های صفحه مقاله
               </h2>
               <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                تمامی بخش‌های پایینی صفحه مقالات را از اینجا شخصی‌سازی یا مخفی کنید:
+                هر بخش یا متنی که در صفحه مقالات نمایش داده می‌شود را از اینجا تغییر دهید یا غیرفعال کنید:
               </p>
             </div>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+            <button
+              type="button"
+              onClick={() => setSettingsPanelOpen(false)}
+              className="w-8 h-8 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center font-bold cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* ۱. تنظیمات هدر مقاله، نوار مسیر، زمان مطالعه، نویسنده و تاریخ */}
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] pb-2.5">
+              <h3 className="font-black text-[var(--accent-blue)]">
+                ۱. نوار مسیر (Breadcrumb)، تصویر شاخص و اطلاعات نویسنده / تاریخ
+              </h3>
+              <div className="flex flex-wrap gap-3">
+                <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showBreadcrumb}
+                    onChange={(e) => setShowBreadcrumb(e.target.checked)}
+                    className="accent-[var(--accent-blue)]"
+                  />
+                  <span>نوار مسیر</span>
+                </label>
+                <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showFeaturedImage}
+                    onChange={(e) => setShowFeaturedImage(e.target.checked)}
+                    className="accent-[var(--accent-blue)]"
+                  />
+                  <span>تصویر شاخص</span>
+                </label>
+                <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showReadingTime}
+                    onChange={(e) => setShowReadingTime(e.target.checked)}
+                    className="accent-[var(--accent-blue)]"
+                  />
+                  <span>زمان مطالعه</span>
+                </label>
+                <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showAuthor}
+                    onChange={(e) => setShowAuthor(e.target.checked)}
+                    className="accent-[var(--accent-blue)]"
+                  />
+                  <span>نام نویسنده</span>
+                </label>
+                <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showPublishDate}
+                    onChange={(e) => setShowPublishDate(e.target.checked)}
+                    className="accent-[var(--accent-blue)]"
+                  />
+                  <span>تاریخ انتشار</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  عنوان خانه در نوار مسیر:
+                </label>
                 <input
-                  type="checkbox"
-                  checked={ctaBoxEnabled}
-                  onChange={(e) => setCtaBoxEnabled(e.target.checked)}
-                  className="w-4 h-4 accent-[var(--accent-blue)] rounded cursor-pointer"
+                  type="text"
+                  value={breadcrumbHomeLabel}
+                  onChange={(e) => setBreadcrumbHomeLabel(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
                 />
-                <span>نمایش باکس مشاوره پایین مقاله</span>
-              </label>
-              <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+              </div>
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  عنوان مجله در نوار مسیر:
+                </label>
                 <input
-                  type="checkbox"
-                  checked={showRelatedPosts}
-                  onChange={(e) => setShowRelatedPosts(e.target.checked)}
-                  className="w-4 h-4 accent-[var(--accent-blue)] rounded cursor-pointer"
+                  type="text"
+                  value={breadcrumbBlogLabel}
+                  onChange={(e) => setBreadcrumbBlogLabel(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
                 />
-                <span>نمایش مقالات مرتبط</span>
-              </label>
+              </div>
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  نام پیش‌فرض نویسنده مقالات:
+                </label>
+                <input
+                  type="text"
+                  value={defaultAuthorName}
+                  onChange={(e) => setDefaultAuthorName(e.target.value)}
+                  placeholder="تحریریه فنی آکسون کور"
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  پیشوند زمان مطالعه:
+                </label>
+                <input
+                  type="text"
+                  value={readingTimePrefix}
+                  onChange={(e) => setReadingTimePrefix(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  واحد زمان مطالعه:
+                </label>
+                <input
+                  type="text"
+                  value={readingTimeUnit}
+                  onChange={(e) => setReadingTimeUnit(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  پیشوند تاریخ انتشار:
+                </label>
+                <input
+                  type="text"
+                  value={publishDatePrefix}
+                  onChange={(e) => setPublishDatePrefix(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
-                عنوان باکس مشاوره پایین صفحه:
+          {/* ۲. کارت محصول مرتبط زیر مقاله */}
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4">
+            <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-2.5">
+              <h3 className="font-black text-emerald-400">
+                ۲. کارت محصول بررسی‌شده زیر مقاله
+              </h3>
+              <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showLinkedProductCard}
+                  onChange={(e) => setShowLinkedProductCard(e.target.checked)}
+                  className="accent-emerald-500"
+                />
+                <span>نمایش کارت محصول زیر مقاله</span>
               </label>
-              <input
-                type="text"
-                value={ctaBoxTitle}
-                onChange={(e) => setCtaBoxTitle(e.target.value)}
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
-              />
             </div>
 
-            <div>
-              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
-                متن پیش‌فرض گارانتی (خالی = عدم نمایش برای کالاهای بدون گارانتی):
-              </label>
-              <input
-                type="text"
-                value={defaultWarrantyFallback}
-                onChange={(e) => setDefaultWarrantyFallback(e.target.value)}
-                placeholder="خالی بگذارید تا فقط گارانتی واقعی هر کالا نمایش داده شود"
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
-                توضیحات باکس مشاوره پایین صفحه:
-              </label>
-              <input
-                type="text"
-                value={ctaBoxSubtitle}
-                onChange={(e) => setCtaBoxSubtitle(e.target.value)}
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
-                متن دکمه اصلی باکس مشاوره:
-              </label>
-              <input
-                type="text"
-                value={ctaButtonText}
-                onChange={(e) => setCtaButtonText(e.target.value)}
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
-                لینک دکمه اصلی (مثلاً /products یا /contact):
-              </label>
-              <input
-                type="text"
-                dir="ltr"
-                value={ctaButtonUrl}
-                onChange={(e) => setCtaButtonUrl(e.target.value)}
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  متن بج بالای کارت محصول:
+                </label>
+                <input
+                  type="text"
+                  value={linkedProductBadge}
+                  onChange={(e) => setLinkedProductBadge(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  متن دکمه خرید کارت محصول:
+                </label>
+                <input
+                  type="text"
+                  value={linkedProductButtonText}
+                  onChange={(e) => setLinkedProductButtonText(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  متن جایگزین گارانتی (در صورت خالی بودن):
+                </label>
+                <input
+                  type="text"
+                  value={defaultWarrantyFallback}
+                  onChange={(e) => setDefaultWarrantyFallback(e.target.value)}
+                  placeholder="خالی = عدم نمایش برای کالاهای بدون گارانتی"
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          {/* ۳. بخش مقالات مرتبط و باکس مشاوره پایین صفحه */}
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] pb-2.5">
+              <h3 className="font-black text-indigo-400">
+                ۳. بخش مقالات مرتبط و باکس مشاوره پایین صفحه
+              </h3>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showRelatedPosts}
+                    onChange={(e) => setShowRelatedPosts(e.target.checked)}
+                    className="accent-[var(--accent-blue)]"
+                  />
+                  <span>نمایش مقالات مرتبط</span>
+                </label>
+                <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={ctaBoxEnabled}
+                    onChange={(e) => setCtaBoxEnabled(e.target.checked)}
+                    className="accent-[var(--accent-blue)]"
+                  />
+                  <span>نمایش باکس مشاوره پایین</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  عنوان بخش مقالات مرتبط:
+                </label>
+                <input
+                  type="text"
+                  value={relatedPostsTitle}
+                  onChange={(e) => setRelatedPostsTitle(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  متن دکمه مطالعه روی کارت‌های مرتبط:
+                </label>
+                <input
+                  type="text"
+                  value={relatedPostLinkText}
+                  onChange={(e) => setRelatedPostLinkText(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  عنوان باکس مشاوره پایین صفحه:
+                </label>
+                <input
+                  type="text"
+                  value={ctaBoxTitle}
+                  onChange={(e) => setCtaBoxTitle(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  متن توضیحات باکس مشاوره پایین صفحه:
+                </label>
+                <input
+                  type="text"
+                  value={ctaBoxSubtitle}
+                  onChange={(e) => setCtaBoxSubtitle(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  متن دکمه اصلی باکس مشاوره:
+                </label>
+                <input
+                  type="text"
+                  value={ctaButtonText}
+                  onChange={(e) => setCtaButtonText(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  لینک دکمه اصلی:
+                </label>
+                <input
+                  type="text"
+                  dir="ltr"
+                  value={ctaButtonUrl}
+                  onChange={(e) => setCtaButtonUrl(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  متن دکمه دوم (آرشیو مجله):
+                </label>
+                <input
+                  type="text"
+                  value={archiveButtonText}
+                  onChange={(e) => setArchiveButtonText(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                  لینک دکمه دوم:
+                </label>
+                <input
+                  type="text"
+                  dir="ltr"
+                  value={archiveButtonUrl}
+                  onChange={(e) => setArchiveButtonUrl(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
               onClick={() => setSettingsPanelOpen(false)}
@@ -742,11 +1313,11 @@ export function AdminBlogManager() {
             <button
               type="submit"
               disabled={savingSettings}
-              className="px-6 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black cursor-pointer disabled:opacity-50"
+              className="px-6 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black cursor-pointer disabled:opacity-50 shadow-lg"
             >
               {savingSettings
                 ? "در حال ذخیره..."
-                : "💾 ذخیره تنظیمات صفحه مقالات"}
+                : "💾 ذخیره و اعمال تنظیمات در تمام مقالات"}
             </button>
           </div>
         </form>
@@ -768,7 +1339,7 @@ export function AdminBlogManager() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start text-xs">
         <form
           onSubmit={handleSavePost}
-          className="lg:col-span-7 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4"
+          className="lg:col-span-7 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5"
         >
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--accent-blue)]/40 space-y-2">
             <label className="block font-black text-[var(--accent-blue)]">
@@ -791,15 +1362,32 @@ export function AdminBlogManager() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
+            <div className="sm:col-span-2">
               <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
-                کلمه کلیدی هدف سئو (Target Keyword):
+                عنوان اصلی مقاله *
               </label>
               <input
                 type="text"
-                value={targetKeyword}
-                onChange={(e) => setTargetKeyword(e.target.value)}
-                placeholder="مثال: خرید و قیمت ..."
+                required
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (!editingId) setSlug(makeSlug(e.target.value));
+                }}
+                placeholder="عنوان جامع مقاله..."
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                نویسنده این مقاله (اختیاری):
+              </label>
+              <input
+                type="text"
+                value={author}
+                onChange={(e) => setAuthor(e.target.value)}
+                placeholder={defaultAuthorName || "تحریریه فنی آکسون کور"}
                 className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
               />
             </div>
@@ -812,23 +1400,6 @@ export function AdminBlogManager() {
                 type="text"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
-                عنوان مقاله *
-              </label>
-              <input
-                type="text"
-                required
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  if (!editingId) setSlug(makeSlug(e.target.value));
-                }}
-                placeholder="عنوان جامع مقاله..."
                 className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
               />
             </div>
@@ -887,160 +1458,437 @@ export function AdminBlogManager() {
                 className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-relaxed"
               />
             </div>
+          </div>
 
-            <div className="sm:col-span-2 space-y-2.5">
-              <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-black text-[var(--accent-blue)]">
-                    📊 رادار زنده کیفیت سئوی مقاله:
-                  </span>
-                  <span
-                    className={
-                      "px-3 py-1 rounded-xl font-mono font-black text-[11px] " +
-                      (liveBlogSeoScore >= 85
-                        ? "bg-emerald-500/15 text-emerald-400"
-                        : "bg-amber-500/15 text-amber-400")
-                    }
-                  >
-                    امتیاز زنده سئو: {liveBlogSeoScore}/100 ({wordCount} کلمه)
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
-                  <span
-                    className={
-                      "px-2 py-1 rounded-lg " +
-                      (hasStandardTitle
-                        ? "bg-emerald-500/15 text-emerald-400"
-                        : "bg-slate-500/15 text-slate-400")
-                    }
-                  >
-                    {hasStandardTitle ? "✓" : "○"} طول عنوان استاندارد
-                  </span>
-                  <span
-                    className={
-                      "px-2 py-1 rounded-lg " +
-                      (hasStandardMeta
-                        ? "bg-emerald-500/15 text-emerald-400"
-                        : "bg-slate-500/15 text-slate-400")
-                    }
-                  >
-                    {hasStandardMeta ? "✓" : "○"} متا دیسکریپشن
-                  </span>
-                  <span
-                    className={
-                      "px-2 py-1 rounded-lg " +
-                      (hasH2
-                        ? "bg-emerald-500/15 text-emerald-400"
-                        : "bg-slate-500/15 text-slate-400")
-                    }
-                  >
-                    {hasH2 ? "✓" : "○"} زیرعنوان H2
-                  </span>
-                  <span
-                    className={
-                      "px-2 py-1 rounded-lg " +
-                      (hasTable
-                        ? "bg-emerald-500/15 text-emerald-400"
-                        : "bg-slate-500/15 text-slate-400")
-                    }
-                  >
-                    {hasTable ? "✓" : "○"} جدول مقایسه
-                  </span>
-                  <span
-                    className={
-                      "px-2 py-1 rounded-lg " +
-                      (hasProductLink
-                        ? "bg-emerald-500/15 text-emerald-400"
-                        : "bg-slate-500/15 text-slate-400")
-                    }
-                  >
-                    {hasProductLink ? "✓" : "○"} لینک داخلی محصول
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      appendHtmlSnippet(
-                        "<h2>عنوان بخش جدید</h2>\n<p>متن توضیح این بخش...</p>"
-                      )
-                    }
-                    className="px-2.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold text-[11px] cursor-pointer"
-                  >
-                    + تیتر H2
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      appendHtmlSnippet(
-                        "<h3>زیرعنوان تخصصی</h3>\n<p>توضیحات تکمیلی...</p>"
-                      )
-                    }
-                    className="px-2.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold text-[11px] cursor-pointer"
-                  >
-                    + زیرتیتر H3
-                  </button>
-                  <button
-                    type="button"
-                    onClick={injectComparisonTableSnippet}
-                    className="px-2.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--accent-blue)] text-[var(--accent-blue)] font-black text-[11px] cursor-pointer"
-                  >
-                    + جدول مقایسه فنی
-                  </button>
-                  <button
-                    type="button"
-                    onClick={injectFaqSnippet}
-                    className="px-2.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-emerald-500 font-bold text-[11px] cursor-pointer"
-                  >
-                    + سوالات متداول (FAQ)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={injectProductCtaBox}
-                    className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-black text-[11px] cursor-pointer"
-                  >
-                    + باکس خرید کالا
-                  </button>
-                </div>
-
+          {/* نوار انتخاب حالت ویرایشگر محتوا + امتیاز سئو */}
+          <div className="space-y-3 pt-2 border-t border-[var(--card-border)]">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap gap-1.5 p-1 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-black">
                 <button
                   type="button"
-                  onClick={() => setPreviewMode(!previewMode)}
+                  onClick={() => {
+                    setBlocks(parseArticleHtmlToBlocks(content));
+                    setEditorMode("visual");
+                  }}
                   className={
-                    "px-3 py-1.5 rounded-xl font-black text-[11px] cursor-pointer border " +
-                    (previewMode
-                      ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)]"
-                      : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)]")
+                    "px-3 py-1.5 rounded-xl cursor-pointer transition " +
+                    (editorMode === "visual"
+                      ? "bg-[var(--accent-blue)] text-white shadow"
+                      : "text-[var(--text-secondary)]")
                   }
                 >
-                  {previewMode
-                    ? "✏️ بازگشت به ویرایشگر کد"
-                    : "👁️ پیش‌نمایش زنده مقاله"}
+                  🧩 ویرایشگر بخش‌بندی‌شده (جدول، متن، FAQ)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditorMode("html")}
+                  className={
+                    "px-3 py-1.5 rounded-xl cursor-pointer transition " +
+                    (editorMode === "html"
+                      ? "bg-[var(--accent-blue)] text-white shadow"
+                      : "text-[var(--text-secondary)]")
+                  }
+                >
+                  💻 ویرایش کد HTML
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditorMode("preview")}
+                  className={
+                    "px-3 py-1.5 rounded-xl cursor-pointer transition " +
+                    (editorMode === "preview"
+                      ? "bg-[var(--accent-blue)] text-white shadow"
+                      : "text-[var(--text-secondary)]")
+                  }
+                >
+                  👁️ پیش‌نمایش زنده
                 </button>
               </div>
 
-              {previewMode ? (
-                <div
-                  className="w-full min-h-[260px] p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--accent-blue)]/50 leading-loose space-y-3 overflow-y-auto max-h-[420px]"
-                  dangerouslySetInnerHTML={{
-                    __html: content || "<p>هنوز محتوایی وارد نشده است...</p>",
-                  }}
-                />
-              ) : (
-                <textarea
-                  rows={10}
-                  required
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="محتوای کامل مقاله (پشتیبانی از تگ‌های HTML، جدول و لینک خرید)..."
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-loose focus:border-[var(--accent-blue)]"
-                />
-              )}
+              <span
+                className={
+                  "px-3 py-1.5 rounded-xl font-mono font-black text-[11px] " +
+                  (liveBlogSeoScore >= 85
+                    ? "bg-emerald-500/15 text-emerald-400"
+                    : "bg-amber-500/15 text-amber-400")
+                }
+              >
+                سئو: {liveBlogSeoScore}/100 ({wordCount} کلمه)
+              </span>
             </div>
+
+            {editorMode === "visual" && (
+              <div className="space-y-4">
+                {/* بلوک ۱: مقدمه */}
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
+                  <span className="font-black text-[var(--accent-blue)] block">
+                    بخش ۱: تیتر و متن مقدمه مقاله
+                  </span>
+                  <input
+                    type="text"
+                    value={blocks.introHeading}
+                    onChange={(e) =>
+                      updateBlocksAndSyncHtml((b) => ({
+                        ...b,
+                        introHeading: e.target.value,
+                      }))
+                    }
+                    placeholder="تیتر بخش مقدمه (H2)..."
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                  />
+                  <textarea
+                    rows={3}
+                    value={blocks.introBody}
+                    onChange={(e) =>
+                      updateBlocksAndSyncHtml((b) => ({
+                        ...b,
+                        introBody: e.target.value,
+                      }))
+                    }
+                    placeholder="متن پاراگراف مقدمه..."
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] leading-relaxed"
+                  />
+                </div>
+
+                {/* بلوک ۲: بررسی و ارزش خرید */}
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
+                  <span className="font-black text-[var(--accent-blue)] block">
+                    بخش ۲: تیتر و متن بررسی تخصصی / ارزش خرید
+                  </span>
+                  <input
+                    type="text"
+                    value={blocks.whyHeading}
+                    onChange={(e) =>
+                      updateBlocksAndSyncHtml((b) => ({
+                        ...b,
+                        whyHeading: e.target.value,
+                      }))
+                    }
+                    placeholder="تیتر بخش بررسی..."
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                  />
+                  <textarea
+                    rows={3}
+                    value={blocks.whyBody}
+                    onChange={(e) =>
+                      updateBlocksAndSyncHtml((b) => ({
+                        ...b,
+                        whyBody: e.target.value,
+                      }))
+                    }
+                    placeholder="متن توضیحات این بخش..."
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] leading-relaxed"
+                  />
+                </div>
+
+                {/* بلوک ۳: جدول مشخصات کلیدی */}
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-[var(--accent-blue)]">
+                      بخش ۳: جدول مشخصات کلیدی (قابل ویرایش ردیف‌به‌ردیف)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateBlocksAndSyncHtml((b) => ({
+                          ...b,
+                          tableRows: [...b.tableRows, { label: "", value: "" }],
+                        }))
+                      }
+                      className="px-3 py-1 rounded-xl bg-[var(--accent-blue)] text-white font-black text-[11px] cursor-pointer"
+                    >
+                      + افزودن ردیف
+                    </button>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={blocks.tableHeading}
+                    onChange={(e) =>
+                      updateBlocksAndSyncHtml((b) => ({
+                        ...b,
+                        tableHeading: e.target.value,
+                      }))
+                    }
+                    placeholder="عنوان بالای جدول..."
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                  />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={blocks.tableCol1Header}
+                      onChange={(e) =>
+                        updateBlocksAndSyncHtml((b) => ({
+                          ...b,
+                          tableCol1Header: e.target.value,
+                        }))
+                      }
+                      placeholder="تیتر ستون اول"
+                      className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-black text-center"
+                    />
+                    <input
+                      type="text"
+                      value={blocks.tableCol2Header}
+                      onChange={(e) =>
+                        updateBlocksAndSyncHtml((b) => ({
+                          ...b,
+                          tableCol2Header: e.target.value,
+                        }))
+                      }
+                      placeholder="تیتر ستون دوم"
+                      className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-black text-center"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    {blocks.tableRows.map((row, rIdx) => (
+                      <div key={rIdx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={row.label}
+                          onChange={(e) =>
+                            updateBlocksAndSyncHtml((b) => {
+                              const nextRows = [...b.tableRows];
+                              nextRows[rIdx] = {
+                                ...nextRows[rIdx],
+                                label: e.target.value,
+                              };
+                              return { ...b, tableRows: nextRows };
+                            })
+                          }
+                          placeholder="عنوان ویژگی"
+                          className="w-1/3 p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                        />
+                        <input
+                          type="text"
+                          value={row.value}
+                          onChange={(e) =>
+                            updateBlocksAndSyncHtml((b) => {
+                              const nextRows = [...b.tableRows];
+                              nextRows[rIdx] = {
+                                ...nextRows[rIdx],
+                                value: e.target.value,
+                              };
+                              return { ...b, tableRows: nextRows };
+                            })
+                          }
+                          placeholder="مقدار / توضیح"
+                          className="flex-1 p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateBlocksAndSyncHtml((b) => ({
+                              ...b,
+                              tableRows: b.tableRows.filter(
+                                (_, idx) => idx !== rIdx
+                              ),
+                            }))
+                          }
+                          className="w-8 h-8 rounded-xl bg-rose-500/15 text-rose-400 hover:bg-rose-500 hover:text-white font-bold cursor-pointer shrink-0"
+                          title="حذف این ردیف"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* بلوک ۴: سوالات متداول (FAQ) */}
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-emerald-400">
+                      بخش ۴: سوالات متداول (FAQ)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateBlocksAndSyncHtml((b) => ({
+                          ...b,
+                          faqItems: [
+                            ...b.faqItems,
+                            { question: "", answer: "" },
+                          ],
+                        }))
+                      }
+                      className="px-3 py-1 rounded-xl bg-emerald-600 text-white font-black text-[11px] cursor-pointer"
+                    >
+                      + افزودن سوال
+                    </button>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={blocks.faqHeading}
+                    onChange={(e) =>
+                      updateBlocksAndSyncHtml((b) => ({
+                        ...b,
+                        faqHeading: e.target.value,
+                      }))
+                    }
+                    placeholder="عنوان بخش سوالات متداول..."
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                  />
+
+                  <div className="space-y-3">
+                    {blocks.faqItems.map((faq, fIdx) => (
+                      <div
+                        key={fIdx}
+                        className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={faq.question}
+                            onChange={(e) =>
+                              updateBlocksAndSyncHtml((b) => {
+                                const nextFaqs = [...b.faqItems];
+                                nextFaqs[fIdx] = {
+                                  ...nextFaqs[fIdx],
+                                  question: e.target.value,
+                                };
+                                return { ...b, faqItems: nextFaqs };
+                              })
+                            }
+                            placeholder="متن پرسش..."
+                            className="flex-1 p-2 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] font-bold"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateBlocksAndSyncHtml((b) => ({
+                                ...b,
+                                faqItems: b.faqItems.filter(
+                                  (_, idx) => idx !== fIdx
+                                ),
+                              }))
+                            }
+                            className="px-2.5 py-1.5 rounded-lg bg-rose-500/15 text-rose-400 font-bold cursor-pointer"
+                          >
+                            حذف
+                          </button>
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={faq.answer}
+                          onChange={(e) =>
+                            updateBlocksAndSyncHtml((b) => {
+                              const nextFaqs = [...b.faqItems];
+                              nextFaqs[fIdx] = {
+                                ...nextFaqs[fIdx],
+                                answer: e.target.value,
+                              };
+                              return { ...b, faqItems: nextFaqs };
+                            })
+                          }
+                          placeholder="متن پاسخ..."
+                          className="w-full p-2 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] leading-relaxed"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* بلوک ۵: باکس آبی خرید مستقیم داخل مقاله */}
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-sky-500/40 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-sky-400">
+                      بخش ۵: باکس خرید مستقیم انتهای متن مقاله
+                    </span>
+                    <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={blocks.inArticleCtaEnabled}
+                        onChange={(e) =>
+                          updateBlocksAndSyncHtml((b) => ({
+                            ...b,
+                            inArticleCtaEnabled: e.target.checked,
+                          }))
+                        }
+                        className="accent-sky-500"
+                      />
+                      <span>فعال باشد</span>
+                    </label>
+                  </div>
+
+                  {blocks.inArticleCtaEnabled && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <input
+                        type="text"
+                        value={blocks.inArticleCtaTitle}
+                        onChange={(e) =>
+                          updateBlocksAndSyncHtml((b) => ({
+                            ...b,
+                            inArticleCtaTitle: e.target.value,
+                          }))
+                        }
+                        placeholder="عنوان باکس خرید..."
+                        className="sm:col-span-2 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                      />
+                      <input
+                        type="text"
+                        value={blocks.inArticleCtaText}
+                        onChange={(e) =>
+                          updateBlocksAndSyncHtml((b) => ({
+                            ...b,
+                            inArticleCtaText: e.target.value,
+                          }))
+                        }
+                        placeholder="متن توضیح باکس خرید..."
+                        className="sm:col-span-2 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]"
+                      />
+                      <input
+                        type="text"
+                        value={blocks.inArticleCtaButtonText}
+                        onChange={(e) =>
+                          updateBlocksAndSyncHtml((b) => ({
+                            ...b,
+                            inArticleCtaButtonText: e.target.value,
+                          }))
+                        }
+                        placeholder="متن دکمه خرید..."
+                        className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold"
+                      />
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={blocks.inArticleCtaUrl}
+                        onChange={(e) =>
+                          updateBlocksAndSyncHtml((b) => ({
+                            ...b,
+                            inArticleCtaUrl: e.target.value,
+                          }))
+                        }
+                        placeholder="/products/..."
+                        className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {editorMode === "html" && (
+              <textarea
+                rows={12}
+                required
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="محتوای کامل مقاله (HTML)..."
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none leading-loose focus:border-[var(--accent-blue)]"
+              />
+            )}
+
+            {editorMode === "preview" && (
+              <div
+                className="w-full min-h-[260px] p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--accent-blue)]/50 leading-loose space-y-3 overflow-y-auto max-h-[500px]"
+                dangerouslySetInnerHTML={{
+                  __html: content || "<p>هنوز محتوایی وارد نشده است...</p>",
+                }}
+              />
+            )}
           </div>
 
           <label className="flex items-center gap-2 font-bold cursor-pointer pt-1">
@@ -1061,11 +1909,12 @@ export function AdminBlogManager() {
             {saving
               ? "در حال ذخیره در دیتابیس..."
               : editingId
-              ? "💾 بروزرسانی و ذخیره تغییرات مقاله"
+              ? "💾 بروزرسانی و ذخیره تمام تغییرات مقاله"
               : "💾 ذخیره و انتشار مقاله سئو"}
           </button>
         </form>
 
+        {/* ستون چپ: آرشیو مقالات مجله */}
         <div className="lg:col-span-5 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 h-fit">
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[var(--card-border)] pb-3">
             <h3 className="font-black text-sm">
@@ -1178,7 +2027,7 @@ export function AdminBlogManager() {
                       type="button"
                       onClick={() => handleEditPost(post)}
                       className="px-2.5 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold cursor-pointer"
-                      title="ویرایش مقاله"
+                      title="ویرایش کامل مقاله"
                     >
                       ✏️
                     </button>

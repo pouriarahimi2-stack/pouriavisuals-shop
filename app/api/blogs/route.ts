@@ -217,12 +217,21 @@ export async function GET(req: NextRequest) {
       allPosts = await ensureCatalogSeoArticles();
     }
 
-    const filtered = onlyPublished
-      ? allPosts.filter((p: any) => p.is_published !== false)
-      : allPosts;
+    const layoutCfg = siteRow?.homepage_layout_config || {};
+    const blogPageConfig = layoutCfg.blog_page_config || {};
+    const postAuthorsMap: Record<string, string> =
+      layoutCfg.blog_post_authors && typeof layoutCfg.blog_post_authors === "object"
+        ? layoutCfg.blog_post_authors
+        : {};
 
-    const blogPageConfig =
-      siteRow?.homepage_layout_config?.blog_page_config || {};
+    const enrichedPosts = allPosts.map((p: any) => ({
+      ...p,
+      author: p.author || postAuthorsMap[String(p.id)] || "",
+    }));
+
+    const filtered = onlyPublished
+      ? enrichedPosts.filter((p: any) => p.is_published !== false)
+      : enrichedPosts;
 
     return NextResponse.json(
       { success: true, posts: filtered, data: filtered, blogPageConfig },
@@ -248,20 +257,53 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
+    // ذخیره تنظیمات سراسری تمامی اجزای صفحه مقالات
     if (body.action === "save_blog_settings") {
       const siteRow = await getMasterSiteInfoRow();
       const layoutCfg = siteRow?.homepage_layout_config || {};
       const nextBlogCfg = {
+        showBreadcrumb: body.showBreadcrumb !== false,
+        breadcrumbHomeLabel: String(body.breadcrumbHomeLabel || "خانه").trim(),
+        breadcrumbBlogLabel: String(
+          body.breadcrumbBlogLabel || "مجله تخصصی"
+        ).trim(),
+        showReadingTime: body.showReadingTime !== false,
+        readingTimePrefix: String(
+          body.readingTimePrefix || "زمان مطالعه:"
+        ).trim(),
+        readingTimeUnit: String(body.readingTimeUnit || "دقیقه").trim(),
+        showAuthor: body.showAuthor !== false,
+        authorPrefix: String(body.authorPrefix || "نویسنده:").trim(),
+        defaultAuthorName: String(body.defaultAuthorName || "").trim(),
+        showPublishDate: body.showPublishDate !== false,
+        publishDatePrefix: String(
+          body.publishDatePrefix || "تاریخ انتشار:"
+        ).trim(),
+        showFeaturedImage: body.showFeaturedImage !== false,
+        showLinkedProductCard: body.showLinkedProductCard !== false,
+        linkedProductBadge: String(
+          body.linkedProductBadge || "🛍️ محصول بررسی‌شده در این مقاله"
+        ).trim(),
+        linkedProductButtonText: String(
+          body.linkedProductButtonText || "مشاهده مشخصات و خرید آنلاین ←"
+        ).trim(),
+        defaultWarrantyFallback: String(
+          body.defaultWarrantyFallback || ""
+        ).trim(),
+        showRelatedPosts: body.showRelatedPosts !== false,
+        relatedPostsTitle: String(
+          body.relatedPostsTitle || "📚 سایر مقالات و راهنماهای تخصصی مرتبط"
+        ).trim(),
+        relatedPostLinkText: String(
+          body.relatedPostLinkText || "مطالعه مقاله ←"
+        ).trim(),
         ctaBoxEnabled: body.ctaBoxEnabled !== false,
         ctaBoxTitle: String(body.ctaBoxTitle || "").trim(),
         ctaBoxSubtitle: String(body.ctaBoxSubtitle || "").trim(),
         ctaButtonText: String(body.ctaButtonText || "").trim(),
         ctaButtonUrl: String(body.ctaButtonUrl || "/products").trim(),
         archiveButtonText: String(body.archiveButtonText || "").trim(),
-        defaultWarrantyFallback: String(
-          body.defaultWarrantyFallback || ""
-        ).trim(),
-        showRelatedPosts: body.showRelatedPosts !== false,
+        archiveButtonUrl: String(body.archiveButtonUrl || "/blog").trim(),
       };
 
       await saveMasterSiteInfoRow(
@@ -277,7 +319,7 @@ export async function POST(req: NextRequest) {
         success: true,
         blogPageConfig: nextBlogCfg,
         message:
-          "✓ تنظیمات صفحه مقالات و باکس مشاوره با موفقیت ذخیره و در کل سایت اعمال شد.",
+          "✓ تنظیمات تمامی بخش‌های صفحه مقالات با موفقیت ذخیره و در کل سایت اعمال شد.",
       });
     }
 
@@ -316,9 +358,18 @@ export async function POST(req: NextRequest) {
             );
         } else {
           nextContent = nextContent
-            .replace(/با استانداردهای کیفی برند\s*<strong>Apple<\/strong>/g, "با استانداردهای کیفی روز")
-            .replace(/با پوشش\s*<strong>۱۸ ماه گارانتی اصالت و سلامت فیزیکی طلایی<\/strong>/g, "با تضمین سلامت فیزیکی")
-            .replace(/۱۸ ماه گارانتی اصالت و سلامت فیزیکی طلایی/g, "تضمین سلامت فیزیکی کالا")
+            .replace(
+              /با استانداردهای کیفی برند\s*<strong>Apple<\/strong>/g,
+              "با استانداردهای کیفی روز"
+            )
+            .replace(
+              /با پوشش\s*<strong>۱۸ ماه گارانتی اصالت و سلامت فیزیکی طلایی<\/strong>/g,
+              "با تضمین سلامت فیزیکی"
+            )
+            .replace(
+              /۱۸ ماه گارانتی اصالت و سلامت فیزیکی طلایی/g,
+              "تضمین سلامت فیزیکی کالا"
+            )
             .replace(/۱۸ ماه گارانتی اصالت طلایی/g, "تضمین سلامت فیزیکی کالا");
           nextMeta = nextMeta
             .replace(/و گارانتی اصالت/g, "")
@@ -368,6 +419,7 @@ export async function POST(req: NextRequest) {
 
     const title = String(body.title || "").trim();
     const content = String(body.content || "").trim();
+    const authorName = String(body.author || "").trim();
 
     if (!title || !content) {
       return NextResponse.json(
@@ -414,6 +466,33 @@ export async function POST(req: NextRequest) {
       updated_at: nowIso,
     };
 
+    const persistAuthorMapping = async (postId: string) => {
+      try {
+        const siteRow = await getMasterSiteInfoRow();
+        const layoutCfg = siteRow?.homepage_layout_config || {};
+        const prevAuthors =
+          layoutCfg.blog_post_authors &&
+          typeof layoutCfg.blog_post_authors === "object"
+            ? { ...layoutCfg.blog_post_authors }
+            : {};
+
+        if (authorName) {
+          prevAuthors[postId] = authorName;
+        } else {
+          delete prevAuthors[postId];
+        }
+
+        await saveMasterSiteInfoRow(
+          siteRow,
+          {
+            ...layoutCfg,
+            blog_post_authors: prevAuthors,
+          },
+          {}
+        );
+      } catch {}
+    };
+
     if (body.id) {
       const { data: updated, error } = await supabaseAdmin
         .from("posts")
@@ -423,11 +502,13 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (error) throw error;
+      await persistAuthorMapping(String(updated.id));
+
       return NextResponse.json({
         success: true,
         message: "✓ مقاله سئو با موفقیت به‌روزرسانی شد.",
-        data: updated,
-        post: updated,
+        data: { ...updated, author: authorName },
+        post: { ...updated, author: authorName },
       });
     } else {
       const { data: existingSlug } = await supabaseAdmin
@@ -453,11 +534,13 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (error) throw error;
+      await persistAuthorMapping(String(inserted.id));
+
       return NextResponse.json({
         success: true,
         message: "✓ مقاله سئو با موفقیت در دیتابیس ذخیره و منتشر گردید.",
-        data: inserted,
-        post: inserted,
+        data: { ...inserted, author: authorName },
+        post: { ...inserted, author: authorName },
       });
     }
   } catch (err: any) {

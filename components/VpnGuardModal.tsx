@@ -5,13 +5,23 @@ import React, { useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { soundEngine } from "@/lib/soundEngine";
 
+const DISMISS_STORAGE_KEY = "axon_vpn_notice_dismissed_v1";
+
 export default function VpnGuardModal() {
   const pathname = usePathname() || "/";
   const [vpnDetected, setVpnDetected] = useState(false);
-  const [detectedCountry, setDetectedCountry] = useState("");
+  const [dismissed, setDismissed] = useState(false);
   const [checking, setChecking] = useState(false);
 
   const isAdminRoute = pathname.startsWith("/admin");
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(DISMISS_STORAGE_KEY) === "true") {
+        setDismissed(true);
+      }
+    } catch {}
+  }, []);
 
   const checkConnection = useCallback(async () => {
     if (isAdminRoute) {
@@ -25,18 +35,7 @@ export default function VpnGuardModal() {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.isVpn) {
-          setVpnDetected(true);
-          setDetectedCountry(data.country || "NON-IR");
-          if (typeof document !== "undefined") {
-            document.body.style.overflow = "hidden";
-          }
-        } else {
-          setVpnDetected(false);
-          if (typeof document !== "undefined") {
-            document.body.style.overflow = "";
-          }
-        }
+        setVpnDetected(Boolean(data.isVpn));
       }
     } catch {
     } finally {
@@ -50,51 +49,77 @@ export default function VpnGuardModal() {
     window.addEventListener("focus", onFocus);
     return () => {
       window.removeEventListener("focus", onFocus);
-      if (typeof document !== "undefined") {
-        document.body.style.overflow = "";
-      }
     };
   }, [checkConnection]);
 
-  if (!vpnDetected || isAdminRoute) return null;
+  const handleDismiss = () => {
+    soundEngine.playClick();
+    setDismissed(true);
+    try {
+      sessionStorage.setItem(DISMISS_STORAGE_KEY, "true");
+    } catch {}
+  };
+
+  if (!vpnDetected || dismissed || isAdminRoute) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-2xl font-sans select-none animate-fadeIn"
+    <aside
+      aria-label="یادآوری اتصال اینترنت"
+      className="fixed bottom-20 md:bottom-6 right-4 left-4 sm:left-auto sm:w-[375px] z-40 pointer-events-auto font-sans select-text animate-fadeIn"
       dir="rtl"
     >
-      <div className="max-w-md w-full p-6 sm:p-8 rounded-[2.5rem] bg-slate-900 border-2 border-amber-500/40 shadow-[0_0_80px_rgba(245,158,11,0.25)] text-center space-y-5 text-white">
-        <div className="w-16 h-16 mx-auto rounded-3xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-3xl shadow-inner animate-pulse">
-          🛡️
+      <div className="p-4 sm:p-5 rounded-3xl bg-[var(--modal-bg)]/95 backdrop-blur-2xl border border-amber-500/40 shadow-2xl text-[var(--text-primary)] space-y-3">
+        <div className="flex items-start justify-between gap-2.5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-2xl bg-amber-500/15 border border-amber-500/35 text-amber-400 flex items-center justify-center text-lg shrink-0">
+              🛡️
+            </div>
+            <div>
+              <h3 className="font-black text-xs sm:text-[13px] text-amber-400">
+                یادآوری محترمانه برای تجربه بهتر خرید
+              </h3>
+              <span className="text-[10px] text-[var(--text-secondary)] font-bold block">
+                پیشنهاد بهینه‌سازی اتصال بانکی و پیامکی
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleDismiss}
+            aria-label="بستن اعلان"
+            className="w-7 h-7 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-amber-500/50 text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center text-xs font-bold transition cursor-pointer shrink-0"
+          >
+            ✕
+          </button>
         </div>
 
-        <div className="space-y-2">
-          <span className="px-3 py-1 rounded-full bg-amber-500/15 text-amber-400 font-mono text-[10px] font-black">
-            SECURITY SHIELD • IP: {detectedCountry}
-          </span>
-          <h2 className="text-lg sm:text-xl font-black text-amber-400">
-            لطفاً فیلترشکن (VPN) خود را خاموش فرمایید
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium text-justify">
-            همراه گرامی، به منظور تضمین امنیت کامل تراکنش‌های بانکی شما در شبکه شاپرک، دریافت بی‌وقفه پیامک‌های کد تایید و تجربه مرور وب‌سایت با بالاترین سرعت، دسترسی به فروشگاه تنها با آی‌پی داخلی ایران امکان‌پذیر است.
-          </p>
-          <p className="text-xs text-amber-300/90 font-bold pt-1">
-            خواهشمندیم فیلترشکن یا ابزار تغییر آی‌پی خود را غیرفعال نموده و سپس روی دکمه زیر کلیک کنید.
-          </p>
-        </div>
+        <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] leading-relaxed font-medium text-justify">
+          همراه گرامی، بازدید از تمامی بخش‌های فروشگاه با فیلترشکن (VPN) بدون هیچ‌گونه محدودیتی امکان‌پذیر است؛ با این حال، برای اتصال بی‌وقفه به درگاه پرداخت شاپرک و دریافت سریع پیامک‌های تایید، پیشنهاد می‌کنیم هنگام ثبت سفارش فیلترشکن خود را خاموش فرمایید.
+        </p>
 
-        <button
-          type="button"
-          disabled={checking}
-          onClick={() => {
-            soundEngine.playClick();
-            checkConnection();
-          }}
-          className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-95 text-slate-950 font-black text-xs sm:text-sm shadow-xl cursor-pointer transition disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          <span>{checking ? "در حال بررسی مجدد اتصال..." : "🔄 فیلترشکن را خاموش کردم (ورود به سایت)"}</span>
-        </button>
+        <div className="flex items-center gap-2 pt-1">
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-95 text-slate-950 font-black text-[11px] shadow-md cursor-pointer transition"
+          >
+            متوجه شدم، ادامه بازدید ✓
+          </button>
+
+          <button
+            type="button"
+            disabled={checking}
+            onClick={() => {
+              soundEngine.playClick();
+              checkConnection();
+            }}
+            className="py-2.5 px-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] font-bold text-[11px] cursor-pointer transition disabled:opacity-50 shrink-0"
+          >
+            {checking ? "بررسی..." : "بررسی مجدد"}
+          </button>
+        </div>
       </div>
-    </div>
+    </aside>
   );
 }

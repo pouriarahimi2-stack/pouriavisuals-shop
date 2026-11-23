@@ -129,7 +129,8 @@ export default function CheckoutPage() {
     appliedCoupon,
     applyCoupon,
     removeCoupon,
-  } = useCart();
+    clearCart,
+  } = useCart() as any;
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -143,6 +144,10 @@ export default function CheckoutPage() {
     null
   );
   const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean>(true);
+
+  // استیت‌های کیف پول مشتری
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [useWallet, setUseWallet] = useState<boolean>(false);
 
   const allowedShipping = React.useMemo(() => {
     const items = (cartItems || []) as any[];
@@ -204,6 +209,33 @@ export default function CheckoutPage() {
   const [captchaVerified, setCaptchaVerified] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const fetchWalletForPhone = useCallback(async (rawPhoneVal: string) => {
+    const clean = String(rawPhoneVal || "")
+      .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 1776))
+      .replace(/\D/g, "");
+    if (!/^09\d{9}$/.test(clean)) {
+      setWalletBalance(0);
+      setUseWallet(false);
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/user/wallet?phone=${encodeURIComponent(clean)}&t=${Date.now()}`,
+        { cache: "no-store" }
+      );
+      if (res.ok) {
+        const json = await res.json();
+        const bal = Math.max(0, Number(json.balance || 0));
+        setWalletBalance(bal);
+        if (bal <= 0) setUseWallet(false);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    fetchWalletForPhone(phone);
+  }, [phone, fetchWalletForPhone]);
+
   const fetchLiveStoreRules = useCallback(async () => {
     try {
       const [settingsRes, siteInfoRes] = await Promise.allSettled([
@@ -231,6 +263,13 @@ export default function CheckoutPage() {
     try {
       const userSess = localStorage.getItem("axon_user_session");
       setIsUserLoggedIn(Boolean(userSess));
+      if (userSess) {
+        const parsed = JSON.parse(userSess);
+        if (parsed?.phone) {
+          setPhone((prev) => prev || String(parsed.phone));
+          fetchWalletForPhone(String(parsed.phone));
+        }
+      }
     } catch {
       setIsUserLoggedIn(false);
     }
@@ -252,7 +291,7 @@ export default function CheckoutPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchLiveStoreRules]);
+  }, [fetchLiveStoreRules, fetchWalletForPhone]);
 
   const qualifiesForFreeShipping =
     financialRules.freeShippingThreshold > 0 &&
@@ -273,7 +312,21 @@ export default function CheckoutPage() {
       ? invoice.totalVatAmount
       : Math.round((finalPayable * financialRules.vatPercent) / 100);
 
-  const grandTotal = Math.max(0, finalPayable + vatAmount + shippingCost);
+  const grandTotalBeforeWallet = Math.max(
+    0,
+    finalPayable + vatAmount + shippingCost
+  );
+
+  let walletDeduction =
+    useWallet && walletBalance > 0
+      ? Math.min(walletBalance, grandTotalBeforeWallet)
+      : 0;
+  let grandTotal = Math.max(0, grandTotalBeforeWallet - walletDeduction);
+  if (grandTotal > 0 && grandTotal < 1000 && grandTotalBeforeWallet >= 1000) {
+    grandTotal = 1000;
+    walletDeduction = Math.max(0, grandTotalBeforeWallet - 1000);
+  }
+
   const currency = financialRules.currencyLabel || "تومان";
 
   const provinceList = Object.keys(IRAN_PROVINCES_CITIES).sort();
@@ -400,6 +453,7 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           otpVerificationToken: tokenToUse,
+          useWallet: Boolean(useWallet && walletBalance > 0),
           customer: {
             fullName,
             phone: cleanPhone,
@@ -429,12 +483,29 @@ export default function CheckoutPage() {
         throw new Error(orderData.message || "خطا در ثبت سفارش");
 
       const orderId = orderData.order?.id || orderData.order?.order_number;
+      const serverPayable = Number(
+        orderData.order?.final_amount ?? grandTotal
+      );
       soundEngine.playSuccess();
+
+      if (orderData.paidByWallet || serverPayable === 0) {
+        if (typeof clearCart === "function") clearCart();
+        router.push(
+          "/checkout/payment?orderId=" +
+            encodeURIComponent(String(orderId)) +
+            "&walletPaid=1&trackingCode=" +
+            encodeURIComponent(
+              String(orderData.order?.tracking_code || orderId)
+            )
+        );
+        return;
+      }
+
       router.push(
         "/checkout/payment?orderId=" +
           encodeURIComponent(String(orderId)) +
           "&amount=" +
-          encodeURIComponent(String(grandTotal)) +
+          encodeURIComponent(String(serverPayable)) +
           "&phone=" +
           encodeURIComponent(cleanPhone)
       );
@@ -817,7 +888,7 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* ستون چپ: صورتحساب و بخش ثبت کد تخفیف */}
+        {/* ستون چپ: صورتحساب، کیف پول و بخش ثبت کد تخفیف */}
         <div className="p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs h-fit">
           <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
             ۳. صورتحساب و تایید نهایی
@@ -874,6 +945,46 @@ export default function CheckoutPage() {
                 </div>
               ))}
             </div>
+          )}
+
+          {/* کارت استفاده از اعتبار کیف پول مشتری */}
+          {walletBalance > 0 && (
+            <label
+              className={
+                "p-4 rounded-2xl border-2 cursor-pointer transition flex items-center justify-between gap-3 " +
+                (useWallet
+                  ? "border-emerald-500 bg-emerald-500/15"
+                  : "border-emerald-500/35 bg-emerald-500/5 hover:border-emerald-500/60")
+              }
+            >
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={useWallet}
+                  onChange={(e) => {
+                    soundEngine.playClick();
+                    setUseWallet(e.target.checked);
+                  }}
+                  className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+                />
+                <div>
+                  <span className="font-black text-xs text-emerald-500 block">
+                    👛 پرداخت با اعتبار کیف پول شما
+                  </span>
+                  <span className="text-[11px] font-bold text-[var(--text-secondary)]">
+                    موجودی قابل استفاده:{" "}
+                    <strong className="font-mono text-emerald-400">
+                      {formatPrice(walletBalance)} {currency}
+                    </strong>
+                  </span>
+                </div>
+              </div>
+              {useWallet && walletDeduction > 0 && (
+                <span className="px-2.5 py-1 rounded-xl bg-emerald-500 text-slate-950 font-mono font-black text-[10px] shrink-0">
+                  -{formatPrice(walletDeduction)} ت
+                </span>
+              )}
+            </label>
           )}
 
           {/* کادر ثبت کد تخفیف */}
@@ -998,10 +1109,24 @@ export default function CheckoutPage() {
                   : formatPrice(shippingCost) + " " + currency}
               </span>
             </div>
+            {walletDeduction > 0 && (
+              <div className="flex justify-between text-emerald-500 font-black">
+                <span>👛 کسر از اعتبار کیف پول:</span>
+                <span className="font-mono">
+                  - {formatPrice(walletDeduction)} {currency}
+                </span>
+              </div>
+            )}
             <div className="pt-2.5 border-t border-[var(--card-border)] flex justify-between items-center text-sm">
-              <span className="font-black">مبلغ قابل پرداخت:</span>
+              <span className="font-black">
+                {grandTotal === 0
+                  ? "مبلغ قابل پرداخت در درگاه:"
+                  : "مبلغ قابل پرداخت:"}
+              </span>
               <span className="font-mono font-black text-[var(--accent-blue)]">
-                {formatPrice(grandTotal)} {currency}
+                {grandTotal === 0
+                  ? "۰ تومان (تسویه با کیف پول)"
+                  : `${formatPrice(grandTotal)} ${currency}`}
               </span>
             </div>
           </div>
@@ -1015,6 +1140,10 @@ export default function CheckoutPage() {
           >
             {submitting || isOtpRequestLocked
               ? "در حال پردازش امن..."
+              : grandTotal === 0 && walletDeduction > 0
+              ? verifiedToken
+                ? "👛 ثبت نهایی و تسویه با کیف پول ←"
+                : "🔒 تایید شماره و تسویه با کیف پول ←"
               : verifiedToken
               ? "💳 ورود به درگاه زرین‌پال ←"
               : "🔒 تایید شماره و پرداخت آنلاین ←"}
@@ -1056,7 +1185,7 @@ export default function CheckoutPage() {
               disabled={submitting}
               className="w-full py-4 rounded-2xl bg-emerald-600 text-white font-black text-xs shadow-xl cursor-pointer disabled:opacity-50"
             >
-              {submitting ? "در حال انتقال..." : "✓ تایید کد و پرداخت"}
+              {submitting ? "در حال انتقال..." : "✓ تایید کد و ادامه"}
             </button>
           </form>
         </div>

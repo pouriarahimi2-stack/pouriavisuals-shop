@@ -6,6 +6,7 @@ import { verifyCustomerToken, CUSTOMER_COOKIE_NAME } from "@/lib/customerSession
 import { normalizeSystemSettings } from "@/lib/systemSettings";
 import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
 import { logAuditEvent } from "@/lib/auditLogger";
+import { sendTextSMS } from "@/lib/otpService";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const customer = body.customer || {};
     const items = Array.isArray(body.items) ? body.items : [];
+    const requestedUseWallet = Boolean(body.useWallet);
 
     const fullName = String(
       customer.fullName || body.customer_name || "خریدار محترم"
@@ -187,7 +189,6 @@ export async function POST(req: NextRequest) {
       const qty = Math.max(1, Math.min(99, Number(item.quantity || 1)));
       const dbProd = prodId ? dbProdMap.get(prodId) : null;
 
-      // امنیت مطلق: رد کردن هر کالایی که در دیتابیس وجود ندارد (جلوگیری از دستکاری قیمت)
       if (!dbProd) {
         return NextResponse.json(
           {
@@ -241,7 +242,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // تشخیص روش ارسال معتبر در سمت سرور
     const rawShippingMethod = String(
       body.shippingMethod ||
         (address.includes("[ارسال با تیپاکس]") ? "tipax" : "post")
@@ -340,7 +340,6 @@ export async function POST(req: NextRequest) {
 
     const afterDiscount = Math.max(0, verifiedSubtotal - verifiedDiscount);
 
-    // محاسبه دقیق هزینه ارسال در سمت سرور مطابق تنظیمات کلان پنل مدیریت
     const qualifiesForFreeShipping =
       sysRules.freeShippingThreshold > 0 &&
       afterDiscount >= sysRules.freeShippingThreshold;
@@ -350,7 +349,6 @@ export async function POST(req: NextRequest) {
       if (resolvedShippingMethod === "post") {
         shippingCost = Number(sysRules.postShippingCost || 0);
       } else {
-        // تیپاکس به صورت پس‌کرایه محاسبه می‌شود و به مبلغ فاکتور آنلاین اضافه نمی‌گردد
         shippingCost = 0;
       }
     }
@@ -361,29 +359,85 @@ export async function POST(req: NextRequest) {
         ? Math.round((afterDiscount * vatPercent) / 100)
         : 0;
 
-    let finalAmount = Math.max(0, afterDiscount + vatAmount + shippingCost);
+    const grandTotalBeforeWallet = Math.max(
+      0,
+      afterDiscount + vatAmount + shippingCost
+    );
+
+    // کسر ایمن از اعتبار کیف پول در سمت سرور
+    let walletUsedAmount = 0;
+    let finalAmount = grandTotalBeforeWallet;
+
+    if (requestedUseWallet && grandTotalBeforeWallet > 0) {
+      try {
+        const { data: walletRow } = await supabaseAdmin
+          .from("customer_wallets")
+          .select("balance")
+          .eq("customer_phone", cleanPhone)
+          .maybeSingle();
+
+        const availableWallet = Math.max(0, Number(walletRow?.balance || 0));
+        if (availableWallet > 0) {
+          walletUsedAmount = Math.min(availableWallet, grandTotalBeforeWallet);
+          finalAmount = Math.max(0, grandTotalBeforeWallet - walletUsedAmount);
+
+          // رعایت حداقل مبلغ ۱۰۰۰ تومان در صورت انتقال به درگاه بانکی
+          if (
+            finalAmount > 0 &&
+            finalAmount < 1000 &&
+            grandTotalBeforeWallet >= 1000
+          ) {
+            finalAmount = 1000;
+            walletUsedAmount = Math.max(0, grandTotalBeforeWallet - 1000);
+          }
+
+          const nextWalletBalance = Math.max(
+            0,
+            availableWallet - walletUsedAmount
+          );
+          await supabaseAdmin
+            .from("customer_wallets")
+            .update({
+              balance: nextWalletBalance,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("customer_phone", cleanPhone);
+        }
+      } catch (walletErr) {
+        console.error("Wallet deduction error:", walletErr);
+      }
+    }
+
     if (finalAmount > 0 && finalAmount < 1000) {
       finalAmount = 1000;
     }
+
+    const isPaidFullyByWallet =
+      walletUsedAmount > 0 && finalAmount === 0;
 
     const shortCode = Math.floor(100000 + Math.random() * 900000).toString();
     const orderNumber = "AXN-" + shortCode;
     const trackingCode =
       "TRK-" + Date.now().toString().slice(-6) + "-" + shortCode.slice(0, 3);
+    const walletNoteSuffix =
+      walletUsedAmount > 0
+        ? ` [کسر از کیف پول: ${walletUsedAmount.toLocaleString("fa-IR")} تومان]`
+        : "";
     const fullAddress =
       province +
       "، " +
       city +
       " — " +
       address +
-      (notes ? " (" + notes + ")" : "");
+      (notes ? " (" + notes + ")" : "") +
+      walletNoteSuffix;
 
     const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     const { data: recentDuplicate } = await supabaseAdmin
       .from("orders")
-      .select("id, final_amount, tracking_code, order_number")
+      .select("id, final_amount, tracking_code, order_number, status")
       .eq("phone", cleanPhone)
-      .eq("status", "pending")
+      .in("status", ["pending", "paid"])
       .gte("created_at", twoMinsAgo)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -393,9 +447,11 @@ export async function POST(req: NextRequest) {
       if (Math.abs(Number(recentDuplicate.final_amount) - finalAmount) <= 100) {
         return NextResponse.json({
           success: true,
+          paidByWallet: recentDuplicate.status === "paid",
+          walletUsed: walletUsedAmount,
           order: recentDuplicate,
           message:
-            "✓ سفارش شما پیش از این ثبت شده و در حال انتقال به درگاه است.",
+            "✓ سفارش شما پیش از این ثبت شده است.",
         });
       }
     }
@@ -419,8 +475,8 @@ export async function POST(req: NextRequest) {
       final_amount: finalAmount,
       coupon_code: validCouponRow ? validCouponRow.code : null,
       user_identifier: userIdentifier,
-      status: "pending",
-      payment_status: "pending",
+      status: isPaidFullyByWallet ? "paid" : "pending",
+      payment_status: isPaidFullyByWallet ? "paid" : "pending",
       tracking_code: trackingCode,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -444,7 +500,7 @@ export async function POST(req: NextRequest) {
         items: verifiedItems,
         total_amount: verifiedSubtotal,
         final_amount: finalAmount,
-        status: "pending",
+        status: isPaidFullyByWallet ? "paid" : "pending",
         tracking_code: trackingCode,
         created_at: new Date().toISOString(),
       };
@@ -531,6 +587,15 @@ export async function POST(req: NextRequest) {
       ]);
     } catch {}
 
+    if (isPaidFullyByWallet) {
+      try {
+        await sendTextSMS(
+          cleanPhone,
+          `${fullName} عزیز، سفارش شما به شماره ${orderNumber} از طریق اعتبار کیف پول تسویه و ثبت شد. کد رهگیری: ${trackingCode} | axoncore.ir`
+        );
+      } catch {}
+    }
+
     await logAuditEvent({
       action: "CREATE_CUSTOMER_ORDER",
       target_resource: "orders:" + orderNumber,
@@ -540,6 +605,8 @@ export async function POST(req: NextRequest) {
       details: {
         orderNumber,
         finalAmount,
+        walletUsedAmount,
+        isPaidFullyByWallet,
         shippingMethod: resolvedShippingMethod,
         shippingCost,
         vatAmount,
@@ -549,7 +616,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "سفارش با موفقیت ثبت گردید.",
+      paidByWallet: isPaidFullyByWallet,
+      walletUsed: walletUsedAmount,
+      message: isPaidFullyByWallet
+        ? "✓ سفارش شما با اعتبار کیف پول با موفقیت پرداخت و ثبت شد."
+        : "سفارش با موفقیت ثبت گردید.",
       order: {
         ...savedOrder,
         order_number: orderNumber,

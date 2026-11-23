@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/authSecurityHelper";
 import { unpackProductRow, packProductDescription } from "@/lib/productUnpacker";
+import { triggerBackInStockNotifications } from "@/lib/backInStockService";
 
 export const dynamic = "force-dynamic";
 
@@ -58,12 +59,13 @@ export async function POST(req: NextRequest) {
       const results = await Promise.all(
         batch.map(async (rawRow: any) => {
           const unpacked = unpackProductRow(rawRow);
+          const prevStock = Math.max(0, Number(rawRow.stock ?? 0));
           let nextPrice = Math.max(0, Number(rawRow.price || 0));
           let nextDiscount =
             rawRow.discount_price && Number(rawRow.discount_price) > 0
               ? Number(rawRow.discount_price)
               : null;
-          let nextStock = Math.max(0, Number(rawRow.stock ?? 0));
+          let nextStock = prevStock;
 
           if (operation === "percent_price") {
             const factor = 1 + Number(percentChange) / 100;
@@ -78,7 +80,6 @@ export async function POST(req: NextRequest) {
             }
           } else if (operation === "fixed_price") {
             const delta = Number(fixedChange);
-            // محافظت از کالاهای ۰ تومانی در برابر افزایش/کاهش مبلغ ثابت
             if (nextPrice > 0) {
               nextPrice = Math.max(0, nextPrice + delta);
               if (roundPrices) nextPrice = roundToThousand(nextPrice);
@@ -94,7 +95,6 @@ export async function POST(req: NextRequest) {
             nextDiscount = null;
           }
 
-          // اطمینان از اینکه قیمت تخفیف‌خورده بزرگ‌تر یا مساوی قیمت پایه نباشد
           if (
             nextDiscount !== null &&
             (nextDiscount <= 0 || (nextPrice > 0 && nextDiscount >= nextPrice))
@@ -132,6 +132,14 @@ export async function POST(req: NextRequest) {
               updated_at: new Date().toISOString(),
             })
             .eq("id", rawRow.id);
+
+          if (!upErr && prevStock <= 0 && nextStock > 0) {
+            await triggerBackInStockNotifications(
+              rawRow.id,
+              rawRow.title || rawRow.name || "محصول",
+              nextStock
+            );
+          }
 
           return !upErr;
         })

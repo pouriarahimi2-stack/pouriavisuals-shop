@@ -15,19 +15,25 @@ function PaymentGatewayContent() {
   const orderId = searchParams.get("orderId") || "";
   const amount = Number(searchParams.get("amount") || 0);
   const phone = searchParams.get("phone") || "";
-  const authority = searchParams.get("Authority") || searchParams.get("authority") || "";
-  const statusParam = searchParams.get("Status") || searchParams.get("status") || "";
+  const walletPaid = searchParams.get("walletPaid") === "1";
+  const authority =
+    searchParams.get("Authority") || searchParams.get("authority") || "";
+  const statusParam =
+    searchParams.get("Status") || searchParams.get("status") || "";
 
-  const [phase, setPhase] = useState<"redirecting" | "verifying" | "success" | "failed">(
-    authority ? "verifying" : "redirecting"
+  const [phase, setPhase] = useState<
+    "redirecting" | "verifying" | "success" | "failed"
+  >(walletPaid ? "success" : authority ? "verifying" : "redirecting");
+  const [message, setMessage] = useState<string>(
+    walletPaid
+      ? "سفارش شما با موفقیت از طریق اعتبار کیف پول تسویه و ثبت گردید."
+      : ""
   );
-  const [message, setMessage] = useState<string>("");
   const [refId, setRefId] = useState<string>("");
   const [trackingCode, setTrackingCode] = useState<string>(
     searchParams.get("trackingCode") || orderId
   );
 
-  // ۱. انتقال خودکار به درگاه شاپرک زرین‌پال در صورتی که هنوز Authority دریافت نشده باشد
   const startZarinpalPayment = async () => {
     if (!orderId) {
       setPhase("failed");
@@ -58,7 +64,6 @@ function PaymentGatewayContent() {
     }
   };
 
-  // ۲. تایید خودکار تراکنش پس از بازگشت از درگاه زرین‌پال
   const verifyZarinpalCallback = async () => {
     if (statusParam && statusParam.toUpperCase() !== "OK") {
       setPhase("failed");
@@ -89,7 +94,9 @@ function PaymentGatewayContent() {
         if (json.trackingCode) setTrackingCode(String(json.trackingCode));
         if (json.user && typeof window !== "undefined") {
           localStorage.setItem("axon_user_session", JSON.stringify(json.user));
-          window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: json.user }));
+          window.dispatchEvent(
+            new CustomEvent("user_auth_changed", { detail: json.user })
+          );
         }
         if (typeof clearCart === "function") clearCart();
         setPhase("success");
@@ -108,12 +115,20 @@ function PaymentGatewayContent() {
   };
 
   useEffect(() => {
+    if (walletPaid && orderId) {
+      if (typeof clearCart === "function") clearCart();
+      const timer = setTimeout(() => {
+        router.push("/account?orderId=" + encodeURIComponent(orderId));
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
+
     if (authority) {
       verifyZarinpalCallback();
     } else if (orderId) {
       startZarinpalPayment();
     }
-  }, [authority, orderId]);
+  }, [authority, orderId, walletPaid]);
 
   return (
     <div
@@ -130,11 +145,15 @@ function PaymentGatewayContent() {
               <h1 className="text-lg font-black text-[var(--accent-blue)]">
                 در حال انتقال به درگاه امن زرین‌پال
               </h1>
-              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{message}</p>
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                {message}
+              </p>
             </div>
             {amount > 0 && (
               <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs flex justify-between items-center">
-                <span className="font-bold text-[var(--text-secondary)]">مبلغ قابل پرداخت:</span>
+                <span className="font-bold text-[var(--text-secondary)]">
+                  مبلغ قابل پرداخت:
+                </span>
                 <span className="font-mono font-black text-emerald-500">
                   {amount.toLocaleString("fa-IR")} تومان
                 </span>
@@ -168,24 +187,48 @@ function PaymentGatewayContent() {
               ✓
             </div>
             <div className="space-y-1">
-              <h1 className="text-sm md:text-xl font-black text-emerald-400">پرداخت با موفقیت انجام شد!</h1>
+              <h1 className="text-sm md:text-xl font-black text-emerald-400">
+                پرداخت با موفقیت انجام شد!
+              </h1>
               <p className="text-xs text-[var(--text-secondary)]">{message}</p>
             </div>
 
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs space-y-2.5 text-right">
               <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">شماره سفارش:</span>
-                <span className="font-mono font-black text-[var(--accent-blue)]">{orderId}</span>
+                <span className="text-[var(--text-secondary)]">
+                  شماره سفارش:
+                </span>
+                <span className="font-mono font-black text-[var(--accent-blue)]">
+                  {orderId}
+                </span>
               </div>
+              {walletPaid && (
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">
+                    روش تسویه:
+                  </span>
+                  <span className="font-black text-emerald-400">
+                    👛 اعتبار کیف پول مشتری
+                  </span>
+                </div>
+              )}
               {refId && (
                 <div className="flex justify-between">
-                  <span className="text-[var(--text-secondary)]">شماره مرجع شاپرک (RefID):</span>
-                  <span className="font-mono font-black text-emerald-400">{refId}</span>
+                  <span className="text-[var(--text-secondary)]">
+                    شماره مرجع شاپرک (RefID):
+                  </span>
+                  <span className="font-mono font-black text-emerald-400">
+                    {refId}
+                  </span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">کد رهگیری مرسوله:</span>
-                <span className="font-mono font-black text-amber-400">{trackingCode}</span>
+                <span className="text-[var(--text-secondary)]">
+                  کد رهگیری مرسوله:
+                </span>
+                <span className="font-mono font-black text-amber-400">
+                  {trackingCode}
+                </span>
               </div>
             </div>
 
@@ -204,8 +247,12 @@ function PaymentGatewayContent() {
               ✕
             </div>
             <div className="space-y-1">
-              <h1 className="text-lg font-black text-rose-500">خطا یا انصراف از پرداخت</h1>
-              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{message}</p>
+              <h1 className="text-lg font-black text-rose-500">
+                خطا یا انصراف از پرداخت
+              </h1>
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                {message}
+              </p>
             </div>
 
             <div className="space-y-2.5 pt-2">

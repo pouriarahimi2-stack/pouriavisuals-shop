@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { unpackProductRow, packProductDescription } from "@/lib/productUnpacker";
+import { triggerBackInStockNotifications } from "@/lib/backInStockService";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,6 @@ export async function GET(req: NextRequest) {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // فقط سفارش‌های تاییدشده و غیرلغوشده در ۳۰ روز اخیر در سود قطعی ماهانه لحاظ می‌شوند
     const monthlyOrders = orders.filter(
       (o: {
         created_at?: string;
@@ -226,7 +226,6 @@ export async function POST(req: NextRequest) {
         purchase_price: newPurchasePrice,
         description: packagedDesc,
         updated_at: new Date().toISOString(),
-        /* Enterprise Infrastructure Inject */
         discount_start_date:
           typeof body !== "undefined" && body.discount_start_date
             ? new Date(body.discount_start_date).toISOString()
@@ -247,6 +246,10 @@ export async function POST(req: NextRequest) {
       .eq("id", productId);
 
     if (upErr) throw upErr;
+
+    if (currentStock <= 0 && newStock > 0) {
+      await triggerBackInStockNotifications(productId, product.title, newStock);
+    }
 
     try {
       await supabaseAdmin.from("inventory_logs").insert([
@@ -321,6 +324,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const unpackedExisting = unpackProductRow(rawExisting);
+    const prevStock = Math.max(0, Number(unpackedExisting.stock ?? 0));
 
     const cleanTitle = String(title).trim();
     const numericStock = Math.max(0, Number(stock ?? 0));
@@ -330,7 +334,6 @@ export async function PUT(req: NextRequest) {
         ? Number(discountPrice)
         : null;
 
-    // قیمت تخفیف فقط زمانی معتبر است که کمتر از قیمت فروش پایه باشد
     const cleanDiscount =
       rawDiscount !== null && (cleanBasePrice === 0 || rawDiscount < cleanBasePrice)
         ? rawDiscount
@@ -389,7 +392,6 @@ export async function PUT(req: NextRequest) {
       description: packagedDesc,
       shipping_type: shipping_type || unpackedExisting.shipping_type || "both",
       updated_at: new Date().toISOString(),
-      /* Enterprise Infrastructure Inject */
       discount_start_date:
         typeof body !== "undefined" && body.discount_start_date
           ? new Date(body.discount_start_date).toISOString()
@@ -416,6 +418,10 @@ export async function PUT(req: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    if (prevStock <= 0 && numericStock > 0) {
+      await triggerBackInStockNotifications(id, cleanTitle, numericStock);
+    }
 
     try {
       await supabaseAdmin.from("inventory_logs").insert([

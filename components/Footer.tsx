@@ -1,24 +1,14 @@
 // File Path: components/Footer.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import Link from "next/link";
 import { useSiteInfo } from "@/context/SiteInfoContext";
 import EnamadBadge from "@/components/EnamadBadge";
-
-function resolveSafeUrl(val: any): string {
-  if (typeof val !== "string") return "";
-  const clean = val.trim();
-  if (!clean) return "";
-  if (clean.includes(".supabase.co/storage/")) {
-    return "/api/media-proxy?url=" + encodeURIComponent(clean);
-  }
-  return clean;
-}
+import AnimatedLogo from "@/components/AnimatedLogo";
 
 export default function Footer() {
   const { siteInfo } = useSiteInfo();
-  const [logoImgFailed, setLogoImgFailed] = useState(false);
 
   const info = siteInfo || {};
   const layoutCfg = info?.homepage_layout_config || {};
@@ -43,12 +33,6 @@ export default function Footer() {
       : persisted.footer_logo_url !== undefined
       ? String(persisted.footer_logo_url)
       : String(info.footer_logo_url || info.footerLogoUrl || "");
-
-  const footerLogoUrl = resolveSafeUrl(rawFooterLogo);
-
-  useEffect(() => {
-    setLogoImgFailed(false);
-  }, [footerLogoUrl]);
 
   if (footerCfg.show === false) return null;
 
@@ -234,16 +218,13 @@ export default function Footer() {
       : scaleMode === "large"
       ? "text-sm"
       : "text-xs";
-  const footerImgKey = footerLogoUrl
-    ? footerLogoUrl.slice(-32) + "_" + footerLogoUrl.length
-    : "no_footer_logo";
 
   const renderColumn = (colKey: string) => {
     if (colKey === "brand") {
       return (
         <div key="col_brand" className="lg:col-span-4 space-y-4">
           <div className="flex flex-wrap items-center gap-4">
-            {footerLogoUrl && !logoImgFailed ? (
+            {rawFooterLogo.trim() !== "" && (
               <div
                 className={
                   showFooterLogoBox
@@ -251,21 +232,17 @@ export default function Footer() {
                     : "flex items-center justify-center shrink-0"
                 }
               >
-                <img
-                  key={footerImgKey}
-                  src={footerLogoUrl}
-                  alt={brandTitle || ""}
-                  onError={() => setLogoImgFailed(true)}
-                  style={{
-                    width: footerLogoWidth + "px",
-                    height: footerLogoHeight + "px",
-                    borderRadius: String(footerLogoRadius),
-                    objectFit: "contain",
-                  }}
+                <AnimatedLogo
+                  variant="footer"
+                  srcOverride={rawFooterLogo}
+                  width={footerLogoWidth}
+                  height={footerLogoHeight}
+                  borderRadius={String(footerLogoRadius)}
+                  objectFit="contain"
                   className="transition-all duration-300"
                 />
               </div>
-            ) : null}
+            )}
             {(brandTitle || brandSubtitle) && (
               <div className="min-w-[180px] flex-1">
                 {brandTitle && (

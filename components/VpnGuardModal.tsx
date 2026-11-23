@@ -4,11 +4,14 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { soundEngine } from "@/lib/soundEngine";
+import { useSiteInfo } from "@/context/SiteInfoContext";
+import AnimatedLogo from "@/components/AnimatedLogo";
 
 const DISMISS_STORAGE_KEY = "axon_vpn_notice_dismissed_v1";
 
 export default function VpnGuardModal() {
   const pathname = usePathname() || "/";
+  const { siteInfo } = useSiteInfo();
   const [vpnDetected, setVpnDetected] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -62,21 +65,32 @@ export default function VpnGuardModal() {
 
   if (!vpnDetected || dismissed || isAdminRoute) return null;
 
+  const storeTitle = String(
+    siteInfo?.settings?.site_name ||
+      siteInfo?.site_name ||
+      "فروشگاه"
+  ).trim();
+
   return (
     <aside
       aria-label="یادآوری اتصال اینترنت"
-      className="fixed bottom-20 md:bottom-6 right-4 left-4 sm:left-auto sm:w-[375px] z-40 pointer-events-auto font-sans select-text animate-fadeIn"
+      className="fixed bottom-20 md:bottom-6 right-4 left-4 sm:left-auto sm:w-[385px] z-40 pointer-events-auto font-sans select-text animate-fadeIn"
       dir="rtl"
     >
       <div className="p-4 sm:p-5 rounded-3xl bg-[var(--modal-bg)]/95 backdrop-blur-2xl border border-amber-500/40 shadow-2xl text-[var(--text-primary)] space-y-3">
-        <div className="flex items-start justify-between gap-2.5">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-amber-500/15 border border-amber-500/35 text-amber-400 flex items-center justify-center text-lg shrink-0">
-              🛡️
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center p-1 shrink-0 shadow-inner">
+              <AnimatedLogo
+                variant="header"
+                size={36}
+                borderRadius="10px"
+                fallback={<span className="text-lg text-amber-400">🛡️</span>}
+              />
             </div>
             <div>
               <h3 className="font-black text-xs sm:text-[13px] text-amber-400">
-                یادآوری محترمانه برای تجربه بهتر خرید
+                یادآوری محترمانه {storeTitle}
               </h3>
               <span className="text-[10px] text-[var(--text-secondary)] font-bold block">
                 پیشنهاد بهینه‌سازی اتصال بانکی و پیامکی

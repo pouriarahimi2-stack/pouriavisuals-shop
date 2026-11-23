@@ -4,6 +4,7 @@
 import React, { useState } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import Link from "next/link";
+import AnimatedLogo from "@/components/AnimatedLogo";
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState("");
@@ -75,11 +76,16 @@ export default function AdminLoginPage() {
     >
       <div className="relative w-full max-w-md p-8 sm:p-10 rounded-[2.5rem] bg-slate-900/95 border border-slate-800 backdrop-blur-2xl shadow-2xl space-y-6">
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 mx-auto rounded-3xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-2xl shadow-md">
-            🛡️
+          <div className="w-16 h-16 mx-auto rounded-3xl bg-slate-800/80 border border-slate-700/70 flex items-center justify-center p-1.5 shadow-md">
+            <AnimatedLogo
+              variant="header"
+              size={48}
+              borderRadius="14px"
+              fallback={<span className="text-2xl">🛡️</span>}
+            />
           </div>
           <h1 className="text-lg font-black tracking-tight">
-            ورود به پیشخوان مدیریت آکسون کور
+            ورود به پیشخوان مدیریت
           </h1>
           <p className="text-xs text-slate-400 font-medium">
             شناسه کاربری و کلمه عبور یا پین اختصاصی خود را وارد نمایید

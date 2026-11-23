@@ -10,6 +10,7 @@ import { soundEngine } from "@/lib/soundEngine";
 import { themeEngine } from "@/lib/themeEngine";
 import { DEFAULT_HEADER_CONFIG } from "@/services/siteInfoService";
 import { supabase } from "@/lib/supabase";
+import AnimatedLogo from "@/components/AnimatedLogo";
 
 function resolveSafeUrl(val: any): string {
   if (typeof val !== "string") return "";
@@ -68,7 +69,6 @@ export default function Header() {
   const [userLabel, setUserLabel] = useState<string | null>(null);
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [logoError, setLogoError] = useState(false);
   const [annDismissed, setAnnDismissed] = useState(false);
   const [offerDismissed, setOfferDismissed] = useState(false);
   const [copiedCoupon, setCopiedCoupon] = useState<string | null>(null);
@@ -226,7 +226,6 @@ export default function Header() {
       : persisted.logo_url !== undefined
       ? String(persisted.logo_url)
       : String(siteInfo?.logo_url || "");
-  const logoSrc = resolveSafeUrl(rawHeaderLogo);
 
   const syncAnnouncements = useCallback(async () => {
     try {
@@ -385,10 +384,6 @@ export default function Header() {
   }, [announcements.length]);
 
   useEffect(() => {
-    setLogoError(false);
-  }, [logoSrc]);
-
-  useEffect(() => {
     if (typeof window === "undefined") return;
     const detectViewportDevice = () => {
       const w = window.innerWidth;
@@ -531,10 +526,6 @@ export default function Header() {
     Boolean(activeDeviceOffer?.text) &&
     !offerDismissed;
 
-  const imgKey = logoSrc
-    ? logoSrc.slice(-32) + "_" + logoSrc.length
-    : "no_header_logo";
-
   return (
     <>
       <div
@@ -656,20 +647,14 @@ export default function Header() {
                 onClick={() => soundEngine.playClick()}
                 className="flex items-center gap-2.5 text-sm sm:text-base font-black tracking-tight text-[var(--text-primary)] hover:opacity-90 transition shrink-0"
               >
-                {logoSrc && !logoError ? (
-                  <img
-                    key={imgKey}
-                    src={logoSrc}
-                    alt={brandName || ""}
-                    onError={() => setLogoError(true)}
-                    style={{
-                      width: logoWidth + "px",
-                      height: logoHeight + "px",
-                      borderRadius: String(logoRadius),
-                      objectFit: logoFit as any,
-                    }}
-                  />
-                ) : null}
+                <AnimatedLogo
+                  variant="header"
+                  srcOverride={rawHeaderLogo}
+                  width={logoWidth}
+                  height={logoHeight}
+                  borderRadius={String(logoRadius)}
+                  objectFit={logoFit as "contain" | "cover"}
+                />
                 {brandName ? (
                   <span className="font-black whitespace-nowrap">
                     {brandName}

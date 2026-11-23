@@ -1,7 +1,9 @@
-"use client";
 // File Path: components/admin/MediaUploadModal.tsx
+"use client";
+
 import React, { useState, useRef, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
+import AnimatedLogo from "@/components/AnimatedLogo";
 
 interface MediaUploadModalProps {
   isOpen: boolean;
@@ -273,13 +275,15 @@ export default function MediaUploadModal({
               }}
             />
             {previewUrl ? (
-              <div className="space-y-2">
-                <img
-                  key={previewUrl.slice(-24) + "_" + previewUrl.length}
-                  src={previewUrl}
-                  alt=""
-                  className="w-32 h-20 object-contain mx-auto rounded-xl border border-[var(--card-border)] p-1 bg-white/5"
-                />
+              <div className="space-y-2 flex flex-col items-center">
+                <div className="p-2 rounded-xl border border-[var(--card-border)] bg-white/5 flex items-center justify-center">
+                  <AnimatedLogo
+                    srcOverride={previewUrl}
+                    width={140}
+                    height={72}
+                    borderRadius="8px"
+                  />
+                </div>
                 <span className="text-[11px] text-[var(--accent-blue)] font-bold block">
                   {uploading ? "در حال آپلود و ذخیره‌سازی..." : "برای انتخاب تصویر جدید کلیک کنید یا فایل را بکشید"}
                 </span>
@@ -316,7 +320,12 @@ export default function MediaUploadModal({
             </div>
             {urlInput && (
               <div className="p-2 border border-[var(--card-border)] rounded-2xl bg-[var(--input-bg)] flex justify-center">
-                <img src={urlInput} alt="" className="max-h-24 object-contain rounded-xl" />
+                <AnimatedLogo
+                  srcOverride={urlInput}
+                  width={160}
+                  height={84}
+                  borderRadius="10px"
+                />
               </div>
             )}
             <button

@@ -120,7 +120,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  const title = post.title || "مقاله تخصصی تکنولوژی و دیجیتال";
+  const title = post.title || "مقاله تخصصی و راهنمای خرید";
   const cleanContentText = String(post.content || "")
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
@@ -128,7 +128,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const desc =
     post.meta_description ||
     cleanContentText.slice(0, 155) ||
-    `بررسی و راهنمای تخصصی خرید محصولات دیجیتال و تکنولوژی در مجله ${siteName}.`;
+    `بررسی و راهنمای تخصصی خرید محصولات در مجله ${siteName}.`;
   const canonicalUrl = `${baseUrl}/blog/${encodeURIComponent(
     post.slug || post.id
   )}`;
@@ -166,10 +166,9 @@ export default async function BlogPostPage({ params }: PageProps) {
 
   if (!post) notFound();
 
-  const sys = normalizeSystemSettings(
-    siteRow?.homepage_layout_config || {},
-    siteRow
-  );
+  const layoutCfg = siteRow?.homepage_layout_config || {};
+  const sys = normalizeSystemSettings(layoutCfg, siteRow);
+  const blogCfg = layoutCfg?.blog_page_config || {};
 
   const [linkedProduct, relatedPosts] = await Promise.all([
     getLinkedProductFromContent(post.content || ""),
@@ -245,6 +244,27 @@ export default async function BlogPostPage({ params }: PageProps) {
       },
     ],
   };
+
+  const productWarrantyDisplay = String(
+    linkedProduct?.warranty || blogCfg.defaultWarrantyFallback || ""
+  ).trim();
+
+  const ctaBoxEnabled = blogCfg.ctaBoxEnabled !== false;
+  const ctaBoxTitle = String(
+    blogCfg.ctaBoxTitle || "نیاز به مشاوره تخصصی پیش از خرید دارید؟"
+  ).trim();
+  const ctaBoxSubtitle = String(
+    blogCfg.ctaBoxSubtitle ||
+      `کارشناسان ${siteName} آماده پاسخگویی و راهنمایی تخصصی شما برای انتخاب بهترین کالا هستند.`
+  ).trim();
+  const ctaButtonText = String(
+    blogCfg.ctaButtonText || "مشاهده کاتالوگ محصولات ←"
+  ).trim();
+  const ctaButtonUrl = String(blogCfg.ctaButtonUrl || "/products").trim();
+  const archiveButtonText = String(
+    blogCfg.archiveButtonText || "آرشیو مجله"
+  ).trim();
+  const showRelatedPosts = blogCfg.showRelatedPosts !== false;
 
   return (
     <article
@@ -365,10 +385,11 @@ export default async function BlogPostPage({ params }: PageProps) {
               <h3 className="text-sm sm:text-base font-black text-[var(--text-primary)]">
                 {linkedProduct.title}
               </h3>
-              <p className="text-xs text-[var(--text-secondary)]">
-                {linkedProduct.warranty ||
-                  "۱۸ ماه گارانتی اصالت طلایی آکسون کور"}
-              </p>
+              {productWarrantyDisplay && (
+                <p className="text-xs text-[var(--text-secondary)]">
+                  {productWarrantyDisplay}
+                </p>
+              )}
               <div className="text-sm font-black text-[var(--accent-blue)] font-mono">
                 {Number(
                   linkedProduct.discount_price || linkedProduct.price || 0
@@ -387,7 +408,7 @@ export default async function BlogPostPage({ params }: PageProps) {
         </div>
       )}
 
-      {relatedPosts.length > 0 && (
+      {showRelatedPosts && relatedPosts.length > 0 && (
         <section className="space-y-4 pt-4">
           <h3 className="text-sm sm:text-base font-black text-[var(--accent-blue)]">
             📚 سایر مقالات و راهنماهای تخصصی مرتبط
@@ -420,31 +441,40 @@ export default async function BlogPostPage({ params }: PageProps) {
         </section>
       )}
 
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h4 className="font-black text-sm text-[var(--text-primary)]">
-            نیاز به مشاوره تخصصی جهت خرید محصولات دیجیتال دارید؟
-          </h4>
-          <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            کارشناسان {siteName} آماده پاسخگویی و راهنمایی تخصصی شما برای انتخاب
-            بهترین تجهیزات هستند.
-          </p>
+      {ctaBoxEnabled && (
+        <div className="p-5 sm:p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            {ctaBoxTitle && (
+              <h4 className="font-black text-sm text-[var(--text-primary)]">
+                {ctaBoxTitle}
+              </h4>
+            )}
+            {ctaBoxSubtitle && (
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                {ctaBoxSubtitle}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            {ctaButtonText && (
+              <Link
+                href={ctaButtonUrl || "/products"}
+                className="flex-1 sm:flex-initial px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 transition shadow-md text-center"
+              >
+                {ctaButtonText}
+              </Link>
+            )}
+            {archiveButtonText && (
+              <Link
+                href="/blog"
+                className="flex-1 sm:flex-initial px-4 py-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition text-center"
+              >
+                {archiveButtonText}
+              </Link>
+            )}
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <Link
-            href="/products"
-            className="flex-1 sm:flex-initial px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 transition shadow-md text-center"
-          >
-            مشاهده کاتالوگ محصولات ←
-          </Link>
-          <Link
-            href="/blog"
-            className="flex-1 sm:flex-initial px-4 py-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition text-center"
-          >
-            آرشیو مجله
-          </Link>
-        </div>
-      </div>
+      )}
     </article>
   );
 }

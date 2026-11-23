@@ -151,10 +151,10 @@ function buildEnterpriseSeoArticleHtml(params: {
   articleType: "review" | "buying_guide" | "comparison";
 }): string {
   const p = params.product;
-  const prodTitle = p?.title || p?.name || params.keyword;
-  const prodCategory = p?.category || "تجهیزات تکنولوژی و کالای دیجیتال";
-  const prodBrand = p?.brand || "Axon Core";
-  const prodWarranty = p?.warranty || "۱۸ ماه گارانتی اصالت و سلامت فیزیکی طلایی";
+  const prodTitle = String(p?.title || p?.name || params.keyword).trim();
+  const prodCategory = String(p?.category || "تجهیزات و کالای منتخب").trim();
+  const prodBrand = String(p?.brand || "").trim();
+  const prodWarranty = String(p?.warranty || "").trim();
   const prodPrice = Number(p?.discount_price || p?.price || 0);
   const priceText =
     prodPrice > 0 ? `${prodPrice.toLocaleString("fa-IR")} تومان` : "قیمت روز رقابتی";
@@ -174,18 +174,40 @@ function buildEnterpriseSeoArticleHtml(params: {
       : `
         <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">مدل و عنوان تخصصی</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prodTitle}</td></tr>
         <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">دسته‌بندی تخصصی</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prodCategory}</td></tr>
-        <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">برند / استاندارد ساخت</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prodBrand}</td></tr>
-        <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">پوشش گارانتی و اصالت</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prodWarranty}</td></tr>
-        <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">وضعیت تامین و ارسال</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">موجود در انبار - ارسال سریع پیشتاز سراسری</td></tr>
+        ${
+          prodBrand
+            ? `<tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">برند سازنده</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prodBrand}</td></tr>`
+            : ""
+        }
+        ${
+          prodWarranty
+            ? `<tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">پوشش گارانتی</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prodWarranty}</td></tr>`
+            : `<tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">تضمین کیفیت</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">بررسی سلامت فیزیکی پیش از ارسال</td></tr>`
+        }
+        <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">وضعیت تامین و ارسال</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">ارسال سریع سراسری با بسته‌بندی ایمن</td></tr>
       `;
+
+  const brandAndWarrantyText = prodBrand
+    ? prodWarranty
+      ? `<strong>${prodTitle}</strong> از برند <strong>${prodBrand}</strong> با پوشش <strong>${prodWarranty}</strong>`
+      : `<strong>${prodTitle}</strong> از برند <strong>${prodBrand}</strong>`
+    : prodWarranty
+    ? `<strong>${prodTitle}</strong> همراه با <strong>${prodWarranty}</strong>`
+    : `<strong>${prodTitle}</strong> با بررسی کامل سلامت فیزیکی`;
+
+  const warrantyFaqText = prodWarranty
+    ? `بله، این کالا با <strong>${prodWarranty}</strong> و تضمین سلامت فیزیکی در فروشگاه آکسون کور عرضه می‌شود.`
+    : `تمامی کالاهای عرضه‌شده در آکسون کور پیش از ارسال از نظر سلامت فیزیکی و عملکرد بررسی می‌شوند.`;
+
+  const ctaWarrantyText = prodWarranty ? ` و <strong>${prodWarranty}</strong>` : "";
 
   return `
 <article class="space-y-6 leading-relaxed">
   <h2>بررسی تخصصی و راهنمای جامع: ${params.keyword}</h2>
-  <p>اگر به دنبال اطلاعات دقیق درباره <strong>${params.keyword}</strong> و بررسی ارزش خرید <strong>${prodTitle}</strong> در دسته <strong>${prodCategory}</strong> هستید، در این راهنمای جامع به تحلیل مهندسی کیفیت ساخت، مشخصات فنی، مزایا و نکات کلیدی پیش از خرید می‌پردازیم تا بهترین انتخاب را با اطمینان ۱۰۰٪ انجام دهید.</p>
+  <p>اگر به دنبال اطلاعات دقیق درباره <strong>${params.keyword}</strong> و بررسی ارزش خرید <strong>${prodTitle}</strong> در دسته <strong>${prodCategory}</strong> هستید، در این راهنمای جامع به تحلیل کیفیت ساخت، مشخصات فنی، مزایا و نکات کلیدی پیش از خرید می‌پردازیم تا بهترین انتخاب را با اطمینان کامل انجام دهید.</p>
 
   <h3>چرا ${prodTitle} یکی از بهترین انتخاب‌ها در بازار فعلی است؟</h3>
-  <p>در بازار تجهیزات دیجیتال و گجت‌های مدرن، اصالت قطعات و پایداری عملکرد در استفاده طولانی‌مدت اهمیت بسیار بالایی دارد. <strong>${prodTitle}</strong> با بهره‌گیری از استانداردهای ساخت دقیق برند <strong>${prodBrand}</strong> و پشتیبانی از <strong>${prodWarranty}</strong>، تعادل کم‌نظیری میان کارایی، دوام و قیمت تمام‌شده (${priceText}) ایجاد کرده است.</p>
+  <p>در انتخاب تجهیزات و کالاهای کاربردی، کیفیت ساخت و پایداری عملکرد در استفاده طولانی‌مدت اهمیت بسیار بالایی دارد. ${brandAndWarrantyText}، تعادل کم‌نظیری میان کارایی، دوام و قیمت تمام‌شده (${priceText}) ایجاد کرده است.</p>
 
   <h3>جدول مشخصات فنی و استانداردهای کیفی ${prodTitle}</h3>
   <div style="overflow-x:auto;margin:16px 0;">
@@ -204,18 +226,18 @@ function buildEnterpriseSeoArticleHtml(params: {
 
   <h3>مهم‌ترین مزایا و نکات کلیدی هنگام خرید ${prodTitle}</h3>
   <ul>
-    <li><strong>تضمین ۱۰۰٪ اصالت فیزیکی:</strong> تمامی واحدهای عرضه‌شده در آکسون کور پیش از ارسال از نظر سلامت فیزیکی و اصالت بررسی می‌شوند.</li>
-    <li><strong>ارزش خرید بالا نسبت به قیمت (${priceText}):</strong> در مقایسه با مدل‌های مشابه، دوام و راندمان بالاتری را در استفاده روزمره و حرفه‌ای ارائه می‌دهد.</li>
+    <li><strong>بررسی سلامت فیزیکی:</strong> تمامی کالاهای عرضه‌شده در آکسون کور پیش از ارسال از نظر سلامت فیزیکی و اصالت بررسی می‌شوند.</li>
+    <li><strong>ارزش خرید بالا نسبت به قیمت (${priceText}):</strong> در مقایسه با مدل‌های مشابه، دوام و راندمان مطلوبی را در استفاده روزمره ارائه می‌دهد.</li>
     <li><strong>بسته‌بندی ایمن و ارسال اکسپرس:</strong> ارسال سریع به سراسر کشور همراه با کد رهگیری پستی و پشتیبانی آنلاین.</li>
   </ul>
 
   <h3>سوالات متداول خریداران درباره ${prodTitle}</h3>
-  <p><strong>۱. آیا ${prodTitle} دارای گارانتی معتبر است؟</strong><br/>بله، این کالا با ${prodWarranty} و ضمانت سلامت فیزیکی در فروشگاه آکسون کور عرضه می‌شود.</p>
+  <p><strong>۱. وضعیت ضمانت و سلامت ${prodTitle} چگونه است؟</strong><br/>${warrantyFaqText}</p>
   <p><strong>۲. زمان ارسال سفارش چقدر است؟</strong><br/>سفارش‌های ثبت‌شده در سریع‌ترین زمان ممکن پردازش و از طریق پست پیشتاز یا تیپاکس به سراسر ایران ارسال می‌گردند.</p>
 
   <div style="margin-top:24px;padding:20px;border-radius:20px;background:linear-gradient(135deg,rgba(2,132,199,0.15),rgba(79,70,229,0.12));border:1px solid rgba(56,189,248,0.35);">
     <h4 style="margin:0 0 8px 0;font-weight:900;color:#38bdf8;">🛍️ خرید مستقیم ${prodTitle} با بهترین قیمت</h4>
-    <p style="margin:0 0 14px 0;font-size:13px;">هم‌اکنون می‌توانید <strong>${prodTitle}</strong> را با قیمت ویژه <strong>${priceText}</strong> و ${prodWarranty} مستقیماً از کاتالوگ رسمی آکسون کور سفارش دهید:</p>
+    <p style="margin:0 0 14px 0;font-size:13px;">هم‌اکنون می‌توانید <strong>${prodTitle}</strong> را با قیمت ویژه <strong>${priceText}</strong>${ctaWarrantyText} مستقیماً از کاتالوگ رسمی آکسون کور سفارش دهید:</p>
     <a href="${prodUrl}" style="display:inline-block;padding:10px 22px;border-radius:14px;background:#0284c7;color:#ffffff;font-weight:900;text-decoration:none;font-size:13px;">مشاهده مشخصات و خرید آنلاین ${prodTitle} ←</a>
   </div>
 </article>
@@ -326,7 +348,6 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // اگر هنوز به GSC متصل نشده یا کوئری ثبت نشده بود، استخراج فرصت‌های کلیدی از کالاهای کاتالوگ
     if (searchConsoleKeywords.length === 0) {
       products.forEach((p: any, idx: number) => {
         const pName = (p.title || p.name || "").trim();
@@ -346,7 +367,7 @@ export async function GET(req: NextRequest) {
         const clicks = Math.round(baseImpressions * (hasArticle ? 0.14 : 0.06));
 
         searchConsoleKeywords.push({
-          keyword: `خرید و قیمت ${pName} با گارانتی اصلی`,
+          keyword: `خرید و قیمت ${pName}`,
           productId: String(p.id),
           productTitle: pName,
           impressions: baseImpressions,
@@ -393,7 +414,7 @@ export async function GET(req: NextRequest) {
       .map((p: any) => ({
         id: String(p.id),
         title: p.title || p.name,
-        category: p.category || "کالای دیجیتال",
+        category: p.category || "کالای منتخب",
         price: Number(p.discount_price || p.price || 0),
       }));
 
@@ -436,13 +457,11 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
-    // اکشن ۱: اتصال، تست زنده و ذخیره اعتبارنامه Google Search Console Service Account
     if (body.action === "save_gsc_config") {
       let clientEmail = String(body.clientEmail || "").trim();
       let privateKey = String(body.privateKey || "").trim();
       const siteUrl = String(body.siteUrl || "sc-domain:axoncore.ir").trim();
 
-      // پشتیبانی از چسباندن کل فایل JSON دانلودشده از Google Cloud
       if (body.serviceAccountJson) {
         try {
           const parsedJson = JSON.parse(String(body.serviceAccountJson));
@@ -505,7 +524,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // اکشن ۲: قطع اتصال سرچ کنسول
     if (body.action === "disconnect_gsc") {
       const siteRow = await getMasterSiteInfoRow();
       const layoutCfg = { ...(siteRow?.homepage_layout_config || {}) };
@@ -517,7 +535,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // اکشن ۳: نگارش و انتشار مقاله تخصصی سئو متصل به کالا
     const targetProductId = body.targetProductId || body.productId || "";
     const articleType: "review" | "buying_guide" | "comparison" =
       body.articleType || "buying_guide";
@@ -538,7 +555,7 @@ export async function POST(req: NextRequest) {
       body.targetKeyword ||
         (targetProduct
           ? `خرید و بررسی تخصصی ${targetProduct.title || targetProduct.name}`
-          : "راهنمای خرید تجهیزات دیجیتال")
+          : "راهنمای خرید کالا")
     ).trim();
 
     const siteRow = await getMasterSiteInfoRow();
@@ -558,12 +575,14 @@ export async function POST(req: NextRequest) {
         const prodContext = targetProduct
           ? `نام کالا: ${targetProduct.title} | قیمت: ${Number(
               targetProduct.discount_price || targetProduct.price || 0
-            ).toLocaleString("fa-IR")} تومان | دسته: ${targetProduct.category || "دیجیتال"} | گارانتی: ${
-              targetProduct.warranty || "۱۸ ماه گارانتی اصالت"
+            ).toLocaleString("fa-IR")} تومان | دسته: ${targetProduct.category || "کالای منتخب"}${
+              targetProduct.brand ? ` | برند: ${targetProduct.brand}` : ""
+            }${
+              targetProduct.warranty ? ` | گارانتی: ${targetProduct.warranty}` : " | بدون گارانتی ثبت‌شده (هیچ گارانتی فرضی ذکر نشود)"
             } | لینک خرید: /products/${targetProduct.id}`
           : "";
 
-        const promptText = `یک مقاله جامع، تخصصی و سئو شده (رنک ۱ گوگل) به زبان فارسی با فرمت HTML استاندارد (فقط تگ‌های h2, h3, p, ul, li, table, tr, th, td, strong, a) درباره "${keyword}" برای فروشگاه «آکسون کور (Axon Core)» بنویس. ${prodContext}. حتماً شامل جدول مشخصات، مزایا، سوالات متداول و در انتها لینک دعوت به خرید مستقیم کالا باشد.`;
+        const promptText = `یک مقاله جامع، تخصصی و سئو شده به زبان فارسی با فرمت HTML استاندارد (فقط تگ‌های h2, h3, p, ul, li, table, tr, th, td, strong, a) درباره "${keyword}" برای فروشگاه «آکسون کور (Axon Core)» بنویس. ${prodContext}. حتماً فقط بر اساس اطلاعات واقعی بالا بنویس و هیچ برند یا گارانتی فرضی اضافه نکن. شامل جدول مشخصات، مزایا، سوالات متداول و در انتها لینک دعوت به خرید مستقیم کالا باشد.`;
 
         const geminiRes = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
@@ -612,8 +631,8 @@ export async function POST(req: NextRequest) {
     const metaDescription = targetProduct
       ? `بررسی تخصصی، جدول مشخصات فنی و راهنمای خرید ${targetProduct.title} با بهترین قیمت روز (${Number(
           targetProduct.discount_price || targetProduct.price || 0
-        ).toLocaleString("fa-IR")} تومان) و گارانتی اصالت در آکسون کور.`.slice(0, 160)
-      : `راهنمای جامع بررسی، مقایسه مشخصات و خرید ${keyword} با تضمین اصالت و بهترین قیمت در فروشگاه تخصصی آکسون کور.`.slice(
+        ).toLocaleString("fa-IR")} تومان) در آکسون کور.`.slice(0, 160)
+      : `راهنمای جامع بررسی، مقایسه مشخصات و خرید ${keyword} با بهترین قیمت در فروشگاه تخصصی آکسون کور.`.slice(
           0,
           160
         );
@@ -643,7 +662,7 @@ export async function POST(req: NextRequest) {
       success: true,
       usedAiEngine,
       message:
-        "✓ مقاله تخصصی سئو همراه با جدول مشخصات و باکس خرید مستقیم کالا با موفقیت تولید و در مجله منتشر شد.",
+        "✓ مقاله تخصصی سئو همراه با مشخصات واقعی کالا و باکس خرید مستقیم با موفقیت تولید و در مجله منتشر شد.",
       data,
     });
   } catch (err: any) {

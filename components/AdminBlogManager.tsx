@@ -24,6 +24,7 @@ interface CatalogProductItem {
   id: string;
   title: string;
   category: string;
+  brand: string;
   price: number;
   image: string;
   warranty: string;
@@ -36,9 +37,29 @@ export function AdminBlogManager() {
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [rebuilding, setRebuilding] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
+  const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  // تنظیمات سراسری صفحه مقالات و باکس مشاوره پایین صفحه
+  const [ctaBoxEnabled, setCtaBoxEnabled] = useState(true);
+  const [ctaBoxTitle, setCtaBoxTitle] = useState(
+    "نیاز به مشاوره تخصصی پیش از خرید دارید؟"
+  );
+  const [ctaBoxSubtitle, setCtaBoxSubtitle] = useState(
+    "کارشناسان آکسون کور آماده پاسخگویی و راهنمایی تخصصی شما برای انتخاب بهترین کالا هستند."
+  );
+  const [ctaButtonText, setCtaButtonText] = useState(
+    "مشاهده کاتالوگ محصولات ←"
+  );
+  const [ctaButtonUrl, setCtaButtonUrl] = useState("/products");
+  const [archiveButtonText, setArchiveButtonText] = useState("آرشیو مجله");
+  const [defaultWarrantyFallback, setDefaultWarrantyFallback] = useState("");
+  const [showRelatedPosts, setShowRelatedPosts] = useState(true);
+
   const [statusMsg, setStatusMsg] = useState<{
     type: "success" | "error";
     text: string;
@@ -55,11 +76,13 @@ export function AdminBlogManager() {
   const [isPublished, setIsPublished] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "published" | "draft"
+  >("all");
 
   const notify = (text: string, type: "success" | "error" = "success") => {
     setStatusMsg({ type, text });
-    setTimeout(() => setStatusMsg(null), 4500);
+    setTimeout(() => setStatusMsg(null), 5000);
   };
 
   const fetchPostsAndProducts = useCallback(async () => {
@@ -73,23 +96,46 @@ export function AdminBlogManager() {
         const bJson = await postsRes.json();
         const list = bJson.posts || bJson.data || [];
         setPosts(Array.isArray(list) ? list : []);
+
+        const bCfg = bJson.blogPageConfig;
+        if (bCfg && typeof bCfg === "object") {
+          if (bCfg.ctaBoxEnabled !== undefined)
+            setCtaBoxEnabled(Boolean(bCfg.ctaBoxEnabled));
+          if (bCfg.ctaBoxTitle !== undefined)
+            setCtaBoxTitle(String(bCfg.ctaBoxTitle));
+          if (bCfg.ctaBoxSubtitle !== undefined)
+            setCtaBoxSubtitle(String(bCfg.ctaBoxSubtitle));
+          if (bCfg.ctaButtonText !== undefined)
+            setCtaButtonText(String(bCfg.ctaButtonText));
+          if (bCfg.ctaButtonUrl !== undefined)
+            setCtaButtonUrl(String(bCfg.ctaButtonUrl));
+          if (bCfg.archiveButtonText !== undefined)
+            setArchiveButtonText(String(bCfg.archiveButtonText));
+          if (bCfg.defaultWarrantyFallback !== undefined)
+            setDefaultWarrantyFallback(String(bCfg.defaultWarrantyFallback));
+          if (bCfg.showRelatedPosts !== undefined)
+            setShowRelatedPosts(Boolean(bCfg.showRelatedPosts));
+        }
       }
 
       if (prodsRes && prodsRes.ok) {
         const pJson = await prodsRes.json();
         const pList = pJson.data || pJson.products || [];
-        const mapped: CatalogProductItem[] = (Array.isArray(pList) ? pList : []).map(
-          (p: any) => ({
-            id: String(p.id),
-            title: p.title || p.name || "کالای دیجیتال",
-            category: p.category || "کالای دیجیتال و تکنولوژی",
-            price: Number(p.discount_price || p.price || 0),
-            image:
-              p.image || (Array.isArray(p.images) && p.images[0]) || "/placeholder.png",
-            warranty: p.warranty || "۱۸ ماه گارانتی اصالت طلایی",
-            specs: p.specs || {},
-          })
-        );
+        const mapped: CatalogProductItem[] = (
+          Array.isArray(pList) ? pList : []
+        ).map((p: any) => ({
+          id: String(p.id),
+          title: p.title || p.name || "کالای منتخب",
+          category: p.category || "راهنمای خرید و بررسی تخصصی",
+          brand: String(p.brand || "").trim(),
+          price: Number(p.discount_price || p.price || 0),
+          image:
+            p.image ||
+            (Array.isArray(p.images) && p.images[0]) ||
+            "/placeholder.png",
+          warranty: String(p.warranty || "").trim(),
+          specs: p.specs || {},
+        }));
         setProducts(mapped);
       }
     } catch (e) {
@@ -104,16 +150,24 @@ export function AdminBlogManager() {
 
     const chPosts = supabase
       .channel("realtime-admin-blog-posts")
-      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
-        fetchPostsAndProducts();
-      })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "posts" },
+        () => {
+          fetchPostsAndProducts();
+        }
+      )
       .subscribe();
 
     const chProducts = supabase
       .channel("realtime-admin-blog-products")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
-        fetchPostsAndProducts();
-      })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        () => {
+          fetchPostsAndProducts();
+        }
+      )
       .subscribe();
 
     return () => {
@@ -129,7 +183,71 @@ export function AdminBlogManager() {
       .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
       .replace(/^-+|-+$/g, "");
 
-  // پر شدن هوشمند و خودکار موضوع، کلمه کلیدی، متا و ساختار مقاله با انتخاب محصول از کاتالوگ
+  const handleSaveBlogPageSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    soundEngine.playClick();
+    setSavingSettings(true);
+    try {
+      const res = await fetch("/api/blogs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save_blog_settings",
+          ctaBoxEnabled,
+          ctaBoxTitle,
+          ctaBoxSubtitle,
+          ctaButtonText,
+          ctaButtonUrl,
+          archiveButtonText,
+          defaultWarrantyFallback,
+          showRelatedPosts,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        notify(json.message);
+        setSettingsPanelOpen(false);
+      } else {
+        notify(json.message || "خطا در ذخیره تنظیمات.", "error");
+      }
+    } catch {
+      notify("خطا در ارتباط با سرور.", "error");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleRebuildAllFromRealProducts = async () => {
+    if (
+      !confirm(
+        "آیا مطمئن هستید؟ تمامی مقالات متصل به محصولات بر اساس برند، گارانتی و قیمت واقعی ثبت‌شده در کاتالوگ بازسازی و اصلاح خواهند شد."
+      )
+    )
+      return;
+    soundEngine.playClick();
+    setRebuilding(true);
+    try {
+      const res = await fetch("/api/blogs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "rebuild_from_real_products" }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        notify(json.message);
+        await fetchPostsAndProducts();
+      } else {
+        notify(json.message || "خطا در بازسازی مقالات.", "error");
+      }
+    } catch {
+      notify("خطا در ارتباط با سرور.", "error");
+    } finally {
+      setRebuilding(false);
+    }
+  };
+
   const handleSelectProductAutoFill = (prodId: string) => {
     soundEngine.playClick();
     setSelectedProductId(prodId);
@@ -141,32 +259,61 @@ export function AdminBlogManager() {
     const autoKey = "خرید و قیمت " + prod.title;
     const autoTitle = "بررسی تخصصی، مشخصات فنی و راهنمای خرید " + prod.title;
     const autoSlug = makeSlug(prod.title) + "-review";
+    const warrantyDescPart = prod.warranty ? ` و ${prod.warranty}` : "";
     const autoMeta =
-      `بررسی تخصصی ${prod.title} در دسته ${prod.category} به همراه جدول مشخصات فنی، ارزش خرید و سفارش آنلاین با بهترین قیمت (${prod.price.toLocaleString("fa-IR")} تومان) و ${prod.warranty} در آکسون کور.`.slice(
+      `بررسی تخصصی ${prod.title} در دسته ${prod.category} به همراه جدول مشخصات فنی، ارزش خرید و سفارش آنلاین با بهترین قیمت (${prod.price.toLocaleString("fa-IR")} تومان)${warrantyDescPart} در آکسون کور.`.slice(
         0,
         160
       );
 
+    const specEntries =
+      prod.specs && typeof prod.specs === "object"
+        ? Object.entries(prod.specs).filter(([k, v]) => k && v)
+        : [];
+
+    const tableRows =
+      specEntries.length > 0
+        ? specEntries
+            .map(
+              ([k, v]) =>
+                `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">${k}</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${v}</td></tr>`
+            )
+            .join("\n")
+        : [
+            `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">دسته‌بندی تخصصی</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prod.category}</td></tr>`,
+            prod.brand
+              ? `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">برند سازنده</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prod.brand}</td></tr>`
+              : "",
+            prod.warranty
+              ? `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">پوشش گارانتی</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prod.warranty}</td></tr>`
+              : `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">تضمین کیفیت</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">بررسی سلامت فیزیکی پیش از ارسال</td></tr>`,
+            `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">قیمت روز در آکسون کور</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prod.price.toLocaleString("fa-IR")} تومان</td></tr>`,
+          ]
+            .filter(Boolean)
+            .join("\n");
+
     const autoContent = [
       `<h2>معرفی و بررسی تخصصی ${prod.title}</h2>`,
-      `<p>اگر به دنبال <strong>${autoKey}</strong> با تضمین اصالت و بالاترین استاندارد ساخت هستید، <strong>${prod.title}</strong> یکی از بهترین انتخاب‌های موجود در دسته <strong>${prod.category}</strong> به شمار می‌رود که تعادل فوق‌العاده‌ای میان کارایی، دوام و ارزش خرید ارائه می‌دهد.</p>`,
+      `<p>اگر به دنبال <strong>${autoKey}</strong> با بررسی کامل مشخصات و بالاترین استاندارد ساخت هستید، <strong>${prod.title}</strong> یکی از گزینه‌های کاربردی موجود در دسته <strong>${prod.category}</strong> به شمار می‌رود که تعادل مناسبی میان کارایی، دوام و ارزش خرید ارائه می‌دهد.</p>`,
       `<h3>مهم‌ترین ویژگی‌ها و مزایای رقابتی ${prod.title}</h3>`,
       `<ul>`,
-      `  <li><strong>کیفیت ساخت ممتاز:</strong> بهره‌گیری از متریال اورجینال و تست سلامت فیزیکی پیش از ارسال</li>`,
-      `  <li><strong>سازگاری و پایداری بالا:</strong> عملکرد مطمئن در استفاده‌های روزمره و تخصصی</li>`,
-      `  <li><strong>گارانتی معتبر:</strong> عرضه رسمی همراه با ${prod.warranty}</li>`,
+      `  <li><strong>بررسی سلامت فیزیکی:</strong> تست و کنترل سلامت کالا پیش از بسته‌بندی و ارسال</li>`,
+      `  <li><strong>عملکرد مطمئن:</strong> کارایی پایدار در استفاده‌های روزمره</li>`,
+      prod.warranty
+        ? `  <li><strong>گارانتی معتبر:</strong> عرضه همراه با ${prod.warranty}</li>`
+        : `  <li><strong>ارسال سریع سراسری:</strong> ارسال ایمن از طریق پست پیشتاز یا تیپاکس</li>`,
       `</ul>`,
       `<h3>جدول مشخصات و استانداردهای کیفی ${prod.title}</h3>`,
       `<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:13px;">`,
       `  <thead><tr style="background:rgba(2,132,199,0.15);"><th style="padding:10px;border:1px solid rgba(148,163,184,0.3);text-align:right;">شاخص بررسی</th><th style="padding:10px;border:1px solid rgba(148,163,184,0.3);text-align:right;">وضعیت در ${prod.title}</th></tr></thead>`,
       `  <tbody>`,
-      `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">دسته‌بندی تخصصی</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prod.category}</td></tr>`,
-      `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">پوشش گارانتی</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prod.warranty}</td></tr>`,
-      `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">قیمت روز در آکسون کور</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${prod.price.toLocaleString("fa-IR")} تومان</td></tr>`,
+      tableRows,
       `  </tbody>`,
       `</table>`,
       `<h3>سوالات متداول خریداران درباره ${prod.title}</h3>`,
-      `<p><strong>۱. آیا ${prod.title} با ضمانت اصالت عرضه می‌شود؟</strong><br/>بله، تمامی کالاهای آکسون کور همراه با ${prod.warranty} و تضمین سلامت فیزیکی ارسال می‌گردند.</p>`,
+      prod.warranty
+        ? `<p><strong>۱. آیا ${prod.title} دارای گارانتی است؟</strong><br/>بله، این کالا همراه با ${prod.warranty} و تضمین سلامت فیزیکی عرضه می‌گردد.</p>`
+        : `<p><strong>۱. وضعیت سلامت و ارسال ${prod.title} چگونه است؟</strong><br/>تمامی کالاهای آکسون کور پیش از ارسال از نظر سلامت فیزیکی بررسی شده و با بسته‌بندی ایمن ارسال می‌گردند.</p>`,
       `<h3>خرید مستقیم از کاتالوگ رسمی آکسون کور</h3>`,
       `<p>شما می‌توانید همین حالا <strong>${prod.title}</strong> را با قیمت ویژه <strong>${prod.price.toLocaleString("fa-IR")} تومان</strong> از طریق لینک زیر سفارش دهید:</p>`,
       `<p><a href="/products/${prod.id}"><strong>🛍️ مشاهده مشخصات کامل و خرید آنلاین ${prod.title} در فروشگاه آکسون کور ←</strong></a></p>`,
@@ -181,12 +328,13 @@ export function AdminBlogManager() {
     if (!editingId || !content.trim()) setContent(autoContent);
 
     notify(
-      `✓ ساختار مقاله، جدول مشخصات، متاتگ‌ها و لینک خرید بر اساس محصول «${prod.title}» تکمیل شد.`
+      `✓ ساختار مقاله، جدول مشخصات، متاتگ‌ها و لینک خرید بر اساس اطلاعات واقعی محصول «${prod.title}» تکمیل شد.`
     );
   };
 
   const handleGenerateAiSeoPost = async () => {
-    const kw = targetKeyword.trim() || title.trim() || "تجهیزات دیجیتال پرچمدار";
+    const kw =
+      targetKeyword.trim() || title.trim() || "راهنمای خرید کالای منتخب";
     soundEngine.playClick();
     setGeneratingAi(true);
     try {
@@ -202,7 +350,9 @@ export function AdminBlogManager() {
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        notify(json.message || "✓ مقاله سئو با هوش مصنوعی تولید و در مجله منتشر شد.");
+        notify(
+          json.message || "✓ مقاله سئو با هوش مصنوعی تولید و در مجله منتشر شد."
+        );
         await fetchPostsAndProducts();
       } else {
         notify(json.message || "خطا در تولید خودکار مقاله.", "error");
@@ -294,7 +444,9 @@ export function AdminBlogManager() {
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        notify(json.message || "✓ مقاله با موفقیت در دیتابیس ذخیره و منتشر شد.");
+        notify(
+          json.message || "✓ مقاله با موفقیت در دیتابیس ذخیره و منتشر شد."
+        );
         resetForm();
         await fetchPostsAndProducts();
       } else {
@@ -326,23 +478,24 @@ export function AdminBlogManager() {
     }
   };
 
-  // ابزارهای درج سریع بلوک‌های HTML سئو
   const appendHtmlSnippet = (snippet: string) => {
     soundEngine.playClick();
     setContent((prev) => (prev.trim() ? prev + "\n\n" + snippet : snippet));
   };
 
   const injectComparisonTableSnippet = () => {
-    const selProd = products.find((p) => p.id === selectedProductId) || products[0];
+    const selProd =
+      products.find((p) => p.id === selectedProductId) || products[0];
     const pName = selProd ? selProd.title : "محصول منتخب آکسون کور";
     const pHref = selProd ? "/products/" + selProd.id : "/products";
+    const warrantyCol = selProd?.warranty || "بررسی سلامت فیزیکی پیش از ارسال";
     const snippet = [
       `<h3>جدول مقایسه فنی و ارزش خرید ${pName}</h3>`,
       `<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:13px;">`,
-      `  <thead><tr style="background:rgba(2,132,199,0.15);"><th style="padding:10px;border:1px solid rgba(148,163,184,0.3);text-align:right;">ویژگی تخصصی</th><th style="padding:10px;border:1px solid rgba(148,163,184,0.3);text-align:right;">نسخه‌های متداول بازار</th><th style="padding:10px;border:1px solid rgba(148,163,184,0.3);text-align:right;">${pName} در آکسون کور</th></tr></thead>`,
+      `  <thead><tr style="background:rgba(2,132,199,0.15);"><th style="padding:10px;border:1px solid rgba(148,163,184,0.3);text-align:right;">ویژگی تخصصی</th><th style="padding:10px;border:1px solid rgba(148,163,184,0.3);text-align:right;">وضعیت در آکسون کور</th></tr></thead>`,
       `  <tbody>`,
-      `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">کیفیت ساخت و اصالت</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">متغیر و بدون تست</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">اورجینال با تضمین ۱۰۰٪ سلامت فیزیکی</td></tr>`,
-      `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">گارانتی و پشتیبانی</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">فاقد ضمانت معتبر</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">۱۸ ماه گارانتی اصالت طلایی آکسون</td></tr>`,
+      `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">کیفیت و سلامت فیزیکی</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">تست سلامت فیزیکی پیش از ارسال</td></tr>`,
+      `    <tr><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);font-weight:bold;">ضمانت / گارانتی</td><td style="padding:10px;border:1px solid rgba(148,163,184,0.2);">${warrantyCol}</td></tr>`,
       `  </tbody>`,
       `</table>`,
       `<p><a href="${pHref}"><strong>🛒 مشاهده قیمت روز و خرید مستقیم ${pName} ←</strong></a></p>`,
@@ -353,18 +506,23 @@ export function AdminBlogManager() {
   const injectFaqSnippet = () => {
     const selProd = products.find((p) => p.id === selectedProductId);
     const pName = selProd ? selProd.title : title || "این محصول";
+    const warrantyLine = selProd?.warranty
+      ? `بله، این محصول همراه با ${selProd.warranty} و تضمین سلامت فیزیکی عرضه می‌شود.`
+      : `تمامی محصولات عرضه‌شده در آکسون کور پیش از ارسال از نظر سلامت فیزیکی بررسی می‌شوند.`;
     const snippet = [
       `<h3>سوالات متداول خریداران درباره ${pName}</h3>`,
-      `<p><strong>۱. آیا ${pName} دارای گارانتی و ضمانت اصالت است؟</strong><br/>بله، تمامی محصولات عرضه‌شده در آکسون کور با تضمین ۱۰۰٪ اصالت فیزیکی و گارانتی معتبر ارائه می‌شوند.</p>`,
-      `<p><strong>۲. نحوه ارسال سفارش به شهرستان‌ها چگونه است؟</strong><br/>تمامی سفارش‌ها در بسته‌بندی ایمن و ضدضربه از طریق پست پیشتاز به سراسر ایران ارسال شده و کد رهگیری پیامک می‌گردد.</p>`,
+      `<p><strong>۱. وضعیت ضمانت و سلامت ${pName} چگونه است؟</strong><br/>${warrantyLine}</p>`,
+      `<p><strong>۲. نحوه ارسال سفارش به شهرستان‌ها چگونه است؟</strong><br/>تمامی سفارش‌ها در بسته‌بندی ایمن و ضدضربه از طریق پست پیشتاز یا تیپاکس به سراسر ایران ارسال شده و کد رهگیری پیامک می‌گردد.</p>`,
     ].join("\n");
     appendHtmlSnippet(snippet);
   };
 
   const injectProductCtaBox = () => {
-    const selProd = products.find((p) => p.id === selectedProductId) || products[0];
+    const selProd =
+      products.find((p) => p.id === selectedProductId) || products[0];
     if (!selProd) return;
-    const snippet = `<div style="margin:20px 0;padding:18px;border-radius:18px;background:rgba(2,132,199,0.12);border:1px solid rgba(56,189,248,0.35);"><h4>🛍️ سفارش آنلاین ${selProd.title}</h4><p>هم‌اکنون می‌توانید <strong>${selProd.title}</strong> را با قیمت <strong>${selProd.price.toLocaleString("fa-IR")} تومان</strong> و ${selProd.warranty} از آکسون کور تهیه کنید:</p><p><a href="/products/${selProd.id}"><strong>🔗 مشاهده مشخصات و خرید مستقیم ${selProd.title} ←</strong></a></p></div>`;
+    const wPart = selProd.warranty ? ` و ${selProd.warranty}` : "";
+    const snippet = `<div style="margin:20px 0;padding:18px;border-radius:18px;background:rgba(2,132,199,0.12);border:1px solid rgba(56,189,248,0.35);"><h4>🛍️ سفارش آنلاین ${selProd.title}</h4><p>هم‌اکنون می‌توانید <strong>${selProd.title}</strong> را با قیمت <strong>${selProd.price.toLocaleString("fa-IR")} تومان</strong>${wPart} از آکسون کور تهیه کنید:</p><p><a href="/products/${selProd.id}"><strong>🔗 مشاهده مشخصات و خرید مستقیم ${selProd.title} ←</strong></a></p></div>`;
     appendHtmlSnippet(snippet);
   };
 
@@ -403,34 +561,63 @@ export function AdminBlogManager() {
   });
 
   return (
-    <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div
+      className="space-y-6 font-sans select-text text-[var(--text-primary)]"
+      dir="rtl"
+    >
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📚</span> مدیریت هوشمند مجله، وبلاگ و مقالات سئو (مجهز به اتصال خودکار کاتالوگ)
+            <span>📚</span> مدیریت هوشمند مجله، وبلاگ و مقالات سئو
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            با انتخاب هر محصول، موضوع، کلمه کلیدی، متا دیسکریپشن، جدول مشخصات و لینک خرید مستقیم به صورت خودکار پر می‌شود
+            ویرایش کامل متون مقالات، باکس مشاوره پایین صفحه و بازسازی خودکار مقالات بر اساس مشخصات واقعی کالاها
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap gap-2 w-full lg:w-auto">
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.playClick();
+              setSettingsPanelOpen(!settingsPanelOpen);
+            }}
+            className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-black cursor-pointer transition"
+          >
+            ⚙️ تنظیمات صفحه مقالات و باکس مشاوره
+          </button>
+
+          <button
+            type="button"
+            disabled={rebuilding}
+            onClick={handleRebuildAllFromRealProducts}
+            className="px-4 py-2.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-400 hover:bg-amber-500 hover:text-slate-950 font-black text-xs transition cursor-pointer disabled:opacity-50"
+          >
+            {rebuilding
+              ? "⏳ در حال پاکسازی مقالات..."
+              : "🧹 اصلاح خودکار مقالات فعلی"}
+          </button>
+
           <button
             type="button"
             disabled={generatingAi}
             onClick={handleGenerateAiSeoPost}
-            className="flex-1 sm:flex-initial px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-sky-600 text-white font-black text-xs shadow-lg hover:opacity-90 transition cursor-pointer disabled:opacity-50"
+            className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-sky-600 text-white font-black text-xs shadow-lg hover:opacity-90 transition cursor-pointer disabled:opacity-50"
           >
-            {generatingAi ? "⏳ در حال نگارش هوشمند..." : "🤖 تولید و انتشار فوری مقاله با AI"}
+            {generatingAi
+              ? "⏳ در حال نگارش..."
+              : "🤖 تولید مقاله جدید با AI"}
           </button>
+
           <Link
             href="/blog"
             target="_blank"
             className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-sky-500 text-xs font-bold flex items-center gap-1.5"
           >
-            <span>مشاهده مجله سایت</span>
+            <span>مشاهده مجله</span>
             <span>🔗</span>
           </Link>
+
           {editingId && (
             <button
               type="button"
@@ -442,6 +629,128 @@ export function AdminBlogManager() {
           )}
         </div>
       </div>
+
+      {/* پنل تنظیمات سراسری صفحه مقالات و باکس مشاوره پایین صفحه */}
+      {settingsPanelOpen && (
+        <form
+          onSubmit={handleSaveBlogPageSettings}
+          className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border-2 border-[var(--accent-blue)]/40 shadow-xl space-y-4 text-xs animate-fadeIn"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] pb-3">
+            <div>
+              <h2 className="font-black text-sm text-[var(--accent-blue)]">
+                ⚙️ تنظیمات متون ثابت صفحه مقالات و باکس مشاوره پایین صفحه
+              </h2>
+              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                تمامی بخش‌های پایینی صفحه مقالات را از اینجا شخصی‌سازی یا مخفی کنید:
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={ctaBoxEnabled}
+                  onChange={(e) => setCtaBoxEnabled(e.target.checked)}
+                  className="w-4 h-4 accent-[var(--accent-blue)] rounded cursor-pointer"
+                />
+                <span>نمایش باکس مشاوره پایین مقاله</span>
+              </label>
+              <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showRelatedPosts}
+                  onChange={(e) => setShowRelatedPosts(e.target.checked)}
+                  className="w-4 h-4 accent-[var(--accent-blue)] rounded cursor-pointer"
+                />
+                <span>نمایش مقالات مرتبط</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                عنوان باکس مشاوره پایین صفحه:
+              </label>
+              <input
+                type="text"
+                value={ctaBoxTitle}
+                onChange={(e) => setCtaBoxTitle(e.target.value)}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                متن پیش‌فرض گارانتی (خالی = عدم نمایش برای کالاهای بدون گارانتی):
+              </label>
+              <input
+                type="text"
+                value={defaultWarrantyFallback}
+                onChange={(e) => setDefaultWarrantyFallback(e.target.value)}
+                placeholder="خالی بگذارید تا فقط گارانتی واقعی هر کالا نمایش داده شود"
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                توضیحات باکس مشاوره پایین صفحه:
+              </label>
+              <input
+                type="text"
+                value={ctaBoxSubtitle}
+                onChange={(e) => setCtaBoxSubtitle(e.target.value)}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                متن دکمه اصلی باکس مشاوره:
+              </label>
+              <input
+                type="text"
+                value={ctaButtonText}
+                onChange={(e) => setCtaButtonText(e.target.value)}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                لینک دکمه اصلی (مثلاً /products یا /contact):
+              </label>
+              <input
+                type="text"
+                dir="ltr"
+                value={ctaButtonUrl}
+                onChange={(e) => setCtaButtonUrl(e.target.value)}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setSettingsPanelOpen(false)}
+              className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold cursor-pointer"
+            >
+              بستن
+            </button>
+            <button
+              type="submit"
+              disabled={savingSettings}
+              className="px-6 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black cursor-pointer disabled:opacity-50"
+            >
+              {savingSettings
+                ? "در حال ذخیره..."
+                : "💾 ذخیره تنظیمات صفحه مقالات"}
+            </button>
+          </div>
+        </form>
+      )}
 
       {statusMsg && (
         <div
@@ -456,7 +765,6 @@ export function AdminBlogManager() {
         </div>
       )}
 
-      {/* گرید استاندارد ۱۲ ستونی: ۷ ستون فرم ویرایشگر و ۵ ستون آرشیو مقالات */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start text-xs">
         <form
           onSubmit={handleSavePost}
@@ -464,7 +772,7 @@ export function AdminBlogManager() {
         >
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--accent-blue)]/40 space-y-2">
             <label className="block font-black text-[var(--accent-blue)]">
-              🎯 گام ۱: انتخاب محصول از کاتالوگ (پر شدن خودکار موضوع، کلمه کلیدی، جدول و کارت خرید):
+              🎯 گام ۱: انتخاب محصول از کاتالوگ (پر شدن خودکار بر اساس اطلاعات واقعی کالا):
             </label>
             <select
               value={selectedProductId}
@@ -482,7 +790,6 @@ export function AdminBlogManager() {
             </select>
           </div>
 
-          {/* گرید ۲ ستونه تمیز و متقارن برای فیلدهای فرم */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
@@ -581,7 +888,6 @@ export function AdminBlogManager() {
               />
             </div>
 
-            {/* چک‌لیست زنده سئو و ویرایشگر محتوای کامل */}
             <div className="sm:col-span-2 space-y-2.5">
               <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -654,19 +960,26 @@ export function AdminBlogManager() {
                 </div>
               </div>
 
-              {/* نوار ابزار درج سریع تگ‌های HTML و بلوک‌های فروش */}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => appendHtmlSnippet("<h2>عنوان بخش جدید</h2>\n<p>متن توضیح این بخش...</p>")}
+                    onClick={() =>
+                      appendHtmlSnippet(
+                        "<h2>عنوان بخش جدید</h2>\n<p>متن توضیح این بخش...</p>"
+                      )
+                    }
                     className="px-2.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold text-[11px] cursor-pointer"
                   >
                     + تیتر H2
                   </button>
                   <button
                     type="button"
-                    onClick={() => appendHtmlSnippet("<h3>زیرعنوان تخصصی</h3>\n<p>توضیحات تکمیلی...</p>")}
+                    onClick={() =>
+                      appendHtmlSnippet(
+                        "<h3>زیرعنوان تخصصی</h3>\n<p>توضیحات تکمیلی...</p>"
+                      )
+                    }
                     className="px-2.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold text-[11px] cursor-pointer"
                   >
                     + زیرتیتر H3
@@ -704,7 +1017,9 @@ export function AdminBlogManager() {
                       : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)]")
                   }
                 >
-                  {previewMode ? "✏️ بازگشت به ویرایشگر کد" : "👁️ پیش‌نمایش زنده مقاله"}
+                  {previewMode
+                    ? "✏️ بازگشت به ویرایشگر کد"
+                    : "👁️ پیش‌نمایش زنده مقاله"}
                 </button>
               </div>
 
@@ -751,7 +1066,6 @@ export function AdminBlogManager() {
           </button>
         </form>
 
-        {/* ستون چپ (۵ ستون): آرشیو مقالات منتشرشده */}
         <div className="lg:col-span-5 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 h-fit">
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[var(--card-border)] pb-3">
             <h3 className="font-black text-sm">
@@ -837,9 +1151,14 @@ export function AdminBlogManager() {
                               : "bg-amber-500/15 text-amber-400")
                           }
                         >
-                          {post.is_published !== false ? "منتشرشده ✓" : "پیش‌نویس"}
+                          {post.is_published !== false
+                            ? "منتشرشده ✓"
+                            : "پیش‌نویس"}
                         </button>
-                        <span className="font-mono text-slate-400 truncate" dir="ltr">
+                        <span
+                          className="font-mono text-slate-400 truncate"
+                          dir="ltr"
+                        >
                           /blog/{post.slug || post.id}
                         </span>
                       </div>

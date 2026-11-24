@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
+import { useSiteInfo } from "@/context/SiteInfoContext";
 
 export interface ProductReviewsProps {
   productId?: string | number;
@@ -13,11 +14,18 @@ export interface ProductReviewsProps {
 }
 
 export function ProductReviews(props: ProductReviewsProps) {
+  const { siteInfo } = useSiteInfo();
   const resolvedProductId = String(
     props.productId || props.product?.id || props.id || "default"
   );
   const resolvedTitle =
     props.productTitle || props.product?.title || props.product?.name || "این محصول";
+
+  const storeName = String(
+    siteInfo?.settings?.site_name ||
+      siteInfo?.site_name ||
+      "پشتیبانی فروشگاه"
+  ).trim();
 
   const [reviews, setReviews] = useState<any[]>(
     Array.isArray(props.initialReviews) ? props.initialReviews : []
@@ -25,8 +33,8 @@ export function ProductReviews(props: ProductReviewsProps) {
   const [stats, setStats] = useState({
     totalCount: 0,
     satisfiedCount: 0,
-    satisfactionPercent: 98,
-    averageRating: 4.9,
+    satisfactionPercent: 0,
+    averageRating: 0,
   });
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("");
@@ -37,6 +45,19 @@ export function ProductReviews(props: ProductReviewsProps) {
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  useEffect(() => {
+    try {
+      const rawSess = localStorage.getItem("axon_user_session");
+      if (rawSess) {
+        const parsed = JSON.parse(rawSess);
+        const autoName = parsed?.full_name || parsed?.name || "";
+        if (autoName && !/^0?9\d{9}$/.test(String(autoName).trim())) {
+          setUserName((prev) => prev || String(autoName).trim());
+        }
+      }
+    } catch {}
+  }, []);
 
   const fetchProductReviews = useCallback(async () => {
     try {
@@ -112,7 +133,6 @@ export function ProductReviews(props: ProductReviewsProps) {
         soundEngine.playSuccess();
         setFeedback({ type: "success", text: json.message });
         setComment("");
-        setUserName("");
         await fetchProductReviews();
       } else {
         setFeedback({
@@ -140,7 +160,6 @@ export function ProductReviews(props: ProductReviewsProps) {
       }}
       dir="rtl"
     >
-      {/* هدر آمار */}
       <div
         className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 pb-5"
         style={{ borderBottom: "1px solid var(--glass-border, var(--card-border))" }}
@@ -172,7 +191,7 @@ export function ProductReviews(props: ProductReviewsProps) {
               className="font-mono font-black text-base block"
               style={{ color: "var(--accent-blue)" }}
             >
-              {stats.totalCount}
+              {stats.totalCount.toLocaleString("fa-IR")}
             </span>
             <span
               className="text-[10px] font-bold"
@@ -183,15 +202,17 @@ export function ProductReviews(props: ProductReviewsProps) {
           </div>
           <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30">
             <span className="font-mono font-black text-base text-emerald-400 block">
-              {stats.satisfactionPercent}%
+              {stats.totalCount > 0 ? `${stats.satisfactionPercent}%` : "—"}
             </span>
             <span className="text-[10px] text-emerald-400 font-bold">
-              رضایت ({stats.satisfiedCount} نفر)
+              {stats.totalCount > 0
+                ? `رضایت (${stats.satisfiedCount.toLocaleString("fa-IR")} نفر)`
+                : "میزان رضایت"}
             </span>
           </div>
           <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30">
             <span className="font-mono font-black text-base text-amber-400 block">
-              {stats.averageRating} ★
+              {stats.totalCount > 0 ? `${stats.averageRating} ★` : "—"}
             </span>
             <span className="text-[10px] text-amber-400 font-bold">امتیاز کل</span>
           </div>
@@ -212,7 +233,6 @@ export function ProductReviews(props: ProductReviewsProps) {
       )}
 
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* فرم ثبت دیدگاه */}
         <form
           onSubmit={handleSubmitReview}
           className="w-full lg:w-5/12 p-5 rounded-2xl space-y-4 h-fit"
@@ -314,7 +334,6 @@ export function ProductReviews(props: ProductReviewsProps) {
           </button>
         </form>
 
-        {/* لیست دیدگاه‌ها */}
         <div className="w-full lg:w-7/12 space-y-3 lg:max-h-[520px] lg:overflow-y-auto pr-1">
           {loading ? (
             <div
@@ -379,7 +398,7 @@ export function ProductReviews(props: ProductReviewsProps) {
 
                 {rev.admin_reply && (
                   <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs leading-relaxed">
-                    <strong>🛡️ پاسخ رسمی پشتیبانی آکسون کور:</strong> {rev.admin_reply}
+                    <strong>🛡️ پاسخ رسمی {storeName}:</strong> {rev.admin_reply}
                   </div>
                 )}
               </div>

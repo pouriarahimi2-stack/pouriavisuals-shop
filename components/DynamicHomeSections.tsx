@@ -1,15 +1,13 @@
-"use client";
 // File Path: components/DynamicHomeSections.tsx
+"use client";
+
 import React, { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { soundEngine } from "@/lib/soundEngine";
 import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
 import ProductList from "@/components/ProductList";
 import MobileSlider from "@/components/MobileSlider";
 import { useSiteInfo } from "@/context/SiteInfoContext";
 import { DEFAULT_HOMEPAGE_LAYOUT_CONFIG } from "@/services/siteInfoService";
-import { formatPrice } from "@/lib/formatters";
 
 interface Props {
   initialProducts?: any[];
@@ -46,7 +44,6 @@ export const DEFAULT_BANNER_SIZING: BannerSizingConfig = {
   mobileLayout: "horizontal",
 };
 
-// پاکسازی ریشه‌ای متون سرگردان و هاردکدشده از پیش‌فرض‌های سکشن‌ها
 export const DEFAULT_SECTIONS_ORDER: ResponsiveSectionItem[] = [
   {
     id: "sec_banners",
@@ -71,7 +68,7 @@ export const DEFAULT_SECTIONS_ORDER: ResponsiveSectionItem[] = [
   {
     id: "sec_catalog",
     type: "NativeProductCatalog",
-    title: "کاتالوگ تجهیزات تخصصی و کالای دیجیتال",
+    title: "کاتالوگ محصولات",
     subtitle: "",
     enabled: true,
     showOnMobile: true,
@@ -101,6 +98,9 @@ function normalizeProductRow(p: any) {
     ...p,
     id: String(p.id),
     title: p.title || p.name || "کالای دیجیتال",
+    brand: p.brand || meta.brand || "",
+    warranty: p.warranty || meta.warranty || "",
+    specs: p.specs || p.specs_jsonb || meta.specs || {},
     image: primaryImg,
     image_url: primaryImg,
     images:
@@ -133,13 +133,12 @@ export default function DynamicHomeSections({
     (initialProducts || []).map(normalizeProductRow)
   );
   const [banners, setBanners] = useState<any[]>(initialBanners);
-  const [activeSlide, setActiveSlide] = useState(0);
 
   const fetchLiveHomeData = useCallback(async () => {
     try {
       const [pRes, bRes] = await Promise.all([
-        fetch("/api/products", { cache: "no-store" }).catch(() => null),
-        fetch("/api/public/banners", { cache: "no-store" }).catch(() => null),
+        fetch("/api/products?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
+        fetch("/api/public/banners?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
       ]);
       if (pRes?.ok) {
         const pJson = await pRes.json();
@@ -174,8 +173,8 @@ export default function DynamicHomeSections({
     banners.length > 0
       ? banners.map((b: any) => ({
           id: String(b.id),
-          title: b.title || "پیشنهاد ویژه آکسون",
-          subtitle: b.subtitle || "مشاهده مشخصات و خرید آنلاین با گارانتی اصالت",
+          title: b.title || "پیشنهاد ویژه",
+          subtitle: b.subtitle || "مشاهده مشخصات و خرید آنلاین",
           image: b.image_url || b.image || "/placeholder.png",
           link: b.link_url || b.link || "/products",
           price: b.price ? Number(b.price) : null,
@@ -187,19 +186,13 @@ export default function DynamicHomeSections({
           title: p.title || p.name || "محصول ویژه",
           subtitle:
             p.short_description ||
-            (p.description ? String(p.description).slice(0, 110) : "خرید مستقیم با گارانتی اصالت"),
+            (p.description ? String(p.description).slice(0, 110) : "مشاهده مشخصات و خرید آنلاین"),
           image: p.image || p.image_url || "/placeholder.png",
           link: "/products/" + p.id,
           price: Number(p.discount_price || p.discountPrice || p.price || 0),
           badge: p.category || "ویژه",
           cta: "مشاهده و خرید محصول",
         }));
-
-  useEffect(() => {
-    if (effectiveSlides.length <= 1) return;
-    const t = setInterval(() => setActiveSlide((prev) => (prev + 1) % effectiveSlides.length), 5000);
-    return () => clearInterval(t);
-  }, [effectiveSlides.length]);
 
   const rawSections: ResponsiveSectionItem[] =
     Array.isArray(tbCfg?.homeSections) && tbCfg.homeSections.length > 0
@@ -232,7 +225,11 @@ export default function DynamicHomeSections({
       if (products.length === 0) return null;
       return (
         <div key={sec.id} className="hidden lg:block">
-          <ProductPerspectiveSlider products={products} customTitle="" customSubtitle="" />
+          <ProductPerspectiveSlider
+            products={products}
+            customTitle={sec.title || ""}
+            customSubtitle={sec.subtitle || ""}
+          />
         </div>
       );
     }
@@ -242,8 +239,8 @@ export default function DynamicHomeSections({
         <div key={sec.id}>
           <ProductList
             initialProducts={products}
-            customHeading="کاتالوگ تجهیزات تخصصی و کالای دیجیتال"
-            customSubtitle=""
+            customHeading={sec.title ?? ""}
+            customSubtitle={sec.subtitle ?? ""}
           />
         </div>
       );

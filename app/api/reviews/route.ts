@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { sanitizeInput } from "@/lib/validationGuard";
 import { getMasterSiteInfoRow, saveMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import { rateLimiter } from "@/lib/rateLimiter";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -83,7 +84,7 @@ export async function GET(req: NextRequest) {
       (r) => Number(r.rating || 5) >= 4
     ).length;
     const satisfactionPercent =
-      totalCount > 0 ? Math.round((satisfiedCount / totalCount) * 100) : 98;
+      totalCount > 0 ? Math.round((satisfiedCount / totalCount) * 100) : 0;
     const averageRating =
       totalCount > 0
         ? Number(
@@ -94,7 +95,7 @@ export async function GET(req: NextRequest) {
               ) / totalCount
             ).toFixed(1)
           )
-        : 4.9;
+        : 0;
 
     return NextResponse.json(
       {
@@ -118,8 +119,8 @@ export async function GET(req: NextRequest) {
       stats: {
         totalCount: 0,
         satisfiedCount: 0,
-        satisfactionPercent: 98,
-        averageRating: 4.9,
+        satisfactionPercent: 0,
+        averageRating: 0,
       },
       message: err.message,
     });
@@ -128,6 +129,25 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1";
+    const rateCheck = await rateLimiter.checkLimit(
+      clientIp,
+      "submit_product_review",
+      5,
+      10
+    );
+
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "تعداد ارسال دیدگاه بیش از حد مجاز است. لطفاً دقایقی دیگر تلاش کنید.",
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const productId = String(body.product_id || body.productId || "").trim();
     const userName = sanitizeInput(
@@ -170,7 +190,6 @@ export async function POST(req: NextRequest) {
       created_at: nowIso,
     };
 
-    // تلاش برای درج در جدول reviews و product_reviews
     const { error: err1 } = await supabaseAdmin.from("reviews").insert([fullPayload]);
     if (err1) {
       await supabaseAdmin.from("reviews").insert([minimalPayload]);
@@ -183,7 +202,6 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin.from("product_reviews").insert([fullPayload]);
     }
 
-    // ذخیره هم‌زمان در متادیتای پایدار برای تضمین ۱۰۰٪ عدم مفقودی
     try {
       const siteRow = await getMasterSiteInfoRow();
       const layoutCfg = siteRow?.homepage_layout_config || {};

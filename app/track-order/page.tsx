@@ -60,7 +60,20 @@ export default function TrackOrderPage() {
       case "processing":
         return (
           <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
-            پرداخت شده / آماده ارسال ✓
+            پرداخت شده / در حال پردازش ✓
+          </span>
+        );
+      case "picking":
+      case "packing":
+        return (
+          <span className="px-3 py-1 rounded-full bg-sky-500/15 text-sky-500 font-bold text-xs">
+            در حال آماده‌سازی و بسته‌بندی انبار 📦
+          </span>
+        );
+      case "ready":
+        return (
+          <span className="px-3 py-1 rounded-full bg-orange-500/15 text-orange-500 font-bold text-xs">
+            آماده تحویل به پست 📦
           </span>
         );
       case "shipped":
@@ -230,7 +243,12 @@ export default function TrackOrderPage() {
                     suppressHydrationWarning
                   >
                     {formatPrice(
-                      Number(ord.final_amount || ord.total_price || ord.total_amount || 0)
+                      Number(
+                        ord.final_amount ??
+                          ord.total_price ??
+                          ord.total_amount ??
+                          0
+                      )
                     )}{" "}
                     تومان
                   </span>

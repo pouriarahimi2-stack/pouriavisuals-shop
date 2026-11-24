@@ -7,6 +7,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 import { IRAN_PROVINCES_CITIES } from "@/lib/iranProvinces";
+import { useCart } from "@/context/CartContext";
 
 interface CustomerOrder {
   id: string;
@@ -51,28 +52,39 @@ function formatReadableOrderCode(ord: Partial<CustomerOrder>): string {
   return "AXN-" + rawId.slice(0, 6).toUpperCase();
 }
 
-function parseCleanAddressAndTax(rawAddress: string): {
+function parseCleanAddressAndMeta(rawAddress: string): {
   cleanAddress: string;
   extractedVatPercent: number | null;
   extractedVatAmount: number | null;
+  extractedWalletUsed: number;
 } {
   const str = String(rawAddress || "");
-  const match = str.match(/\[مالیات\s*(\d+)%:\s*(\d+)\s*تومان\]/);
+  const vatMatch = str.match(/\[مالیات\s*(\d+)%:\s*(\d+)\s*تومان\]/);
+  const walletMatch = str.match(
+    /\[کسر از کیف پول:\s*([\d,۰-۹]+)\s*تومان\]/
+  );
+
+  let extractedWalletUsed = 0;
+  if (walletMatch?.[1]) {
+    const num = Number(
+      walletMatch[1]
+        .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+        .replace(/,/g, "")
+        .trim()
+    );
+    if (Number.isFinite(num) && num > 0) extractedWalletUsed = num;
+  }
+
   const cleanAddress = str
     .replace(/\s*\[مالیات\s*\d+%:\s*\d+\s*تومان\]/g, "")
+    .replace(/\s*\[کسر از کیف پول:\s*[\d,۰-۹]+\s*تومان\]/g, "")
     .trim();
 
-  if (match) {
-    return {
-      cleanAddress,
-      extractedVatPercent: Number(match[1]),
-      extractedVatAmount: Number(match[2]),
-    };
-  }
   return {
     cleanAddress,
-    extractedVatPercent: null,
-    extractedVatAmount: null,
+    extractedVatPercent: vatMatch ? Number(vatMatch[1]) : null,
+    extractedVatAmount: vatMatch ? Number(vatMatch[2]) : null,
+    extractedWalletUsed,
   };
 }
 
@@ -87,10 +99,14 @@ function computeOrderFinancialBreakdown(ord: CustomerOrder) {
   const subtotal = Number(ord.total_amount || itemsSum || 0);
   const discount = Number(ord.discount_amount || 0);
   const afterDiscount = Math.max(0, subtotal - discount);
-  const finalTotal = Number(ord.final_amount || ord.total_amount || subtotal);
+  const finalTotal = Number(ord.final_amount ?? ord.total_amount ?? subtotal);
 
-  const { cleanAddress, extractedVatPercent, extractedVatAmount } =
-    parseCleanAddressAndTax(ord.address || "");
+  const {
+    cleanAddress,
+    extractedVatPercent,
+    extractedVatAmount,
+    extractedWalletUsed,
+  } = parseCleanAddressAndMeta(ord.address || "");
 
   let vatAmount =
     ord.vat_amount !== undefined
@@ -109,7 +125,7 @@ function computeOrderFinancialBreakdown(ord: CustomerOrder) {
   let shippingCost =
     ord.shipping_cost !== undefined ? Number(ord.shipping_cost) : 0;
 
-  const diff = Math.max(0, finalTotal - afterDiscount);
+  const diff = Math.max(0, finalTotal + extractedWalletUsed - afterDiscount);
   if (vatAmount === 0 && shippingCost === 0 && diff > 0) {
     const expectedTenPercentVat = Math.round(afterDiscount * 0.1);
     if (Math.abs(diff - expectedTenPercentVat) <= 500) {
@@ -132,6 +148,7 @@ function computeOrderFinancialBreakdown(ord: CustomerOrder) {
     vatPercent,
     vatAmount,
     shippingCost,
+    walletUsed: extractedWalletUsed,
     finalTotal,
   };
 }
@@ -139,6 +156,7 @@ function computeOrderFinancialBreakdown(ord: CustomerOrder) {
 function AccountDashboardContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { addToCart, openCart } = useCart();
   const highlightOrderId = searchParams.get("orderId") || "";
 
   const [activeTab, setActiveTab] = useState<"orders" | "profile">("orders");
@@ -210,7 +228,7 @@ function AccountDashboardContent() {
       );
 
       if (latestNamedOrder) {
-        const { cleanAddress } = parseCleanAddressAndTax(
+        const { cleanAddress } = parseCleanAddressAndMeta(
           latestNamedOrder.address || ""
         );
         setProfName((prev) => prev || latestNamedOrder.customer_name);
@@ -450,6 +468,7 @@ function AccountDashboardContent() {
         setFeedbackMsg("✓ سفارش ناتمام با موفقیت از لیست شما حذف شد.");
         setTimeout(() => setFeedbackMsg(null), 3500);
         fetchCustomerOrders(cleanPhone, user);
+        fetchWalletBalance(cleanPhone);
       } else {
         alert(json.message || "خطا در حذف سفارش.");
       }
@@ -458,6 +477,27 @@ function AccountDashboardContent() {
     } finally {
       setDeletingOrderId(null);
     }
+  };
+
+  const handleReorderItems = (ord: CustomerOrder) => {
+    const itemsList = Array.isArray(ord.items) ? ord.items : [];
+    if (itemsList.length === 0) return;
+    soundEngine.playAddToCart();
+    itemsList.forEach((it) => {
+      addToCart(
+        {
+          id: it.productId || it.id,
+          title: it.title || it.name,
+          price: it.price,
+          discount_price: it.discount_price || it.discountPrice || null,
+          image: it.image || "/placeholder.png",
+          quantity: Math.max(1, Number(it.quantity || 1)),
+          selectedColor: it.selectedColor || undefined,
+        },
+        false
+      );
+    });
+    openCart();
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -621,7 +661,6 @@ function AccountDashboardContent() {
       className="max-w-6xl mx-auto px-4 py-8 sm:py-12 font-sans select-text text-[var(--text-primary)] space-y-6"
       dir="rtl"
     >
-      {/* هدر حساب کاربری + کارت موجودی کیف پول */}
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
@@ -644,7 +683,6 @@ function AccountDashboardContent() {
             </div>
           </div>
 
-          {/* کارت موجودی کیف پول مشتری */}
           <div className="w-full md:w-auto px-4 py-3 rounded-2xl bg-gradient-to-l from-emerald-500/15 via-teal-500/10 to-sky-500/10 border border-emerald-500/30 flex items-center justify-between md:justify-end gap-4">
             <div className="flex items-center gap-2.5">
               <span className="text-xl">👛</span>
@@ -892,7 +930,7 @@ function AccountDashboardContent() {
                   const isSelected = selectedOrder?.id === ord.id;
                   const shortOrderCode = formatReadableOrderCode(ord);
                   const ordFinalAmt = Number(
-                    ord.final_amount || ord.total_amount || 0
+                    ord.final_amount ?? ord.total_amount ?? 0
                   );
 
                   return (
@@ -932,7 +970,9 @@ function AccountDashboardContent() {
                           {new Date(ord.created_at).toLocaleDateString("fa-IR")}
                         </span>
                         <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
-                          {ordFinalAmt.toLocaleString("fa-IR")} تومان
+                          {ordFinalAmt === 0
+                            ? "تسویه با کیف پول"
+                            : `${ordFinalAmt.toLocaleString("fa-IR")} تومان`}
                         </span>
                       </div>
 
@@ -1010,13 +1050,21 @@ function AccountDashboardContent() {
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
+                      onClick={() => handleReorderItems(selectedOrder)}
+                      className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-emerald-500 text-emerald-500 font-black text-xs cursor-pointer transition"
+                    >
+                      🔄 سفارش مجدد
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => {
                         soundEngine.playClick();
                         setInvoiceModalOpen(true);
                       }}
                       className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[var(--accent-blue)] font-black text-xs cursor-pointer transition"
                     >
-                      🖨️ مشاهده و چاپ فاکتور رسمی
+                      🖨️ چاپ فاکتور رسمی
                     </button>
 
                     <button
@@ -1033,7 +1081,7 @@ function AccountDashboardContent() {
                       className="px-3.5 py-2 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-black text-xs cursor-pointer transition hover:bg-emerald-500/25"
                     >
                       {copiedCode
-                        ? "✓ کد رهگیری کپی شد"
+                        ? "✓ کپی شد"
                         : "کد پیگیری: " +
                           (selectedOrder.tracking_code ||
                             formatReadableOrderCode(selectedOrder))}
@@ -1112,6 +1160,7 @@ function AccountDashboardContent() {
                         <div>
                           <div className="font-black">
                             {item.title || item.name || "کالای دیجیتال"}
+                            {item.selectedColor ? ` (${item.selectedColor})` : ""}
                           </div>
                           <span className="text-[10px] font-mono text-[var(--text-secondary)]">
                             تعداد: {item.quantity || 1} عدد
@@ -1177,8 +1226,18 @@ function AccountDashboardContent() {
                     </div>
                   )}
 
+                  {selectedBreakdown.walletUsed > 0 && (
+                    <div className="flex justify-between items-center text-emerald-500">
+                      <span className="font-bold">👛 پرداخت از کیف پول:</span>
+                      <span className="font-mono font-bold">
+                        -{selectedBreakdown.walletUsed.toLocaleString("fa-IR")}{" "}
+                        تومان
+                      </span>
+                    </div>
+                  )}
+
                   <div className="pt-2.5 border-t border-[var(--card-border)] flex items-center justify-between text-sm font-black">
-                    <span>مبلغ کل فاکتور:</span>
+                    <span>مبلغ پرداختی درگاه / مانده:</span>
                     <span className="font-mono text-base text-emerald-600 dark:text-emerald-400">
                       {selectedBreakdown.finalTotal.toLocaleString("fa-IR")}{" "}
                       تومان
@@ -1240,7 +1299,6 @@ function AccountDashboardContent() {
             onClick={(e) => e.stopPropagation()}
             className="max-w-3xl w-full max-h-[92vh] overflow-y-auto bg-white text-slate-900 rounded-3xl p-6 sm:p-10 shadow-2xl space-y-6 text-xs border border-slate-300"
           >
-            {/* هدر فاکتور رسمی */}
             <div className="flex flex-wrap items-start justify-between gap-4 border-b-2 border-slate-800 pb-4">
               <div className="space-y-1">
                 <h2 className="text-lg sm:text-xl font-black text-slate-900">
@@ -1279,7 +1337,6 @@ function AccountDashboardContent() {
               </div>
             </div>
 
-            {/* مشخصات خریدار و فروشنده */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200 leading-relaxed">
               <div className="space-y-1">
                 <div className="font-black text-slate-800 border-b border-slate-200 pb-1">
@@ -1307,7 +1364,6 @@ function AccountDashboardContent() {
               </div>
             </div>
 
-            {/* جدول اقلام فاکتور */}
             <div className="overflow-x-auto border border-slate-300 rounded-2xl">
               <table className="w-full text-right border-collapse text-xs">
                 <thead className="bg-slate-800 text-white">
@@ -1352,7 +1408,6 @@ function AccountDashboardContent() {
               </table>
             </div>
 
-            {/* جمع‌بندی مالی فاکتور */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 pt-2">
               <div className="text-[11px] text-slate-500 space-y-1">
                 <div>
@@ -1398,8 +1453,16 @@ function AccountDashboardContent() {
                     </span>
                   </div>
                 )}
+                {selectedBreakdown.walletUsed > 0 && (
+                  <div className="flex justify-between text-emerald-700">
+                    <span>پرداخت از کیف پول:</span>
+                    <span className="font-mono font-bold">
+                      -{selectedBreakdown.walletUsed.toLocaleString("fa-IR")} تومان
+                    </span>
+                  </div>
+                )}
                 <div className="pt-2 border-t border-slate-300 flex justify-between font-black text-sm text-slate-900">
-                  <span>مبلغ قابل پرداخت / کل:</span>
+                  <span>مبلغ قابل پرداخت / درگاه:</span>
                   <span className="font-mono">
                     {selectedBreakdown.finalTotal.toLocaleString("fa-IR")} تومان
                   </span>
@@ -1407,7 +1470,6 @@ function AccountDashboardContent() {
               </div>
             </div>
 
-            {/* دکمه‌های عملیات چاپ و بستن */}
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 print:hidden">
               <button
                 type="button"

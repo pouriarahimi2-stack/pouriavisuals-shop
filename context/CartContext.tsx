@@ -1,10 +1,18 @@
 // File Path: context/CartContext.tsx
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 
 export interface CartItem {
   id: string | number;
+  cartKey?: string;
   title: string;
   name?: string;
   price: number;
@@ -36,12 +44,14 @@ interface CartContextType {
   openCart: () => void;
   closeCart: () => void;
   addToCart: (item: any, openDrawer?: boolean) => void;
-  removeFromCart: (id: string | number) => void;
-  updateQuantity: (id: string | number, deltaOrQty: number) => void;
+  removeFromCart: (idOrKey: string | number) => void;
+  updateQuantity: (idOrKey: string | number, deltaOrQty: number) => void;
   clearCart: () => void;
   appliedCoupon: AppliedCoupon | null;
-  // پشتیبانی از دریافت شماره موبایل برای سد امنیتی لایه اول
-  applyCoupon: (code: string, customerPhone?: string) => Promise<{ success: boolean; message: string }>;
+  applyCoupon: (
+    code: string,
+    customerPhone?: string
+  ) => Promise<{ success: boolean; message: string }>;
   removeCoupon: () => void;
   totalPrice: number;
   totalAmount: number;
@@ -54,10 +64,17 @@ const CART_STORAGE_KEY = "axon_cart_store_v2026";
 const LEGACY_CART_KEY = "axon_cart";
 const COUPON_STORAGE_KEY = "axon_active_coupon_v2026";
 
+function buildCartItemKey(id: string | number, color?: string): string {
+  const cleanColor = String(color || "").trim();
+  return cleanColor ? `${String(id)}::${cleanColor}` : String(id);
+}
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(
+    null
+  );
 
   const loadStoredCart = useCallback(() => {
     try {
@@ -72,7 +89,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (Array.isArray(items)) {
-        setCartItems(items);
+        const normalized = items.map((it) => ({
+          ...it,
+          cartKey:
+            it.cartKey || buildCartItemKey(it.id, it.selectedColor),
+        }));
+        setCartItems(normalized);
       }
 
       const cpn = localStorage.getItem(COUPON_STORAGE_KEY);
@@ -88,63 +110,90 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     loadStoredCart();
     const handleOpenDrawerEvent = () => setIsCartOpen(true);
     const handleCartUpdatedEvent = () => loadStoredCart();
+    const handleStorageEvent = (e: StorageEvent) => {
+      if (e.key === CART_STORAGE_KEY || e.key === COUPON_STORAGE_KEY) {
+        loadStoredCart();
+      }
+    };
 
     window.addEventListener("open_cart_drawer", handleOpenDrawerEvent);
     window.addEventListener("cart_updated", handleCartUpdatedEvent);
+    window.addEventListener("storage", handleStorageEvent);
 
     return () => {
       window.removeEventListener("open_cart_drawer", handleOpenDrawerEvent);
       window.removeEventListener("cart_updated", handleCartUpdatedEvent);
+      window.removeEventListener("storage", handleStorageEvent);
     };
   }, [loadStoredCart]);
 
-  const persistCart = useCallback((items: CartItem[]) => {
-    setCartItems(items);
+  const writeCartStorage = (items: CartItem[]) => {
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
       localStorage.setItem(LEGACY_CART_KEY, JSON.stringify(items));
-      window.dispatchEvent(new Event("cart_updated"));
     } catch {}
+  };
+
+  const persistCart = useCallback((items: CartItem[]) => {
+    setCartItems(items);
+    writeCartStorage(items);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("cart_updated"));
+    }
   }, []);
 
   const addToCart = useCallback((item: any, openDrawer: boolean = false) => {
     const itemId = String(item.id);
+    const selectedColor = item.selectedColor
+      ? String(item.selectedColor).trim()
+      : undefined;
+    const itemKey = buildCartItemKey(itemId, selectedColor);
     const itemTitle = item.title || item.name || "کالای دیجیتال";
-    const itemPrice = Number(item.discount_price || item.discountPrice || item.price || 0);
-    const itemImage = item.image || item.image_url || item.images?.[0] || "/placeholder.png";
-    const itemStock = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 999;
-    const addQuantity = Number(item.quantity || 1);
+    const itemPrice = Number(
+      item.discount_price || item.discountPrice || item.price || 0
+    );
+    const itemImage =
+      item.image || item.image_url || item.images?.[0] || "/placeholder.png";
+    const itemStock =
+      item.stock !== undefined && item.stock !== null
+        ? Number(item.stock)
+        : 999;
+    const addQuantity = Math.max(1, Number(item.quantity || 1));
 
     setCartItems((prevItems) => {
-      const existingIndex = prevItems.findIndex((i) => String(i.id) === itemId);
+      const existingIndex = prevItems.findIndex(
+        (i) => (i.cartKey || buildCartItemKey(i.id, i.selectedColor)) === itemKey
+      );
       let updated: CartItem[];
 
       if (existingIndex > -1) {
         const existingItem = prevItems[existingIndex];
         const newQty = Math.min(itemStock, existingItem.quantity + addQuantity);
-        updated = prevItems.map((i, idx) => (idx === existingIndex ? { ...i, quantity: newQty } : i));
+        updated = prevItems.map((i, idx) =>
+          idx === existingIndex ? { ...i, quantity: newQty } : i
+        );
       } else {
         updated = [
           ...prevItems,
           {
             id: itemId,
+            cartKey: itemKey,
             title: itemTitle,
             name: itemTitle,
             price: itemPrice,
-            discountPrice: item.discount_price ? Number(item.discount_price) : undefined,
+            discountPrice: item.discount_price
+              ? Number(item.discount_price)
+              : undefined,
             image: itemImage,
             quantity: Math.min(itemStock, addQuantity),
             stock: itemStock,
             category: item.category || "عمومی",
-            selectedColor: item.selectedColor || undefined,
+            selectedColor,
             shipping_type: item.shipping_type || undefined,
           },
         ];
       }
-      try {
-        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updated));
-        localStorage.setItem(LEGACY_CART_KEY, JSON.stringify(updated));
-      } catch {}
+      writeCartStorage(updated);
       return updated;
     });
 
@@ -153,44 +202,61 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const removeFromCart = useCallback((id: string | number) => {
+  const removeFromCart = useCallback((idOrKey: string | number) => {
+    const target = String(idOrKey);
     setCartItems((prev) => {
-      const updated = prev.filter((i) => String(i.id) !== String(id));
-      try {
-        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updated));
-        localStorage.setItem(LEGACY_CART_KEY, JSON.stringify(updated));
-      } catch {}
+      const updated = prev.filter(
+        (i) =>
+          (i.cartKey || buildCartItemKey(i.id, i.selectedColor)) !== target &&
+          String(i.id) !== target
+      );
+      writeCartStorage(updated);
       return updated;
     });
   }, []);
 
-  const updateQuantity = useCallback((id: string | number, deltaOrQty: number) => {
-    setCartItems((prev) => {
-      const existing = prev.find((i) => String(i.id) === String(id));
-      if (!existing) return prev;
+  const updateQuantity = useCallback(
+    (idOrKey: string | number, deltaOrQty: number) => {
+      const target = String(idOrKey);
+      setCartItems((prev) => {
+        const existing = prev.find(
+          (i) =>
+            (i.cartKey || buildCartItemKey(i.id, i.selectedColor)) === target ||
+            String(i.id) === target
+        );
+        if (!existing) return prev;
 
-      let newQty = deltaOrQty;
+        const matchedKey =
+          existing.cartKey ||
+          buildCartItemKey(existing.id, existing.selectedColor);
 
-      if (newQty <= 0) {
-        const filtered = prev.filter((i) => String(i.id) !== String(id));
-        try {
-          localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(filtered));
-          localStorage.setItem(LEGACY_CART_KEY, JSON.stringify(filtered));
-        } catch {}
-        return filtered;
-      }
+        if (deltaOrQty <= 0) {
+          const filtered = prev.filter(
+            (i) =>
+              (i.cartKey || buildCartItemKey(i.id, i.selectedColor)) !==
+              matchedKey
+          );
+          writeCartStorage(filtered);
+          return filtered;
+        }
 
-      const maxLimit = existing.stock !== undefined && existing.stock !== null ? existing.stock : 999;
-      const finalQty = Math.min(maxLimit, newQty);
-      const updated = prev.map((i) => (String(i.id) === String(id) ? { ...i, quantity: finalQty } : i));
+        const maxLimit =
+          existing.stock !== undefined && existing.stock !== null
+            ? existing.stock
+            : 999;
+        const finalQty = Math.min(maxLimit, deltaOrQty);
+        const updated = prev.map((i) =>
+          (i.cartKey || buildCartItemKey(i.id, i.selectedColor)) === matchedKey
+            ? { ...i, quantity: finalQty }
+            : i
+        );
 
-      try {
-        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updated));
-        localStorage.setItem(LEGACY_CART_KEY, JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-  }, []);
+        writeCartStorage(updated);
+        return updated;
+      });
+    },
+    []
+  );
 
   const clearCart = useCallback(() => {
     persistCart([]);
@@ -198,9 +264,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.removeItem(COUPON_STORAGE_KEY);
     } catch {}
-    
-    // وقتی سبد خرید پس از پرداخت پاک می‌شود، یک رویداد کلی به سیستم می‌فرستیم
-    // تا هدر و کارت محصولات در صورت تمام شدن ظرفیت کوپن، بلافاصله از نو با بک‌اند سینک شوند.
+
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("coupons_updated"));
     }
@@ -211,7 +275,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const toggleCart = () => setIsCartOpen((prev) => !prev);
 
   const totalPrice = useMemo(() => {
-    return cartItems.reduce((acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity, 0);
+    return cartItems.reduce(
+      (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
+      0
+    );
   }, [cartItems]);
 
   const discountAmount = useMemo(() => {
@@ -219,7 +286,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (appliedCoupon.discountType === "fixed" && appliedCoupon.fixedAmount) {
       return Math.min(totalPrice, appliedCoupon.fixedAmount);
     }
-    let disc = Math.round((totalPrice * (appliedCoupon.discountPercent || 0)) / 100);
+    let disc = Math.round(
+      (totalPrice * (appliedCoupon.discountPercent || 0)) / 100
+    );
     if (appliedCoupon.maxDiscount && disc > appliedCoupon.maxDiscount) {
       disc = appliedCoupon.maxDiscount;
     }
@@ -234,7 +303,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
   }, [cartItems]);
 
-  // درخواست امن به سمت سرور برای اعتبارسنجی
   const applyCoupon = async (code: string, customerPhone?: string) => {
     const clean = code.trim().toUpperCase();
     try {
@@ -248,9 +316,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           customerPhone: customerPhone || "",
         }),
       });
-      
+
       const res = await response.json();
-      
+
       if (res.valid && res.coupon) {
         const cpn: any = res.coupon;
         const isFixed = cpn.type === "fixed" || cpn.discount_type === "fixed";
@@ -267,16 +335,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           discountType: isFixed ? "fixed" : "percent",
           discountPercent: isFixed ? 0 : rawVal,
           fixedAmount: isFixed ? rawVal : undefined,
-          maxDiscount: Number(cpn.max_discount || cpn.max_discount_amount || 0) || undefined,
+          maxDiscount:
+            Number(cpn.max_discount || cpn.max_discount_amount || 0) ||
+            undefined,
         };
 
         setAppliedCoupon(newCoupon);
         localStorage.setItem(COUPON_STORAGE_KEY, JSON.stringify(newCoupon));
-        return { success: true, message: res.message || "✓ کد تخفیف با موفقیت اعمال شد." };
+        return {
+          success: true,
+          message: res.message || "✓ کد تخفیف با موفقیت اعمال شد.",
+        };
       }
-      return { success: false, message: res.message || "کد تخفیف نامعتبر است." };
-    } catch (err) {
-      return { success: false, message: "خطا در ارتباط با سرور جهت بررسی کد تخفیف." };
+      return {
+        success: false,
+        message: res.message || "کد تخفیف نامعتبر است.",
+      };
+    } catch {
+      return {
+        success: false,
+        message: "خطا در ارتباط با سرور جهت بررسی کد تخفیف.",
+      };
     }
   };
 

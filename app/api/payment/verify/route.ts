@@ -1,13 +1,124 @@
+// File Path: app/api/payment/verify/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { postViaNetafrazRelay } from "@/lib/netafrazRelay";
 import { normalizeSystemSettings } from "@/lib/systemSettings";
-import { sendOtpPattern } from "@/lib/otpService";
+import { sendTextSMS } from "@/lib/otpService";
 
 export const dynamic = "force-dynamic";
 
-const ZARINPAL_MERCHANT_ID =
-  process.env.ZARINPAL_MERCHANT_ID || "";
+const ZARINPAL_MERCHANT_ID = process.env.ZARINPAL_MERCHANT_ID || "";
+
+function extractWalletDeductionFromAddress(addressStr: string): number {
+  const match = String(addressStr || "").match(
+    /\[کسر از کیف پول:\s*([\d,۰-۹]+)\s*تومان\]/
+  );
+  if (!match || !match[1]) return 0;
+  const englishDigits = match[1]
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/,/g, "")
+    .trim();
+  const num = Number(englishDigits);
+  return Number.isFinite(num) && num > 0 ? num : 0;
+}
+
+async function refundWalletAndCouponOnCancel(
+  orderRow: any,
+  clientIp: string
+) {
+  if (!orderRow || orderRow.status === "cancelled") return;
+
+  // ۱. بازگرداندن موجودی کالاها به انبار
+  if (Array.isArray(orderRow.items)) {
+    for (const it of orderRow.items) {
+      const pId = String(it.id || it.productId || it.product_id || "");
+      const qty = Math.max(1, Number(it.quantity || 1));
+      if (!pId) continue;
+      try {
+        const { data: pRow } = await supabaseAdmin
+          .from("products")
+          .select("id, stock")
+          .eq("id", pId)
+          .maybeSingle();
+        if (pRow) {
+          const nextStock = Math.max(0, Number(pRow.stock || 0)) + qty;
+          await supabaseAdmin
+            .from("products")
+            .update({
+              stock: nextStock,
+              is_available: nextStock > 0,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", pRow.id);
+        }
+      } catch {}
+    }
+  }
+
+  // ۲. بازگرداندن خودکار اعتبار کسرشده از کیف پول مشتری
+  const walletUsed = extractWalletDeductionFromAddress(orderRow.address || "");
+  const cleanPhone = String(orderRow.phone || "").replace(/\D/g, "");
+  if (walletUsed > 0 && /^09\d{9}$/.test(cleanPhone)) {
+    try {
+      const { data: walletRow } = await supabaseAdmin
+        .from("customer_wallets")
+        .select("balance")
+        .eq("customer_phone", cleanPhone)
+        .maybeSingle();
+
+      const currentBal = Math.max(0, Number(walletRow?.balance || 0));
+      const refundedBal = currentBal + walletUsed;
+
+      await supabaseAdmin.from("customer_wallets").upsert(
+        [
+          {
+            customer_phone: cleanPhone,
+            balance: refundedBal,
+            updated_at: new Date().toISOString(),
+          },
+        ],
+        { onConflict: "customer_phone" }
+      );
+
+      await supabaseAdmin.from("admin_audit_logs").insert([
+        {
+          action: "WALLET_REFUND_ON_PAYMENT_CANCEL",
+          user_id: cleanPhone,
+          details: {
+            orderId: orderRow.id,
+            orderNumber: orderRow.order_number,
+            refundedAmount: walletUsed,
+            newWalletBalance: refundedBal,
+          },
+          ip_address: clientIp,
+          severity: "info",
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    } catch {}
+  }
+
+  // ۳. آزادسازی ظرفیت کد تخفیف استفاده‌شده در سفارش لغوشده
+  if (orderRow.coupon_code) {
+    try {
+      const { data: cpn } = await supabaseAdmin
+        .from("coupons")
+        .select("id, used_count, times_used")
+        .eq("code", orderRow.coupon_code)
+        .maybeSingle();
+      if (cpn) {
+        const nextUsed = Math.max(
+          0,
+          Number(cpn.used_count ?? cpn.times_used ?? 1) - 1
+        );
+        await supabaseAdmin
+          .from("coupons")
+          .update({ used_count: nextUsed, times_used: nextUsed })
+          .eq("id", cpn.id);
+      }
+    } catch {}
+  }
+}
 
 async function handleVerify(params: {
   authority: string;
@@ -45,32 +156,33 @@ async function handleVerify(params: {
     }
   }
 
+  // جلوگیری از خطا در صورت رفرش صفحه بازگشت از بانک پس از تایید موفق
+  if (
+    orderRow &&
+    (orderRow.payment_status === "paid" || orderRow.status === "paid")
+  ) {
+    return NextResponse.json({
+      success: true,
+      verified: true,
+      orderId: orderRow.id,
+      trackingCode: orderRow.tracking_code || orderRow.order_number || orderRow.id,
+      amount: Number(orderRow.final_amount || fallbackAmount || 0),
+      message: "✓ پرداخت این سفارش پیش از این تایید شده است.",
+    });
+  }
+
   const verifiedAmount = Math.max(
     1000,
     Math.round(
-      Number(orderRow?.final_amount || orderRow?.total_amount || fallbackAmount || 1000)
+      Number(
+        orderRow?.final_amount || orderRow?.total_amount || fallbackAmount || 1000
+      )
     )
   );
 
   if (status && status.toUpperCase() !== "OK") {
     if (orderRow?.id) {
-      if (orderRow.status !== "cancelled" && Array.isArray(orderRow.items)) {
-        for (const it of orderRow.items) {
-          const pId = String(it.id || it.productId || it.product_id || "");
-          const qty = Math.max(1, Number(it.quantity || 1));
-          if (!pId) continue;
-          try {
-            const { data: pRow } = await supabaseAdmin
-              .from("products")
-              .select("id, stock")
-              .eq("id", pId)
-              .maybeSingle();
-            if (pRow) {
-              await supabaseAdmin.rpc("increment_product_stock", { p_id: pRow.id, qty: qty });
-            }
-          } catch {}
-        }
-      }
+      await refundWalletAndCouponOnCancel(orderRow, clientIp);
       await supabaseAdmin
         .from("orders")
         .update({
@@ -85,7 +197,8 @@ async function handleVerify(params: {
       {
         success: false,
         cancelled: true,
-        message: "عملیات پرداخت توسط خریدار لغو شد یا ناموفق بود.",
+        message:
+          "عملیات پرداخت توسط خریدار لغو شد یا ناموفق بود (در صورت استفاده از کیف پول، اعتبار شما بازگردانده شد).",
       },
       { status: 400 }
     );
@@ -170,9 +283,6 @@ async function handleVerify(params: {
             verifiedAmountIRT: verifiedAmount,
             zarinpalErrorCode: firstErr?.code || 502,
             zarinpalErrorMessage: firstErr?.message || "Verify Failed",
-            rootCauseExplanation:
-              "خطا در تایید نهایی تراکنش زرین‌پال پس از بازگشت از بانک: " +
-              (firstErr?.message || "عدم تطابق وضعیت یا انقضای توکن"),
             rawGatewayAttempts: attemptsLog,
           },
           ip_address: clientIp,
@@ -205,25 +315,6 @@ async function handleVerify(params: {
         updated_at: new Date().toISOString(),
       })
       .eq("id", orderRow.id);
-
-    if (orderRow.coupon_code) {
-      try {
-        const { data: cpn } = await supabaseAdmin
-          .from("coupons")
-          .select("id, used_count, times_used")
-          .eq("code", orderRow.coupon_code)
-          .maybeSingle();
-        if (cpn) {
-          const nextUsed = Number(cpn.used_count ?? cpn.times_used ?? 0) + 1;
-          await supabaseAdmin
-            .from("coupons")
-            .update({ used_count: nextUsed, times_used: nextUsed })
-            .eq("id", cpn.id);
-        }
-      } catch (err) {
-        console.error("Error incrementing coupon usage:", err);
-      }
-    }
   }
 
   try {
@@ -234,10 +325,11 @@ async function handleVerify(params: {
       .maybeSingle();
     const sys = normalizeSystemSettings(siteRow?.homepage_layout_config);
     if (sys.autoSendOrderSms && orderRow?.phone) {
-      sendOtpPattern({
-        mobile: String(orderRow.phone),
-        code: String(refId).slice(-6),
-      }).catch(() => {});
+      const orderNum = orderRow.order_number || orderRow.id;
+      sendTextSMS(
+        String(orderRow.phone),
+        `${orderRow.customer_name || "مشتری گرامی"} عزیز، پرداخت سفارش ${orderNum} با شماره مرجع بانکی ${refId} تایید شد. کد رهگیری: ${trackingCode}`
+      ).catch(() => {});
     }
   } catch {}
 

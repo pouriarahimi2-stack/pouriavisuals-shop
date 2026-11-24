@@ -4,6 +4,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
+import { useSiteInfo } from "@/context/SiteInfoContext";
+import { IRAN_PROVINCES_CITIES } from "@/lib/iranProvinces";
 
 export interface CrmCustomer {
   id: string;
@@ -14,6 +16,7 @@ export interface CrmCustomer {
   city?: string;
   address?: string;
   postal_code?: string;
+  wallet_balance?: number;
   lifecycle_stage: "lead" | "prospect" | "active" | "vip" | "at_risk";
   tags: string[];
   total_spent: number;
@@ -34,6 +37,7 @@ function cleanDigitsInput(val: string): string {
 }
 
 export default function AdminCustomers() {
+  const { siteInfo } = useSiteInfo();
   const [customers, setCustomers] = useState<CrmCustomer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -42,10 +46,18 @@ export default function AdminCustomers() {
   const [editingCustomer, setEditingCustomer] = useState<Partial<CrmCustomer> | null>(null);
   const [tagsInput, setTagsInput] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // مودال مدیریت کیف پول مشتری
+  const [walletModalCustomer, setWalletModalCustomer] = useState<CrmCustomer | null>(null);
+  const [walletActionType, setWalletActionType] = useState<"credit" | "debit">("credit");
+  const [walletAmountInput, setWalletAmountInput] = useState<number | "">(100000);
+  const [walletReasonInput, setWalletReasonInput] = useState("شارژ هدیه وفاداری / بازگشت وجه");
+  const [walletSendSms, setWalletSendSms] = useState(true);
+  const [savingWallet, setSavingWallet] = useState(false);
+
+  // مودال پیامک و کوپن پاداش
   const [isSmsModalOpen, setIsSmsModalOpen] = useState(false);
   const [activeSmsCustomer, setActiveSmsCustomer] = useState<CrmCustomer | null>(null);
-
-  // استیت‌های مدیریت دقیق کوپن پاداش در مودال پیامک
   const [rewardCouponCode, setRewardCouponCode] = useState("");
   const [rewardDiscountType, setRewardDiscountType] = useState<"percent" | "fixed">("percent");
   const [rewardDiscountValue, setRewardDiscountValue] = useState<number | "">(15);
@@ -59,6 +71,20 @@ export default function AdminCustomers() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  const sysSettings =
+    siteInfo?.settings ||
+    siteInfo?.system_settings ||
+    siteInfo?.homepage_layout_config?.system_settings ||
+    {};
+  const storeName = String(
+    sysSettings.site_name || siteInfo?.site_name || "آکسون کور"
+  ).trim();
+  const storeDomain = String(
+    sysSettings.canonicalBaseUrl || "https://axoncore.ir"
+  )
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/+$/, "");
 
   const showFeedback = (text: string, type: "success" | "error" = "success") => {
     setActionFeedback({ type, text });
@@ -96,9 +122,17 @@ export default function AdminCustomers() {
       )
       .subscribe();
 
+    const walletsCh = supabase
+      .channel("realtime-crm-wallets")
+      .on("postgres_changes", { event: "*", schema: "public", table: "customer_wallets" }, () =>
+        fetchCrmData()
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(crmCh);
       supabase.removeChannel(ordersCh);
+      supabase.removeChannel(walletsCh);
     };
   }, [fetchCrmData]);
 
@@ -108,8 +142,8 @@ export default function AdminCustomers() {
       full_name: "",
       phone: "",
       email: "",
-      province: "تهران",
-      city: "تهران",
+      province: "فارس",
+      city: "شیراز",
       address: "",
       postal_code: "",
       lifecycle_stage: "lead",
@@ -168,6 +202,55 @@ export default function AdminCustomers() {
     }
   };
 
+  const handleOpenWalletModal = (c: CrmCustomer) => {
+    soundEngine.playClick();
+    setWalletModalCustomer(c);
+    setWalletActionType("credit");
+    setWalletAmountInput(100000);
+    setWalletReasonInput("شارژ اعتبار هدیه / بازگشت وجه");
+    setWalletSendSms(true);
+  };
+
+  const handleSubmitWalletAdjustment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!walletModalCustomer || !walletAmountInput || Number(walletAmountInput) <= 0) return;
+
+    const signedDelta =
+      walletActionType === "credit"
+        ? Math.round(Number(walletAmountInput))
+        : -Math.round(Number(walletAmountInput));
+
+    soundEngine.playClick();
+    setSavingWallet(true);
+    try {
+      const res = await fetch("/api/crm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "adjust_wallet",
+          phone: walletModalCustomer.phone,
+          customerName: walletModalCustomer.full_name,
+          amountDelta: signedDelta,
+          reason: walletReasonInput.trim(),
+          sendSmsNotify: walletActionType === "credit" && walletSendSms,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        showFeedback(json.message, "success");
+        setWalletModalCustomer(null);
+        fetchCrmData();
+      } else {
+        showFeedback(json.message || "خطا در به‌روزرسانی کیف پول.", "error");
+      }
+    } catch {
+      showFeedback("خطا در برقراری ارتباط با سرور.", "error");
+    } finally {
+      setSavingWallet(false);
+    }
+  };
+
   const handleDeleteCustomer = async (c: CrmCustomer) => {
     const confirmMsg =
       "آیا از حذف پرونده «" + c.full_name + "» از سامانه CRM اطمینان دارید؟";
@@ -195,7 +278,6 @@ export default function AdminCustomers() {
     }
   };
 
-  // تنظیمات اولیه هنگام باز کردن مودال پیامک پاداش (تولید کد عددی سازگار با پترن پیامکی)
   const handleOpenRewardModal = (c: CrmCustomer) => {
     soundEngine.playClick();
     setActiveSmsCustomer(c);
@@ -207,12 +289,11 @@ export default function AdminCustomers() {
     setRewardExpireDays(7);
     setRewardMinPurchase(0);
     setSmsText(
-      `${c.full_name} عزیز، به پاس همراهی ارزشمند شما با آکسون کور، کد تخفیف اختصاصی ${initialCode} (۱۵٪ تخفیف ویژه) با اعتبار ۷ روزه تقدیم شما می‌گردد. axoncore.ir`
+      `${c.full_name} عزیز، به پاس همراهی ارزشمند شما با ${storeName}، کد تخفیف اختصاصی ${initialCode} (۱۵٪ تخفیف ویژه) با اعتبار ۷ روزه تقدیم شما می‌گردد. ${storeDomain}`
     );
     setIsSmsModalOpen(true);
   };
 
-  // به‌روزرسانی زنده متن پیامک با تغییر تنظیمات تخفیف
   useEffect(() => {
     if (!activeSmsCustomer || !isSmsModalOpen) return;
     const valText =
@@ -222,7 +303,7 @@ export default function AdminCustomers() {
 
     const days = Math.max(1, Number(rewardExpireDays || 7));
     setSmsText(
-      `${activeSmsCustomer.full_name} عزیز، به پاس همراهی ارزشمند شما با آکسون کور، کد تخفیف اختصاصی ${rewardCouponCode} (${valText}) با اعتبار ${days} روزه تقدیم شما می‌گردد. axoncore.ir`
+      `${activeSmsCustomer.full_name} عزیز، به پاس همراهی ارزشمند شما با ${storeName}، کد تخفیف اختصاصی ${rewardCouponCode} (${valText}) با اعتبار ${days} روزه تقدیم شما می‌گردد. ${storeDomain}`
     );
   }, [
     rewardCouponCode,
@@ -231,6 +312,8 @@ export default function AdminCustomers() {
     rewardExpireDays,
     activeSmsCustomer,
     isSmsModalOpen,
+    storeName,
+    storeDomain,
   ]);
 
   const handleSendSmsAndCreateCoupon = async (e: React.FormEvent) => {
@@ -253,7 +336,6 @@ export default function AdminCustomers() {
       const numericVal = Number(rewardDiscountValue);
       const cleanCoupon = rewardCouponCode.trim().toUpperCase();
 
-      // ۱. ثبت کوپن در دیتابیس با متد استاندارد ساخت کوپن
       const couponPayload = {
         code: cleanCoupon,
         discount_type: rewardDiscountType,
@@ -287,7 +369,6 @@ export default function AdminCustomers() {
         throw new Error(errJson.message || "خطا در ثبت کوپن در پایگاه داده.");
       }
 
-      // ۲. ارسال پیامک به مشتری همراه با کد کوپن
       const smsRes = await fetch("/api/sms/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -372,8 +453,18 @@ export default function AdminCustomers() {
   });
 
   const totalConfirmedLtv = customers.reduce((sum, c) => sum + Number(c.total_spent || 0), 0);
+  const totalWalletsLiability = customers.reduce(
+    (sum, c) => sum + Number(c.wallet_balance || 0),
+    0
+  );
   const totalVipCount = customers.filter((c) => c.lifecycle_stage === "vip").length;
   const totalActiveCount = customers.filter((c) => c.lifecycle_stage === "active").length;
+
+  const provinceList = Object.keys(IRAN_PROVINCES_CITIES).sort();
+  const activeEditProvince = editingCustomer?.province || "";
+  const availableCitiesForProvince = activeEditProvince
+    ? IRAN_PROVINCES_CITIES[activeEditProvince] || []
+    : [];
 
   return (
     <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
@@ -393,10 +484,10 @@ export default function AdminCustomers() {
       <div className="bg-[var(--modal-bg)] p-4 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-4">
         <div>
           <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>👥</span> سامانه هوشمند مدیریت ارتباط با مشتریان (Enterprise CRM)
+            <span>👥</span> سامانه هوشمند مدیریت ارتباط با مشتریان و کیف پول (CRM)
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            پایش چرخه عمر مشتریان، ارزش مادام‌العمر قطعی (LTV)، ثبت دستی و ارسال پیامک بازاریابی هدفمند
+            پایش چرخه عمر مشتریان، موجودی کیف پول، ارزش خرید قطعی (LTV) و ارسال پیامک بازاریابی هدفمند
           </p>
         </div>
 
@@ -428,13 +519,7 @@ export default function AdminCustomers() {
         <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm space-y-1">
           <span className="text-[var(--text-secondary)] font-bold">کل مخاطبان باشگاه:</span>
           <span className="text-lg font-black font-mono text-[var(--accent-blue)] block">
-            {customers.length} نفر
-          </span>
-        </div>
-        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm space-y-1">
-          <span className="text-[var(--text-secondary)] font-bold">مشتریان VIP الماس:</span>
-          <span className="text-lg font-black font-mono text-blue-400 block">
-            {totalVipCount} نفر
+            {customers.length} نفر ({totalVipCount} VIP)
           </span>
         </div>
         <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm space-y-1">
@@ -447,6 +532,12 @@ export default function AdminCustomers() {
           <span className="text-[var(--text-secondary)] font-bold">مجموع خرید قطعی (LTV):</span>
           <span className="text-lg font-black font-mono text-emerald-500 block">
             {totalConfirmedLtv.toLocaleString("fa-IR")} ت
+          </span>
+        </div>
+        <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm space-y-1">
+          <span className="text-[var(--text-secondary)] font-bold">مجموع اعتبار کیف پول مشتریان:</span>
+          <span className="text-lg font-black font-mono text-amber-400 block">
+            {totalWalletsLiability.toLocaleString("fa-IR")} ت
           </span>
         </div>
       </div>
@@ -504,15 +595,15 @@ export default function AdminCustomers() {
       </div>
 
       <div className="bg-[var(--modal-bg)] p-4 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl overflow-x-auto">
-        <table className="w-full text-right text-xs border-collapse min-w-[780px]">
+        <table className="w-full text-right text-xs border-collapse min-w-[860px]">
           <thead>
             <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black pb-3">
               <th className="p-3.5">نام و نام خانوادگی</th>
               <th className="p-3.5">شماره تماس</th>
               <th className="p-3.5 text-center">مرحله چرخه عمر</th>
-              <th className="p-3.5 text-center">تعداد فاکتور</th>
-              <th className="p-3.5">حجم کل خرید قطعی (LTV)</th>
-              <th className="p-3.5">موقعیت و شهر</th>
+              <th className="p-3.5">حجم خرید قطعی (LTV)</th>
+              <th className="p-3.5">موجودی کیف پول</th>
+              <th className="p-3.5">موقعیت مکانی</th>
               <th className="p-3.5 text-center">عملیات CRM</th>
             </tr>
           </thead>
@@ -530,87 +621,229 @@ export default function AdminCustomers() {
                 </td>
               </tr>
             ) : (
-              filtered.map((c) => (
-                <tr key={c.id} className="hover:bg-[var(--input-bg)]/60 transition">
-                  <td className="p-3.5">
-                    <div className="font-black text-[var(--text-primary)]">{c.full_name}</div>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {(c.tags || []).map((t, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-0.5 rounded-md bg-[var(--input-bg)] border border-[var(--card-border)] text-[9px] text-[var(--text-secondary)]"
+              filtered.map((c) => {
+                const wBal = Number(c.wallet_balance || 0);
+                const locLabel =
+                  c.province && c.city
+                    ? `${c.province}، ${c.city}`
+                    : c.province || c.city || "ثبت نشده";
+                return (
+                  <tr key={c.id} className="hover:bg-[var(--input-bg)]/60 transition">
+                    <td className="p-3.5">
+                      <div className="font-black text-[var(--text-primary)]">{c.full_name}</div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {(c.tags || []).map((t, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded-md bg-[var(--input-bg)] border border-[var(--card-border)] text-[9px] text-[var(--text-secondary)]"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td
+                      className="p-3.5 font-mono text-[var(--accent-blue)] font-bold"
+                      dir="ltr"
+                    >
+                      {c.phone}
+                    </td>
+                    <td className="p-3.5 text-center">{getStageBadge(c.lifecycle_stage)}</td>
+                    <td className="p-3.5 font-mono">
+                      <div className="font-black text-emerald-600 dark:text-emerald-400">
+                        {(c.total_spent || 0).toLocaleString("fa-IR")} ت ({c.order_count || 0} فاکتور)
+                      </div>
+                      {Number(c.pending_amount || 0) > 0 && (
+                        <div className="text-[10px] text-amber-500 mt-0.5">
+                          سبد معلق: {Number(c.pending_amount).toLocaleString("fa-IR")} ت
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-3.5 font-mono">
+                      <span
+                        className={
+                          "px-2.5 py-1 rounded-xl font-black " +
+                          (wBal > 0
+                            ? "bg-emerald-500/15 text-emerald-400"
+                            : "bg-[var(--input-bg)] text-[var(--text-secondary)]")
+                        }
+                      >
+                        {wBal.toLocaleString("fa-IR")} ت
+                      </span>
+                    </td>
+                    <td className="p-3.5 text-[var(--text-secondary)] font-medium">
+                      {locLabel}
+                    </td>
+                    <td className="p-3.5 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenWalletModal(c)}
+                          className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 font-bold text-[11px] transition cursor-pointer whitespace-nowrap"
+                          title="شارژ یا کسر اعتبار کیف پول مشتری"
                         >
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td
-                    className="p-3.5 font-mono text-[var(--accent-blue)] font-bold"
-                    dir="ltr"
-                  >
-                    {c.phone}
-                  </td>
-                  <td className="p-3.5 text-center">{getStageBadge(c.lifecycle_stage)}</td>
-                  <td className="p-3.5 font-mono text-center">
-                    <div className="font-black text-[var(--text-primary)]">
-                      {c.order_count || 0} فاکتور موفق
-                    </div>
-                    {Number(c.pending_orders_count || 0) > 0 && (
-                      <div className="text-[10px] text-amber-500 font-bold mt-0.5">
-                        ({c.pending_orders_count} در انتظار پرداخت)
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-3.5 font-mono">
-                    <div className="font-black text-emerald-600 dark:text-emerald-400">
-                      {(c.total_spent || 0).toLocaleString("fa-IR")} تومان
-                    </div>
-                    {Number(c.pending_amount || 0) > 0 && (
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                        سبد معلق: {Number(c.pending_amount).toLocaleString("fa-IR")} ت
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-3.5 text-[var(--text-secondary)] font-medium">
-                    {c.province || "تهران"}، {c.city || "تهران"}
-                  </td>
-                  <td className="p-3.5 text-center">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenRewardModal(c)}
-                        className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 hover:bg-amber-500 hover:text-slate-950 font-bold text-[11px] transition cursor-pointer whitespace-nowrap"
-                        title="ارسال پیامک و کد تخفیف"
-                      >
-                        🎁 پیامک / کوپن
-                      </button>
+                          👛 کیف پول
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEditCustomer(c)}
-                        className="px-2.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold text-[11px] transition cursor-pointer whitespace-nowrap"
-                        title="ویرایش پرونده"
-                      >
-                        ✏️ پرونده
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenRewardModal(c)}
+                          className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 hover:bg-amber-500 hover:text-slate-950 font-bold text-[11px] transition cursor-pointer whitespace-nowrap"
+                          title="ارسال پیامک و کد تخفیف"
+                        >
+                          🎁 کوپن
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCustomer(c)}
-                        className="p-1.5 px-2 rounded-xl bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-500 border border-rose-500/20 text-[11px] transition cursor-pointer"
-                        title="حذف از CRM"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditCustomer(c)}
+                          className="px-2.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold text-[11px] transition cursor-pointer whitespace-nowrap"
+                          title="ویرایش پرونده"
+                        >
+                          ✏️ پرونده
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCustomer(c)}
+                          className="p-1.5 px-2 rounded-xl bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-500 border border-rose-500/20 text-[11px] transition cursor-pointer"
+                          title="حذف از CRM"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
+
+      {/* مودال شارژ یا تعدیل اعتبار کیف پول مشتری */}
+      {walletModalCustomer && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !savingWallet)
+              setWalletModalCustomer(null);
+          }}
+        >
+          <div className="max-w-md w-full p-6 rounded-3xl bg-[var(--modal-bg)] border border-emerald-500/40 space-y-5 text-xs text-[var(--text-primary)] shadow-2xl">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <div>
+                <h3 className="font-black text-sm text-emerald-400">
+                  👛 مدیریت کیف پول: {walletModalCustomer.full_name}
+                </h3>
+                <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                  موجودی فعلی:{" "}
+                  <strong className="font-mono text-emerald-400">
+                    {Number(walletModalCustomer.wallet_balance || 0).toLocaleString("fa-IR")} تومان
+                  </strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWalletModalCustomer(null)}
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitWalletAdjustment} className="space-y-4">
+              <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-black">
+                <button
+                  type="button"
+                  onClick={() => setWalletActionType("credit")}
+                  className={
+                    "py-2.5 rounded-xl transition cursor-pointer " +
+                    (walletActionType === "credit"
+                      ? "bg-emerald-600 text-white shadow"
+                      : "text-[var(--text-secondary)]")
+                  }
+                >
+                  ➕ افزایش اعتبار (شارژ)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWalletActionType("debit")}
+                  className={
+                    "py-2.5 rounded-xl transition cursor-pointer " +
+                    (walletActionType === "debit"
+                      ? "bg-rose-600 text-white shadow"
+                      : "text-[var(--text-secondary)]")
+                  }
+                >
+                  ➖ کسر اعتبار
+                </button>
+              </div>
+
+              <div>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                  مبلغ (تومان) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={1000}
+                  step={1000}
+                  value={walletAmountInput}
+                  onChange={(e) =>
+                    setWalletAmountInput(
+                      e.target.value === "" ? "" : Number(e.target.value)
+                    )
+                  }
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black text-center text-sm outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                  شرح / بابت تراکنش:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={walletReasonInput}
+                  onChange={(e) => setWalletReasonInput(e.target.value)}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+                />
+              </div>
+
+              {walletActionType === "credit" && (
+                <label className="flex items-center gap-2 font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={walletSendSms}
+                    onChange={(e) => setWalletSendSms(e.target.checked)}
+                    className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+                  />
+                  <span>ارسال پیامک اطلاع‌رسانی شارژ کیف پول به مشتری</span>
+                </label>
+              )}
+
+              <button
+                type="submit"
+                disabled={savingWallet}
+                className={
+                  "w-full py-3.5 rounded-2xl text-white font-black text-xs shadow-xl cursor-pointer transition disabled:opacity-50 " +
+                  (walletActionType === "credit"
+                    ? "bg-emerald-600 hover:bg-emerald-500"
+                    : "bg-rose-600 hover:bg-rose-500")
+                }
+              >
+                {savingWallet
+                  ? "در حال اعمال..."
+                  : walletActionType === "credit"
+                  ? "✓ تایید و شارژ کیف پول مشتری"
+                  : "✓ تایید و کسر از کیف پول"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* مودال ثبت و ویرایش کامل پرونده مشتری */}
       {isModalOpen && editingCustomer && (
@@ -713,28 +946,57 @@ export default function AdminCustomers() {
                   <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
                     استان
                   </label>
-                  <input
-                    type="text"
-                    value={editingCustomer.province || "تهران"}
-                    onChange={(e) =>
-                      setEditingCustomer({ ...editingCustomer, province: e.target.value })
-                    }
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none"
-                  />
+                  <select
+                    value={activeEditProvince}
+                    onChange={(e) => {
+                      const nextProv = e.target.value;
+                      const nextCities = nextProv ? IRAN_PROVINCES_CITIES[nextProv] || [] : [];
+                      setEditingCustomer({
+                        ...editingCustomer,
+                        province: nextProv,
+                        city: nextCities[0] || "",
+                      });
+                    }}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+                  >
+                    <option value="">-- انتخاب استان --</option>
+                    {provinceList.map((prov) => (
+                      <option key={prov} value={prov}>
+                        {prov}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
                   <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
                     شهرستان / شهر
                   </label>
-                  <input
-                    type="text"
-                    value={editingCustomer.city || "تهران"}
-                    onChange={(e) =>
-                      setEditingCustomer({ ...editingCustomer, city: e.target.value })
-                    }
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none"
-                  />
+                  {availableCitiesForProvince.length > 0 ? (
+                    <select
+                      value={editingCustomer.city || ""}
+                      onChange={(e) =>
+                        setEditingCustomer({ ...editingCustomer, city: e.target.value })
+                      }
+                      className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+                    >
+                      {availableCitiesForProvince.map((ct) => (
+                        <option key={ct} value={ct}>
+                          {ct}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={editingCustomer.city || ""}
+                      onChange={(e) =>
+                        setEditingCustomer({ ...editingCustomer, city: e.target.value })
+                      }
+                      placeholder="نام شهر..."
+                      className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none"
+                    />
+                  )}
                 </div>
 
                 <div>
@@ -762,7 +1024,7 @@ export default function AdminCustomers() {
                   </label>
                   <input
                     type="text"
-                    placeholder="مثلاً: خریدار وفادار، همکار، شیراز"
+                    placeholder="مثلاً: خریدار وفادار، همکار"
                     value={tagsInput}
                     onChange={(e) => setTagsInput(e.target.value)}
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none"

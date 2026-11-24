@@ -1,11 +1,16 @@
+// File Path: components/admin/SmartImporterUI.tsx
 "use client";
 
 import { useState } from "react";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function SmartImporterUI() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [message, setMessage] = useState<{
+    text: string;
+    type: "success" | "error";
+  } | null>(null);
   const [profitMargin, setProfitMargin] = useState<number>(20);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -17,10 +22,14 @@ export default function SmartImporterUI() {
 
   const handleUpload = async () => {
     if (!file) {
-      setMessage({ text: "لطفاً ابتدا یک فایل (result.json) انتخاب کنید.", type: "error" });
+      setMessage({
+        text: "لطفاً ابتدا یک فایل (result.json) انتخاب کنید.",
+        type: "error",
+      });
       return;
     }
 
+    soundEngine.playClick();
     setLoading(true);
     setMessage({ text: "در حال خواندن و پردازش فایل...", type: "success" });
 
@@ -29,11 +38,12 @@ export default function SmartImporterUI() {
       try {
         const fileContent = event.target?.result as string;
         const parsedData = JSON.parse(fileContent);
-        
-        // اضافه کردن حاشیه سود به دیتای ارسالی
         parsedData.profitMargin = profitMargin;
 
-        setMessage({ text: "در حال ارتباط با هسته هوشمند ایمپورت...", type: "success" });
+        setMessage({
+          text: "در حال ارتباط با هسته هوشمند ایمپورت...",
+          type: "success",
+        });
 
         const response = await fetch("/api/admin/import-products", {
           method: "POST",
@@ -44,13 +54,20 @@ export default function SmartImporterUI() {
         const result = await response.json();
 
         if (response.ok && result.success) {
+          soundEngine.playSuccess();
           setMessage({ text: "✅ " + result.message, type: "success" });
-          setFile(null); // ریست کردن فایل
+          setFile(null);
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("products_updated"));
+          }
         } else {
           setMessage({ text: "❌ خطا: " + result.message, type: "error" });
         }
-      } catch (err: any) {
-        setMessage({ text: "❌ خطای پردازش فایل: لطفاً مطمئن شوید فایل انتخابی JSON معتبر تلگرام است.", type: "error" });
+      } catch {
+        setMessage({
+          text: "❌ خطای پردازش فایل: لطفاً مطمئن شوید فایل انتخابی JSON معتبر تلگرام است.",
+          type: "error",
+        });
       } finally {
         setLoading(false);
       }
@@ -65,52 +82,69 @@ export default function SmartImporterUI() {
   };
 
   return (
-    <div className="p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-      <h2 className="text-xl font-bold mb-2 text-gray-800 dark:text-white">ایمپورت هوشمند کاتالوگ (Universal Importer)</h2>
-      <p className="text-sm text-gray-500 mb-6">
-        فایل <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">result.json</code> استخراج شده از تلگرام را آپلود کنید تا سیستم به صورت خودکار کالاها، قیمت‌ها و تصاویر را متصل کند.
-      </p>
+    <div
+      className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl text-[var(--text-primary)] font-sans space-y-5"
+      dir="rtl"
+    >
+      <div>
+        <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)]">
+          📥 ایمپورت هوشمند کاتالوگ (Universal JSON Importer)
+        </h2>
+        <p className="text-xs text-[var(--text-secondary)] mt-1">
+          فایل{" "}
+          <code className="bg-[var(--input-bg)] px-1.5 py-0.5 rounded font-mono">
+            result.json
+          </code>{" "}
+          استخراج‌شده از تلگرام را آپلود کنید تا کالاها، قیمت‌ها و تصاویر متصل شوند.
+        </p>
+      </div>
 
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">فایل دیتا (JSON)</label>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+        <div className="md:col-span-2">
+          <label className="block font-bold text-[var(--text-secondary)] mb-1.5">
+            فایل دیتا (JSON):
+          </label>
           <input
             type="file"
             accept=".json"
             onChange={handleFileChange}
             disabled={loading}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-white"
+            className="w-full p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs file:ml-3 file:py-1.5 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-[var(--accent-blue)] file:text-white cursor-pointer"
           />
         </div>
-        <div className="w-full md:w-1/3">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">حاشیه سود (درصد)</label>
+        <div>
+          <label className="block font-bold text-[var(--text-secondary)] mb-1.5">
+            حاشیه سود (درصد):
+          </label>
           <input
             type="number"
+            min={0}
+            max={300}
             value={profitMargin}
             onChange={(e) => setProfitMargin(Number(e.target.value))}
             disabled={loading}
-            className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-4 py-2"
+            className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none focus:border-[var(--accent-blue)]"
           />
         </div>
       </div>
 
       <button
+        type="button"
         onClick={handleUpload}
         disabled={loading || !file}
-        className="w-full md:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full md:w-auto px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 text-white font-black text-xs transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
       >
-        {loading ? (
-          <>
-            <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            در حال پردازش...
-          </>
-        ) : (
-          "شروع ایمپورت هوشمند"
-        )}
+        {loading ? "⏳ در حال پردازش..." : "🚀 شروع ایمپورت هوشمند"}
       </button>
 
       {message && (
-        <div className={`mt-4 p-4 rounded-lg ${message.type === 'success' ? 'bg-green-50 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-50 text-red-800 dark:bg-red-900/30 dark:text-red-400'}`}>
+        <div
+          className={`p-4 rounded-2xl text-xs font-bold ${
+            message.type === "success"
+              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-500"
+              : "bg-rose-500/15 border border-rose-500/30 text-rose-500"
+          }`}
+        >
           {message.text}
         </div>
       )}

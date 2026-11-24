@@ -3,17 +3,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { getMasterSiteInfoRow, saveMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import { sendTextSMS } from "@/lib/otpService";
 
 export const dynamic = "force-dynamic";
 
 const VIP_THRESHOLD_TOMAN = 50_000_000;
 
 function normalizeIranPhone(raw: any): string {
-  return String(raw || "")
+  const digits = String(raw || "")
     .trim()
     .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
     .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
     .replace(/\D/g, "");
+  if (digits.startsWith("98") && digits.length === 12) return "0" + digits.slice(2);
+  if (digits.startsWith("9") && digits.length === 10) return "0" + digits;
+  return digits;
 }
 
 function isOrderCancelled(o: { status?: string; payment_status?: string }) {
@@ -36,7 +40,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
-    const [crmRes, ordersRes, siteRow] = await Promise.all([
+    const [crmRes, ordersRes, walletsRes, siteRow] = await Promise.all([
       supabaseAdmin.from("crm_customers").select("*").order("created_at", { ascending: false }),
       supabaseAdmin
         .from("orders")
@@ -44,11 +48,18 @@ export async function GET(req: NextRequest) {
           "id, order_number, customer_name, phone, customer_phone, province, city, address, customer_address, postal_code, final_amount, total_amount, created_at, status, payment_status"
         )
         .order("created_at", { ascending: false }),
+      supabaseAdmin.from("customer_wallets").select("customer_phone, balance"),
       getMasterSiteInfoRow(),
     ]);
 
     const rawCrm = crmRes.data || [];
     const orders = ordersRes.data || [];
+    const walletMap = new Map<string, number>();
+    (walletsRes.data || []).forEach((w: any) => {
+      const ph = normalizeIranPhone(w.customer_phone);
+      if (ph) walletMap.set(ph, Math.max(0, Number(w.balance || 0)));
+    });
+
     const archivedPhones = new Set<string>(
       Array.isArray(siteRow?.homepage_layout_config?.crm_archived_phones)
         ? siteRow.homepage_layout_config.crm_archived_phones
@@ -95,8 +106,8 @@ export async function GET(req: NextRequest) {
           totalAttemptedOrders: 1,
           lastDate: o.created_at || new Date().toISOString(),
           name: String(o.customer_name || "مشتری گرامی").trim(),
-          province: ordProvince || "تهران",
-          city: ordCity || "تهران",
+          province: ordProvince,
+          city: ordCity,
           address: ordAddress,
           postalCode: ordPostal,
         });
@@ -112,16 +123,8 @@ export async function GET(req: NextRequest) {
         if (o.created_at && o.created_at > existing.lastDate) {
           existing.lastDate = o.created_at;
         }
-        if (
-          (!existing.province || existing.province === "تهران") &&
-          ordProvince &&
-          ordProvince !== "تهران"
-        ) {
-          existing.province = ordProvince;
-        }
-        if ((!existing.city || existing.city === "تهران") && ordCity && ordCity !== "تهران") {
-          existing.city = ordCity;
-        }
+        if (!existing.province && ordProvince) existing.province = ordProvince;
+        if (!existing.city && ordCity) existing.city = ordCity;
         if (!existing.address && ordAddress) existing.address = ordAddress;
         if (!existing.postalCode && ordPostal) existing.postalCode = ordPostal;
       }
@@ -133,7 +136,6 @@ export async function GET(req: NextRequest) {
       const phone = normalizeIranPhone(c.phone);
       const ordStat = phone ? orderStatsByPhone.get(phone) : undefined;
 
-      // اگر سفارش واقعی در جدول orders ثبت شده، آمار واقعی فاکتورهای پرداخت‌شده ملاک است
       const paidOrdersCount = ordStat
         ? ordStat.paidCount
         : Math.max(0, Number(c.order_count || c.total_orders || 0));
@@ -152,12 +154,8 @@ export async function GET(req: NextRequest) {
         stage = paidOrdersCount > 0 ? "active" : pendingOrdersCount > 0 ? "prospect" : "lead";
       }
 
-      const resolvedProvince =
-        c.province && c.province !== "تهران"
-          ? c.province
-          : ordStat?.province || c.province || "تهران";
-      const resolvedCity =
-        c.city && c.city !== "تهران" ? c.city : ordStat?.city || c.city || "تهران";
+      const resolvedProvince = String(c.province || ordStat?.province || "").trim();
+      const resolvedCity = String(c.city || ordStat?.city || "").trim();
 
       const baseTags: string[] =
         Array.isArray(c.tags) && c.tags.length > 0 ? [...c.tags] : ["مشتری فروشگاه"];
@@ -170,6 +168,7 @@ export async function GET(req: NextRequest) {
         id: String(c.id),
         full_name: c.full_name || (ordStat ? ordStat.name : "مشتری گرامی"),
         phone: phone || "---",
+        wallet_balance: phone ? walletMap.get(phone) || 0 : 0,
         order_count: paidOrdersCount,
         total_orders: paidOrdersCount,
         total_spent: confirmedSpent,
@@ -200,6 +199,7 @@ export async function GET(req: NextRequest) {
           id: "crm_" + phone,
           full_name: stat.name,
           phone,
+          wallet_balance: walletMap.get(phone) || 0,
           order_count: stat.paidCount,
           total_orders: stat.paidCount,
           total_spent: stat.paidSpent,
@@ -212,8 +212,8 @@ export async function GET(req: NextRequest) {
             : stat.paidCount > 0
             ? ["خریدار فعال"]
             : ["در انتظار تکمیل پرداخت"],
-          province: stat.province || "تهران",
-          city: stat.city || "تهران",
+          province: stat.province || "",
+          city: stat.city || "",
           address: stat.address || "",
           postal_code: stat.postalCode || "",
           created_at: stat.lastDate,
@@ -240,6 +240,81 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+
+    // اکشن اختصاصی شارژ یا تعدیل اعتبار کیف پول مشتری توسط مدیر
+    if (body.action === "adjust_wallet") {
+      const cleanPhone = normalizeIranPhone(body.phone);
+      const amountDelta = Math.round(Number(body.amountDelta || 0));
+      const reason = String(body.reason || "تعدیل اعتبار کیف پول توسط مدیریت").trim();
+      const sendSmsNotify = Boolean(body.sendSmsNotify);
+      const customerName = String(body.customerName || "مشتری گرامی").trim();
+
+      if (!/^09\d{9}$/.test(cleanPhone) || amountDelta === 0) {
+        return NextResponse.json(
+          { success: false, message: "شماره موبایل معتبر و مبلغ غیرصفر الزامی است." },
+          { status: 400 }
+        );
+      }
+
+      const { data: existingWallet } = await supabaseAdmin
+        .from("customer_wallets")
+        .select("balance")
+        .eq("customer_phone", cleanPhone)
+        .maybeSingle();
+
+      const prevBalance = Math.max(0, Number(existingWallet?.balance || 0));
+      const nextBalance = Math.max(0, prevBalance + amountDelta);
+
+      const { error: walletErr } = await supabaseAdmin
+        .from("customer_wallets")
+        .upsert(
+          [
+            {
+              customer_phone: cleanPhone,
+              balance: nextBalance,
+              updated_at: new Date().toISOString(),
+            },
+          ],
+          { onConflict: "customer_phone" }
+        );
+
+      if (walletErr) throw walletErr;
+
+      try {
+        await supabaseAdmin.from("admin_audit_logs").insert([
+          {
+            action: "ADMIN_WALLET_ADJUSTMENT",
+            user_id: cleanPhone,
+            details: {
+              customerName,
+              prevBalance,
+              amountDelta,
+              nextBalance,
+              reason,
+            },
+            ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
+            severity: "info",
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      } catch {}
+
+      if (sendSmsNotify && amountDelta > 0) {
+        try {
+          await sendTextSMS(
+            cleanPhone,
+            `${customerName} عزیز، کیف پول شما به مبلغ ${amountDelta.toLocaleString("fa-IR")} تومان شارژ شد. موجودی فعلی: ${nextBalance.toLocaleString("fa-IR")} تومان.`
+          );
+        } catch {}
+      }
+
+      return NextResponse.json({
+        success: true,
+        newBalance: nextBalance,
+        message: `✓ اعتبار کیف پول ${customerName} با موفقیت به‌روزرسانی شد (موجودی جدید: ${nextBalance.toLocaleString("fa-IR")} تومان).`,
+      });
+    }
+
     const fullName = String(body.full_name || "").trim();
     const cleanPhone = normalizeIranPhone(body.phone);
 
@@ -258,8 +333,8 @@ export async function POST(req: NextRequest) {
       full_name: fullName,
       phone: cleanPhone,
       email: body.email ? String(body.email).trim() : null,
-      province: body.province ? String(body.province).trim() : "تهران",
-      city: body.city ? String(body.city).trim() : "تهران",
+      province: body.province ? String(body.province).trim() : "",
+      city: body.city ? String(body.city).trim() : "",
       address: body.address ? String(body.address).trim() : null,
       postal_code: body.postal_code ? normalizeIranPhone(body.postal_code) : null,
       lifecycle_stage: body.lifecycle_stage || "lead",
@@ -271,7 +346,6 @@ export async function POST(req: NextRequest) {
     if (body.total_spent !== undefined) payload.total_spent = Math.max(0, Number(body.total_spent));
     if (body.order_count !== undefined) payload.order_count = Math.max(0, Number(body.order_count));
 
-    // خارج کردن شماره از لیست آرشیو در صورت ثبت مجدد
     try {
       const siteRow = await getMasterSiteInfoRow();
       const layoutCfg = siteRow?.homepage_layout_config || {};

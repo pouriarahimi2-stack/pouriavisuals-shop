@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/formatters";
 import { soundEngine } from "@/lib/soundEngine";
 import AddToCartButton from "@/components/AddToCartButton";
 import { supabase } from "@/lib/supabase";
+import { useCompare } from "@/context/CompareContext";
 
 interface ProductCardProps {
   product: {
@@ -20,12 +21,14 @@ interface ProductCardProps {
     image_url?: string | null;
     images?: string[];
     category?: string;
+    brand?: string;
     stock?: number;
     warranty?: string;
+    specs?: Record<string, any>;
+    specs_jsonb?: Record<string, any>;
   };
 }
 
-// کش اشتراکی در سطح ماژول برای جلوگیری از ارسال ۲۴ درخواست تکراری و ۲۴ کانال WebSocket هم‌زمان
 let sharedCouponsCache: any[] | null = null;
 let sharedCouponsPromise: Promise<any[]> | null = null;
 let sharedChannelRefCount = 0;
@@ -106,6 +109,9 @@ function getImg(p: ProductCardProps["product"]): string {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
+  const { isInCompare, toggleCompareProduct } = useCompare();
+  const compared = isInCompare(product.id);
+
   const title = product.title || product.name || "کالای دیجیتال";
   const basePrice = Number(product.price || 0);
   const discountVal = product.discount_price || product.discountPrice;
@@ -356,21 +362,21 @@ export default function ProductCard({ product }: ProductCardProps) {
       </Link>
 
       <div
-        className="px-4 pb-4 pt-2 relative z-10"
+        className="px-3.5 sm:px-4 pb-4 pt-2 relative z-10"
         style={{ borderTop: "1px solid var(--glass-border)" }}
       >
-        <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center justify-between gap-1.5 mb-2.5">
           {discPct > 0 ? (
-            <div className="space-y-0.5">
+            <div className="space-y-0.5 min-w-0">
               <span
-                className="line-through text-[9px] sm:text-[10px] block"
+                className="line-through text-[9px] sm:text-[10px] block truncate"
                 style={{ color: "var(--text-secondary)" }}
                 suppressHydrationWarning
               >
                 {formatPrice(basePrice)} ت
               </span>
               <span
-                className="font-black text-sm sm:text-base block"
+                className="font-black text-xs sm:text-base block truncate"
                 style={{ color: "var(--accent-blue)" }}
                 suppressHydrationWarning
               >
@@ -379,14 +385,39 @@ export default function ProductCard({ product }: ProductCardProps) {
             </div>
           ) : (
             <span
-              className="font-black text-sm sm:text-base"
+              className="font-black text-xs sm:text-base truncate"
               style={{ color: "var(--text-primary)" }}
               suppressHydrationWarning
             >
               {formatPrice(basePrice)} ت
             </span>
           )}
+
+          {/* دکمه مقایسه فنی کالا */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleCompareProduct({ ...product, image: imgSrc });
+            }}
+            className={
+              "px-2 sm:px-2.5 py-1 rounded-xl text-[9px] sm:text-[10px] font-black transition cursor-pointer shrink-0 flex items-center gap-1 border " +
+              (compared
+                ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-sm"
+                : "bg-[var(--input-bg)] text-[var(--text-secondary)] border-[var(--card-border)] hover:border-[var(--accent-blue)] hover:text-[var(--accent-blue)]")
+            }
+            title={
+              compared
+                ? "حذف از لیست مقایسه فنی"
+                : "افزودن به جدول مقایسه فنی کالاها"
+            }
+          >
+            <span>{compared ? "✓" : "⚖️"}</span>
+            <span>{compared ? "در مقایسه" : "مقایسه"}</span>
+          </button>
         </div>
+
         <AddToCartButton
           product={{ ...product, image: imgSrc }}
           showCounter={false}

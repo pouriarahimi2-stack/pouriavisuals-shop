@@ -12,6 +12,7 @@ import ThemeProvider from "@/components/ThemeProvider";
 import ClientLayoutEnhancer from "@/components/ClientLayoutEnhancer";
 import VpnGuardModal from "@/components/VpnGuardModal";
 import { useSiteInfo } from "@/context/SiteInfoContext";
+import { CompareProvider } from "@/context/CompareContext";
 import MaintenancePage from "@/app/maintenance/page";
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
@@ -54,7 +55,6 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
   const allowAdminBypass =
     sys.maintenanceAdminBypass !== false && isVerifiedAdmin;
 
-  // در زمان فعال بودن حالت تعمیرات، تمام صفحات فروشگاه از جمله /login و /account برای کاربران عادی قفل می‌شوند
   const isMaintenanceActive =
     !isAdminRoute &&
     pathname !== "/maintenance" &&
@@ -65,30 +65,32 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
 
   return (
     <ThemeProvider>
-      <ClientLayoutEnhancer />
-      <VpnGuardModal />
-      <div
-        className="min-h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300"
-        style={{ overflowX: "hidden" }}
-      >
-        {!isAdminRoute && <Header />}
-        <main
-          className={[
-            "flex-1 w-full",
-            !isAdminRoute ? "pt-20 sm:pt-24 md:pt-28 pb-20 md:pb-8" : "",
-          ].join(" ")}
+      <CompareProvider>
+        <ClientLayoutEnhancer />
+        <VpnGuardModal />
+        <div
+          className="min-h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300"
+          style={{ overflowX: "hidden" }}
         >
-          {children}
-        </main>
-        {!isAdminRoute && (
-          <>
-            <Footer />
-            <ContactDock />
-            <CartDrawer />
-            <MobileBottomNav />
-          </>
-        )}
-      </div>
+          {!isAdminRoute && <Header />}
+          <main
+            className={[
+              "flex-1 w-full",
+              !isAdminRoute ? "pt-20 sm:pt-24 md:pt-28 pb-20 md:pb-8" : "",
+            ].join(" ")}
+          >
+            {children}
+          </main>
+          {!isAdminRoute && (
+            <>
+              <Footer />
+              <ContactDock />
+              <CartDrawer />
+              <MobileBottomNav />
+            </>
+          )}
+        </div>
+      </CompareProvider>
     </ThemeProvider>
   );
 }

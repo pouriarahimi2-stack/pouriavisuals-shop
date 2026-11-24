@@ -14,10 +14,12 @@ import { Search, Check, RotateCcw } from "lucide-react";
 import ProductCard from "@/components/ProductCard";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
+import { useCompare } from "@/context/CompareContext";
 
 function ProductsCatalogContent() {
   const searchParams = useSearchParams();
   const urlCategoryParam = searchParams.get("category") || "";
+  const { compareItems, openCompareModal } = useCompare();
 
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -222,18 +224,30 @@ function ProductsCatalogContent() {
             </span>
           </div>
 
-          <div className="relative w-full md:w-80">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="جستجوی نام کالا، برند یا مشخصه..."
-              className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] font-bold shadow-sm"
-            />
-            <Search
-              size={16}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-            />
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            {compareItems.length > 0 && (
+              <button
+                type="button"
+                onClick={openCompareModal}
+                className="px-4 py-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black shadow-md hover:opacity-90 transition cursor-pointer shrink-0"
+              >
+                ⚖️ جدول مقایسه ({compareItems.length.toLocaleString("fa-IR")})
+              </button>
+            )}
+
+            <div className="relative flex-1 md:w-80">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="جستجوی نام کالا، برند یا مشخصه..."
+                className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] font-bold shadow-sm"
+              />
+              <Search
+                size={16}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+            </div>
           </div>
         </div>
 

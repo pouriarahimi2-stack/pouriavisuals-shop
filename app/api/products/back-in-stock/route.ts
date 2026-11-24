@@ -3,10 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   registerBackInStockAlert,
   triggerBackInStockNotifications,
+  BackInStockAlertItem,
 } from "@/lib/backInStockService";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { rateLimiter } from "@/lib/rateLimiter";
-import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import {
+  getMasterSiteInfoRow,
+  saveMasterSiteInfoRow,
+} from "@/lib/siteInfoPersistence";
 
 export const dynamic = "force-dynamic";
 
@@ -21,17 +25,20 @@ export async function GET(req: NextRequest) {
     }
 
     const siteRow = await getMasterSiteInfoRow();
-    const alerts = Array.isArray(
+    const alerts: BackInStockAlertItem[] = Array.isArray(
       siteRow?.homepage_layout_config?.back_in_stock_alerts
     )
       ? siteRow.homepage_layout_config.back_in_stock_alerts
       : [];
 
-    return NextResponse.json({
-      success: true,
-      count: alerts.length,
-      alerts,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        count: alerts.length,
+        alerts,
+      },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
   } catch (err: any) {
     return NextResponse.json(
       { success: false, message: err.message },
@@ -79,7 +86,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         sentCount: sent,
-        message: `✓ پیامک موجودی برای ${sent} کاربر ارسال شد.`,
+        message: `✓ پیامک اطلاع‌رسانی موجودی برای ${sent} کاربر ارسال شد.`,
       });
     }
 
@@ -97,6 +104,56 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     return NextResponse.json(
       { success: false, message: err.message || "خطا در ثبت اطلاع‌رسانی." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json(
+        { success: false, message: "دسترسی غیرمجاز." },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = String(searchParams.get("id") || "").trim();
+    if (!id) {
+      return NextResponse.json(
+        { success: false, message: "شناسه درخواست الزامی است." },
+        { status: 400 }
+      );
+    }
+
+    const siteRow = await getMasterSiteInfoRow();
+    const layoutCfg = siteRow?.homepage_layout_config || {};
+    const alerts: BackInStockAlertItem[] = Array.isArray(
+      layoutCfg.back_in_stock_alerts
+    )
+      ? layoutCfg.back_in_stock_alerts
+      : [];
+
+    const nextAlerts = alerts.filter((a) => String(a.id) !== id);
+
+    await saveMasterSiteInfoRow(
+      siteRow,
+      {
+        ...layoutCfg,
+        back_in_stock_alerts: nextAlerts,
+      },
+      {}
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: "✓ درخواست اطلاع‌رسانی با موفقیت حذف شد.",
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, message: err.message || "خطا در حذف درخواست." },
       { status: 500 }
     );
   }

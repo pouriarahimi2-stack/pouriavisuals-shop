@@ -1,7 +1,7 @@
 // File Path: components/AdminInventoryManager.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
 import OrderManager from "@/components/admin/OrderManager";
@@ -30,16 +30,32 @@ export interface ProductFinancialRow {
   shipping_type?: "post" | "tipax" | "both";
 }
 
+export interface BackInStockWaiterItem {
+  id: string;
+  productId: string;
+  productTitle: string;
+  phone: string;
+  createdAt: string;
+}
+
 export function AdminInventoryManager({
   defaultSubTab = "accounting",
 }: {
-  defaultSubTab?: "accounting" | "orders" | "reports";
+  defaultSubTab?: "accounting" | "orders" | "reports" | "alerts";
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<"accounting" | "orders" | "reports">(
-    defaultSubTab
-  );
+  const [activeSubTab, setActiveSubTab] = useState<
+    "accounting" | "orders" | "reports" | "alerts"
+  >(defaultSubTab);
   const [items, setItems] = useState<ProductFinancialRow[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
+  const [backInStockAlerts, setBackInStockAlerts] = useState<
+    BackInStockWaiterItem[]
+  >([]);
+  const [alertSearch, setAlertSearch] = useState("");
+  const [sendingAlertForProdId, setSendingAlertForProdId] = useState<
+    string | null
+  >(null);
+
   const [summary, setSummary] = useState({
     totalInventoryAssets: 0,
     totalMonthlySalesGross: 0,
@@ -50,9 +66,10 @@ export function AdminInventoryManager({
   });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(
-    null
-  );
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   // فرم ورود / کسر موجودی انبار
   const [selectedProdId, setSelectedProdId] = useState("");
@@ -70,7 +87,8 @@ export function AdminInventoryManager({
   }>({ isOpen: false, product: null, delta: 0 });
 
   // مودال ویرایش ۱۰۰٪ کامل کالا در حسابداری و انبار
-  const [editingProduct, setEditingProduct] = useState<ProductFinancialRow | null>(null);
+  const [editingProduct, setEditingProduct] =
+    useState<ProductFinancialRow | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
   const notify = (text: string, type: "success" | "error" = "success") => {
@@ -78,9 +96,26 @@ export function AdminInventoryManager({
     setTimeout(() => setFeedback(null), 4000);
   };
 
+  const fetchBackInStockAlerts = useCallback(async () => {
+    try {
+      const res = await fetch(
+        "/api/products/back-in-stock?t=" + Date.now(),
+        { cache: "no-store" }
+      );
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.alerts)) {
+          setBackInStockAlerts(json.alerts);
+        }
+      }
+    } catch {}
+  }, []);
+
   const fetchAccountingData = useCallback(async () => {
     try {
-      const res = await fetch("/api/accounting?t=" + Date.now(), { cache: "no-store" });
+      const res = await fetch("/api/accounting?t=" + Date.now(), {
+        cache: "no-store",
+      });
       const json = await res.json();
       if (json.success) {
         const list: ProductFinancialRow[] = json.productFinancials || [];
@@ -89,7 +124,10 @@ export function AdminInventoryManager({
         setLogs(json.inventoryLogs || []);
 
         setSelectedProdId((prevId) => {
-          const targetId = prevId && list.some((x) => x.id === prevId) ? prevId : list[0]?.id || "";
+          const targetId =
+            prevId && list.some((x) => x.id === prevId)
+              ? prevId
+              : list[0]?.id || "";
           const found = list.find((x) => x.id === targetId);
           if (found) {
             setPurchaseCostInput(found.purchasePrice ?? "");
@@ -106,34 +144,60 @@ export function AdminInventoryManager({
 
   useEffect(() => {
     fetchAccountingData();
+    fetchBackInStockAlerts();
 
     const chProds = supabase
       .channel("realtime-accounting-products")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
-        fetchAccountingData();
-      })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        () => {
+          fetchAccountingData();
+          fetchBackInStockAlerts();
+        }
+      )
       .subscribe();
 
     const chOrders = supabase
       .channel("realtime-accounting-orders")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
-        fetchAccountingData();
-      })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => {
+          fetchAccountingData();
+        }
+      )
       .subscribe();
 
     const chLogs = supabase
       .channel("realtime-accounting-logs")
-      .on("postgres_changes", { event: "*", schema: "public", table: "inventory_logs" }, () => {
-        fetchAccountingData();
-      })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "inventory_logs" },
+        () => {
+          fetchAccountingData();
+        }
+      )
+      .subscribe();
+
+    const chSiteInfo = supabase
+      .channel("realtime-accounting-back-in-stock")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "site_info" },
+        () => {
+          fetchBackInStockAlerts();
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(chProds);
       supabase.removeChannel(chOrders);
       supabase.removeChannel(chLogs);
+      supabase.removeChannel(chSiteInfo);
     };
-  }, [fetchAccountingData]);
+  }, [fetchAccountingData, fetchBackInStockAlerts]);
 
   const executeRestockTransaction = async () => {
     if (!selectedProdId) return;
@@ -148,7 +212,8 @@ export function AdminInventoryManager({
         body: JSON.stringify({
           productId: selectedProdId,
           stockDelta: Number(stockDelta),
-          purchasePrice: purchaseCostInput !== "" ? Number(purchaseCostInput) : undefined,
+          purchasePrice:
+            purchaseCostInput !== "" ? Number(purchaseCostInput) : undefined,
           supplier: supplierInput.trim(),
           referenceNote: noteInput.trim(),
         }),
@@ -159,6 +224,7 @@ export function AdminInventoryManager({
         notify(json.message);
         setNoteInput("");
         fetchAccountingData();
+        fetchBackInStockAlerts();
       } else {
         notify(json.message || "خطا در ثبت سند انبار.", "error");
       }
@@ -167,7 +233,6 @@ export function AdminInventoryManager({
     }
   };
 
-  // بررسی هوشمند قبل از ثبت ورود کالا: اگر کالا موجودی دارد، حتماً از ادمین سوال تاییدیه پرسیده شود
   const handlePrepareRestockSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     soundEngine.playClick();
@@ -229,11 +294,67 @@ export function AdminInventoryManager({
         notify(json.message);
         setEditingProduct(null);
         fetchAccountingData();
+        fetchBackInStockAlerts();
       } else {
         notify(json.message || "خطا در ویرایش کالا.", "error");
       }
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const handleTriggerAlertSmsNow = async (
+    productId: string,
+    productTitle: string
+  ) => {
+    soundEngine.playClick();
+    setSendingAlertForProdId(productId);
+    try {
+      const matchedProd = items.find((x) => String(x.id) === String(productId));
+      const res = await fetch("/api/products/back-in-stock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "trigger_restock",
+          productId,
+          productTitle,
+          newStock: Math.max(1, Number(matchedProd?.stock || 1)),
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        notify(json.message);
+        fetchBackInStockAlerts();
+      } else {
+        notify(json.message || "خطا در ارسال پیامک موجودی.", "error");
+      }
+    } catch {
+      notify("خطا در ارتباط با سرویس پیامک.", "error");
+    } finally {
+      setSendingAlertForProdId(null);
+    }
+  };
+
+  const handleDeleteBackInStockAlert = async (alertId: string) => {
+    soundEngine.playClick();
+    try {
+      const res = await fetch(
+        "/api/products/back-in-stock?id=" + encodeURIComponent(alertId),
+        { method: "DELETE" }
+      );
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        setBackInStockAlerts((prev) =>
+          prev.filter((a) => String(a.id) !== String(alertId))
+        );
+        notify(json.message);
+      } else {
+        notify(json.message || "خطا در حذف درخواست.", "error");
+      }
+    } catch {
+      notify("خطا در ارتباط با سرور.", "error");
     }
   };
 
@@ -276,6 +397,38 @@ export function AdminInventoryManager({
     URL.revokeObjectURL(url);
   };
 
+  const handleExportAlertsCsv = () => {
+    soundEngine.playSuccess();
+    let csv = "\uFEFFشناسه درخواست,عنوان کالا,شماره موبایل مشتری,تاریخ ثبت\n";
+    backInStockAlerts.forEach((a) => {
+      const dateStr = a.createdAt
+        ? new Date(a.createdAt).toLocaleString("fa-IR")
+        : "";
+      csv += `"${a.id}","${String(a.productTitle || "").replace(
+        /"/g,
+        '""'
+      )}","${a.phone}","${dateStr}"\n`;
+    });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "axon_back_in_stock_waitlist.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const alertsCountByProduct = useMemo(() => {
+    const map = new Map<string, number>();
+    backInStockAlerts.forEach((a) => {
+      const pid = String(a.productId || "");
+      if (pid) map.set(pid, (map.get(pid) || 0) + 1);
+    });
+    return map;
+  }, [backInStockAlerts]);
+
   const filteredItems = items.filter(
     (p) =>
       p.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -284,16 +437,29 @@ export function AdminInventoryManager({
       (p.brand && p.brand.toLowerCase().includes(search.toLowerCase()))
   );
 
+  const filteredAlerts = backInStockAlerts.filter((a) => {
+    if (!alertSearch.trim()) return true;
+    const q = alertSearch.toLowerCase().trim();
+    return (
+      String(a.productTitle || "")
+        .toLowerCase()
+        .includes(q) || String(a.phone || "").includes(q)
+    );
+  });
+
   return (
-    <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      {/* هدر یکپارچه ادغام ۳ بخش: حسابداری و انبار + سفارشات و بارنامه + گزارش‌های مالی */}
+    <div
+      className="space-y-6 font-sans select-text text-[var(--text-primary)]"
+      dir="rtl"
+    >
+      {/* هدر یکپارچه ۴ بخشی: حسابداری و انبار + سفارشات + گزارش مالی + منتظران پیامک موجودی */}
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2 md:gap-4">
         <div>
           <h1 className="text-base sm:text-sm md:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🏛️</span> مرکز یکپارچه حسابداری، انبار، سفارشات و گردش مالی ماهانه
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            ادغام کامل حسابداری، انبارگردانی، صدور بارنامه سفارشات و ترازنامه مالی در یک بخش واحد (Realtime)
+            ادغام کامل حسابداری، انبارگردانی، صدور بارنامه سفارشات، ترازنامه مالی و صف اطلاع‌رسانی موجودی (Realtime)
           </p>
         </div>
 
@@ -343,6 +509,34 @@ export function AdminInventoryManager({
           >
             📈 ۳. گزارش مالی و گردش آخر ماه
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.playClick();
+              setActiveSubTab("alerts");
+              fetchBackInStockAlerts();
+            }}
+            className={
+              "flex-1 lg:flex-initial px-4 py-2.5 rounded-2xl transition cursor-pointer flex items-center justify-center gap-1.5 " +
+              (activeSubTab === "alerts"
+                ? "bg-amber-500 text-slate-950 shadow-lg"
+                : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] hover:border-amber-500/50")
+            }
+          >
+            <span>🔔 ۴. منتظران پیامک موجودی</span>
+            {backInStockAlerts.length > 0 && (
+              <span
+                className={
+                  "px-2 py-0.5 rounded-full font-mono text-[10px] font-black " +
+                  (activeSubTab === "alerts"
+                    ? "bg-slate-950 text-amber-400"
+                    : "bg-amber-500 text-slate-950")
+                }
+              >
+                {backInStockAlerts.length.toLocaleString("fa-IR")}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -362,14 +556,20 @@ export function AdminInventoryManager({
       {/* کارت‌های خلاصه ترازنامه مالی و انبار */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 text-xs">
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1 shadow-sm">
-          <span className="text-[var(--text-secondary)] font-bold">ارزش دارایی موجودی انبار:</span>
+          <span className="text-[var(--text-secondary)] font-bold">
+            ارزش دارایی موجودی انبار:
+          </span>
           <span className="text-lg sm:text-sm md:text-xl font-black font-mono text-[var(--accent-blue)] block">
             {summary.totalInventoryAssets.toLocaleString("fa-IR")} ت
           </span>
-          <span className="text-[10px] text-slate-400">بر مبنای قیمت خرید واحد</span>
+          <span className="text-[10px] text-slate-400">
+            بر مبنای قیمت خرید واحد
+          </span>
         </div>
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1 shadow-sm">
-          <span className="text-[var(--text-secondary)] font-bold">فروش ناخالص ۳۰ روز اخیر:</span>
+          <span className="text-[var(--text-secondary)] font-bold">
+            فروش ناخالص ۳۰ روز اخیر:
+          </span>
           <span className="text-lg sm:text-sm md:text-xl font-black font-mono text-emerald-500 block">
             {summary.totalMonthlySalesGross.toLocaleString("fa-IR")} ت
           </span>
@@ -378,18 +578,26 @@ export function AdminInventoryManager({
           </span>
         </div>
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1 shadow-sm">
-          <span className="text-[var(--text-secondary)] font-bold">مالیات بر ارزش افزوده (۱۰٪):</span>
+          <span className="text-[var(--text-secondary)] font-bold">
+            مالیات بر ارزش افزوده (۱۰٪):
+          </span>
           <span className="text-lg sm:text-sm md:text-xl font-black font-mono text-amber-500 block">
             {summary.totalMonthlyVAT.toLocaleString("fa-IR")} ت
           </span>
-          <span className="text-[10px] text-slate-400">ذخیره قانونی مالیاتی</span>
+          <span className="text-[10px] text-slate-400">
+            ذخیره قانونی مالیاتی
+          </span>
         </div>
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1 shadow-sm">
-          <span className="text-[var(--text-secondary)] font-bold">سود خالص قطعی ماهانه:</span>
+          <span className="text-[var(--text-secondary)] font-bold">
+            سود خالص قطعی ماهانه:
+          </span>
           <span className="text-lg sm:text-sm md:text-xl font-black font-mono text-indigo-400 block">
             {summary.totalMonthlyNetProfit.toLocaleString("fa-IR")} ت
           </span>
-          <span className="text-[10px] text-slate-400">پس از کسر بهای خرید و مالیات</span>
+          <span className="text-[10px] text-slate-400">
+            پس از کسر بهای خرید و مالیات
+          </span>
         </div>
       </div>
 
@@ -423,11 +631,15 @@ export function AdminInventoryManager({
                   }}
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
                 >
-                  {items.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      📦 {p.title} (موجودی فعلی: {p.stock} عدد)
-                    </option>
-                  ))}
+                  {items.map((p) => {
+                    const wCount = alertsCountByProduct.get(String(p.id)) || 0;
+                    return (
+                      <option key={p.id} value={p.id}>
+                        📦 {p.title} (موجودی: {p.stock} عدد
+                        {wCount > 0 ? ` • 🔔 ${wCount} منتظر پیامک` : ""})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -453,7 +665,9 @@ export function AdminInventoryManager({
                   min={0}
                   value={purchaseCostInput}
                   onChange={(e) =>
-                    setPurchaseCostInput(e.target.value === "" ? "" : Number(e.target.value))
+                    setPurchaseCostInput(
+                      e.target.value === "" ? "" : Number(e.target.value)
+                    )
                   }
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none focus:border-[var(--accent-blue)]"
                 />
@@ -475,7 +689,8 @@ export function AdminInventoryManager({
           <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-[var(--card-border)] pb-3">
               <h3 className="font-black text-sm">
-                جدول جامع کالاها، موجودی، بهای تمام‌شده و ویرایش کامل ({filteredItems.length})
+                جدول جامع کالاها، موجودی، بهای تمام‌شده و ویرایش کامل (
+                {filteredItems.length})
               </h3>
               <div className="flex flex-wrap gap-2">
                 <input
@@ -521,14 +736,33 @@ export function AdminInventoryManager({
                         p.discountPrice !== undefined &&
                         Number(p.discountPrice) > 0 &&
                         Number(p.discountPrice) < p.basePrice;
+                      const waitingCount =
+                        alertsCountByProduct.get(String(p.id)) || 0;
 
                       return (
-                        <tr key={p.id} className="hover:bg-[var(--input-bg)]/50 transition">
+                        <tr
+                          key={p.id}
+                          className="hover:bg-[var(--input-bg)]/50 transition"
+                        >
                           <td className="p-3">
-                            <div className="font-black text-[var(--text-primary)]">{p.title}</div>
-                            <div className="text-[10px] font-mono text-slate-400">
-                              {p.sku} | {p.category}
-                              {p.brand ? ` | ${p.brand}` : ""}
+                            <div className="font-black text-[var(--text-primary)]">
+                              {p.title}
+                            </div>
+                            <div className="text-[10px] font-mono text-slate-400 flex flex-wrap items-center gap-1.5 mt-0.5">
+                              <span>
+                                {p.sku} | {p.category}
+                                {p.brand ? ` | ${p.brand}` : ""}
+                              </span>
+                              {waitingCount > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveSubTab("alerts")}
+                                  className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-400 font-sans font-black text-[9px] cursor-pointer hover:bg-amber-500 hover:text-slate-950 transition"
+                                >
+                                  🔔 {waitingCount.toLocaleString("fa-IR")} نفر
+                                  منتظر موجودی
+                                </button>
+                              )}
                             </div>
                           </td>
                           <td className="p-3 text-center">
@@ -555,7 +789,9 @@ export function AdminInventoryManager({
                                   {p.basePrice.toLocaleString("fa-IR")} ت
                                 </div>
                                 <div className="text-emerald-400 flex items-center gap-1">
-                                  <span>{p.sellingPrice.toLocaleString("fa-IR")} ت</span>
+                                  <span>
+                                    {p.sellingPrice.toLocaleString("fa-IR")} ت
+                                  </span>
                                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 font-black">
                                     ویژه
                                   </span>
@@ -563,7 +799,9 @@ export function AdminInventoryManager({
                               </div>
                             ) : (
                               <div className="flex items-center gap-1.5">
-                                <span>{p.sellingPrice.toLocaleString("fa-IR")} ت</span>
+                                <span>
+                                  {p.sellingPrice.toLocaleString("fa-IR")} ت
+                                </span>
                                 {p.sellingPrice === 0 && p.stock > 0 && (
                                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-black">
                                     ⚠️ قیمت ۰
@@ -573,7 +811,8 @@ export function AdminInventoryManager({
                             )}
                           </td>
                           <td className="p-3 font-mono text-emerald-400">
-                            {p.netProfitPerUnit.toLocaleString("fa-IR")} ت ({p.profitMarginPercent}%)
+                            {p.netProfitPerUnit.toLocaleString("fa-IR")} ت (
+                            {p.profitMarginPercent}%)
                           </td>
                           <td className="p-3 text-center font-mono font-bold">
                             {p.unitsSoldMonthly}
@@ -680,13 +919,155 @@ export function AdminInventoryManager({
         </div>
       )}
 
+      {/* زیرمنوی ۴: لیست مشتریان منتظر پیامک موجودی کالاها */}
+      {activeSubTab === "alerts" && (
+        <div className="space-y-6 text-xs">
+          <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-[var(--card-border)] pb-3">
+              <div>
+                <h3 className="font-black text-sm text-amber-400 flex items-center gap-2">
+                  <span>🔔</span> لیست مشتریان منتظر پیامک «موجود شد خبرم کن» (
+                  {backInStockAlerts.length.toLocaleString("fa-IR")} درخواست)
+                </h3>
+                <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                  به محض افزایش موجودی هر کالا در انبار، پیامک اطلاع‌رسانی به‌صورت خودکار برای این شماره‌ها ارسال می‌شود (یا می‌توانید دستی ارسال کنید).
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <input
+                  type="text"
+                  value={alertSearch}
+                  onChange={(e) => setAlertSearch(e.target.value)}
+                  placeholder="🔍 جستجوی نام کالا یا شماره موبایل..."
+                  className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-amber-500"
+                />
+                {backInStockAlerts.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleExportAlertsCsv}
+                    className="px-4 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-black cursor-pointer shadow"
+                  >
+                    📥 خروجی اکسل شماره‌ها (CSV)
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {filteredAlerts.length === 0 ? (
+              <div className="py-16 text-center text-[var(--text-secondary)] space-y-2">
+                <span className="text-3xl block">🔕</span>
+                <p className="font-bold">
+                  در حال حاضر هیچ درخواست منتظری برای اطلاع‌رسانی موجودی ثبت نشده است.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-xs min-w-[780px]">
+                  <thead>
+                    <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black">
+                      <th className="p-3">نام محصول</th>
+                      <th className="p-3 text-center">وضعیت فعلی انبار</th>
+                      <th className="p-3 text-center">شماره موبایل مشتری</th>
+                      <th className="p-3 text-center">زمان ثبت درخواست</th>
+                      <th className="p-3 text-center">عملیات پیامک / مدیریت</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--card-border)] font-medium">
+                    {filteredAlerts.map((alert) => {
+                      const prodRow = items.find(
+                        (p) => String(p.id) === String(alert.productId)
+                      );
+                      const currentStock =
+                        prodRow !== undefined ? Number(prodRow.stock || 0) : 0;
+                      const isSending =
+                        sendingAlertForProdId === String(alert.productId);
+
+                      return (
+                        <tr
+                          key={alert.id}
+                          className="hover:bg-[var(--input-bg)]/50 transition"
+                        >
+                          <td className="p-3 font-black text-[var(--text-primary)]">
+                            {alert.productTitle || prodRow?.title || "محصول"}
+                          </td>
+                          <td className="p-3 text-center">
+                            <span
+                              className={
+                                "px-2.5 py-1 rounded-xl font-mono font-black " +
+                                (currentStock > 0
+                                  ? "bg-emerald-500/15 text-emerald-400"
+                                  : "bg-rose-500/15 text-rose-400")
+                              }
+                            >
+                              {currentStock > 0
+                                ? `موجود (${currentStock} عدد)`
+                                : "ناموجود (۰)"}
+                            </span>
+                          </td>
+                          <td
+                            className="p-3 text-center font-mono font-black text-[var(--accent-blue)]"
+                            dir="ltr"
+                          >
+                            {alert.phone}
+                          </td>
+                          <td className="p-3 text-center text-[11px] text-[var(--text-secondary)] font-mono">
+                            {alert.createdAt
+                              ? new Date(alert.createdAt).toLocaleString("fa-IR")
+                              : "—"}
+                          </td>
+                          <td className="p-3 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                disabled={isSending}
+                                onClick={() =>
+                                  handleTriggerAlertSmsNow(
+                                    String(alert.productId),
+                                    alert.productTitle ||
+                                      prodRow?.title ||
+                                      "محصول"
+                                  )
+                                }
+                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] cursor-pointer transition disabled:opacity-50"
+                                title="ارسال پیامک موجودی برای تمام منتظران این کالا"
+                              >
+                                {isSending
+                                  ? "در حال ارسال..."
+                                  : "📲 ارسال پیامک موجودی"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteBackInStockAlert(alert.id)
+                                }
+                                className="px-2.5 py-1.5 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold text-[11px] cursor-pointer transition"
+                                title="حذف این درخواست"
+                              >
+                                🗑️ حذف
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* مودال سوال تاییدیه امنیتی هنگام ورود مجدد موجودی */}
       {confirmRestockModal.isOpen && confirmRestockModal.product && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
           <div className="w-full max-w-md rounded-3xl bg-[var(--modal-bg)] border border-amber-500/40 p-6 space-y-5 shadow-2xl text-xs">
             <div className="flex items-center gap-3 text-amber-400">
               <span className="text-3xl">⚠️</span>
-              <h3 className="text-sm font-black">تاییدیه امنیتی ورود مجدد موجودی به انبار</h3>
+              <h3 className="text-sm font-black">
+                تاییدیه امنیتی ورود مجدد موجودی به انبار
+              </h3>
             </div>
 
             <p className="text-[var(--text-secondary)] leading-relaxed">
@@ -706,7 +1087,8 @@ export function AdminInventoryManager({
               </strong>{" "}
               به موجودی فعلی این کالا اضافه کنید (جمع جدید:{" "}
               <strong className="font-mono">
-                {confirmRestockModal.product.stock + confirmRestockModal.delta} عدد
+                {confirmRestockModal.product.stock + confirmRestockModal.delta}{" "}
+                عدد
               </strong>
               )؟
             </p>
@@ -715,7 +1097,11 @@ export function AdminInventoryManager({
               <button
                 type="button"
                 onClick={() =>
-                  setConfirmRestockModal({ isOpen: false, product: null, delta: 0 })
+                  setConfirmRestockModal({
+                    isOpen: false,
+                    product: null,
+                    delta: 0,
+                  })
                 }
                 className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold cursor-pointer"
               >
@@ -738,7 +1124,8 @@ export function AdminInventoryManager({
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn"
           onClick={(e) => {
-            if (e.target === e.currentTarget && !savingEdit) setEditingProduct(null);
+            if (e.target === e.currentTarget && !savingEdit)
+              setEditingProduct(null);
           }}
         >
           <div className="w-full max-w-xl rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 space-y-4 shadow-2xl text-xs max-h-[90vh] overflow-y-auto">
@@ -766,7 +1153,10 @@ export function AdminInventoryManager({
                     required
                     value={editingProduct.title}
                     onChange={(e) =>
-                      setEditingProduct({ ...editingProduct, title: e.target.value })
+                      setEditingProduct({
+                        ...editingProduct,
+                        title: e.target.value,
+                      })
                     }
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
                   />
@@ -780,7 +1170,10 @@ export function AdminInventoryManager({
                     type="text"
                     value={editingProduct.category}
                     onChange={(e) =>
-                      setEditingProduct({ ...editingProduct, category: e.target.value })
+                      setEditingProduct({
+                        ...editingProduct,
+                        category: e.target.value,
+                      })
                     }
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
                   />
@@ -794,7 +1187,10 @@ export function AdminInventoryManager({
                     type="text"
                     value={editingProduct.brand || ""}
                     onChange={(e) =>
-                      setEditingProduct({ ...editingProduct, brand: e.target.value })
+                      setEditingProduct({
+                        ...editingProduct,
+                        brand: e.target.value,
+                      })
                     }
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
                   />
@@ -809,7 +1205,10 @@ export function AdminInventoryManager({
                     dir="ltr"
                     value={editingProduct.sku}
                     onChange={(e) =>
-                      setEditingProduct({ ...editingProduct, sku: e.target.value })
+                      setEditingProduct({
+                        ...editingProduct,
+                        sku: e.target.value,
+                      })
                     }
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
                   />
@@ -824,7 +1223,10 @@ export function AdminInventoryManager({
                     onChange={(e) =>
                       setEditingProduct({
                         ...editingProduct,
-                        shipping_type: e.target.value as "post" | "tipax" | "both",
+                        shipping_type: e.target.value as
+                          | "post"
+                          | "tipax"
+                          | "both",
                       })
                     }
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
@@ -882,7 +1284,9 @@ export function AdminInventoryManager({
                     onChange={(e) =>
                       setEditingProduct({
                         ...editingProduct,
-                        discountPrice: e.target.value ? Number(e.target.value) : null,
+                        discountPrice: e.target.value
+                          ? Number(e.target.value)
+                          : null,
                       })
                     }
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none"
@@ -915,7 +1319,10 @@ export function AdminInventoryManager({
                     type="text"
                     value={editingProduct.warranty}
                     onChange={(e) =>
-                      setEditingProduct({ ...editingProduct, warranty: e.target.value })
+                      setEditingProduct({
+                        ...editingProduct,
+                        warranty: e.target.value,
+                      })
                     }
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none"
                   />

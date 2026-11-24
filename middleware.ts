@@ -11,6 +11,8 @@ const PRIVATE_NOINDEX_PREFIXES = [
   "/my-orders",
   "/checkout",
   "/payment",
+  "/track",
+  "/track-order",
   "/maintenance",
 ];
 
@@ -62,7 +64,6 @@ async function getActiveRedirectRules(origin: string): Promise<RedirectRuleItem[
       }
     }
   } catch {
-    // در صورت تایم‌اوت، درخواست بدون وقفه عبور می‌کند
   } finally {
     redirectCacheExpiresAt = now + 60_000;
   }
@@ -95,7 +96,6 @@ function withSecurityHeaders(res: NextResponse, pathname: string): NextResponse 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // ۱. محافظت مطلق و بدون استثنا از تمامی مسیرهای مدیریت (/admin)
   if (pathname.startsWith("/admin")) {
     if (PUBLIC_ADMIN_PATHS.some((p) => pathname.startsWith(p))) {
       return withSecurityHeaders(NextResponse.next(), pathname);
@@ -137,7 +137,6 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // ۲. اجرای زنده قوانین ریدایرکت ۳۰۱ و ۳۰۲ تعریف‌شده در پنل سئو (/admin/seo)
   if (!pathname.startsWith("/api") && req.method === "GET") {
     const normalizedPath = normalizeRoutePath(pathname);
     const rules = await getActiveRedirectRules(req.nextUrl.origin);

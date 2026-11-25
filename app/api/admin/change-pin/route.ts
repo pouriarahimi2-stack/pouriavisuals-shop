@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { authSecurity } from "@/lib/authSecurity";
+import { rateLimiter } from "@/lib/rateLimiter";
 import {
   getAllAdminUsers,
   saveAdminUsersRegistry,
@@ -15,6 +16,27 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "127.0.0.1";
+
+    const rateCheck = await rateLimiter.checkLimit(
+      clientIp,
+      "admin_change_pin",
+      8,
+      15
+    );
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "تعداد تلاش‌های تغییر رمز بیش از حد مجاز است. لطفاً ۱۵ دقیقه دیگر تلاش کنید.",
+        },
+        { status: 429 }
+      );
+    }
+
     const session: any = await verifyAdminSession(req);
     if (!session) {
       return NextResponse.json(
@@ -63,8 +85,33 @@ export async function POST(req: NextRequest) {
       .ilike("username", targetUsername)
       .maybeSingle();
 
-    // اگر کاربر در حال تغییر رمز خودش است و رمز فعلی را وارد کرده، صحت آن بررسی شود
-    if (!isChangingOtherUser && currentPassword) {
+    const siteRow = await getMasterSiteInfoRow();
+    const secCfg = siteRow?.homepage_layout_config?.auth_security_config || {};
+    const configuredMasterPin = String(
+      secCfg.adminPin ||
+        secCfg.adminDeck?.pin ||
+        process.env.ADMIN_MASTER_PIN ||
+        ""
+    ).trim();
+    const configuredMasterPass = String(
+      secCfg.adminPassword || process.env.ADMIN_PASSWORD || ""
+    ).trim();
+
+    const hasExistingCredential = Boolean(
+      (registryIdx !== -1 && allUsers[registryIdx].password_hash) ||
+        dbUserRecord?.password_hash ||
+        dbUserRecord?.password ||
+        (session.role === "superadmin" && (configuredMasterPin || configuredMasterPass))
+    );
+
+    if (!isChangingOtherUser && hasExistingCredential) {
+      if (!currentPassword) {
+        return NextResponse.json(
+          { success: false, message: "وارد کردن رمز عبور یا پین فعلی الزامی است." },
+          { status: 400 }
+        );
+      }
+
       let currentValid = false;
 
       if (registryIdx !== -1 && allUsers[registryIdx].password_hash) {
@@ -85,31 +132,15 @@ export async function POST(req: NextRequest) {
       }
 
       if (!currentValid && session.role === "superadmin") {
-        const siteRow = await getMasterSiteInfoRow();
-        const secCfg = siteRow?.homepage_layout_config?.auth_security_config || {};
-        const masterPin = String(
-          secCfg.adminPin ||
-            secCfg.adminDeck?.pin ||
-            process.env.ADMIN_MASTER_PIN ||
-            "123456"
-        ).trim();
-        const masterPass = String(
-          secCfg.adminPassword || process.env.ADMIN_PASSWORD || "admin123"
-        ).trim();
         if (
-          currentPassword === masterPin ||
-          currentPassword === masterPass ||
-          currentPassword === "Axon2026!"
+          (configuredMasterPin && currentPassword === configuredMasterPin) ||
+          (configuredMasterPass && currentPassword === configuredMasterPass)
         ) {
           currentValid = true;
         }
       }
 
-      if (
-        !currentValid &&
-        ((registryIdx !== -1 && allUsers[registryIdx].password_hash) ||
-          dbUserRecord?.password)
-      ) {
+      if (!currentValid) {
         return NextResponse.json(
           { success: false, message: "رمز عبور یا پین فعلی وارد شده صحیح نیست." },
           { status: 400 }
@@ -121,7 +152,6 @@ export async function POST(req: NextRequest) {
     const legacyHash = authSecurity.hashPassword(newPassword);
     const nowIso = new Date().toISOString();
 
-    // ۱. بروزرسانی در رجیستری مرکزی مدیران (admin_users_registry)
     if (registryIdx !== -1) {
       allUsers[registryIdx] = {
         ...allUsers[registryIdx],
@@ -144,14 +174,16 @@ export async function POST(req: NextRequest) {
     }
     await saveAdminUsersRegistry(allUsers);
 
-    // ۲. اگر حساب هدف مدیر ارشد (admin) است، پین و رمز ارشد در auth_security_config هم همگام شود
-    if (targetUsername === "admin" || (registryIdx !== -1 && allUsers[registryIdx].role === "superadmin")) {
+    if (
+      targetUsername === "admin" ||
+      (registryIdx !== -1 && allUsers[registryIdx].role === "superadmin")
+    ) {
       try {
-        const siteRow = await getMasterSiteInfoRow();
-        const layoutCfg = siteRow?.homepage_layout_config || {};
+        const latestSiteRow = await getMasterSiteInfoRow();
+        const layoutCfg = latestSiteRow?.homepage_layout_config || {};
         const prevSec = layoutCfg.auth_security_config || {};
         await saveMasterSiteInfoRow(
-          siteRow,
+          latestSiteRow,
           {
             ...layoutCfg,
             auth_security_config: {
@@ -169,13 +201,18 @@ export async function POST(req: NextRequest) {
       } catch {}
     }
 
-    // ۳. بروزرسانی در جدول admin_users دیتابیس
     try {
       if (dbUserRecord && dbUserRecord.id) {
-        await supabaseAdmin
+        const { error: uErr } = await supabaseAdmin
           .from("admin_users")
-          .update({ password: legacyHash })
+          .update({ password: legacyHash, password_hash: pbkdf2Hash })
           .eq("id", dbUserRecord.id);
+        if (uErr) {
+          await supabaseAdmin
+            .from("admin_users")
+            .update({ password: legacyHash })
+            .eq("id", dbUserRecord.id);
+        }
       } else {
         await supabaseAdmin.from("admin_users").insert([
           {
@@ -189,14 +226,13 @@ export async function POST(req: NextRequest) {
       }
     } catch {}
 
-    // ۴. ثبت در لاگ‌های امنیتی
     try {
       await supabaseAdmin.from("admin_audit_logs").insert([
         {
           action: "CHANGE_ADMIN_PASSWORD",
           user_id: session.username || "admin",
           details: { role: session.role, target: targetUsername },
-          ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
+          ip_address: clientIp,
           severity: "info",
           created_at: nowIso,
         },

@@ -95,21 +95,44 @@ export const ROLE_PERMISSIONS: Record<string, RoleConfig> = {
   accountant: {
     label: "حسابدار",
     description: "مالی، سفارشات، گزارش‌ها",
-    routes: ["/admin", "/admin/dashboard", "/admin/financial", "/admin/orders", "/admin/inventory", "/admin/reports", "/admin/change-pin"],
+    routes: [
+      "/admin",
+      "/admin/dashboard",
+      "/admin/financial",
+      "/admin/orders",
+      "/admin/inventory",
+      "/admin/reports",
+      "/admin/change-pin",
+    ],
     canRead: ["/admin/products", "/admin/customers"],
     color: "text-emerald-400",
   },
   editor: {
     label: "ویرایشگر محتوا",
     description: "وبلاگ، اخبار، سئو",
-    routes: ["/admin", "/admin/dashboard", "/admin/blog", "/admin/news", "/admin/seo", "/admin/change-pin"],
+    routes: [
+      "/admin",
+      "/admin/dashboard",
+      "/admin/blog",
+      "/admin/news",
+      "/admin/seo",
+      "/admin/change-pin",
+    ],
     canRead: ["/admin/products"],
     color: "text-blue-400",
   },
   support: {
     label: "پشتیبان فروش",
     description: "سفارشات، پیام‌ها، مشتریان",
-    routes: ["/admin", "/admin/dashboard", "/admin/orders", "/admin/messages", "/admin/reviews", "/admin/customers", "/admin/change-pin"],
+    routes: [
+      "/admin",
+      "/admin/dashboard",
+      "/admin/orders",
+      "/admin/messages",
+      "/admin/reviews",
+      "/admin/customers",
+      "/admin/change-pin",
+    ],
     canRead: ["/admin/products"],
     color: "text-purple-400",
   },
@@ -123,17 +146,23 @@ export const ROLE_PERMISSIONS: Record<string, RoleConfig> = {
 };
 
 export function hasRouteAccess(role: string, pathname: string): boolean {
-  if (!role || role === "superadmin") return true;
-  const cfg = ROLE_PERMISSIONS[role];
-  if (!cfg) return true;
+  const cleanRole = String(role || "").trim().toLowerCase();
+  if (!cleanRole) return false;
+  if (cleanRole === "superadmin") return true;
+  const cfg = ROLE_PERMISSIONS[cleanRole];
+  if (!cfg) return false;
   if (cfg.routes.includes("*")) return true;
-  return [...cfg.routes, ...cfg.canRead].some((r) => pathname === r || pathname.startsWith(r + "/"));
+  return [...cfg.routes, ...cfg.canRead].some(
+    (r) => pathname === r || pathname.startsWith(r + "/")
+  );
 }
 
 export function hasWriteAccess(role: string, pathname: string): boolean {
-  if (!role || role === "superadmin") return true;
-  const cfg = ROLE_PERMISSIONS[role];
-  if (!cfg) return true;
+  const cleanRole = String(role || "").trim().toLowerCase();
+  if (!cleanRole) return false;
+  if (cleanRole === "superadmin") return true;
+  const cfg = ROLE_PERMISSIONS[cleanRole];
+  if (!cfg) return false;
   if (cfg.routes.includes("*")) return true;
   return cfg.routes.some((r) => pathname === r || pathname.startsWith(r + "/"));
 }

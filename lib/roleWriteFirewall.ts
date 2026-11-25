@@ -1,7 +1,5 @@
 // File Path: lib/roleWriteFirewall.ts
 
-// ماژول‌هایی که هر نقش (به جز مدیر ارشد که به همه چیز دسترسی کامل دارد) مجاز به ویرایش و انجام کار در آن‌هاست.
-// هر ماژول دیگری که توسط مدیر ارشد برای این نقش‌ها تیک بخورد، صرفاً در حالت «فقط مشاهده (Read-Only)» باز می‌شود.
 export const ROLE_WRITABLE_MODULES_MAP: Record<string, string[]> = {
   superadmin: ["all"],
   product_manager: [
@@ -31,16 +29,24 @@ export const ROLE_WRITABLE_MODULES_MAP: Record<string, string[]> = {
     "styles",
     "messages",
   ],
-  viewer_reporter: [], // بیننده و گزارش‌دهنده در تمام بخش‌ها ۱۰۰٪ فقط خواندنی است
+  viewer_reporter: [],
 };
+
+function normalizeAdminRoleName(role: string | undefined): string {
+  const clean = String(role || "").trim().toLowerCase();
+  if (clean === "viewer") return "viewer_reporter";
+  if (clean === "accountant" || clean === "support") return "order_manager";
+  if (clean === "editor") return "content_seo_manager";
+  return clean;
+}
 
 export function canRoleWriteModule(
   role: string | undefined,
   moduleId: string
 ): boolean {
-  const cleanRole = String(role || "").toLowerCase();
+  const cleanRole = normalizeAdminRoleName(role);
   if (cleanRole === "superadmin") return true;
-  if (cleanRole === "viewer_reporter") return false;
+  if (cleanRole === "viewer_reporter" || !cleanRole) return false;
   const writableList = ROLE_WRITABLE_MODULES_MAP[cleanRole] || [];
   return writableList.includes("all") || writableList.includes(moduleId);
 }
@@ -78,20 +84,18 @@ export function canRoleWriteOnAdminPage(
   role: string | undefined,
   pathname: string
 ): boolean {
-  const cleanRole = String(role || "").toLowerCase();
+  const cleanRole = normalizeAdminRoleName(role);
   if (cleanRole === "superadmin") return true;
-  if (cleanRole === "viewer_reporter") return false;
+  if (cleanRole === "viewer_reporter" || !cleanRole) return false;
 
   const matched = ADMIN_PAGE_TO_MODULE.find((m) =>
     pathname.startsWith(m.prefix)
   );
   if (!matched) return false;
 
-  // در صفحه یکپارچه /admin/inventory، هم مدیر انبار و هم پشتیبان سفارشات مجاز به کار هستند
   if (matched.prefix === "/admin/inventory") {
     return cleanRole === "product_manager" || cleanRole === "order_manager";
   }
-  // در صفحات ظاهر و صفحه‌ساز، کارشناس محتوا و مدیر کاتالوگ مجاز به کار هستند
   if (
     matched.prefix === "/admin/appearance" ||
     matched.prefix === "/admin/pages" ||
@@ -105,16 +109,14 @@ export function canRoleWriteOnAdminPage(
   return canRoleWriteModule(cleanRole, matched.moduleId);
 }
 
-// بررسی دقیق مجوز نوشتن/ویرایش/حذف در سطح APIهای بک‌اند برای هر نقش
 export function canRoleMutateApi(
   role: string | undefined,
   apiPathname: string
 ): boolean {
-  const cleanRole = String(role || "").toLowerCase();
+  const cleanRole = normalizeAdminRoleName(role);
   if (cleanRole === "superadmin") return true;
-  if (cleanRole === "viewer_reporter") return false;
+  if (cleanRole === "viewer_reporter" || !cleanRole) return false;
 
-  // خروج از حساب و ثبت تله‌متری برای همه مجاز است
   if (
     apiPathname.startsWith("/api/admin/logout") ||
     apiPathname.startsWith("/api/admin/monitoring")
@@ -122,16 +124,14 @@ export function canRoleMutateApi(
     return true;
   }
 
-  // تمام نقش‌های مدیریتی به‌جز بیننده (viewer_reporter) مجاز به پاسخگویی در گفتگوی زنده و تیکت‌ها هستند
   if (
     apiPathname.startsWith("/api/live-chat") ||
     apiPathname.startsWith("/api/admin/messages") ||
     apiPathname.startsWith("/api/contact")
   ) {
-    return cleanRole !== "viewer_reporter";
+    return true;
   }
 
-  // بخش‌های حیاتی مالک سایت که هیچ نقشی به جز superadmin حق تغییر آن‌ها را ندارد
   const ownerOnlyApis = [
     "/api/admin/settings",
     "/api/admin/backup",
@@ -150,6 +150,7 @@ export function canRoleMutateApi(
       "/api/admin/products",
       "/api/admin/import-products",
       "/api/admin/export-products",
+      "/api/admin/parse-document",
       "/api/accounting",
       "/api/admin/financial",
       "/api/categories",
@@ -159,6 +160,8 @@ export function canRoleMutateApi(
       "/api/reviews",
       "/api/admin/upload",
       "/api/admin/upload-image",
+      "/api/admin/footer-links",
+      "/api/theme-builder",
       "/api/site-info",
       "/api/admin/site-info",
     ];
@@ -172,6 +175,7 @@ export function canRoleMutateApi(
       "/api/accounting",
       "/api/admin/financial",
       "/api/admin/reports",
+      "/api/products/back-in-stock",
       "/api/crm",
       "/api/admin/coupons",
       "/api/coupons",
@@ -197,6 +201,7 @@ export function canRoleMutateApi(
       "/api/styles",
       "/api/admin/styles",
       "/api/theme-builder",
+      "/api/admin/footer-links",
       "/api/admin/upload",
       "/api/admin/upload-image",
       "/api/site-info",

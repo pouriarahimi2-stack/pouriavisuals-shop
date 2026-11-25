@@ -3,11 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { unpackProductRow, packProductDescription } from "@/lib/productUnpacker";
+import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import { normalizeSystemSettings } from "@/lib/systemSettings";
+import { triggerBackInStockNotifications } from "@/lib/backInStockService";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
 
-// ۱. تعریف دقیق ساختار گالری برای تایپ‌اسکریپت (حذف کامل any)
 interface MediaGalleryItem {
   url: string;
   alt?: string;
@@ -15,7 +17,6 @@ interface MediaGalleryItem {
   sort_order?: number;
 }
 
-// ۲. تعریف ساختار محصولات ورودی
 interface ImportProduct {
   title?: string;
   name?: string;
@@ -28,7 +29,7 @@ interface ImportProduct {
   image_url?: string;
   Photo_Filename?: string;
   media_gallery?: MediaGalleryItem[];
-  [key: string]: unknown; // اجازه به سایر فیلدهای ناشناخته اکسل اما به صورت ایمن
+  [key: string]: unknown;
 }
 
 function extractNumber(val: unknown): number {
@@ -77,12 +78,15 @@ function parseTelegramJsonToProducts(telegramJson: any): ImportProduct[] {
 
       const lines = textContent.split("\n").filter((l: string) => l.trim());
       const rawTitle = lines[0] || "کالای دیجیتال";
-      const cleanTitle = rawTitle.replace(/[^\w\s\u0600-\u06FF]/g, "").trim();
+      const cleanTitle = rawTitle
+        .replace(/[^\w\s\u0600-\u06FF\u200c\-\.\(\)\/\+]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
 
       const catName = topics[m.reply_to_message_id] || "دسته عمومی";
 
       currentProduct = {
-        title: cleanTitle,
+        title: cleanTitle || "کالای دیجیتال",
         description: textContent,
         category: catName,
         price: extractPriceFromText(textContent),
@@ -94,7 +98,7 @@ function parseTelegramJsonToProducts(telegramJson: any): ImportProduct[] {
       if (m.photo && currentProduct.media_gallery) {
         currentProduct.media_gallery.push({
           url: `/${m.photo}`,
-          alt: cleanTitle,
+          alt: cleanTitle || "کالا",
           is_primary: true,
           sort_order: 1,
         });
@@ -131,16 +135,26 @@ export async function POST(req: NextRequest) {
     }
 
     if (!Array.isArray(products) || products.length === 0) {
-      return NextResponse.json({ success: false, message: "هیچ محصولی جهت ایمپورت یافت نشد." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "هیچ محصولی جهت ایمپورت یافت نشد." },
+        { status: 400 }
+      );
     }
 
-    const { data: existingRows } = await supabaseAdmin.from("products").select("*");
+    const [{ data: existingRows }, siteRow] = await Promise.all([
+      supabaseAdmin.from("products").select("*"),
+      getMasterSiteInfoRow(),
+    ]);
     const unpackedExisting = (existingRows || []).map(unpackProductRow);
+    const sys = normalizeSystemSettings(
+      siteRow?.homepage_layout_config || {},
+      siteRow
+    );
+    const storeName = sys.site_name || "آکسون کور";
 
     let upsertedCount = 0;
 
     for (const p of products) {
-      // پشتیبانی از کلیدهای فارسی و انگلیسی
       const rawTitle = p["نام محصول"] || p["نام محصول "] || p.title || p.name;
       const rawSku =
         p["کد محصول"] ||
@@ -164,8 +178,16 @@ export async function POST(req: NextRequest) {
       }
 
       let stock = 0;
-      const stockStr = String(rawStock).trim();
-      if (!stockStr.includes("ناموجود") && !stockStr.includes("اتمام") && stockStr !== "0" && stockStr !== "") {
+      const stockStr = String(rawStock)
+        .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+        .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+        .trim();
+      if (
+        !stockStr.includes("ناموجود") &&
+        !stockStr.includes("اتمام") &&
+        stockStr !== "0" &&
+        stockStr !== ""
+      ) {
         stock = extractNumber(stockStr);
         if (stock === 0 && stockStr.includes("موجود")) stock = 10;
       }
@@ -176,7 +198,6 @@ export async function POST(req: NextRequest) {
           String(ex.title || "").trim().toLowerCase() === title.toLowerCase()
       );
 
-      // اعمال اینترفیس دقیق برای گالری نهایی
       let finalGallery: MediaGalleryItem[] = [];
       if (Array.isArray(p.media_gallery) && p.media_gallery.length > 0) {
         finalGallery = p.media_gallery;
@@ -198,9 +219,9 @@ export async function POST(req: NextRequest) {
 
       const metaDesc = cleanDesc
         ? cleanDesc.slice(0, 155)
-        : `خرید آنلاین ${title} با ضمانت اصالت در فروشگاه آکسون کور.`;
+        : `خرید آنلاین ${title} با بررسی مشخصات فنی در ${storeName}.`;
 
-      const metaTitle = `خرید و قیمت ${title} | آکسون کور`;
+      const metaTitle = `خرید و قیمت ${title} | ${storeName}`;
       const imagesList = finalGallery.map((g: MediaGalleryItem) => g.url).filter(Boolean);
 
       const mediaMeta = {
@@ -237,11 +258,17 @@ export async function POST(req: NextRequest) {
       };
 
       if (existing) {
+        const prevStock = Math.max(0, Number(existing.stock || 0));
         const { error: upErr } = await supabaseAdmin
           .from("products")
           .update(dbPayload)
           .eq("id", existing.id);
-        if (!upErr) upsertedCount++;
+        if (!upErr) {
+          upsertedCount++;
+          if (prevStock <= 0 && stock > 0) {
+            await triggerBackInStockNotifications(existing.id, title, stock);
+          }
+        }
       } else {
         const newId = randomUUID();
         const { error: insErr } = await supabaseAdmin

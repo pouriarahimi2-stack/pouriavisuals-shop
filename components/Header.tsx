@@ -85,7 +85,6 @@ export default function Header() {
   const [couponsLoaded, setCouponsLoaded] = useState(false);
   const [activeAnnIndex, setActiveAnnIndex] = useState(0);
 
-  // استیت‌های جستجوی زنده (Predictive Live Search)
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchProducts, setSearchProducts] = useState<SearchCatalogProduct[]>(
@@ -396,7 +395,7 @@ export default function Header() {
     return () => window.removeEventListener("resize", detectViewportDevice);
   }, []);
 
-  const syncUserSession = () => {
+  const syncUserSession = useCallback(() => {
     try {
       let resolvedName = "";
       const draftRaw = localStorage.getItem("axon_checkout_form_draft_v2027");
@@ -423,20 +422,36 @@ export default function Header() {
         } else {
           setUserLabel("پنل کاربری");
         }
-      } else {
-        setUserLabel(null);
+        return true;
       }
+      setUserLabel(null);
+      return false;
     } catch {
       setUserLabel(null);
+      return false;
     }
-  };
+  }, []);
 
   useEffect(() => {
     themeEngine.initThemeListener();
     if (typeof document !== "undefined") {
       setIsDarkMode(document.documentElement.classList.contains("dark"));
     }
-    syncUserSession();
+    const hasLocal = syncUserSession();
+    if (!hasLocal) {
+      fetch("/api/user/session", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((json) => {
+          if (json?.authenticated && json?.user) {
+            localStorage.setItem(
+              "axon_user_session",
+              JSON.stringify(json.user)
+            );
+            syncUserSession();
+          }
+        })
+        .catch(() => {});
+    }
 
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
     const onThemeChanged = (e: any) => {
@@ -452,7 +467,7 @@ export default function Header() {
       window.removeEventListener("user_auth_changed", syncUserSession);
       window.removeEventListener("theme_changed", onThemeChanged);
     };
-  }, []);
+  }, [syncUserSession]);
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -725,7 +740,6 @@ export default function Header() {
               )}
             </div>
 
-            {/* نوار جستجوی زنده دسکتاپ و تبلت */}
             <div className="hidden md:flex items-center flex-1 max-w-xs xl:max-w-sm mx-2">
               <div className="relative w-full">
                 <input
@@ -760,7 +774,6 @@ export default function Header() {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {/* دکمه جستجوی سریع در موبایل */}
               <button
                 type="button"
                 onClick={() => {
@@ -838,10 +851,8 @@ export default function Header() {
             </div>
           </div>
 
-          {/* پنجره نتایج زنده جستجو (Predictive Live Search Dropdown) */}
           {searchOpen && (
             <div className="max-w-3xl mx-auto mt-2.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl p-4 sm:p-5 space-y-4 text-xs animate-fadeIn">
-              {/* فیلد جستجو در نمای موبایل */}
               <div className="md:hidden relative">
                 <input
                   type="text"
@@ -988,7 +999,7 @@ export default function Header() {
           className="lg:hidden fixed inset-x-0 top-[88px] z-30 px-3"
           dir="rtl"
         >
-          <div className="rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl p-4 space-y-1 max-h-[75vh] overflow-y-auto">
+          <div className="rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl p-4 space-y-1.5 max-h-[75vh] overflow-y-auto">
             <Link
               href={userLabel ? "/account" : "/login"}
               onClick={() => soundEngine.playClick()}
@@ -1003,19 +1014,51 @@ export default function Header() {
             </Link>
 
             {menuItems.map((item: any) => (
-              <Link
-                key={item.id}
-                href={item.url}
-                onClick={() => soundEngine.playClick()}
-                className={
-                  "flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition " +
-                  (pathname === item.url
-                    ? "bg-[var(--accent-blue)] text-white"
-                    : "hover:bg-[var(--input-bg)] text-[var(--text-primary)]")
-                }
-              >
-                <span>{item.title}</span>
-              </Link>
+              <div key={item.id} className="space-y-1">
+                <Link
+                  href={item.url}
+                  onClick={() => soundEngine.playClick()}
+                  className={
+                    "flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition " +
+                    (pathname === item.url
+                      ? "bg-[var(--accent-blue)] text-white"
+                      : "hover:bg-[var(--input-bg)] text-[var(--text-primary)]")
+                  }
+                >
+                  <span>{item.title}</span>
+                </Link>
+
+                {Array.isArray(item.children) && item.children.length > 0 && (
+                  <div className="pr-4 border-r-2 border-[var(--card-border)] space-y-1">
+                    {item.children.map((sub2: any) => (
+                      <div key={sub2.id} className="space-y-0.5">
+                        <Link
+                          href={sub2.url || "/products"}
+                          onClick={() => soundEngine.playClick()}
+                          className="block px-3 py-2 rounded-xl text-[11px] font-bold text-[var(--text-secondary)] hover:text-[var(--accent-blue)] hover:bg-[var(--input-bg)]"
+                        >
+                          ↳ {sub2.title}
+                        </Link>
+                        {Array.isArray(sub2.children) &&
+                          sub2.children.length > 0 && (
+                            <div className="pr-4 space-y-0.5">
+                              {sub2.children.map((sub3: any) => (
+                                <Link
+                                  key={sub3.id}
+                                  href={sub3.url || "/products"}
+                                  onClick={() => soundEngine.playClick()}
+                                  className="block px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent-blue)]"
+                                >
+                                  • {sub3.title}
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>

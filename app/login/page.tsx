@@ -13,12 +13,29 @@ import {
 import { themeEngine } from "@/lib/themeEngine";
 import { supabase } from "@/lib/supabase";
 
+function normalizeDigits(raw: string): string {
+  return String(raw || "")
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .trim();
+}
+
+function normalizePhone(raw: string): string {
+  const digits = normalizeDigits(raw).replace(/\D/g, "");
+  if (digits.startsWith("98") && digits.length === 12) return "0" + digits.slice(2);
+  if (digits.startsWith("9") && digits.length === 10) return "0" + digits;
+  return digits;
+}
+
 export default function UserLoginPage() {
   const router = useRouter();
 
   const [authMode, setAuthMode] = useState<
-    "phone_check" | "otp" | "password" | "register"
+    "phone_check" | "otp" | "password" | "register" | "reset_password"
   >("phone_check");
+  const [otpPurpose, setOtpPurpose] = useState<"login" | "reset_password">(
+    "login"
+  );
   const [, setSecurityConfig] = useState<AuthSecurityConfig>(
     DEFAULT_AUTH_SECURITY_CONFIG
   );
@@ -33,6 +50,10 @@ export default function UserLoginPage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  const [resetOtpToken, setResetOtpToken] = useState("");
+  const [newResetPassword, setNewResetPassword] = useState("");
+  const [confirmResetPassword, setConfirmResetPassword] = useState("");
 
   const [regPhone, setRegPhone] = useState("");
   const [regUsername, setRegUsername] = useState("");
@@ -50,8 +71,10 @@ export default function UserLoginPage() {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const applySecurityConfig = (info: any) => {
-    if (info && info.auth_security_config) {
-      const sec = info.auth_security_config;
+    const sec =
+      info?.auth_security_config ||
+      info?.homepage_layout_config?.auth_security_config;
+    if (sec) {
       setSecurityConfig(sec);
       const rawLen = Number(sec.userDeck?.otpLength || 4);
       const len = Math.min(8, Math.max(4, rawLen));
@@ -96,9 +119,12 @@ export default function UserLoginPage() {
     }, 450);
   };
 
-  const requestOtpCode = async (targetPhone: string) => {
-    const clean = targetPhone.replace(/\D/g, "");
-    if (clean.length !== 11 || !clean.startsWith("09")) {
+  const requestOtpCode = async (
+    targetPhone: string,
+    purpose: "login" | "reset_password" = "login"
+  ) => {
+    const clean = normalizePhone(targetPhone);
+    if (!/^09\d{9}$/.test(clean)) {
       setErrorMessage("شماره موبایل باید ۱۱ رقم و با ۰۹ شروع شود.");
       return false;
     }
@@ -113,8 +139,11 @@ export default function UserLoginPage() {
       });
       const data = await res.json();
       if (res.ok && (data.success || data.sent !== false)) {
+        const serverLen = Number(data.otpLength || otpLength);
+        setOtpLength(serverLen);
         setPhone(clean);
-        setDigits(Array(otpLength).fill(""));
+        setOtpPurpose(purpose);
+        setDigits(Array(serverLen).fill(""));
         setAuthMode("otp");
         setSuccessMessage(
           data.message || "کد تایید به شماره " + clean + " ارسال گردید."
@@ -144,12 +173,13 @@ export default function UserLoginPage() {
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    const clean = phone.replace(/\D/g, "");
-    if (clean.length !== 11 || !clean.startsWith("09")) {
+    const clean = normalizePhone(phone);
+    if (!/^09\d{9}$/.test(clean)) {
       setErrorMessage("شماره موبایل باید ۱۱ رقم و با ۰۹ شروع شود.");
       return;
     }
 
+    setPhone(clean);
     setLoading(true);
 
     try {
@@ -174,14 +204,14 @@ export default function UserLoginPage() {
         );
       }
     } catch {
-      await requestOtpCode(clean);
+      await requestOtpCode(clean, "login");
     } finally {
       setLoading(false);
     }
   };
 
   const handleDigitChange = (index: number, val: string) => {
-    const clean = val.replace(/\D/g, "").slice(-1);
+    const clean = normalizeDigits(val).replace(/\D/g, "").slice(-1);
     const newDigits = [...digits];
     newDigits[index] = clean;
     setDigits(newDigits);
@@ -219,16 +249,32 @@ export default function UserLoginPage() {
     setErrorMessage(null);
 
     try {
-      const cleanPhone = phone.replace(/\D/g, "");
+      const cleanPhone = normalizePhone(phone);
+      const cleanCode = normalizeDigits(code).replace(/\D/g, "");
       const res = await fetch("/api/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: cleanPhone, code, action: "verify" }),
+        body: JSON.stringify({
+          phone: cleanPhone,
+          code: cleanCode,
+          action: "verify",
+        }),
       });
 
       const data = await res.json();
 
       if (res.ok && (data.verified === true || data.success === true)) {
+        if (otpPurpose === "reset_password") {
+          setAnimPhase("idle");
+          setLoading(false);
+          setResetOtpToken(data.otpVerificationToken || data.token || "");
+          setNewResetPassword("");
+          setConfirmResetPassword("");
+          setAuthMode("reset_password");
+          setSuccessMessage("شماره تایید شد. لطفاً کلمه عبور جدید را وارد کنید:");
+          return;
+        }
+
         const userObj = data.user || {
           phone: cleanPhone,
           token: data.token || "USER-VERIFIED",
@@ -289,7 +335,7 @@ export default function UserLoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "login_credentials",
-          identifier: identifier.trim(),
+          identifier: normalizeDigits(identifier).trim(),
           password,
         }),
       });
@@ -313,11 +359,64 @@ export default function UserLoginPage() {
     }
   };
 
+  const handleSaveResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    soundEngine.playClick();
+    setErrorMessage(null);
+
+    if (newResetPassword.trim().length < 6) {
+      setErrorMessage("کلمه عبور جدید باید حداقل ۶ کاراکتر باشد.");
+      return;
+    }
+    if (newResetPassword !== confirmResetPassword) {
+      setErrorMessage("کلمه عبور جدید با تکرار آن یکسان نیست.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/recovery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reset_customer_password",
+          phone: normalizePhone(phone),
+          newPassword: newResetPassword.trim(),
+          otpVerificationToken: resetOtpToken,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        soundEngine.playSuccess();
+        if (data.user) {
+          localStorage.setItem("axon_user_session", JSON.stringify(data.user));
+          window.dispatchEvent(
+            new CustomEvent("user_auth_changed", { detail: data.user })
+          );
+        }
+        setAnimPhase("verified");
+        setTimeout(() => router.push("/"), 1800);
+      } else {
+        setErrorMessage(data.message || "خطا در تغییر کلمه عبور.");
+        setLoading(false);
+      }
+    } catch {
+      setErrorMessage("خطا در برقراری ارتباط با سرور.");
+      setLoading(false);
+    }
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     soundEngine.playClick();
     setErrorMessage(null);
     setSuccessMessage(null);
+
+    const cleanRegPhone = normalizePhone(regPhone);
+    if (!/^09\d{9}$/.test(cleanRegPhone)) {
+      setErrorMessage("شماره موبایل باید ۱۱ رقم و با ۰۹ شروع شود.");
+      return;
+    }
 
     if (regPassword.length < 6) {
       setErrorMessage("کلمه عبور باید حداقل ۶ کاراکتر باشد.");
@@ -337,7 +436,7 @@ export default function UserLoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "register",
-          phone: regPhone.replace(/\D/g, ""),
+          phone: cleanRegPhone,
           username: regUsername.trim() || undefined,
           password: regPassword.trim(),
           email: regEmail.trim() || undefined,
@@ -366,6 +465,8 @@ export default function UserLoginPage() {
 
   const slotWidthPx = otpLength >= 8 ? 36 : otpLength >= 6 ? 44 : 56;
   const slotHeightPx = otpLength >= 8 ? 50 : otpLength >= 6 ? 60 : 72;
+  const cleanIdentifierPhone = normalizePhone(identifier);
+  const hasValidIdentifierPhone = /^09\d{9}$/.test(cleanIdentifierPhone);
 
   return (
     <div
@@ -426,7 +527,7 @@ export default function UserLoginPage() {
                     }}
                     className={
                       "flex-1 py-2 rounded-xl transition cursor-pointer text-center " +
-                      (authMode === "password"
+                      (authMode === "password" || authMode === "reset_password"
                         ? "bg-[var(--accent-blue)] text-white shadow-md"
                         : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]")
                     }
@@ -458,6 +559,8 @@ export default function UserLoginPage() {
                       ? "ورود به حساب کاربری"
                       : authMode === "password"
                       ? "ورود با رمز عبور"
+                      : authMode === "reset_password"
+                      ? "تعیین کلمه عبور جدید"
                       : authMode === "register"
                       ? "ثبت‌نام کاربر جدید"
                       : "کد تایید پیامکی"}
@@ -491,7 +594,7 @@ export default function UserLoginPage() {
                         type="tel"
                         required
                         dir="ltr"
-                        maxLength={11}
+                        maxLength={13}
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="09123456789"
@@ -554,17 +657,76 @@ export default function UserLoginPage() {
                     >
                       {loading ? "در حال ورود..." : "ورود به حساب کاربری ←"}
                     </button>
-                    {identifier &&
-                      /^09\d{9}$/.test(identifier.replace(/\D/g, "")) && (
+                    {hasValidIdentifierPhone && (
+                      <div className="grid grid-cols-1 gap-2 pt-1">
                         <button
                           type="button"
                           disabled={loading}
-                          onClick={() => requestOtpCode(identifier)}
+                          onClick={() =>
+                            requestOtpCode(cleanIdentifierPhone, "login")
+                          }
                           className="w-full py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold text-[var(--accent-blue)] transition cursor-pointer"
                         >
-                          ورود با کد تایید یکبار مصرف پیامکی (OTP) 💬
+                          ورود سریع با کد پیامکی (OTP) 💬
                         </button>
-                      )}
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={() =>
+                            requestOtpCode(
+                              cleanIdentifierPhone,
+                              "reset_password"
+                            )
+                          }
+                          className="w-full py-2 rounded-xl text-[11px] font-bold text-amber-500 hover:underline transition cursor-pointer"
+                        >
+                          🔑 فراموشی رمز عبور؟ تغییر رمز با کد پیامکی
+                        </button>
+                      </div>
+                    )}
+                  </form>
+                )}
+
+                {authMode === "reset_password" && (
+                  <form
+                    onSubmit={handleSaveResetPassword}
+                    className="space-y-3.5 text-xs"
+                  >
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        کلمه عبور جدید (حداقل ۶ کاراکتر) *
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={newResetPassword}
+                        onChange={(e) => setNewResetPassword(e.target.value)}
+                        className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none focus:border-[var(--accent-blue)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                        تکرار کلمه عبور جدید *
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={confirmResetPassword}
+                        onChange={(e) =>
+                          setConfirmResetPassword(e.target.value)
+                        }
+                        className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none focus:border-[var(--accent-blue)]"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg cursor-pointer disabled:opacity-50"
+                    >
+                      {loading
+                        ? "در حال ذخیره..."
+                        : "💾 ثبت کلمه عبور جدید و ورود"}
+                    </button>
                   </form>
                 )}
 
@@ -578,7 +740,7 @@ export default function UserLoginPage() {
                         type="tel"
                         required
                         dir="ltr"
-                        maxLength={11}
+                        maxLength={13}
                         value={regPhone}
                         onChange={(e) => setRegPhone(e.target.value)}
                         className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none focus:border-[var(--accent-blue)]"
@@ -593,8 +755,8 @@ export default function UserLoginPage() {
                         required
                         value={regUsername}
                         onChange={(e) => setRegUsername(e.target.value)}
-                        placeholder="نام کاربری انگلیسی..."
-                        className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none focus:border-[var(--accent-blue)]"
+                        placeholder="نام کاربری..."
+                        className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-center outline-none focus:border-[var(--accent-blue)]"
                       />
                     </div>
                     <div>
@@ -693,7 +855,7 @@ export default function UserLoginPage() {
                     <div className="flex items-center justify-between text-[11px] font-bold px-1">
                       <button
                         type="button"
-                        onClick={() => requestOtpCode(phone)}
+                        onClick={() => requestOtpCode(phone, otpPurpose)}
                         disabled={loading}
                         className="text-[var(--accent-blue)] hover:underline cursor-pointer disabled:opacity-50"
                       >

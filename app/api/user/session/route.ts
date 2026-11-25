@@ -32,7 +32,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST() {
-  const response = NextResponse.json({ success: true, message: "با موفقیت خارج شدید." });
+  const response = NextResponse.json({
+    success: true,
+    message: "با موفقیت خارج شدید.",
+  });
   response.cookies.delete(CUSTOMER_COOKIE_NAME);
+  response.cookies.delete("axon_verified_phone_token");
   return response;
 }

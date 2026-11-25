@@ -33,9 +33,9 @@ export async function POST(req: NextRequest) {
       .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
       .replace(/\D/g, "");
     const province = String(
-      customer.province || body.province || "تهران"
+      customer.province || body.province || ""
     ).trim();
-    const city = String(customer.city || body.city || "تهران").trim();
+    const city = String(customer.city || body.city || "").trim();
     const address = String(customer.address || body.address || "").trim();
     const postalCode = String(
       customer.postalCode || body.postal_code || ""
@@ -68,6 +68,13 @@ export async function POST(req: NextRequest) {
       siteRow?.homepage_layout_config,
       siteRow
     );
+    const storeDomain = (
+      sysRules.canonicalBaseUrl ||
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      "https://axoncore.ir"
+    )
+      .replace(/^https?:\/\//i, "")
+      .replace(/\/+$/, "");
 
     if (sysRules.maintenanceMode) {
       return NextResponse.json(
@@ -364,8 +371,29 @@ export async function POST(req: NextRequest) {
       afterDiscount + vatAmount + shippingCost
     );
 
-    // کسر ایمن از اعتبار کیف پول در سمت سرور
+    const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const { data: recentDuplicate } = await supabaseAdmin
+      .from("orders")
+      .select("id, final_amount, tracking_code, order_number, status")
+      .eq("phone", cleanPhone)
+      .in("status", ["pending", "paid"])
+      .gte("created_at", twoMinsAgo)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (recentDuplicate) {
+      return NextResponse.json({
+        success: true,
+        paidByWallet: recentDuplicate.status === "paid",
+        order: recentDuplicate,
+        message: "✓ سفارش شما پیش از این ثبت شده است.",
+      });
+    }
+
+    // محاسبه و کسر ایمن اعتبار کیف پول
     let walletUsedAmount = 0;
+    let prevWalletBalance = 0;
     let finalAmount = grandTotalBeforeWallet;
 
     if (requestedUseWallet && grandTotalBeforeWallet > 0) {
@@ -376,12 +404,11 @@ export async function POST(req: NextRequest) {
           .eq("customer_phone", cleanPhone)
           .maybeSingle();
 
-        const availableWallet = Math.max(0, Number(walletRow?.balance || 0));
-        if (availableWallet > 0) {
-          walletUsedAmount = Math.min(availableWallet, grandTotalBeforeWallet);
+        prevWalletBalance = Math.max(0, Number(walletRow?.balance || 0));
+        if (prevWalletBalance > 0) {
+          walletUsedAmount = Math.min(prevWalletBalance, grandTotalBeforeWallet);
           finalAmount = Math.max(0, grandTotalBeforeWallet - walletUsedAmount);
 
-          // رعایت حداقل مبلغ ۱۰۰۰ تومان در صورت انتقال به درگاه بانکی
           if (
             finalAmount > 0 &&
             finalAmount < 1000 &&
@@ -393,7 +420,7 @@ export async function POST(req: NextRequest) {
 
           const nextWalletBalance = Math.max(
             0,
-            availableWallet - walletUsedAmount
+            prevWalletBalance - walletUsedAmount
           );
           await supabaseAdmin
             .from("customer_wallets")
@@ -423,38 +450,12 @@ export async function POST(req: NextRequest) {
       walletUsedAmount > 0
         ? ` [کسر از کیف پول: ${walletUsedAmount.toLocaleString("fa-IR")} تومان]`
         : "";
+    const locationPrefix = [province, city].filter(Boolean).join("، ");
     const fullAddress =
-      province +
-      "، " +
-      city +
-      " — " +
+      (locationPrefix ? `${locationPrefix} — ` : "") +
       address +
       (notes ? " (" + notes + ")" : "") +
       walletNoteSuffix;
-
-    const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-    const { data: recentDuplicate } = await supabaseAdmin
-      .from("orders")
-      .select("id, final_amount, tracking_code, order_number, status")
-      .eq("phone", cleanPhone)
-      .in("status", ["pending", "paid"])
-      .gte("created_at", twoMinsAgo)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (recentDuplicate) {
-      if (Math.abs(Number(recentDuplicate.final_amount) - finalAmount) <= 100) {
-        return NextResponse.json({
-          success: true,
-          paidByWallet: recentDuplicate.status === "paid",
-          walletUsed: walletUsedAmount,
-          order: recentDuplicate,
-          message:
-            "✓ سفارش شما پیش از این ثبت شده است.",
-        });
-      }
-    }
 
     const generatedUuid = randomUUID();
     const orderPayload: Record<string, any> = {
@@ -482,7 +483,7 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    let savedOrder: any = orderPayload;
+    let savedOrder: any = null;
     const { data: insertedOrder, error: orderErr } = await supabaseAdmin
       .from("orders")
       .insert([orderPayload])
@@ -504,12 +505,29 @@ export async function POST(req: NextRequest) {
         tracking_code: trackingCode,
         created_at: new Date().toISOString(),
       };
-      const { data: minInserted } = await supabaseAdmin
+      const { data: minInserted, error: minErr } = await supabaseAdmin
         .from("orders")
         .insert([minimalOrder])
         .select()
         .maybeSingle();
-      if (minInserted) savedOrder = minInserted;
+
+      if (!minErr && minInserted) {
+        savedOrder = minInserted;
+      } else {
+        // بازگردانی اعتبار کیف پول در صورت خطا در ثبت رکورد سفارش
+        if (walletUsedAmount > 0) {
+          await supabaseAdmin
+            .from("customer_wallets")
+            .update({
+              balance: prevWalletBalance,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("customer_phone", cleanPhone);
+        }
+        throw new Error(
+          minErr?.message || orderErr?.message || "خطا در ذخیره سفارش در دیتابیس."
+        );
+      }
     }
 
     if (savedOrder && validCouponRow) {
@@ -591,7 +609,7 @@ export async function POST(req: NextRequest) {
       try {
         await sendTextSMS(
           cleanPhone,
-          `${fullName} عزیز، سفارش شما به شماره ${orderNumber} از طریق اعتبار کیف پول تسویه و ثبت شد. کد رهگیری: ${trackingCode} | axoncore.ir`
+          `${fullName} عزیز، سفارش شما به شماره ${orderNumber} از طریق اعتبار کیف پول تسویه و ثبت شد. کد رهگیری: ${trackingCode} | ${storeDomain}`
         );
       } catch {}
     }

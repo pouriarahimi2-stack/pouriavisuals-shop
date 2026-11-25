@@ -1,7 +1,7 @@
 // File Path: app/checkout/payment/page.tsx
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
@@ -11,6 +11,7 @@ function PaymentGatewayContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { clearCart } = useCart() as any;
+  const initiatedRef = useRef(false);
 
   const orderId = searchParams.get("orderId") || "";
   const amount = Number(searchParams.get("amount") || 0);
@@ -65,14 +66,16 @@ function PaymentGatewayContent() {
   };
 
   const verifyZarinpalCallback = async () => {
-    if (statusParam && statusParam.toUpperCase() !== "OK") {
-      setPhase("failed");
-      setMessage("پرداخت توسط شما لغو شد یا تراکنش ناموفق بود.");
-      return;
-    }
+    const isCancelledByBank = Boolean(
+      statusParam && statusParam.toUpperCase() !== "OK"
+    );
 
     setPhase("verifying");
-    setMessage("در حال استعلام و تایید نهایی تراکنش از زرین‌پال...");
+    setMessage(
+      isCancelledByBank
+        ? "در حال ثبت انصراف و بازگرداندن موجودی و اعتبار کیف پول..."
+        : "در حال استعلام و تایید نهایی تراکنش از زرین‌پال..."
+    );
 
     try {
       const res = await fetch("/api/payment/verify", {
@@ -106,15 +109,25 @@ function PaymentGatewayContent() {
         }, 3500);
       } else {
         setPhase("failed");
-        setMessage(json.message || "تراکنش در زرین‌پال تایید نشد.");
+        setMessage(
+          json.message ||
+            "پرداخت توسط شما لغو شد یا تراکنش ناموفق بود."
+        );
       }
     } catch {
       setPhase("failed");
-      setMessage("خطا در تایید تراکنش.");
+      setMessage(
+        isCancelledByBank
+          ? "پرداخت توسط شما لغو شد یا تراکنش ناموفق بود."
+          : "خطا در تایید تراکنش."
+      );
     }
   };
 
   useEffect(() => {
+    if (initiatedRef.current) return;
+    initiatedRef.current = true;
+
     if (walletPaid && orderId) {
       if (typeof clearCart === "function") clearCart();
       const timer = setTimeout(() => {
@@ -128,7 +141,7 @@ function PaymentGatewayContent() {
     } else if (orderId) {
       startZarinpalPayment();
     }
-  }, [authority, orderId, walletPaid]);
+  }, [authority, orderId, walletPaid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div
@@ -175,7 +188,7 @@ function PaymentGatewayContent() {
               <div className="w-8 h-8 rounded-full border-3 border-emerald-500 border-t-transparent animate-spin" />
             </div>
             <h1 className="text-lg font-black text-emerald-400">
-              در حال تایید تراکنش شاپرک...
+              در حال بررسی وضعیت تراکنش...
             </h1>
             <p className="text-xs text-[var(--text-secondary)]">{message}</p>
           </>
@@ -256,13 +269,12 @@ function PaymentGatewayContent() {
             </div>
 
             <div className="space-y-2.5 pt-2">
-              <button
-                type="button"
-                onClick={startZarinpalPayment}
-                className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-lg cursor-pointer"
+              <Link
+                href="/account"
+                className="block w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-lg"
               >
-                🔄 تلاش مجدد و اتصال به درگاه زرین‌پال
-              </button>
+                مشاهده سفارش‌ها و موجودی کیف پول ←
+              </Link>
               <Link
                 href="/checkout"
                 className="block w-full py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold"

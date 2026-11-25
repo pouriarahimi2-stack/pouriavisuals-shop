@@ -10,7 +10,6 @@ import { soundEngine } from "@/lib/soundEngine";
 import { IRAN_PROVINCES_CITIES } from "@/lib/iranProvinces";
 import { formatPrice } from "@/lib/formatters";
 import { supabase } from "@/lib/supabase";
-import { PricingEngine } from "@/lib/pricingEngine";
 
 const CHECKOUT_DRAFT_KEY = "axon_checkout_form_draft_v2027";
 
@@ -145,7 +144,6 @@ export default function CheckoutPage() {
   );
   const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean>(true);
 
-  // استیت‌های کیف پول مشتری
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [useWallet, setUseWallet] = useState<boolean>(false);
 
@@ -304,13 +302,11 @@ export default function CheckoutPage() {
     else if (shippingMethod === "tipax") shippingCost = 0;
   }
 
-  const invoice = PricingEngine.calculateInvoiceBreakdown(cartItems);
+  // همسان‌سازی دقیق فرمول مالیات با محاسبه سرور (/api/checkout)
   const vatAmount =
-    financialRules.vatPercent <= 0
-      ? 0
-      : financialRules.vatPercent === 10 && invoice.totalVatAmount > 0
-      ? invoice.totalVatAmount
-      : Math.round((finalPayable * financialRules.vatPercent) / 100);
+    finalPayable > 0 && financialRules.vatPercent > 0
+      ? Math.round((finalPayable * financialRules.vatPercent) / 100)
+      : 0;
 
   const grandTotalBeforeWallet = Math.max(
     0,
@@ -454,6 +450,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           otpVerificationToken: tokenToUse,
           useWallet: Boolean(useWallet && walletBalance > 0),
+          shippingMethod,
           customer: {
             fullName,
             phone: cleanPhone,
@@ -898,7 +895,7 @@ export default function CheckoutPage() {
             <div className="space-y-2 text-[11px]">
               {cartItems.map((item: any, idx: number) => (
                 <div
-                  key={item.id || idx}
+                  key={item.cartKey || item.id || idx}
                   className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]"
                 >
                   {(item.image || item.image_url) && (
@@ -931,15 +928,10 @@ export default function CheckoutPage() {
                     </div>
                   </div>
                   <div className="font-mono font-black text-[var(--accent-blue)] whitespace-nowrap text-[11px]">
-                    {typeof formatPrice === "function"
-                      ? formatPrice(
-                          (item.discount_price || item.price || 0) *
-                            (item.quantity || 1)
-                        )
-                      : (
-                          (item.discount_price || item.price || 0) *
-                          (item.quantity || 1)
-                        ).toLocaleString("fa-IR")}{" "}
+                    {formatPrice(
+                      (item.discount_price || item.price || 0) *
+                        (item.quantity || 1)
+                    )}{" "}
                     ت
                   </div>
                 </div>
@@ -947,7 +939,6 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {/* کارت استفاده از اعتبار کیف پول مشتری */}
           {walletBalance > 0 && (
             <label
               className={
@@ -987,7 +978,6 @@ export default function CheckoutPage() {
             </label>
           )}
 
-          {/* کادر ثبت کد تخفیف */}
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
             <div className="flex items-center justify-between">
               <span className="font-black text-xs text-[var(--text-primary)]">
@@ -1030,7 +1020,7 @@ export default function CheckoutPage() {
                         e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "")
                       )
                     }
-                    placeholder="AXON-CJZU"
+                    placeholder="کد تخفیف..."
                     className="flex-1 min-w-[80px] px-3.5 py-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-black uppercase outline-none focus:border-[var(--accent-blue)] text-xs"
                   />
                   <button
@@ -1076,10 +1066,10 @@ export default function CheckoutPage() {
             {vatAmount > 0 && (
               <div className="flex justify-between text-slate-500 text-[10px]">
                 <span>
-                  شامل مالیات بر ارزش افزوده ({financialRules.vatPercent}٪):
+                  مالیات بر ارزش افزوده ({financialRules.vatPercent}٪):
                 </span>
                 <span className="font-mono">
-                  {formatPrice(vatAmount)} {currency}
+                  + {formatPrice(vatAmount)} {currency}
                 </span>
               </div>
             )}

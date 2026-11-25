@@ -20,8 +20,10 @@ const ALLOWED_MIME_TYPES = new Set([
 function sanitizeSvgContent(svgText: string): string {
   return svgText
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/<foreignObject[\s\S]*?>[\s\S]*?<\/foreignObject>/gi, "")
     .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, "")
-    .replace(/javascript:/gi, "");
+    .replace(/javascript:/gi, "")
+    .replace(/data:text\/html/gi, "");
 }
 
 export async function POST(req: NextRequest) {
@@ -66,7 +68,6 @@ export async function POST(req: NextRequest) {
       ? "image/gif"
       : mime || "image/png";
 
-    // تحویل مستقیم SVG به صورت Data URI برای لود آنی در ایران بدون نیاز به ارتباط با دامنه خارجی
     if (isSvg) {
       const cleanSvg = sanitizeSvgContent(buffer.toString("utf8"));
       buffer = Buffer.from(cleanSvg, "utf8");
@@ -82,31 +83,32 @@ export async function POST(req: NextRequest) {
       .toString(36)
       .slice(2, 7)}.${ext.replace(/[^a-z0-9]/g, "") || "png"}`;
 
-    try {
-      const bucketName = "products";
-      const filePath = `uploads/${safeFileName}`;
-      const { error: upErr } = await supabaseAdmin.storage
-        .from(bucketName)
-        .upload(filePath, buffer, {
-          contentType,
-          cacheControl: "31536000",
-          upsert: true,
-        });
-
-      if (!upErr) {
-        const { data: pubUrl } = supabaseAdmin.storage
+    for (const bucketName of ["products", "product-images"]) {
+      try {
+        const filePath = `uploads/${safeFileName}`;
+        const { error: upErr } = await supabaseAdmin.storage
           .from(bucketName)
-          .getPublicUrl(filePath);
-        if (pubUrl?.publicUrl) {
-          return NextResponse.json({
-            success: true,
-            url: "/api/media-proxy?url=" + encodeURIComponent(pubUrl.publicUrl),
-            rawUrl: pubUrl.publicUrl,
-            mime: contentType,
+          .upload(filePath, buffer, {
+            contentType,
+            cacheControl: "31536000",
+            upsert: true,
           });
+
+        if (!upErr) {
+          const { data: pubUrl } = supabaseAdmin.storage
+            .from(bucketName)
+            .getPublicUrl(filePath);
+          if (pubUrl?.publicUrl) {
+            return NextResponse.json({
+              success: true,
+              url: "/api/media-proxy?url=" + encodeURIComponent(pubUrl.publicUrl),
+              rawUrl: pubUrl.publicUrl,
+              mime: contentType,
+            });
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
 
     const base64Url = `data:${contentType};base64,${buffer.toString("base64")}`;
     return NextResponse.json({

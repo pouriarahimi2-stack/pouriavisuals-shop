@@ -35,7 +35,6 @@ export default function ContactDock() {
   const [isMobile, setIsMobile] = useState(false);
   const { isCartOpen } = useCart() as any;
 
-  // وضعیت نشست گفتگوی زنده کاربر
   const [sessionId, setSessionId] = useState<string>("");
   const [chatToken, setChatToken] = useState<string>("");
   const [fullName, setFullName] = useState<string>("");
@@ -43,13 +42,11 @@ export default function ContactDock() {
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [filesSentCount, setFilesSentCount] = useState<number>(0);
 
-  // کپچای گرافیکی سرور برای شروع گفتگو
   const [captchaImage, setCaptchaImage] = useState<string>("");
   const [captchaToken, setCaptchaToken] = useState<string>("");
   const [captchaInput, setCaptchaInput] = useState<string>("");
   const [loadingCaptcha, setLoadingCaptcha] = useState<boolean>(false);
 
-  // پیام در حال تایپ مشتری
   const [msgText, setMsgText] = useState<string>("");
   const [attachmentData, setAttachmentData] = useState<{
     url: string;
@@ -61,6 +58,16 @@ export default function ContactDock() {
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const sysSettings =
+    siteInfo?.settings ||
+    siteInfo?.system_settings ||
+    siteInfo?.homepage_layout_config?.system_settings ||
+    {};
+
+  const storeName = String(
+    sysSettings.site_name || siteInfo?.site_name || "فروشگاه"
+  ).trim();
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -140,11 +147,13 @@ export default function ContactDock() {
     loadConfig();
     window.addEventListener("theme_builder_updated", loadConfig);
 
+    let restoredSession = false;
     try {
       const savedRaw = localStorage.getItem(STORAGE_KEY);
       if (savedRaw) {
         const parsed = JSON.parse(savedRaw);
         if (parsed?.sessionId && parsed?.token) {
+          restoredSession = true;
           setSessionId(parsed.sessionId);
           setChatToken(parsed.token);
           setFullName(parsed.fullName || "");
@@ -153,6 +162,24 @@ export default function ContactDock() {
         }
       }
     } catch {}
+
+    if (!restoredSession) {
+      try {
+        const userRaw = localStorage.getItem("axon_user_session");
+        if (userRaw) {
+          const u = JSON.parse(userRaw);
+          if (u?.full_name || u?.name) {
+            const candidateName = String(u.full_name || u.name).trim();
+            if (!/^0?9\d{9}$/.test(candidateName)) {
+              setFullName(candidateName);
+            }
+          }
+          if (u?.phone) {
+            setPhone(String(u.phone).trim());
+          }
+        }
+      } catch {}
+    }
 
     const handleOpenEvent = () => {
       setIsOpen(true);
@@ -329,12 +356,6 @@ export default function ContactDock() {
     }
   };
 
-  const sysSettings =
-    siteInfo?.settings ||
-    siteInfo?.system_settings ||
-    siteInfo?.homepage_layout_config?.system_settings ||
-    {};
-
   if (sysSettings.floatingChatEnabled === false) return null;
   if (isCartOpen) return null;
 
@@ -355,7 +376,7 @@ export default function ContactDock() {
           left: chatConfig.side === "left" ? "20px" : "auto",
           right: chatConfig.side === "right" ? "20px" : "auto",
         }}
-        title="گفتگوی زنده با کارشناسان آکسون کور"
+        title={`گفتگوی زنده با کارشناسان ${storeName}`}
         className="fixed z-[9999] rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 text-white shadow-[0_8px_30px_rgba(37,99,235,0.5)] hover:scale-105 active:scale-95 transition-transform flex items-center justify-center cursor-pointer border-2 border-white/20"
       >
         <span className="relative flex items-center justify-center w-full h-full">
@@ -393,7 +414,7 @@ export default function ContactDock() {
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
                 <div>
                   <div className="font-black text-sm">
-                    پشتیبانی آنلاین آکسون کور
+                    پشتیبانی آنلاین {storeName}
                   </div>
                   <div className="text-[10px] text-white/80 font-medium">
                     پاسخگویی مستقیم کارشناسان فروش و فنی
@@ -422,7 +443,7 @@ export default function ContactDock() {
               >
                 <div className="space-y-4">
                   <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] text-[var(--text-secondary)] leading-relaxed font-medium">
-                    👋 سلام! برای شروع گفتگوی زنده با کارشناسان آکسون کور، نام و شماره همراه خود را وارد نمایید:
+                    👋 سلام! برای شروع گفتگوی زنده با کارشناسان {storeName}، نام و شماره همراه خود را وارد نمایید:
                   </div>
 
                   <div>
@@ -434,7 +455,7 @@ export default function ContactDock() {
                       required
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      placeholder="مثال: علی رضایی"
+                      placeholder="نام و نام خانوادگی"
                       className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                     />
                   </div>

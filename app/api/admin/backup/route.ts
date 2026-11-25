@@ -23,6 +23,8 @@ export async function buildFullSiteSnapshot() {
     categoriesRes,
     ordersRes,
     customersRes,
+    registeredUsersRes,
+    walletsRes,
     couponsRes,
     bannersRes,
     postsRes,
@@ -31,6 +33,7 @@ export async function buildFullSiteSnapshot() {
     siteInfoRes,
     stylesRes,
     messagesRes,
+    contactMessagesRes,
     inventoryLogsRes,
     reviewsRes,
     productReviewsRes,
@@ -39,6 +42,8 @@ export async function buildFullSiteSnapshot() {
     supabaseAdmin.from("categories").select("*").limit(50000),
     supabaseAdmin.from("orders").select("*").limit(50000),
     supabaseAdmin.from("crm_customers").select("*").limit(50000),
+    supabaseAdmin.from("customers").select("*").limit(50000),
+    supabaseAdmin.from("customer_wallets").select("*").limit(50000),
     supabaseAdmin.from("coupons").select("*").limit(50000),
     supabaseAdmin.from("banners").select("*").limit(50000),
     supabaseAdmin.from("posts").select("*").limit(50000),
@@ -47,6 +52,7 @@ export async function buildFullSiteSnapshot() {
     supabaseAdmin.from("site_info").select("*").limit(50000),
     supabaseAdmin.from("site_styles").select("*").limit(50000),
     supabaseAdmin.from("messages").select("*").limit(50000),
+    supabaseAdmin.from("contact_messages").select("*").limit(50000),
     supabaseAdmin.from("inventory_logs").select("*").limit(50000),
     supabaseAdmin.from("reviews").select("*").limit(50000),
     supabaseAdmin.from("product_reviews").select("*").limit(50000),
@@ -60,6 +66,8 @@ export async function buildFullSiteSnapshot() {
     categories: categoriesRes.data || [],
     orders: ordersRes.data || [],
     crm_customers: customersRes.data || [],
+    customers: registeredUsersRes.data || [],
+    customer_wallets: walletsRes.data || [],
     coupons: couponsRes.data || [],
     banners: bannersRes.data || [],
     posts: postsRes.data || [],
@@ -68,6 +76,7 @@ export async function buildFullSiteSnapshot() {
     site_info: siteInfoRes.data || [],
     site_styles: stylesRes.data || [],
     messages: messagesRes.data || [],
+    contact_messages: contactMessagesRes.data || [],
     inventory_logs: inventoryLogsRes.data || [],
     reviews: reviewsRes.data || [],
     product_reviews: productReviewsRes.data || [],
@@ -273,10 +282,17 @@ export async function POST(req: NextRequest) {
 
     const restoredCounts: Record<string, number> = {};
 
-    const upsertTable = async (tableName: string, rows: any[]) => {
+    const upsertTable = async (
+      tableName: string,
+      rows: any[],
+      conflictCol?: string
+    ) => {
       if (!Array.isArray(rows) || rows.length === 0) return;
       try {
-        const { error } = await supabaseAdmin.from(tableName).upsert(rows);
+        const opts = conflictCol ? { onConflict: conflictCol } : undefined;
+        const { error } = await supabaseAdmin
+          .from(tableName)
+          .upsert(rows, opts);
         if (!error) restoredCounts[tableName] = rows.length;
       } catch {}
     };
@@ -286,6 +302,8 @@ export async function POST(req: NextRequest) {
       upsertTable("categories", tables.categories),
       upsertTable("orders", tables.orders),
       upsertTable("crm_customers", tables.crm_customers),
+      upsertTable("customers", tables.customers),
+      upsertTable("customer_wallets", tables.customer_wallets, "customer_phone"),
       upsertTable("coupons", tables.coupons),
       upsertTable("banners", tables.banners),
       upsertTable("posts", tables.posts),
@@ -294,6 +312,7 @@ export async function POST(req: NextRequest) {
       upsertTable("site_info", tables.site_info),
       upsertTable("site_styles", tables.site_styles),
       upsertTable("messages", tables.messages),
+      upsertTable("contact_messages", tables.contact_messages),
       upsertTable("inventory_logs", tables.inventory_logs),
       upsertTable("reviews", tables.reviews),
       upsertTable("product_reviews", tables.product_reviews),

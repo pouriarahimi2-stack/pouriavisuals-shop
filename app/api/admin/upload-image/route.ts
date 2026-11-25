@@ -1,5 +1,4 @@
 // File Path: app/api/admin/upload-image/route.ts
-// آپلود تصویر محصول به Supabase Storage bucket: product-images
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
@@ -11,14 +10,18 @@ const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "im
 const ALLOWED_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
 const BUCKET = "product-images";
 
-export async function OPTIONS() {
-  return NextResponse.json({}, {
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization, Cookie",
-    },
-  });
+export async function OPTIONS(req: NextRequest) {
+  const origin = req.headers.get("origin") || "https://axoncore.ir";
+  return NextResponse.json(
+    {},
+    {
+      headers: {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      },
+    }
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -36,7 +39,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "فایلی ارسال نشده." }, { status: 400 });
     }
 
-    // بررسی نوع فایل
     if (!ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json(
         { success: false, message: "فقط تصاویر JPG، PNG، WebP و GIF مجاز هستند." },
@@ -44,7 +46,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // بررسی حجم فایل
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
         { success: false, message: "حجم فایل نباید بیشتر از ۵ مگابایت باشد." },
@@ -52,7 +53,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // بررسی پسوند
     const ext = "." + file.name.split(".").pop()?.toLowerCase();
     if (!ALLOWED_EXTS.includes(ext)) {
       return NextResponse.json(
@@ -61,7 +61,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // نام یکتای فایل
     const safeName = productId
       ? `${productId}/${Date.now()}${ext}`
       : `misc/${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
@@ -69,7 +68,6 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // آپلود به Supabase Storage
     const { error: uploadErr } = await supabaseAdmin.storage
       .from(BUCKET)
       .upload(safeName, buffer, {
@@ -85,16 +83,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // دریافت URL عمومی
     const { data: urlData } = supabaseAdmin.storage
       .from(BUCKET)
       .getPublicUrl(safeName);
 
     const publicUrl = urlData?.publicUrl || "";
 
-    // بروزرسانی image_url در جدول products اگر product_id داشته باشیم
     if (productId && /^[0-9a-f-]{36}$/i.test(productId)) {
-      // دریافت رکورد فعلی
       const { data: existing } = await supabaseAdmin
         .from("products")
         .select("description")
@@ -109,15 +104,16 @@ export async function POST(req: NextRequest) {
         })
         .eq("id", productId);
 
-      // بروزرسانی لیست images در متادیتا
       if (existing) {
         const oldDesc = String(existing.description || "");
-        const metaMatch = oldDesc.match(/<!--MEDIA_METADATA:([sS]*?)-->/);
+        const metaMatch = oldDesc.match(/<!--MEDIA_METADATA:([\s\S]*?)-->/);
         let meta: Record<string, any> = {};
         if (metaMatch?.[1]) {
-          try { meta = JSON.parse(metaMatch[1]); } catch {}
+          try {
+            meta = JSON.parse(metaMatch[1]);
+          } catch {}
         }
-        const cleanDesc = oldDesc.replace(/<!--MEDIA_METADATA:[sS]*?-->/g, "").trim();
+        const cleanDesc = oldDesc.replace(/<!--MEDIA_METADATA:[\s\S]*?-->/g, "").trim();
         const existingImages: string[] = Array.isArray(meta.images)
           ? meta.images.filter((u: string) => !u.startsWith("data:"))
           : [];

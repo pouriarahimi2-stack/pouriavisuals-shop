@@ -2,16 +2,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getMasterSiteInfoRow, saveMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import { normalizeSystemSettings } from "@/lib/systemSettings";
 import { verifyPayload, COOKIE_NAME } from "@/lib/session";
 import { getAllAdminUsers } from "@/lib/adminUsersStorage";
 import { smsService } from "@/services/smsService";
+import { rateLimiter } from "@/lib/rateLimiter";
 
 export const dynamic = "force-dynamic";
 
-const CHAT_SECRET =
-  process.env.ADMIN_SESSION_SECRET ||
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  "axon_live_chat_hmac_secret_2026";
+function getChatHmacSecret(): string {
+  const secret =
+    process.env.ADMIN_SESSION_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    "";
+  if (!secret || secret.trim().length < 16) {
+    throw new Error("FATAL SECURITY ERROR: ADMIN_SESSION_SECRET is missing.");
+  }
+  return secret.trim();
+}
 
 export interface LiveChatMessage {
   id: string;
@@ -52,21 +60,8 @@ export interface LiveChatNotificationAlert {
   createdAt: string;
 }
 
-const ipRateMap = new Map<string, { count: number; resetAt: number }>();
-
-function checkRateLimit(ip: string, maxReq = 40, windowMs = 60_000): boolean {
-  const now = Date.now();
-  const entry = ipRateMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    ipRateMap.set(ip, { count: 1, resetAt: now + windowMs });
-    return true;
-  }
-  if (entry.count >= maxReq) return false;
-  entry.count += 1;
-  return true;
-}
-
 function generateServerGraphicalCaptcha() {
+  const secret = getChatHmacSecret();
   const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
   let code = "";
   for (let i = 0; i < 5; i++) {
@@ -76,7 +71,7 @@ function generateServerGraphicalCaptcha() {
   const expiresAt = Date.now() + 5 * 60 * 1000;
   const nonce = crypto.randomBytes(8).toString("hex");
   const payload = `${code.toUpperCase()}:${expiresAt}:${nonce}`;
-  const sig = crypto.createHmac("sha256", CHAT_SECRET).update(payload).digest("hex");
+  const sig = crypto.createHmac("sha256", secret).update(payload).digest("hex");
   const captchaToken = Buffer.from(`${expiresAt}:${nonce}:${sig}`).toString("base64");
 
   let noisePaths = "";
@@ -132,6 +127,7 @@ function generateServerGraphicalCaptcha() {
 
 function verifyServerGraphicalCaptcha(userInput: string, captchaToken: string): boolean {
   try {
+    const secret = getChatHmacSecret();
     const cleanInput = String(userInput || "")
       .trim()
       .toUpperCase();
@@ -147,22 +143,24 @@ function verifyServerGraphicalCaptcha(userInput: string, captchaToken: string): 
 
     const expectedPayload = `${cleanInput}:${expiresAt}:${nonce}`;
     const expectedSig = crypto
-      .createHmac("sha256", CHAT_SECRET)
+      .createHmac("sha256", secret)
       .update(expectedPayload)
       .digest("hex");
 
-    return crypto.timingSafeEqual(
-      Buffer.from(providedSig, "hex"),
-      Buffer.from(expectedSig, "hex")
-    );
+    const aBuf = Buffer.from(providedSig, "hex");
+    const bBuf = Buffer.from(expectedSig, "hex");
+    if (aBuf.length === 0 || aBuf.length !== bBuf.length) return false;
+
+    return crypto.timingSafeEqual(aBuf, bBuf);
   } catch {
     return false;
   }
 }
 
 function signChatToken(sessionId: string, phone: string): string {
+  const secret = getChatHmacSecret();
   return crypto
-    .createHmac("sha256", CHAT_SECRET)
+    .createHmac("sha256", secret)
     .update(sessionId + ":" + phone)
     .digest("hex");
 }
@@ -203,7 +201,7 @@ async function resolveAdminResponder(req: NextRequest) {
     );
     return {
       username: found?.username || sessionAny.username || "admin",
-      fullName: found?.full_name || sessionAny.username || "پشتیبانی آکسون کور",
+      fullName: found?.full_name || sessionAny.username || "پشتیبانی آنلاین",
       role: found?.role || sessionAny.role || "superadmin",
     };
   } catch {
@@ -215,7 +213,6 @@ function normalizeSessionStatus(s: LiveChatLeadSession): LiveChatLeadSession {
   const msgs = Array.isArray(s.messages) ? s.messages : [];
   if (msgs.length > 0 && s.status !== "closed") {
     const lastMsg = msgs[msgs.length - 1];
-    // اگر آخرین پیام بعد از پیام خوش‌آمدگویی از سمت مشتری باشد، وضعیت گفتگو در انتظار پاسخ ("open") است
     if (lastMsg.senderType === "customer") {
       return { ...s, status: "open" };
     }
@@ -301,7 +298,8 @@ export async function POST(req: NextRequest) {
       req.headers.get("x-real-ip") ||
       "127.0.0.1";
 
-    if (!checkRateLimit(ip, 40, 60_000)) {
+    const rateCheck = await rateLimiter.checkLimit(ip, "live_chat_post", 40, 1);
+    if (!rateCheck.allowed) {
       return NextResponse.json(
         { success: false, message: "تعداد درخواست‌های شما بیش از حد مجاز است. کمی صبر کنید." },
         { status: 429 }
@@ -318,7 +316,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ۱. شروع مستقیم گفتگوی زنده با نام + شماره موبایل + کپچای گرافیکی سرور
     if (action === "start_chat" || action === "request_otp") {
       const fullName = sanitizeText(body.fullName, 60);
       const phone = String(body.phone || "")
@@ -365,6 +362,8 @@ export async function POST(req: NextRequest) {
 
       const siteRow = await getMasterSiteInfoRow();
       const layoutCfg = siteRow?.homepage_layout_config || {};
+      const sys = normalizeSystemSettings(layoutCfg, siteRow);
+      const storeName = sys.site_name || "فروشگاه";
       const sessions: LiveChatLeadSession[] = Array.isArray(layoutCfg.live_chat_sessions)
         ? layoutCfg.live_chat_sessions
         : [];
@@ -393,7 +392,7 @@ export async function POST(req: NextRequest) {
             {
               id: "msg_welcome_" + Date.now(),
               senderType: "admin",
-              senderName: "پشتیبانی آنلاین آکسون کور",
+              senderName: `پشتیبانی آنلاین ${storeName}`,
               senderRole: "پشتیبانی بلادرنگ",
               text:
                 "سلام " +
@@ -456,7 +455,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ۲. ارسال پیام، لینک یا فایل توسط مشتری
     if (action === "send_customer_message") {
       const {
         sessionId,
@@ -598,7 +596,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ۳. علامت‌گذاری پیام‌های خوانده‌نشده گفتگو هنگام باز کردن توسط ادمین (بدون تغییر وضعیت open به answered)
     if (action === "mark_session_read") {
       const responder = await resolveAdminResponder(req);
       if (!responder || responder.role === "viewer_reporter") {
@@ -622,7 +619,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    // ۴. پاسخگویی بلادرنگ توسط مدیر + امکان ارسال هم‌زمان پیامک اطلاع‌رسانی به مشتری
     if (action === "send_admin_reply") {
       const responder = await resolveAdminResponder(req);
       if (!responder) {
@@ -654,6 +650,8 @@ export async function POST(req: NextRequest) {
 
       const siteRow = await getMasterSiteInfoRow();
       const layoutCfg = siteRow?.homepage_layout_config || {};
+      const sys = normalizeSystemSettings(layoutCfg, siteRow);
+      const storeName = sys.site_name || "فروشگاه";
       const sessions: LiveChatLeadSession[] = Array.isArray(layoutCfg.live_chat_sessions)
         ? layoutCfg.live_chat_sessions
         : [];
@@ -699,7 +697,6 @@ export async function POST(req: NextRequest) {
         {}
       );
 
-      // در صورت انتخاب گزینه ارسال پیامک هم‌زمان به موبایل مشتری
       let smsSent = false;
       if (sendSmsNotify && sessions[idx].phone) {
         const cleanPhone = String(sessions[idx].phone).replace(/\D/g, "");
@@ -707,7 +704,7 @@ export async function POST(req: NextRequest) {
           try {
             await smsService.sendSMS(
               cleanPhone,
-              `${sessions[idx].fullName} عزیز، پاسخ جدید کارشناس آکسون کور در گفتگوی آنلاین ثبت شد: ${cleanText.slice(0, 110)}`
+              `${sessions[idx].fullName} عزیز، پاسخ جدید کارشناس ${storeName} در گفتگوی آنلاین ثبت شد: ${cleanText.slice(0, 110)}`
             );
             smsSent = true;
           } catch {}
@@ -722,7 +719,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ۵. حذف کامل یک نشست گفتگو یا حذف یک پیام خاص توسط ادمین
     if (action === "delete_session" || action === "delete_message" || action === "toggle_status") {
       const responder = await resolveAdminResponder(req);
       if (!responder || responder.role === "viewer_reporter") {

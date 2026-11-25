@@ -3,8 +3,59 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { sendTextSMS } from "@/lib/otpService";
+import { triggerBackInStockNotifications } from "@/lib/backInStockService";
+import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import { normalizeSystemSettings } from "@/lib/systemSettings";
 
 export const dynamic = "force-dynamic";
+
+const PERSIAN_STATUS_LABELS: Record<string, string> = {
+  pending: "در انتظار پرداخت",
+  paid: "پرداخت شده",
+  processing: "در حال پردازش",
+  picking: "آماده‌سازی در انبار",
+  packing: "در حال بسته‌بندی",
+  ready: "آماده تحویل به پست",
+  shipped: "تحویل به پست پیشتاز",
+  delivered: "تحویل شده به مشتری",
+  cancelled: "لغو شده",
+};
+
+function extractWalletDeductionFromAddress(addressStr: string): number {
+  const match = String(addressStr || "").match(
+    /\[کسر از کیف پول:\s*([\d,۰-۹]+)\s*تومان\]/
+  );
+  if (!match || !match[1]) return 0;
+  const englishDigits = match[1]
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/,/g, "")
+    .trim();
+  const num = Number(englishDigits);
+  return Number.isFinite(num) && num > 0 ? num : 0;
+}
+
+async function creditCustomerWallet(phone: string, amount: number) {
+  const cleanPhone = String(phone || "").replace(/\D/g, "");
+  if (!/^09\d{9}$/.test(cleanPhone) || amount <= 0) return;
+
+  const { data: wallet } = await supabaseAdmin
+    .from("customer_wallets")
+    .select("balance")
+    .eq("customer_phone", cleanPhone)
+    .maybeSingle();
+
+  const currentBal = Math.max(0, Number(wallet?.balance || 0));
+  await supabaseAdmin.from("customer_wallets").upsert(
+    [
+      {
+        customer_phone: cleanPhone,
+        balance: currentBal + amount,
+        updated_at: new Date().toISOString(),
+      },
+    ],
+    { onConflict: "customer_phone" }
+  );
+}
 
 async function restoreOrderItemsStock(items: any[], orderLabel?: string) {
   if (!Array.isArray(items)) return;
@@ -15,11 +66,12 @@ async function restoreOrderItemsStock(items: any[], orderLabel?: string) {
     try {
       const { data: pRow } = await supabaseAdmin
         .from("products")
-        .select("id, title, stock, purchase_price")
+        .select("id, title, name, stock, purchase_price")
         .eq("id", pId)
         .maybeSingle();
       if (pRow) {
-        const nextStock = Math.max(0, Number(pRow.stock || 0) + qty);
+        const prevStock = Math.max(0, Number(pRow.stock || 0));
+        const nextStock = prevStock + qty;
         await supabaseAdmin
           .from("products")
           .update({
@@ -34,7 +86,7 @@ async function restoreOrderItemsStock(items: any[], orderLabel?: string) {
             {
               id: "restock_cancel_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
               product_id: String(pRow.id),
-              product_title: pRow.title || it.title || "کالا",
+              product_title: pRow.title || pRow.name || it.title || "کالا",
               change_type: "restock",
               quantity: qty,
               cost_price: Number(pRow.purchase_price || 0),
@@ -44,6 +96,14 @@ async function restoreOrderItemsStock(items: any[], orderLabel?: string) {
             },
           ]);
         } catch {}
+
+        if (prevStock <= 0 && nextStock > 0) {
+          await triggerBackInStockNotifications(
+            pRow.id,
+            String(pRow.title || pRow.name || it.title || "محصول"),
+            nextStock
+          );
+        }
       }
     } catch {}
   }
@@ -133,7 +193,9 @@ export async function PATCH(req: NextRequest) {
 
     const { data: existingOrder } = await supabaseAdmin
       .from("orders")
-      .select("id, order_number, status, payment_status, items, phone, final_amount, total_amount")
+      .select(
+        "id, order_number, status, payment_status, items, phone, address, final_amount, total_amount"
+      )
       .eq("id", id)
       .maybeSingle();
 
@@ -152,7 +214,6 @@ export async function PATCH(req: NextRequest) {
       ) {
         updatePayload.payment_status = "paid";
       }
-      // Enterprise Logistics Statuses
       if (["picking", "packing", "ready"].includes(resolvedStatus)) {
         updatePayload.status = resolvedStatus;
       }
@@ -170,49 +231,30 @@ export async function PATCH(req: NextRequest) {
 
     const orderLabel = existingOrder?.order_number || existingOrder?.id || String(id);
 
-    // [WALLET_INTEGRATION] عودت وجه به کیف پول در صورت لغو سفارش پرداخت‌شده
+    // عودت وجه به کیف پول در صورت لغو سفارش توسط مدیر (چه پرداخت کامل و چه پرداخت جزئی کیف پول)
     if (
       resolvedStatus === "cancelled" &&
       existingOrder &&
-      existingOrder.status !== "cancelled" &&
-      existingOrder.payment_status === "paid"
+      existingOrder.status !== "cancelled"
     ) {
       try {
-        const { data: wallet } = await supabaseAdmin
-          .from("customer_wallets")
-          .select("balance")
-          .eq("customer_phone", existingOrder.phone)
-          .maybeSingle();
-
-        const refundAmount = Number(
-          existingOrder.final_amount || existingOrder.total_amount || 0
+        const walletUsedInOrder = extractWalletDeductionFromAddress(
+          existingOrder.address || ""
         );
+        const gatewayPaidAmount =
+          existingOrder.payment_status === "paid"
+            ? Number(existingOrder.final_amount ?? existingOrder.total_amount ?? 0)
+            : 0;
+        const totalRefund = walletUsedInOrder + gatewayPaidAmount;
 
-        if (wallet) {
-          await supabaseAdmin
-            .from("customer_wallets")
-            .update({
-              balance: Number(wallet.balance) + refundAmount,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("customer_phone", existingOrder.phone);
-        } else {
-          await supabaseAdmin.from("customer_wallets").insert([
-            {
-              customer_phone: existingOrder.phone,
-              balance: refundAmount,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-          ]);
+        if (totalRefund > 0 && existingOrder.phone) {
+          await creditCustomerWallet(existingOrder.phone, totalRefund);
         }
-        console.log("وجه با موفقیت به کیف پول مشتری عودت داده شد.");
       } catch (walletErr) {
         console.error("خطا در عودت وجه به کیف پول:", walletErr);
       }
     }
 
-    // اگر سفارش برای اولین بار به وضعیت «لغو شده» تغییر یابد، موجودی کالاهای آن به انبار بازگردانده شود
     if (
       resolvedStatus === "cancelled" &&
       existingOrder &&
@@ -222,7 +264,6 @@ export async function PATCH(req: NextRequest) {
       await restoreOrderItemsStock(existingOrder.items, orderLabel);
     }
 
-    // اگر سفارش قبلاً لغو شده بوده و اکنون به وضعیت فعال برمی‌گردد، موجودی مجدداً کسر شود
     if (
       resolvedStatus &&
       resolvedStatus !== "cancelled" &&
@@ -236,28 +277,38 @@ export async function PATCH(req: NextRequest) {
     const { error } = await supabaseAdmin.from("orders").update(updatePayload).eq("id", id);
     if (error) throw error;
 
-    if (phone) {
-      const cleanPhone = String(phone).replace(/\D/g, "");
-      if (cleanPhone.length === 11) {
-        try {
-          if (tracking_code) {
-            await sendTextSMS(
-              cleanPhone,
-              (customer_name || "مشتری") +
-                " عزیز، سفارش شما تحویل پست شد. کد رهگیری پستی: " +
-                tracking_code +
-                " | axoncore.ir"
-            );
-          } else if (resolvedStatus) {
-            await sendTextSMS(
-              cleanPhone,
-              "وضعیت سفارش شما در فروشگاه آکسون کور به «" +
-                resolvedStatus +
-                "» بروزرسانی شد. | axoncore.ir"
-            );
-          }
-        } catch {}
-      }
+    const targetPhone = phone || existingOrder?.phone || "";
+    const cleanPhone = String(targetPhone).replace(/\D/g, "");
+    if (cleanPhone.length === 11) {
+      try {
+        const siteRow = await getMasterSiteInfoRow();
+        const sys = normalizeSystemSettings(
+          siteRow?.homepage_layout_config || {},
+          siteRow
+        );
+        const storeName = sys.site_name || "آکسون کور";
+        const storeDomain = (
+          sys.canonicalBaseUrl ||
+          process.env.NEXT_PUBLIC_SITE_URL ||
+          "https://axoncore.ir"
+        )
+          .replace(/^https?:\/\//i, "")
+          .replace(/\/+$/, "");
+
+        if (tracking_code) {
+          await sendTextSMS(
+            cleanPhone,
+            `${customer_name || "مشتری"} عزیز، سفارش ${orderLabel} تحویل پست شد. کد رهگیری پستی: ${tracking_code} | ${storeDomain}`
+          );
+        } else if (resolvedStatus) {
+          const statusPersian =
+            PERSIAN_STATUS_LABELS[resolvedStatus] || resolvedStatus;
+          await sendTextSMS(
+            cleanPhone,
+            `وضعیت سفارش ${orderLabel} در فروشگاه ${storeName} به «${statusPersian}» بروزرسانی شد. | ${storeDomain}`
+          );
+        }
+      } catch {}
     }
 
     return NextResponse.json({
@@ -290,7 +341,9 @@ export async function DELETE(req: NextRequest) {
 
     const { data: ord } = await supabaseAdmin
       .from("orders")
-      .select("id, order_number, status, payment_status, items, phone, final_amount, total_amount")
+      .select(
+        "id, order_number, status, payment_status, items, phone, address, final_amount, total_amount"
+      )
       .eq("id", id)
       .maybeSingle();
 
@@ -300,10 +353,15 @@ export async function DELETE(req: NextRequest) {
       ord.status !== "paid" &&
       ord.payment_status !== "paid" &&
       ord.status !== "shipped" &&
-      ord.status !== "delivered" &&
-      Array.isArray(ord.items)
+      ord.status !== "delivered"
     ) {
-      await restoreOrderItemsStock(ord.items, ord.order_number || ord.id);
+      const walletUsed = extractWalletDeductionFromAddress(ord.address || "");
+      if (walletUsed > 0 && ord.phone) {
+        await creditCustomerWallet(ord.phone, walletUsed);
+      }
+      if (Array.isArray(ord.items)) {
+        await restoreOrderItemsStock(ord.items, ord.order_number || ord.id);
+      }
     }
 
     await supabaseAdmin.from("orders").delete().eq("id", id);

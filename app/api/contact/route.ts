@@ -9,6 +9,9 @@ import {
   createApiSuccess,
 } from "@/lib/validationGuard";
 import { smsService } from "@/services/smsService";
+import { rateLimiter } from "@/lib/rateLimiter";
+import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import { normalizeSystemSettings } from "@/lib/systemSettings";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +51,24 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "127.0.0.1";
+
+    const rateCheck = await rateLimiter.checkLimit(
+      clientIp,
+      "public_contact_form",
+      5,
+      10
+    );
+    if (!rateCheck.allowed) {
+      return createApiError(
+        "تعداد پیام‌های ارسالی بیش از حد مجاز است. لطفاً دقایقی دیگر تلاش کنید.",
+        429
+      );
+    }
+
     const body = await req.json();
     const fullName = sanitizeInput(
       body?.full_name || body?.fullName || body?.name
@@ -82,7 +103,6 @@ export async function POST(req: NextRequest) {
         ? `[موضوع: ${subject}]\n${message}`
         : message;
 
-    // تلاش لایه‌ای برای تطابق ۱۰۰٪ با هر ساختار ستون‌های جدول contact_messages در Supabase
     const candidatePayloads: Record<string, any>[] = [
       {
         id: msgId,
@@ -146,9 +166,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const siteRow = await getMasterSiteInfoRow();
+    const sys = normalizeSystemSettings(
+      siteRow?.homepage_layout_config || {},
+      siteRow
+    );
+    const storeName = sys.site_name || "فروشگاه";
+
     return createApiSuccess(
       null,
-      "پیام شما با موفقیت ثبت شد و کارشناسان آکسون کور به زودی پاسخگوی شما خواهند بود."
+      `پیام شما با موفقیت ثبت شد و کارشناسان ${storeName} به زودی پاسخگوی شما خواهند بود.`
     );
   } catch (err: any) {
     console.error("Contact API Error:", err);
@@ -197,12 +224,16 @@ export async function PATCH(req: NextRequest) {
       const cleanPhone = String(updated.phone).replace(/\D/g, "");
       if (cleanPhone.length === 11) {
         try {
+          const siteRow = await getMasterSiteInfoRow();
+          const sys = normalizeSystemSettings(
+            siteRow?.homepage_layout_config || {},
+            siteRow
+          );
+          const storeName = sys.site_name || "فروشگاه";
+
           await smsService.sendSMS(
             cleanPhone,
-            "کاربر گرامی " +
-              (updated.full_name || updated.name || "") +
-              "، پاسخ مدیریت آکسون کور به تیکت شما: " +
-              String(admin_reply).trim()
+            `کاربر گرامی ${updated.full_name || updated.name || ""}، پاسخ مدیریت ${storeName} به پیام شما: ${String(admin_reply).trim()}`
           );
           smsDelivered = true;
         } catch (smsErr) {

@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { unpackProductRow } from "@/lib/productUnpacker";
 import { getMasterSiteInfoRow, saveMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import { normalizeSystemSettings } from "@/lib/systemSettings";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -107,9 +108,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const nowIso = new Date().toISOString();
 
-    // اکشن تولید خودکار دیدگاه‌های اولیه برای محصولات کاتالوگ (جهت تقویت سئو و AggregateRating)
     if (body.action === "seed_catalog_reviews") {
-      const { data: rawProds } = await supabaseAdmin.from("products").select("*").limit(15);
+      const [{ data: rawProds }, siteRow] = await Promise.all([
+        supabaseAdmin.from("products").select("*").limit(15),
+        getMasterSiteInfoRow(),
+      ]);
       const products = (rawProds || []).map(unpackProductRow);
 
       if (products.length === 0) {
@@ -119,8 +122,9 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const siteRow = await getMasterSiteInfoRow();
       const layoutCfg = siteRow?.homepage_layout_config || {};
+      const sys = normalizeSystemSettings(layoutCfg, siteRow);
+      const storeName = sys.site_name || "فروشگاه";
       const metaList: any[] = Array.isArray(layoutCfg.reviews_metadata_store)
         ? layoutCfg.reviews_metadata_store
         : [];
@@ -129,26 +133,22 @@ export async function POST(req: NextRequest) {
         {
           user: "محمدرضا کاظمی",
           rating: 5,
-          comment:
-            "کیفیت ساخت و متریال دستگاه واقعاً عالیه. بسته‌بندی کاملاً پلمپ و اورجینال به دستم رسید و سرعت ارسال آکسون کور فوق‌العاده بود.",
-          reply:
-            "محمدرضای عزیز، از اعتماد و خرید شما سپاسگزاریم. مبارکتان باشد و همواره در خدمتیم 🌸",
+          comment: `کیفیت ساخت و بسته‌بندی کالا واقعاً عالی بود و با سرعت بسیار خوبی از ${storeName} به دستم رسید.`,
+          reply: `محمدرضای عزیز، از اعتماد و خرید شما از ${storeName} سپاسگزاریم. همواره در خدمتیم 🌸`,
         },
         {
           user: "سارا احمدی",
           rating: 5,
           comment:
-            "قبل از خرید از پشتیبانی مشاوره گرفتم و خیلی دقیق راهنمایی کردن. عملکرد دستگاه دقیقاً مطابق مشخصات فنی سایت هست و کاملاً راضی‌ام.",
-          reply:
-            "سرکار خانم احمدی، خوشحالیم که از کیفیت محصول و خدمات مشاوره آکسون کور رضایت کامل دارید 🛡️",
+            "قبل از خرید از پشتیبانی مشاوره گرفتم و خیلی دقیق راهنمایی کردن. عملکرد کالا دقیقاً مطابق مشخصات سایت هست و کاملاً راضی‌ام.",
+          reply: `سرکار خانم احمدی، خوشحالیم که از کیفیت محصول و خدمات مشاوره ${storeName} رضایت کامل دارید 🛡️`,
         },
         {
           user: "امیرحسین رضوی",
           rating: 5,
           comment:
-            "نسبت به قیمت، ارزش خرید بسیار بالایی داره و گارانتی اصالت کالا خیال آدم رو کاملاً راحت می‌کنه. به دوستان هم پیشنهاد می‌کنم.",
-          reply:
-            "امیرحسین گرامی، ممنون از ثبت تجربه خریدتان. رضایت شما بزرگ‌ترین سرمایه آکسون کور است ✨",
+            "نسبت به قیمت، ارزش خرید بسیار بالایی داره و کنترل سلامت فیزیکی کالا پیش از ارسال خیال آدم رو راحت می‌کنه.",
+          reply: `امیرحسین گرامی، ممنون از ثبت تجربه خریدتان. رضایت شما بزرگ‌ترین سرمایه ${storeName} است ✨`,
         },
       ];
 
@@ -202,7 +202,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ثبت دستی دیدگاه جدید توسط ادمین
     const productId = String(body.product_id || "").trim();
     const userName = String(body.user_name || "خریدار تاییدشده").trim();
     const comment = String(body.comment || "").trim();
@@ -303,7 +302,6 @@ export async function PATCH(req: NextRequest) {
       await supabaseAdmin.from("product_reviews").update(minimalUpdate).eq("id", id);
     }
 
-    // بروزرسانی در متادیتای پایدار
     const siteRow = await getMasterSiteInfoRow();
     const layoutCfg = siteRow?.homepage_layout_config || {};
     const metaList: any[] = Array.isArray(layoutCfg.reviews_metadata_store)

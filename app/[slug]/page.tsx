@@ -13,6 +13,27 @@ interface SlugPageProps {
   params: Promise<{ slug: string }>;
 }
 
+async function resolveModularPage(cleanSlug: string) {
+  const [{ data: dbPage }, siteRow] = await Promise.all([
+    supabaseAdmin
+      .from("modular_pages")
+      .select("*")
+      .eq("slug", cleanSlug)
+      .maybeSingle(),
+    getMasterSiteInfoRow(),
+  ]);
+
+  const backupMap = siteRow?.homepage_layout_config?.modular_pages_map;
+  const backupPage =
+    backupMap && typeof backupMap === "object" ? backupMap[cleanSlug] : null;
+
+  const resolvedPage =
+    dbPage ||
+    (backupPage && !backupPage._deleted ? { slug: cleanSlug, ...backupPage } : null);
+
+  return { pageRecord: resolvedPage, siteRow };
+}
+
 export async function generateMetadata({
   params,
 }: SlugPageProps): Promise<Metadata> {
@@ -21,14 +42,7 @@ export async function generateMetadata({
     .trim()
     .toLowerCase();
 
-  const [{ data: pageRecord }, siteRow] = await Promise.all([
-    supabaseAdmin
-      .from("modular_pages")
-      .select("title, meta_title, meta_description, slug")
-      .eq("slug", cleanSlug)
-      .maybeSingle(),
-    getMasterSiteInfoRow(),
-  ]);
+  const { pageRecord, siteRow } = await resolveModularPage(cleanSlug);
 
   const sys = normalizeSystemSettings(
     siteRow?.homepage_layout_config || {},
@@ -41,7 +55,7 @@ export async function generateMetadata({
   const siteName = sys.site_name || "آکسون کور";
   const allowIndex = !sys.noIndex;
 
-  if (!pageRecord) {
+  if (!pageRecord || pageRecord.is_published === false) {
     return {
       title: siteName,
       robots: { index: false, follow: false },
@@ -72,14 +86,11 @@ export default async function DynamicSlugPage({ params }: SlugPageProps) {
     .trim()
     .toLowerCase();
 
-  const { data: pageRecord } = await supabaseAdmin
-    .from("modular_pages")
-    .select("*")
-    .eq("slug", cleanSlug)
-    .maybeSingle();
+  const { pageRecord } = await resolveModularPage(cleanSlug);
 
   if (
     pageRecord &&
+    pageRecord.is_published !== false &&
     pageRecord.puck_data &&
     Array.isArray(pageRecord.puck_data.content) &&
     pageRecord.puck_data.content.length > 0

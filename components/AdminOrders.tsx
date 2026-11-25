@@ -7,8 +7,26 @@ import { smsService } from "@/services/smsService";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
 import { formatPrice } from "@/lib/formatters";
+import { useSiteInfo } from "@/context/SiteInfoContext";
+
+function escapeHtml(raw: any): string {
+  return String(raw ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function stripInternalAddressTags(rawAddress: string): string {
+  return String(rawAddress || "")
+    .replace(/\s*\[مالیات\s*\d+%:\s*\d+\s*تومان\]/g, "")
+    .replace(/\s*\[کسر از کیف پول:\s*[\d,۰-۹]+\s*تومان\]/g, "")
+    .trim();
+}
 
 export default function AdminOrders() {
+  const { siteInfo } = useSiteInfo();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>("all");
@@ -21,6 +39,17 @@ export default function AdminOrders() {
     order: Order | null;
     code: string;
   }>({ open: false, order: null, code: "" });
+
+  const sysSettings =
+    siteInfo?.settings ||
+    siteInfo?.system_settings ||
+    siteInfo?.homepage_layout_config?.system_settings ||
+    {};
+  const storeName = String(
+    sysSettings.site_name || siteInfo?.site_name || "فروشگاه تخصصی آکسون کور"
+  ).trim();
+  const storePhone = String(sysSettings.phone || siteInfo?.phone || "").trim();
+  const storeAddress = String(sysSettings.address || siteInfo?.address || "").trim();
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -207,14 +236,34 @@ export default function AdminOrders() {
     if (!printWindow) return;
 
     const items = order.items || [];
-    const customerName = order.customer?.fullName || order.customerName || "خریدار محترم";
-    const customerPhone = order.customer?.phone || order.phone || "---";
-    const address = order.customer?.address || order.address || "ثبت نشده";
-    const total = Number(order.finalAmount || order.totalAmount || 0).toLocaleString("fa-IR");
+    const customerName = escapeHtml(
+      order.customer?.fullName || order.customerName || "خریدار محترم"
+    );
+    const customerPhone = escapeHtml(
+      order.customer?.phone || order.phone || "---"
+    );
+    const cleanAddr = stripInternalAddressTags(
+      order.customer?.address || order.address || "ثبت نشده"
+    );
+    const address = escapeHtml(cleanAddr);
+    const orderNumSafe = escapeHtml(order.orderNumber || order.id);
+    const trackingSafe = escapeHtml(
+      order.trackingCode || order.tracking_code || "صادر نشده"
+    );
+    const storeNameSafe = escapeHtml(storeName);
+    const sellerContactHtml = [
+      storePhone ? `تلفن: ${escapeHtml(storePhone)}` : "",
+      storeAddress ? `نشانی: ${escapeHtml(storeAddress)}` : "",
+    ]
+      .filter(Boolean)
+      .join(" | ");
+    const total = Number(
+      order.finalAmount ?? order.totalAmount ?? 0
+    ).toLocaleString("fa-IR");
 
     printWindow.document.write(
       '<html dir="rtl" lang="fa"><head><title>فاکتور رسمی سفارش ' +
-        order.id +
+        orderNumSafe +
         "</title><style>" +
         "body { font-family: Tahoma, sans-serif; padding: 30px; direction: rtl; color: #0f172a; font-size: 13px; }" +
         ".header { text-align: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 20px; }" +
@@ -227,12 +276,16 @@ export default function AdminOrders() {
         ".total-row { font-size: 15px; font-weight: bold; background: #eff6ff; }" +
         ".footer { margin-top: 30px; text-align: center; font-size: 11px; color: #64748b; }" +
         "</style></head><body>" +
-        '<div class="header"><h1 class="title">فاکتور رسمی فروش تجهیزات دیجیتال و تکنولوژی آکسون</h1>' +
+        '<div class="header"><h1 class="title">صورتحساب رسمی فروش — ' +
+        storeNameSafe +
+        "</h1>" +
         "<p>شماره سفارش: " +
-        (order.orderNumber || order.id) +
+        orderNumSafe +
         " | تاریخ: " +
         new Date(order.created_at || Date.now()).toLocaleDateString("fa-IR") +
-        "</p></div>" +
+        "</p>" +
+        (sellerContactHtml ? `<p style="font-size:11px;color:#475569;">${sellerContactHtml}</p>` : "") +
+        "</div>" +
         '<div class="info-grid"><div class="box"><p><strong>خریدار:</strong> ' +
         customerName +
         "</p><p><strong>تلفن همراه:</strong> " +
@@ -240,7 +293,7 @@ export default function AdminOrders() {
         '</p></div><div class="box"><p><strong>نشانی تحویل:</strong> ' +
         address +
         "</p><p><strong>کد رهگیری پست:</strong> " +
-        (order.trackingCode || order.tracking_code || "صادر نشده") +
+        trackingSafe +
         "</p></div></div>" +
         "<table><thead><tr><th>ردیف</th><th>نام کالا</th><th>تعداد</th><th>قیمت واحد (تومان)</th><th>مبلغ کل (تومان)</th></tr></thead><tbody>" +
         items
@@ -249,10 +302,10 @@ export default function AdminOrders() {
               "<tr><td>" +
               (idx + 1) +
               "</td><td>" +
-              (item.title || item.name) +
-              (item.selectedColor ? ` (${item.selectedColor})` : "") +
+              escapeHtml(item.title || item.name || "کالا") +
+              (item.selectedColor ? ` (${escapeHtml(item.selectedColor)})` : "") +
               "</td><td>" +
-              (item.quantity || 1) +
+              Number(item.quantity || 1) +
               "</td><td>" +
               Number(item.price || 0).toLocaleString("fa-IR") +
               "</td><td>" +
@@ -260,10 +313,10 @@ export default function AdminOrders() {
               "</td></tr>"
           )
           .join("") +
-        '<tr class="total-row"><td colspan="4" style="text-align: left; padding-left: 20px;">مبلغ نهایی قابل پرداخت:</td><td>' +
+        '<tr class="total-row"><td colspan="4" style="text-align: left; padding-left: 20px;">مبلغ نهایی فاکتور:</td><td>' +
         total +
         " تومان</td></tr></tbody></table>" +
-        '<div class="footer"><p>کلیه کالاهای این فاکتور دارای ضمانت اصالت ۱۰۰٪ فیزیکی و گارانتی معتبر آکسون هستند.</p></div>' +
+        `<div class="footer"><p>این صورتحساب به‌صورت سیستمی توسط ${storeNameSafe} صادر شده است.</p></div>` +
         "<script>window.print();</script></body></html>"
     );
     printWindow.document.close();
@@ -275,6 +328,24 @@ export default function AdminOrders() {
         return (
           <span className="px-3 py-1 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 whitespace-nowrap">
             پرداخت شده ✓
+          </span>
+        );
+      case "picking":
+        return (
+          <span className="px-3 py-1 rounded-full text-[10px] font-black bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 whitespace-nowrap">
+            آماده‌سازی انبار 🏭
+          </span>
+        );
+      case "packing":
+        return (
+          <span className="px-3 py-1 rounded-full text-[10px] font-black bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 whitespace-nowrap">
+            در حال بسته‌بندی 📦
+          </span>
+        );
+      case "ready":
+        return (
+          <span className="px-3 py-1 rounded-full text-[10px] font-black bg-orange-500/15 text-orange-400 border border-orange-500/30 whitespace-nowrap">
+            آماده ارسال 📮
           </span>
         );
       case "processing":
@@ -447,7 +518,7 @@ export default function AdminOrders() {
                   const isUpdating = updatingId === order.id;
                   const cName = order.customer?.fullName || order.customerName || "بدون نام";
                   const cPhone = order.customer?.phone || order.phone || "---";
-                  const total = order.finalAmount || order.totalAmount || 0;
+                  const total = order.finalAmount ?? order.totalAmount ?? 0;
                   const trackCode = order.trackingCode || order.tracking_code;
                   const currentStatus =
                     order.status === "pending_manual_review" || !order.status
@@ -537,6 +608,9 @@ export default function AdminOrders() {
                             <option value="pending">در انتظار پرداخت</option>
                             <option value="paid">پرداخت شده ✓</option>
                             <option value="processing">در حال پردازش</option>
+                            <option value="picking">آماده‌سازی انبار</option>
+                            <option value="packing">بسته‌بندی مرسوله</option>
+                            <option value="ready">آماده ارسال</option>
                             <option value="shipped">ارسال به پست 📮</option>
                             <option value="delivered">تحویل شده</option>
                             <option value="cancelled">لغو سفارش</option>
@@ -604,7 +678,9 @@ export default function AdminOrders() {
                 )}
                 <p>
                   <strong>نشانی پستی:</strong>{" "}
-                  {selectedOrder.customer?.address || selectedOrder.address}
+                  {stripInternalAddressTags(
+                    selectedOrder.customer?.address || selectedOrder.address || ""
+                  )}
                 </p>
                 {(selectedOrder.postalCode || selectedOrder.postal_code) && (
                   <p>
@@ -647,7 +723,7 @@ export default function AdminOrders() {
                   <strong>مبلغ نهایی:</strong>{" "}
                   <span className="font-mono font-black text-emerald-500">
                     {Number(
-                      selectedOrder.finalAmount || selectedOrder.totalAmount || 0
+                      selectedOrder.finalAmount ?? selectedOrder.totalAmount ?? 0
                     ).toLocaleString("fa-IR")}{" "}
                     تومان
                   </span>
@@ -664,7 +740,6 @@ export default function AdminOrders() {
               </div>
             </div>
 
-            {/* جدول اقلام داخل سفارش */}
             {Array.isArray(selectedOrder.items) && selectedOrder.items.length > 0 && (
               <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 text-xs">
                 <h4 className="font-black text-[var(--accent-blue)]">

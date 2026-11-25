@@ -1,14 +1,16 @@
 // File Path: lib/session.ts
 /**
  * Strict Cryptographic Session Engine using WebCrypto (Edge & Node Compatible)
- * هیچ fallback هاردکدی وجود ندارد — در صورت نبود متغیر محیطی خطا پرتاب می‌شود.
  */
 
 export interface AdminSessionPayload {
   id: string;
+  userId?: string;
   username: string;
   role: string;
   full_name?: string;
+  permissions?: string[];
+  ui_theme?: string;
   sid: string;
   iat: number;
   exp: number;
@@ -21,8 +23,7 @@ function getSecretKey(): string {
   const key = process.env.ADMIN_SESSION_SECRET;
   if (!key || key.trim().length < 32) {
     throw new Error(
-      "FATAL: ADMIN_SESSION_SECRET environment variable is missing or too short (min 32 chars). " +
-      "Set it in your .env.local / Vercel environment variables and restart."
+      "FATAL: ADMIN_SESSION_SECRET environment variable is missing or too short (min 32 chars)."
     );
   }
   return key.trim();
@@ -69,32 +70,49 @@ async function getCryptoKey(usage: "sign" | "verify"): Promise<CryptoKey> {
 }
 
 export async function signPayload(
-  data: Omit<AdminSessionPayload, "iat" | "exp" | "sid"> & { expSeconds?: number; sid?: string }
+  data: Omit<AdminSessionPayload, "iat" | "exp" | "sid"> & {
+    expSeconds?: number;
+    sid?: string;
+    exp?: number;
+  }
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const expSeconds = data.expSeconds || SESSION_EXPIRY_SECONDS;
-  const sid = data.sid || "sid_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
+  const sid =
+    data.sid ||
+    "sid_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
 
   const payload: AdminSessionPayload = {
     id: data.id,
+    userId: data.userId || data.id,
     username: data.username,
     role: data.role,
     full_name: data.full_name,
+    permissions: data.permissions,
+    ui_theme: data.ui_theme,
     sid,
     iat: now,
-    exp: now + expSeconds,
+    exp: data.exp || now + expSeconds,
   };
 
   const header = { alg: "HS256", typ: "JWT" };
-  const unsignedToken = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(payload))}`;
+  const unsignedToken = `${base64UrlEncode(
+    JSON.stringify(header)
+  )}.${base64UrlEncode(JSON.stringify(payload))}`;
 
   const key = await getCryptoKey("sign");
   const enc = new TextEncoder();
-  const signatureBuffer = await crypto.subtle.sign("HMAC", key, enc.encode(unsignedToken));
+  const signatureBuffer = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    enc.encode(unsignedToken)
+  );
   return `${unsignedToken}.${bufferToBase64Url(signatureBuffer)}`;
 }
 
-export async function verifyPayload(token: string | null | undefined): Promise<AdminSessionPayload | null> {
+export async function verifyPayload(
+  token: string | null | undefined
+): Promise<AdminSessionPayload | null> {
   if (!token || typeof token !== "string") return null;
   const parts = token.split(".");
   if (parts.length !== 3) return null;
@@ -115,7 +133,9 @@ export async function verifyPayload(token: string | null | undefined): Promise<A
     );
 
     if (!isValid) return null;
-    const payload: AdminSessionPayload = JSON.parse(base64UrlDecode(encodedPayload));
+    const payload: AdminSessionPayload = JSON.parse(
+      base64UrlDecode(encodedPayload)
+    );
     if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) return null;
     return payload;
   } catch {

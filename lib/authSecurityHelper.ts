@@ -5,11 +5,16 @@ import { canRoleMutateApi } from "@/lib/roleWriteFirewall";
 import { getAllAdminUsers } from "@/lib/adminUsersStorage";
 import { recordSubAdminActivity, resolveSectionFromPath } from "@/lib/subAdminMonitor";
 
-export const OTP_HMAC_SECRET =
-  process.env.OTP_HMAC_SECRET ||
-  process.env.ADMIN_SESSION_SECRET ||
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  "axon_core_otp_secret_key_minimum_32_bytes";
+function resolveOtpSecret(): string {
+  const secret =
+    process.env.OTP_HMAC_SECRET ||
+    process.env.ADMIN_SESSION_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    "";
+  return secret.trim();
+}
+
+export const OTP_HMAC_SECRET = resolveOtpSecret();
 
 async function resolveLiveAdminSession(req: NextRequest): Promise<AdminSessionPayload | null> {
   try {

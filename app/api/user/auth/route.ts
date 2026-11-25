@@ -7,6 +7,7 @@ import {
   verifyCustomerPayload,
   CUSTOMER_COOKIE_NAME,
 } from "@/lib/customerSession";
+import { rateLimiter } from "@/lib/rateLimiter";
 
 export const dynamic = "force-dynamic";
 
@@ -29,11 +30,14 @@ function verifyPwd(supplied: string, stored: string): boolean {
 }
 
 function cleanPhone(raw: string): string {
-  return String(raw || "")
+  const digits = String(raw || "")
     .trim()
     .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
     .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
     .replace(/\D/g, "");
+  if (digits.startsWith("98") && digits.length === 12) return "0" + digits.slice(2);
+  if (digits.startsWith("9") && digits.length === 10) return "0" + digits;
+  return digits;
 }
 
 function setCookie(res: NextResponse, token: string): void {
@@ -48,17 +52,38 @@ function setCookie(res: NextResponse, token: string): void {
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "127.0.0.1";
+
     const body = await req.json();
     const { action, phone, username, password, identifier, email } = body;
 
     if (action === "register") {
-      const cp = cleanPhone(String(phone || ""));
-      const pw = String(password || "").trim();
-      if (cp.length !== 11 || !cp.startsWith("09") || !pw) {
+      const regRate = await rateLimiter.checkLimit(
+        clientIp,
+        "customer_register",
+        6,
+        15
+      );
+      if (!regRate.allowed) {
         return NextResponse.json(
           {
             success: false,
-            message: "شماره همراه ۱۱ رقمی و کلمه عبور الزامی است.",
+            message: "تعداد تلاش‌های ثبت‌نام بیش از حد مجاز است. لطفاً دقایقی دیگر تلاش کنید.",
+          },
+          { status: 429 }
+        );
+      }
+
+      const cp = cleanPhone(String(phone || ""));
+      const pw = String(password || "").trim();
+      if (cp.length !== 11 || !cp.startsWith("09") || pw.length < 6) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "شماره همراه ۱۱ رقمی و کلمه عبور حداقل ۶ کاراکتری الزامی است.",
           },
           { status: 400 }
         );
@@ -81,8 +106,29 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const cleanUser = username
+        ? String(username).replace(/[<>"']/g, "").trim()
+        : cp;
+
+      if (cleanUser !== cp) {
+        const { data: exUsername } = await supabaseAdmin
+          .from("customers")
+          .select("id")
+          .ilike("username", cleanUser)
+          .maybeSingle();
+
+        if (exUsername) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: "این نام کاربری قبلاً انتخاب شده است. لطفاً نام دیگری وارد کنید.",
+            },
+            { status: 400 }
+          );
+        }
+      }
+
       const generatedId = randomUUID();
-      const cleanUser = username ? String(username).trim() : cp;
       const pwdHash = hashPwd(pw);
 
       const newCustomer: Record<string, any> = {
@@ -153,6 +199,22 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "login_credentials") {
+      const loginRate = await rateLimiter.checkLimit(
+        clientIp,
+        "customer_password_login",
+        12,
+        15
+      );
+      if (!loginRate.allowed) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "تعداد تلاش‌های ورود بیش از حد مجاز است. لطفاً ۱۵ دقیقه دیگر تلاش کنید.",
+          },
+          { status: 429 }
+        );
+      }
+
       const id = String(identifier || "").trim();
       const cleanIdPhone = cleanPhone(id);
       const pw = String(password || "").trim();
@@ -163,18 +225,35 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const { data: customer } = await supabaseAdmin
-        .from("customers")
-        .select("*")
-        .or(
-          "phone.eq." +
-            (cleanIdPhone || id) +
-            ",username.eq." +
-            id +
-            ",email.eq." +
-            id.toLowerCase()
-        )
-        .maybeSingle();
+      // جستجوی ایمن و پارامتری بدون تزریق رشته در فیلتر OR
+      let customer: any = null;
+      if (/^09\d{9}$/.test(cleanIdPhone)) {
+        const { data } = await supabaseAdmin
+          .from("customers")
+          .select("*")
+          .eq("phone", cleanIdPhone)
+          .maybeSingle();
+        customer = data;
+      }
+
+      if (!customer && id.includes("@")) {
+        const { data } = await supabaseAdmin
+          .from("customers")
+          .select("*")
+          .eq("email", id.toLowerCase())
+          .maybeSingle();
+        customer = data;
+      }
+
+      if (!customer) {
+        const { data } = await supabaseAdmin
+          .from("customers")
+          .select("*")
+          .ilike("username", id)
+          .limit(1)
+          .maybeSingle();
+        customer = data;
+      }
 
       if (!customer || !verifyPwd(pw, customer.password_hash || "")) {
         return NextResponse.json(

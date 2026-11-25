@@ -75,7 +75,6 @@ function getCleanCredentials() {
     .trim();
   const originE164 = rawOrigin.startsWith("+") ? rawOrigin : toE164(rawOrigin);
 
-  // استفاده مستقیم از پترن جدید WebOTP و نادیده گرفتن متغیر محیطی قدیمی در Vercel
   const patternCode = EXACT_PATTERN_CODE;
 
   return {
@@ -122,7 +121,6 @@ export async function sendOtpPatternDetailed({
 
   const attemptsLog: Array<Record<string, any>> = [];
 
-  // اولویت اول: پترن جدید WebOTP (6xfi2kgb07uy60i) | اولویت دوم: پترن پشتیبان (3d6fa1f8ud3ma1w)
   const patternCandidates: Array<{
     code: string;
     params: Record<string, string>;
@@ -137,7 +135,7 @@ export async function sendOtpPatternDetailed({
     },
   ];
 
-  // ۱. ارسال از طریق پل هاست نت‌افراز (gate.axoncore.ir -> 185.106.201.79)
+  // ۱. ارسال از طریق پل هاست نت‌افراز
   for (const candidate of patternCandidates) {
     const relayResult = await postViaNetafrazRelay(
       "https://edge.ippanel.com/v1/api/send",
@@ -314,7 +312,14 @@ export async function sendOtpPattern(opts: OtpOptions): Promise<boolean> {
 }
 
 export async function sendTextSMS(mobile: string, message: string): Promise<boolean> {
-  const matchCode = String(message).match(/[A-Z0-9-]{4,16}/i);
-  const fallbackCode = matchCode ? matchCode[0] : "743440";
-  return await sendOtpPattern({ mobile, code: fallbackCode });
+  // حذف آدرس‌های اینترنتی از متن پیش از استخراج کد سفارش، کوپن یا کد رهگیری
+  const withoutUrls = String(message || "").replace(/https?:\/\/[^\s]+/gi, " ");
+  const prefixedCodeMatch = withoutUrls.match(/\b[A-Z]{2,6}-\d{3,12}\b/i);
+  const numericCodeMatch = withoutUrls.match(/\b\d{4,10}\b/);
+  const extractedCode = prefixedCodeMatch
+    ? prefixedCodeMatch[0].toUpperCase()
+    : numericCodeMatch
+    ? numericCodeMatch[0]
+    : "100200";
+  return await sendOtpPattern({ mobile, code: extractedCode });
 }

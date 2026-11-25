@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { signPayload, COOKIE_NAME } from "@/lib/session";
 import { authSecurity } from "@/lib/authSecurity";
+import { rateLimiter } from "@/lib/rateLimiter";
 import {
   getAllAdminUsers,
   verifySubAdminCredentials,
@@ -21,7 +22,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const rateStatus = authSecurity.checkRateLimit(clientIp);
-    if (!rateStatus.allowed) {
+    const dbRate = await rateLimiter.checkLimit(
+      clientIp,
+      "admin_login_attempt",
+      12,
+      15
+    );
+
+    if (!rateStatus.allowed || !dbRate.allowed) {
       return NextResponse.json(
         {
           success: false,
@@ -47,7 +55,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ۱. بررسی در رجیستری مرکزی مدیران و زیرمجموعه‌ها (admin_users_registry)
+    // ۱. بررسی در رجیستری مرکزی مدیران و زیرمجموعه‌ها
     const subUserMatch = await verifySubAdminCredentials(
       cleanUsername,
       cleanPassword
@@ -74,11 +82,11 @@ export async function POST(req: NextRequest) {
         userId: String(subUserMatch.id),
         username: subUserMatch.username,
         full_name: subUserMatch.full_name || subUserMatch.username,
-        role: subUserMatch.role as any,
+        role: subUserMatch.role,
         permissions: subUserMatch.permissions,
         ui_theme: resolvedTheme,
         exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7,
-      } as any);
+      });
 
       const res = NextResponse.json({
         success: true,
@@ -165,11 +173,11 @@ export async function POST(req: NextRequest) {
             matchedRegUser?.full_name ||
             adminUser.full_name ||
             adminUser.username,
-          role: resolvedRole as any,
+          role: resolvedRole,
           permissions: resolvedPerms,
           ui_theme: resolvedTheme,
           exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7,
-        } as any);
+        });
 
         const res = NextResponse.json({
           success: true,
@@ -207,26 +215,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ۳. بررسی پین/رمز مدیر ارشد کل سیستم (برای نام کاربری admin)
+    // ۳. بررسی پین/رمز تنظیم‌شده در تنظیمات امنیت پنل یا متغیرهای محیطی (بدون رمز پشتیبان هاردکد)
     if (cleanUsername === "admin" || cleanUsername === "superadmin") {
       const siteRow = await getMasterSiteInfoRow();
       const secCfg =
         siteRow?.homepage_layout_config?.auth_security_config || {};
-      const adminPin = String(
+      const configuredPin = String(
         secCfg.adminPin ||
           secCfg.adminDeck?.pin ||
           process.env.ADMIN_MASTER_PIN ||
-          "123456"
+          ""
       ).trim();
-      const adminPass = String(
-        secCfg.adminPassword || process.env.ADMIN_PASSWORD || "admin123"
+      const configuredPass = String(
+        secCfg.adminPassword || process.env.ADMIN_PASSWORD || ""
       ).trim();
 
-      if (
-        cleanPassword === adminPin ||
-        cleanPassword === adminPass ||
-        cleanPassword === "Axon2026!"
-      ) {
+      const matchesConfiguredSecret =
+        (configuredPin.length >= 4 && cleanPassword === configuredPin) ||
+        (configuredPass.length >= 6 && cleanPassword === configuredPass);
+
+      if (matchesConfiguredSecret) {
         authSecurity.resetAttempts(clientIp);
         const superRecord = allRegistryUsers.find(
           (u) => u.role === "superadmin" || u.username.toLowerCase() === "admin"
@@ -242,7 +250,7 @@ export async function POST(req: NextRequest) {
           permissions: ["all"],
           ui_theme: superTheme,
           exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7,
-        } as any);
+        });
 
         const res = NextResponse.json({
           success: true,
@@ -277,7 +285,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ثبت تلاش ناموفق
     authSecurity.recordFailedAttempt(clientIp);
     try {
       await supabaseAdmin.from("admin_audit_logs").insert([

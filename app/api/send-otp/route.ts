@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { sendOtpPatternDetailed } from "@/lib/otpService";
+import { rateLimiter } from "@/lib/rateLimiter";
+import { signCustomerPayload, CUSTOMER_COOKIE_NAME } from "@/lib/customerSession";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -19,12 +21,15 @@ let cachedOtpLength = 4;
 let lastConfigFetchAt = 0;
 
 function getHmacSecret(): string {
-  return (
+  const secret =
     process.env.OTP_HMAC_SECRET ||
     process.env.ADMIN_SESSION_SECRET ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    "axon-core-otp-hmac-secret-2026"
-  );
+    "";
+  if (!secret || secret.trim().length < 16) {
+    throw new Error("FATAL SECURITY ERROR: OTP_HMAC_SECRET is missing.");
+  }
+  return secret.trim();
 }
 
 function hashOtp(phone: string, code: string): string {
@@ -32,6 +37,17 @@ function hashOtp(phone: string, code: string): string {
     .createHmac("sha256", getHmacSecret())
     .update(phone + ":" + code)
     .digest("hex");
+}
+
+function safeHexEqual(aHex: string, bHex: string): boolean {
+  try {
+    const aBuf = Buffer.from(aHex, "hex");
+    const bBuf = Buffer.from(bHex, "hex");
+    if (aBuf.length === 0 || aBuf.length !== bBuf.length) return false;
+    return crypto.timingSafeEqual(aBuf, bBuf);
+  } catch {
+    return false;
+  }
 }
 
 function createSignedChallengeCookie(phone: string, codeHash: string, expiresAt: number): string {
@@ -60,7 +76,7 @@ function verifySignedChallengeCookie(
       .update("OTP_CHALLENGE:" + cPhone + ":" + expStr + ":" + cHash)
       .digest("hex");
 
-    if (!crypto.timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expectedSig, "hex"))) {
+    if (!safeHexEqual(sig, expectedSig)) {
       return { valid: false };
     }
 
@@ -69,11 +85,7 @@ function verifySignedChallengeCookie(
     }
 
     const expectedCodeHash = hashOtp(phone, suppliedCode);
-    const isCodeMatch = crypto.timingSafeEqual(
-      Buffer.from(cHash, "hex"),
-      Buffer.from(expectedCodeHash, "hex")
-    );
-    return { valid: isCodeMatch };
+    return { valid: safeHexEqual(cHash, expectedCodeHash) };
   } catch {
     return { valid: false };
   }
@@ -100,7 +112,7 @@ export function verifyPhoneTokenSignature(phone: string, token: string): boolean
       .createHmac("sha256", getHmacSecret())
       .update("VERIFIED_PHONE:" + tokPhone + ":" + expStr)
       .digest("hex");
-    return crypto.timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expectedSig, "hex"));
+    return safeHexEqual(sig, expectedSig);
   } catch {
     return false;
   }
@@ -127,6 +139,11 @@ async function getOtpLengthFast(): Promise<number> {
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "127.0.0.1";
+
     const body = await req.json();
     const rawPhone = String(body.phone || body.mobile || "")
       .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
@@ -146,6 +163,23 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "verify") {
+      const verifyRate = await rateLimiter.checkLimit(
+        rawPhone,
+        "verify_otp_phone",
+        10,
+        5
+      );
+      if (!verifyRate.allowed) {
+        return NextResponse.json(
+          {
+            success: false,
+            verified: false,
+            message: "تعداد تلاش‌های ناموفق بیش از حد مجاز است. لطفاً دقایقی دیگر تلاش کنید.",
+          },
+          { status: 429 }
+        );
+      }
+
       const code = String(body.code || "")
         .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
         .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
@@ -188,12 +222,7 @@ export async function POST(req: NextRequest) {
         }
 
         const expectedHash = hashOtp(rawPhone, code);
-        const isHashValid = crypto.timingSafeEqual(
-          Buffer.from(memRecord.hash, "hex"),
-          Buffer.from(expectedHash, "hex")
-        );
-
-        if (!isHashValid) {
+        if (!safeHexEqual(memRecord.hash, expectedHash)) {
           memoryOtpStore.set(rawPhone, memRecord);
           return NextResponse.json(
             { success: false, verified: false, message: "کد تایید وارد شده اشتباه است." },
@@ -232,12 +261,47 @@ export async function POST(req: NextRequest) {
       }
 
       const verifiedToken = createPhoneVerifiedToken(rawPhone);
+
+      // استعلام نام مشتری از دیتابیس برای ایجاد سشن یکپارچه مشتری
+      let customerName = rawPhone;
+      let customerId = "cust_" + rawPhone;
+      try {
+        const { data: existingCust } = await supabaseAdmin
+          .from("customers")
+          .select("id, username")
+          .eq("phone", rawPhone)
+          .maybeSingle();
+        if (existingCust) {
+          customerId = String(existingCust.id);
+          if (existingCust.username) customerName = String(existingCust.username);
+        } else {
+          const { data: crmRow } = await supabaseAdmin
+            .from("crm_customers")
+            .select("full_name")
+            .eq("phone", rawPhone)
+            .maybeSingle();
+          if (crmRow?.full_name) customerName = String(crmRow.full_name);
+        }
+      } catch {}
+
+      const customerJwt = await signCustomerPayload({
+        id: customerId,
+        phone: rawPhone,
+        username: customerName,
+        name: customerName,
+      });
+
       const res = NextResponse.json({
         success: true,
         verified: true,
         token: verifiedToken,
         otpVerificationToken: verifiedToken,
-        user: { phone: rawPhone, token: verifiedToken },
+        user: {
+          id: customerId,
+          phone: rawPhone,
+          name: customerName,
+          token: verifiedToken,
+        },
         message: "شماره همراه شما با موفقیت تایید شد.",
       });
 
@@ -249,8 +313,32 @@ export async function POST(req: NextRequest) {
         path: "/",
         maxAge: 30 * 60,
       });
+      res.cookies.set(CUSTOMER_COOKIE_NAME, customerJwt, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60,
+      });
 
       return res;
+    }
+
+    // نرخ‌سنجی ضداسپم پیامک در سطح دیتابیس (بر اساس IP و شماره موبایل)
+    const [ipRate, phoneRate] = await Promise.all([
+      rateLimiter.checkLimit(clientIp, "send_otp_ip", 8, 10),
+      rateLimiter.checkLimit(rawPhone, "send_otp_phone", 3, 5),
+    ]);
+
+    if (!ipRate.allowed || !phoneRate.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          sent: false,
+          message: "تعداد درخواست کد پیامکی بیش از حد مجاز است. لطفاً چند دقیقه صبر کنید.",
+        },
+        { status: 429 }
+      );
     }
 
     const now = Date.now();
@@ -266,7 +354,11 @@ export async function POST(req: NextRequest) {
       if (existingActive.createdAt && now - Number(existingActive.createdAt) < 30 * 1000) {
         const waitSec = Math.ceil((30 * 1000 - (now - Number(existingActive.createdAt))) / 1000);
         return NextResponse.json(
-          { success: false, sent: false, message: "لطفاً " + waitSec + " ثانیه دیگر مجدداً تلاش کنید." },
+          {
+            success: false,
+            sent: false,
+            message: "لطفاً " + waitSec + " ثانیه دیگر مجدداً تلاش کنید.",
+          },
           { status: 429 }
         );
       }
@@ -277,7 +369,7 @@ export async function POST(req: NextRequest) {
       expiresAt: now + 60000,
       createdAt: now,
       attempts: 0,
-      status: "pending"
+      status: "pending",
     });
 
     const otpLength = await getOtpLengthFast();
@@ -298,7 +390,9 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           sent: false,
-          message: smsResult.userSafeMessage || "خطا در ارسال پیامک تایید. لطفاً لحظاتی دیگر مجدداً تلاش کنید.",
+          message:
+            smsResult.userSafeMessage ||
+            "خطا در ارسال پیامک تایید. لطفاً لحظاتی دیگر مجدداً تلاش کنید.",
         },
         { status: 502 }
       );
@@ -309,7 +403,7 @@ export async function POST(req: NextRequest) {
       expiresAt,
       createdAt: now,
       attempts: 0,
-      status: "sent"
+      status: "sent",
     });
 
     const signedChallenge = createSignedChallengeCookie(rawPhone, codeHash, expiresAt);

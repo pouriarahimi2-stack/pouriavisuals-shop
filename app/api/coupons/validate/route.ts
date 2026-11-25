@@ -1,6 +1,7 @@
 // File Path: app/api/coupons/validate/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { rateLimiter } from "@/lib/rateLimiter";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -22,6 +23,24 @@ function getClientIp(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = getClientIp(req);
+    const rateCheck = await rateLimiter.checkLimit(
+      clientIp,
+      "coupon_code_validate",
+      20,
+      5
+    );
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          valid: false,
+          message: "تعداد تلاش‌های بررسی کد تخفیف بیش از حد مجاز است. لطفاً دقایقی دیگر امتحان کنید.",
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const code = toEnglishText(body.code || body.couponCode || "");
     const cartTotal = Number(body.cartTotal || body.subtotal || body.total || 0);
@@ -41,9 +60,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const userIdentifier = cleanPhone || getClientIp(req);
+    const userIdentifier = cleanPhone || clientIp;
 
-    // بررسی استفاده قبلی از کد تخفیف هم بر اساس شماره موبایل و هم شناسه کاربر
     if (cleanPhone.length === 11) {
       const { data: usedByPhone } = await supabaseAdmin
         .from("orders")

@@ -2,24 +2,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyCustomerToken, CUSTOMER_COOKIE_NAME } from "@/lib/customerSession";
+import { rateLimiter } from "@/lib/rateLimiter";
+import { triggerBackInStockNotifications } from "@/lib/backInStockService";
 
 export const dynamic = "force-dynamic";
-
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_MAX = 25;
-const RATE_LIMIT_WINDOW_MS = 60_000;
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-  if (entry.count >= RATE_LIMIT_MAX) return false;
-  entry.count++;
-  return true;
-}
 
 function getClientIp(req: NextRequest): string {
   return (
@@ -43,12 +29,23 @@ function normalizePhone(val: any): string {
   return digits;
 }
 
+function extractWalletDeductionFromAddress(addressStr: string): number {
+  const match = String(addressStr || "").match(
+    /\[کسر از کیف پول:\s*([\d,۰-۹]+)\s*تومان\]/
+  );
+  if (!match || !match[1]) return 0;
+  const englishDigits = normalizeDigits(match[1]).replace(/,/g, "").trim();
+  const num = Number(englishDigits);
+  return Number.isFinite(num) && num > 0 ? num : 0;
+}
+
 function normalizeOrderRecord(row: any) {
   if (!row || typeof row !== "object") return row;
   const resolvedPhone = row.phone || row.customer_phone || "";
   const rawAddress = String(row.address || row.customer_address || "");
   const cleanAddress = rawAddress
     .replace(/\s*\[مالیات\s*\d+%:\s*\d+\s*تومان\]/g, "")
+    .replace(/\s*\[کسر از کیف پول:\s*[\d,۰-۹]+\s*تومان\]/g, "")
     .trim();
 
   const shortDigits =
@@ -89,7 +86,6 @@ async function fetchOrdersByPhoneOrCode(params: {
   let cleanPhone = normalizePhone(params.phone || "");
   let cleanCode = normalizeDigits(params.code || "").toUpperCase();
 
-  // تشخیص هوشمند اینکه مقدار query شماره موبایل است یا کد سفارش/پیگیری
   if (rawQuery) {
     const maybePhone = normalizePhone(rawQuery);
     if (/^09\d{9}$/.test(maybePhone) && !cleanPhone) {
@@ -99,7 +95,6 @@ async function fetchOrdersByPhoneOrCode(params: {
     }
   }
 
-  // حالت ۱: جستجو با شماره موبایل (با یا بدون کد سفارش)
   if (cleanPhone && /^09\d{9}$/.test(cleanPhone)) {
     const { data, error } = await supabaseAdmin
       .from("orders")
@@ -130,7 +125,6 @@ async function fetchOrdersByPhoneOrCode(params: {
     });
   }
 
-  // حالت ۲: جستجو فقط با شماره سفارش یا کد رهگیری پستی (AXN-... یا TRK-...)
   if (cleanCode && cleanCode.length >= 4) {
     const { data, error } = await supabaseAdmin
       .from("orders")
@@ -164,8 +158,9 @@ async function handleTrackRequest(
   req: NextRequest
 ): Promise<NextResponse> {
   const ip = getClientIp(req);
+  const rateCheck = await rateLimiter.checkLimit(ip, "order_track_lookup", 25, 1);
 
-  if (!checkRateLimit(ip)) {
+  if (!rateCheck.allowed) {
     return NextResponse.json(
       {
         success: false,
@@ -176,8 +171,7 @@ async function handleTrackRequest(
     );
   }
 
-  const rawInput =
-    params.query || params.phone || params.code || "";
+  const rawInput = params.query || params.phone || params.code || "";
   if (!String(rawInput).trim()) {
     return NextResponse.json(
       {
@@ -290,6 +284,17 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
+    const cookieToken = req.cookies.get(CUSTOMER_COOKIE_NAME)?.value;
+    if (cookieToken) {
+      const session = await verifyCustomerToken(cookieToken);
+      if (session && normalizePhone(session.phone) !== cleanPhone) {
+        return NextResponse.json(
+          { success: false, message: "شماره همراه با حساب کاربری مطابقت ندارد." },
+          { status: 403 }
+        );
+      }
+    }
+
     const fullName = String(body.fullName || body.full_name || "").trim();
     const province = String(body.province || "").trim();
     const city = String(body.city || "").trim();
@@ -305,8 +310,8 @@ export async function PATCH(req: NextRequest) {
           id: "cust_" + cleanPhone,
           full_name: fullName || "مشتری گرامی",
           phone: cleanPhone,
-          province: province || "تهران",
-          city: city || "تهران",
+          province: province || "",
+          city: city || "",
           address: address || null,
           postal_code: postalCode || null,
           updated_at: new Date().toISOString(),
@@ -326,7 +331,7 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-// لغو و حذف سفارش پرداخت‌نشده (Pending) توسط خود مشتری و بازگشت موجودی کالا به انبار
+// لغو و حذف سفارش پرداخت‌نشده (Pending) توسط مشتری + بازگشت موجودی، کوپن و اعتبار کیف پول
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -338,6 +343,17 @@ export async function DELETE(req: NextRequest) {
         { success: false, message: "شناسه سفارش و شماره همراه الزامی است." },
         { status: 400 }
       );
+    }
+
+    const cookieToken = req.cookies.get(CUSTOMER_COOKIE_NAME)?.value;
+    if (cookieToken) {
+      const session = await verifyCustomerToken(cookieToken);
+      if (session && normalizePhone(session.phone) !== cleanPhone) {
+        return NextResponse.json(
+          { success: false, message: "عدم تطابق شماره همراه با حساب کاربری." },
+          { status: 403 }
+        );
+      }
     }
 
     const { data: ord } = await supabaseAdmin
@@ -376,7 +392,7 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    // بازگرداندن موجودی اقلام سفارش ناتمام به انبار
+    // ۱. بازگرداندن موجودی اقلام به انبار و فعال‌سازی پیامک موجودی
     if (Array.isArray(ord.items)) {
       for (const it of ord.items) {
         const pId = String(it.id || it.productId || it.product_id || "");
@@ -385,11 +401,12 @@ export async function DELETE(req: NextRequest) {
         try {
           const { data: pRow } = await supabaseAdmin
             .from("products")
-            .select("id, stock")
+            .select("id, title, name, stock")
             .eq("id", pId)
             .maybeSingle();
           if (pRow) {
-            const nextStock = Math.max(0, Number(pRow.stock || 0) + qty);
+            const prevStock = Math.max(0, Number(pRow.stock || 0));
+            const nextStock = prevStock + qty;
             await supabaseAdmin
               .from("products")
               .update({
@@ -398,16 +415,90 @@ export async function DELETE(req: NextRequest) {
                 updated_at: new Date().toISOString(),
               })
               .eq("id", pRow.id);
+
+            if (prevStock <= 0 && nextStock > 0) {
+              await triggerBackInStockNotifications(
+                pRow.id,
+                String(pRow.title || pRow.name || it.title || "محصول"),
+                nextStock
+              );
+            }
           }
         } catch {}
       }
+    }
+
+    // ۲. بازگرداندن اعتبار کیف پول در صورت استفاده در سفارش ناتمام
+    const walletUsed = extractWalletDeductionFromAddress(ord.address || "");
+    if (walletUsed > 0) {
+      try {
+        const { data: walletRow } = await supabaseAdmin
+          .from("customer_wallets")
+          .select("balance")
+          .eq("customer_phone", cleanPhone)
+          .maybeSingle();
+
+        const currentBal = Math.max(0, Number(walletRow?.balance || 0));
+        const refundedBal = currentBal + walletUsed;
+
+        await supabaseAdmin.from("customer_wallets").upsert(
+          [
+            {
+              customer_phone: cleanPhone,
+              balance: refundedBal,
+              updated_at: new Date().toISOString(),
+            },
+          ],
+          { onConflict: "customer_phone" }
+        );
+
+        await supabaseAdmin.from("admin_audit_logs").insert([
+          {
+            action: "WALLET_REFUND_ON_CUSTOMER_CANCEL",
+            user_id: cleanPhone,
+            details: {
+              orderId: ord.id,
+              orderNumber: ord.order_number,
+              refundedAmount: walletUsed,
+              newWalletBalance: refundedBal,
+            },
+            ip_address: getClientIp(req),
+            severity: "info",
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      } catch {}
+    }
+
+    // ۳. آزادسازی ظرفیت کد تخفیف استفاده‌شده
+    if (ord.coupon_code) {
+      try {
+        const { data: cpn } = await supabaseAdmin
+          .from("coupons")
+          .select("id, used_count, times_used")
+          .eq("code", ord.coupon_code)
+          .maybeSingle();
+        if (cpn) {
+          const nextUsed = Math.max(
+            0,
+            Number(cpn.used_count ?? cpn.times_used ?? 1) - 1
+          );
+          await supabaseAdmin
+            .from("coupons")
+            .update({ used_count: nextUsed, times_used: nextUsed })
+            .eq("id", cpn.id);
+        }
+      } catch {}
     }
 
     await supabaseAdmin.from("orders").delete().eq("id", id);
 
     return NextResponse.json({
       success: true,
-      message: "✓ سفارش ناتمام لغو شد و موجودی کالا به انبار بازگشت.",
+      message:
+        walletUsed > 0
+          ? `✓ سفارش ناتمام لغو شد، موجودی کالا بازگشت و مبلغ ${walletUsed.toLocaleString("fa-IR")} تومان به کیف پول شما عودت داده شد.`
+          : "✓ سفارش ناتمام لغو شد و موجودی کالا به انبار بازگشت.",
     });
   } catch (err: any) {
     return NextResponse.json(

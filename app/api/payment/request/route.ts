@@ -2,14 +2,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { postViaNetafrazRelay } from "@/lib/netafrazRelay";
+import { rateLimiter } from "@/lib/rateLimiter";
+import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
+import { normalizeSystemSettings } from "@/lib/systemSettings";
 
 export const dynamic = "force-dynamic";
 
-const ZARINPAL_MERCHANT_ID =
-  process.env.ZARINPAL_MERCHANT_ID ;
+const ZARINPAL_MERCHANT_ID = (process.env.ZARINPAL_MERCHANT_ID || "").trim();
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "127.0.0.1";
+
+    const rateCheck = await rateLimiter.checkLimit(
+      clientIp,
+      "payment_gateway_request",
+      15,
+      10
+    );
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "تعداد درخواست‌های اتصال به درگاه بیش از حد مجاز است. لطفاً دقایقی دیگر تلاش کنید.",
+        },
+        { status: 429 }
+      );
+    }
+
+    if (!ZARINPAL_MERCHANT_ID) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "تنظیمات درگاه پرداخت (Merchant ID) روی سرور پیکربندی نشده است.",
+        },
+        { status: 500 }
+      );
+    }
+
     const body = await req.json();
     const orderId = String(body.orderId || "").trim();
     let amount = Number(body.amount || 0);
@@ -22,7 +55,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // استعلام اجباری مبلغ واقعی فاکتور از دیتابیس جهت جلوگیری ۱۰۰٪ از دستکاری مبلغ توسط کلاینت
     let orderRow: any = null;
     const { data: byId } = await supabaseAdmin
       .from("orders")
@@ -48,7 +80,16 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      const dbAmount = Number(orderRow.final_amount || orderRow.total_amount || 0);
+      const dbAmount = Number(orderRow.final_amount ?? orderRow.total_amount ?? 0);
+      if (dbAmount === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "مبلغ قابل پرداخت این سفارش صفر است و نیازی به درگاه بانکی ندارد.",
+          },
+          { status: 400 }
+        );
+      }
       if (dbAmount > 0) {
         amount = dbAmount;
       }
@@ -61,10 +102,18 @@ export async function POST(req: NextRequest) {
       amount = 1000;
     }
 
+    const siteRow = await getMasterSiteInfoRow();
+    const sys = normalizeSystemSettings(
+      siteRow?.homepage_layout_config || {},
+      siteRow
+    );
+    const storeName = sys.site_name || "آکسون کور";
+
     const canonicalOrderId = String(orderRow?.id || orderId);
 
     const origin =
       req.headers.get("origin") ||
+      sys.canonicalBaseUrl ||
       process.env.NEXT_PUBLIC_SITE_URL ||
       "https://axoncore.ir";
 
@@ -78,7 +127,7 @@ export async function POST(req: NextRequest) {
 
     const descriptionText =
       body.description ||
-      "پرداخت سفارش " + (orderRow?.order_number || canonicalOrderId) + " در فروشگاه آکسون کور";
+      `پرداخت سفارش ${orderRow?.order_number || canonicalOrderId} در فروشگاه ${storeName}`;
 
     const zpPayload = {
       merchant_id: ZARINPAL_MERCHANT_ID,
@@ -95,7 +144,6 @@ export async function POST(req: NextRequest) {
     let authority = "";
     const attemptsLog: Array<Record<string, any>> = [];
 
-    // ۱. ارسال از طریق پل رمزنگاری‌شده نت‌افراز (آی‌پی ثابت ایران)
     const relayRes = await postViaNetafrazRelay(
       "https://payment.zarinpal.com/pg/v4/payment/request.json",
       {},
@@ -114,7 +162,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ۲. فال‌بک مستقیم به زرین‌پال
     if (!authority) {
       for (const ep of [
         "https://payment.zarinpal.com/pg/v4/payment/request.json",
@@ -169,7 +216,7 @@ export async function POST(req: NextRequest) {
               zarinpalErrorMessage: errMsg,
               rawGatewayAttempts: attemptsLog,
             },
-            ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
+            ip_address: clientIp,
             severity: "error",
             created_at: new Date().toISOString(),
           },
@@ -179,7 +226,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "خطا در برقراری ارتباط با درگاه پرداخت. لطفاً لحظاتی دیگر مجدداً تلاش کنید.",
+          message:
+            "خطا در برقراری ارتباط با درگاه پرداخت. لطفاً لحظاتی دیگر مجدداً تلاش کنید.",
         },
         { status: 502 }
       );

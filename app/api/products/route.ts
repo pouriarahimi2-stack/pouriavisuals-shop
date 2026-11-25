@@ -3,21 +3,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { unpackProductRow, packProductDescription } from "@/lib/productUnpacker";
+import { triggerBackInStockNotifications } from "@/lib/backInStockService";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** فیلتر کردن base64 از آرایه تصاویر — فقط URL واقعی نگه می‌داریم */
 function filterRealUrls(arr: unknown[]): string[] {
   return arr
     .map((x) => String(x || "").trim())
     .filter((s) => {
       if (!s) return false;
-      if (s.startsWith("data:")) return false;      // base64 blob
-      if (s.length > 600 && !s.includes("/")) return false; // base64 بدون http
-      return true; // /placeholder.png یا https://...
+      if (s.startsWith("data:")) return false;
+      if (s.length > 600 && !s.includes("/")) return false;
+      return true;
     });
 }
 
@@ -75,7 +75,6 @@ export async function POST(req: NextRequest) {
     const rawId = String(body.id || "").trim();
     const productId = UUID_REGEX.test(rawId) ? rawId : randomUUID();
 
-    // ── تصاویر: حذف base64 و نگه داشتن فقط URL واقعی ──
     const rawImages = Array.isArray(body.images)
       ? filterRealUrls(body.images)
       : [];
@@ -108,7 +107,6 @@ export async function POST(req: NextRequest) {
 
     const numericStock = body.stock !== undefined ? Math.max(0, Number(body.stock)) : 10;
 
-    // ── توضیحات: حذف base64 و متادیتای قدیمی با Regex استاندارد ──
     const cleanDesc = String(body.description || "")
       .replace(/<!--MEDIA_METADATA:[\s\S]*?-->/g, "")
       .trim();
@@ -156,7 +154,6 @@ export async function POST(req: NextRequest) {
       description: packagedDescription,
       color_options: cleanColorOptions,
       updated_at: new Date().toISOString(),
-      /* Enterprise Infrastructure Inject */
       discount_start_date:
         typeof body !== "undefined" && body.discount_start_date
           ? new Date(body.discount_start_date).toISOString()
@@ -173,7 +170,6 @@ export async function POST(req: NextRequest) {
         typeof body !== "undefined" && typeof body.specs === "object"
           ? body.specs
           : undefined,
-      // ← ستون‌های جدید — مستقیم به DB نوشته میشن
       purchase_price: purchasePrice,
       shipping_type: (() => {
         const stMap: Record<string, "post" | "tipax" | "both"> = {
@@ -191,16 +187,16 @@ export async function POST(req: NextRequest) {
       })(),
     };
 
-    // بررسی وجود محصول
     const { data: existing } = await supabaseAdmin
       .from("products")
-      .select("id")
+      .select("id, stock")
       .eq("id", productId)
       .maybeSingle();
 
     let savedRecord: any = null;
 
     if (existing) {
+      const prevStock = Math.max(0, Number(existing.stock || 0));
       const { data, error } = await supabaseAdmin
         .from("products")
         .update(safePayload)
@@ -212,6 +208,14 @@ export async function POST(req: NextRequest) {
         throw new Error(error.message || "خطا در به‌روزرسانی محصول");
       }
       savedRecord = data;
+
+      if (prevStock <= 0 && numericStock > 0) {
+        await triggerBackInStockNotifications(
+          productId,
+          cleanTitle,
+          numericStock
+        );
+      }
     } else {
       safePayload.created_at = new Date().toISOString();
       const { data, error } = await supabaseAdmin

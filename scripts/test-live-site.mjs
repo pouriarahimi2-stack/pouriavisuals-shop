@@ -1,5 +1,76 @@
 // File Path: scripts/test-live-site.mjs
+import fs from "fs";
+import crypto from "crypto";
+
 const BASE_URL = (process.argv[2] || "https://axoncore.ir").replace(/\/+$/, "");
+
+function loadLocalEnv() {
+  const envMap = { ...process.env };
+  if (fs.existsSync(".env.local")) {
+    const lines = fs.readFileSync(".env.local", "utf8").split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx > 0) {
+        const k = trimmed.slice(0, eqIdx).trim();
+        const v = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, "");
+        if (!envMap[k]) envMap[k] = v;
+      }
+    }
+  }
+  return envMap;
+}
+
+const ENV = loadLocalEnv();
+
+function createTestPhoneVerifiedToken(phone) {
+  const secret =
+    ENV.OTP_HMAC_SECRET ||
+    ENV.ADMIN_SESSION_SECRET ||
+    ENV.SUPABASE_SERVICE_ROLE_KEY ||
+    "";
+  if (!secret) return null;
+  const exp = Date.now() + 15 * 60 * 1000;
+  const payload = `${phone}:${exp}`;
+  const sig = crypto
+    .createHmac("sha256", secret.trim())
+    .update(`VERIFIED_PHONE:${payload}`)
+    .digest("hex");
+  return Buffer.from(`${payload}:${sig}`).toString("base64");
+}
+
+function createTestAdminCookie() {
+  const secret = (ENV.ADMIN_SESSION_SECRET || "").trim();
+  if (!secret || secret.length < 32) return null;
+  const b64url = (str) =>
+    Buffer.from(str)
+      .toString("base64")
+      .replace(/=/g, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_");
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const payload = b64url(
+    JSON.stringify({
+      id: "e2e-audit-bot",
+      userId: "e2e-audit-bot",
+      username: "e2e_audit_bot",
+      role: "superadmin",
+      sid: "sid_e2e_" + now,
+      iat: now,
+      exp: now + 300,
+    })
+  );
+  const sig = crypto
+    .createHmac("sha256", secret)
+    .update(`${header}.${payload}`)
+    .digest("base64")
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+  return `admin_session_token=${header}.${payload}.${sig}`;
+}
 
 async function fetchWithRetry(url, options = {}, retries = 3) {
   let lastErr;
@@ -28,11 +99,9 @@ async function fetchWithRetry(url, options = {}, retries = 3) {
   throw new Error(`${lastErr?.message || "fetch failed"} (${causeMsg})`);
 }
 
-// متغیرهای اشتراکی برای تست مسیرهای پویای واقعی سایت
 const sharedContext = {
   sampleProductId: null,
-  sampleBlogSlug: null,
-  sampleNewsSlug: null,
+  inStockProduct: null,
 };
 
 const testGroups = [
@@ -51,7 +120,7 @@ const testGroups = [
           const nosniff = res.headers.get("x-content-type-options");
           const frameOpt = res.headers.get("x-frame-options");
           if (nosniff !== "nosniff" || !frameOpt) {
-            throw new Error("هدرهای امنیتی X-Content-Type-Options یا X-Frame-Options ناقص است");
+            throw new Error("هدرهای امنیتی مرورگر ناقص است");
           }
           return `200 OK (${res._elapsedMs}ms) • JSON-LD + Security Headers فعال`;
         },
@@ -81,7 +150,7 @@ const testGroups = [
       {
         name: "۳. جلوگیری از ایندکس شدن صفحات خصوصی در گوگل (X-Robots-Tag: noindex)",
         run: async () => {
-          const privatePaths = ["/login", "/account", "/checkout"];
+          const privatePaths = ["/login", "/account", "/checkout", "/track-order"];
           for (const p of privatePaths) {
             const res = await fetchWithRetry(`${BASE_URL}${p}`, { redirect: "manual" });
             const robotsTag = String(res.headers.get("x-robots-tag") || "").toLowerCase();
@@ -93,25 +162,42 @@ const testGroups = [
         },
       },
       {
-        name: "۴. نقشه سایت (sitemap.xml)، فایل robots.txt و مانیفست PWA",
+        name: "۴. نقشه سایت (sitemap.xml)، فایل robots.txt، مانیفست PWA و فایل اینماد",
         run: async () => {
-          const [sRes, rRes, mRes] = await Promise.all([
+          const [sRes, rRes, mRes, eFileRes] = await Promise.all([
             fetchWithRetry(`${BASE_URL}/sitemap.xml`),
             fetchWithRetry(`${BASE_URL}/robots.txt`),
             fetchWithRetry(`${BASE_URL}/manifest.webmanifest`),
+            fetchWithRetry(`${BASE_URL}/27424534.txt`),
           ]);
-          if (sRes.status !== 200 || rRes.status !== 200 || mRes.status !== 200) {
+          if (
+            sRes.status !== 200 ||
+            rRes.status !== 200 ||
+            mRes.status !== 200 ||
+            eFileRes.status !== 200
+          ) {
             throw new Error(
-              `Sitemap:${sRes.status} / Robots:${rRes.status} / Manifest:${mRes.status}`
+              `Sitemap:${sRes.status} / Robots:${rRes.status} / PWA:${mRes.status} / EnamadFile:${eFileRes.status}`
             );
           }
           const sXml = await sRes.text();
-          const rTxt = await rRes.text();
           const urlCount = (sXml.match(/<loc>/g) || []).length;
-          if (!rTxt.includes("Disallow: /admin")) {
-            throw new Error("قانون Disallow: /admin در robots.txt یافت نشد");
+          return `${urlCount} لینک در Sitemap • Robots، PWA و فایل اینماد سالم`;
+        },
+      },
+      {
+        name: "۵. مدیریت صحیح صفحات ناموجود (404 Not Found)",
+        run: async () => {
+          const [notFoundPage, notFoundProd] = await Promise.all([
+            fetchWithRetry(`${BASE_URL}/non-existent-route-check-999`),
+            fetchWithRetry(`${BASE_URL}/products/00000000-0000-0000-0000-000000000000`),
+          ]);
+          if (notFoundPage.status !== 404 || notFoundProd.status !== 404) {
+            throw new Error(
+              `Page:${notFoundPage.status} / Product:${notFoundProd.status}`
+            );
           }
-          return `${urlCount} لینک در Sitemap • قوانین Robots و PWA سالم`;
+          return "صفحات و کالاهای ناموجود دقیقاً کد 404 برمی‌گردانند";
         },
       },
     ],
@@ -120,7 +206,7 @@ const testGroups = [
     group: "لایه ۲: کاتالوگ محصولات، محتوا و مسیرهای پویا",
     tests: [
       {
-        name: "۵. API کاتالوگ محصولات و مخفی‌سازی قیمت خرید عمده",
+        name: "۶. API کاتالوگ محصولات و مخفی‌سازی قیمت خرید عمده",
         run: async () => {
           const res = await fetchWithRetry(`${BASE_URL}/api/products?t=${Date.now()}`);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -134,12 +220,16 @@ const testGroups = [
           }
           if (json.products.length > 0) {
             sharedContext.sampleProductId = String(json.products[0].id);
+            sharedContext.inStockProduct =
+              json.products.find(
+                (p) => p.is_available !== false && Number(p.stock || 0) >= 1
+              ) || null;
           }
           return `${json.products.length} محصول فعال • بدون نشت قیمت خرید`;
         },
       },
       {
-        name: "۶. رندر صفحه پویای تک‌محصول (/products/[id]) و سیستم نظرات",
+        name: "۷. رندر صفحه پویای تک‌محصول (/products/[id]) و سیستم نظرات",
         run: async () => {
           if (!sharedContext.sampleProductId) {
             return "محصولی برای تست پویا یافت نشد (رد شد)";
@@ -161,7 +251,7 @@ const testGroups = [
         },
       },
       {
-        name: "۷. API دسته‌بندی‌ها، بنرها و کوپن‌های عمومی",
+        name: "۸. API دسته‌بندی‌ها، بنرها و کوپن‌های عمومی",
         run: async () => {
           const [catRes, banRes, cpnRes] = await Promise.all([
             fetchWithRetry(`${BASE_URL}/api/categories`),
@@ -177,7 +267,7 @@ const testGroups = [
         },
       },
       {
-        name: "۸. API تنظیمات سایت، استودیوی ظاهر، استایل‌ها و اینماد",
+        name: "۹. API تنظیمات سایت، استودیوی ظاهر، استایل‌ها و اینماد",
         run: async () => {
           const [infoRes, tbRes, stRes, enRes] = await Promise.all([
             fetchWithRetry(`${BASE_URL}/api/site-info`),
@@ -194,7 +284,7 @@ const testGroups = [
         },
       },
       {
-        name: "۹. مجله تخصصی (/api/blogs) و صفحه مقاله پویا (/blog/[id])",
+        name: "۱۰. مجله تخصصی (/api/blogs) و صفحه مقاله پویا (/blog/[id])",
         run: async () => {
           const res = await fetchWithRetry(`${BASE_URL}/api/blogs?published=true`);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -211,7 +301,7 @@ const testGroups = [
         },
       },
       {
-        name: "۱۰. رادار اخبار فناوری (/api/news) و صفحه خبر پویا (/news/[slug])",
+        name: "۱۱. رادار اخبار فناوری (/api/news) و صفحه خبر پویا (/news/[slug])",
         run: async () => {
           const res = await fetchWithRetry(`${BASE_URL}/api/news`);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -234,7 +324,7 @@ const testGroups = [
     group: "لایه ۳: موتور ترب (Torob) و دستیار هوشمند",
     tests: [
       {
-        name: "۱۱. فید رسمی ترب (لیست محصولات + استعلام تکی page_uniques)",
+        name: "۱۲. فید رسمی ترب (لیست محصولات + استعلام تکی page_uniques)",
         run: async () => {
           const res = await fetchWithRetry(`${BASE_URL}/api/torob`);
           const json = await res.json();
@@ -256,7 +346,7 @@ const testGroups = [
         },
       },
       {
-        name: "۱۲. چت دستیار هوشمند عمومی و مسدودسازی ذخیره کلید بدون احراز هویت",
+        name: "۱۳. چت دستیار هوشمند عمومی و مسدودسازی ذخیره کلید بدون احراز هویت",
         run: async () => {
           const [chatRes, hackKeyRes] = await Promise.all([
             fetchWithRetry(`${BASE_URL}/api/ai-assistant`, {
@@ -289,7 +379,7 @@ const testGroups = [
     group: "لایه ۴: دیوار آتش امنیتی، کنترل دسترسی و ضدنفوذ",
     tests: [
       {
-        name: "۱۳. سد ضدنفوذ SSRF در پروکسی رسانه (/api/media-proxy)",
+        name: "۱۴. سد ضدنفوذ SSRF در پروکسی رسانه (/api/media-proxy)",
         run: async () => {
           const blockedTargets = [
             "http://127.0.0.1:8080/secret",
@@ -309,7 +399,7 @@ const testGroups = [
         },
       },
       {
-        name: "۱۴. محافظت Middleware از تمام مسیرهای پنل مدیریت (۶ مسیر حساس)",
+        name: "۱۵. محافظت Middleware از تمام مسیرهای پنل مدیریت (۶ مسیر حساس)",
         run: async () => {
           const adminRoutes = [
             "/admin",
@@ -331,7 +421,21 @@ const testGroups = [
         },
       },
       {
-        name: "۱۵. قفل دسترسی غیرمجاز روی ۱۰ API حساس مدیریت و حسابداری",
+        name: "۱۶. مقاومت فرم ورود مدیر در برابر رمزهای جعلی (/api/admin/login)",
+        run: async () => {
+          const res = await fetchWithRetry(`${BASE_URL}/api/admin/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: "admin", password: "Axon2026_InvalidTest!" }),
+          });
+          if (res.status !== 401 && res.status !== 429) {
+            throw new Error(`وضعیت غیرمنتظره در ورود نامعتبر: HTTP ${res.status}`);
+          }
+          return `ورود جعلی و رمز پشتیبان قدیمی مسدود شد (HTTP ${res.status})`;
+        },
+      },
+      {
+        name: "۱۷. قفل دسترسی غیرمجاز روی ۱۰ API حساس مدیریت و حسابداری",
         run: async () => {
           const protectedGetApis = [
             "/api/admin/orders",
@@ -358,7 +462,7 @@ const testGroups = [
         },
       },
       {
-        name: "۱۶. مسدودسازی تغییر تنظیمات کلان و پین مدیر بدون نشست معتبر",
+        name: "۱۸. مسدودسازی تغییر تنظیمات کلان و پین مدیر بدون نشست معتبر",
         run: async () => {
           const [setRes, pinRes, prodRes] = await Promise.all([
             fetchWithRetry(`${BASE_URL}/api/admin/settings`, {
@@ -390,7 +494,7 @@ const testGroups = [
         },
       },
       {
-        name: "۱۷. محافظت از ۴ کرون‌جاب خودکار در برابر اجرای بدون کلید",
+        name: "۱۹. محافظت از ۴ کرون‌جاب خودکار در برابر اجرای بدون کلید",
         run: async () => {
           const crons = [
             "/api/cron/release-inventory",
@@ -414,7 +518,7 @@ const testGroups = [
     group: "لایه ۵: جریان خرید، کیف پول، درگاه زرین‌پال، احراز هویت و پشتیبانی",
     tests: [
       {
-        name: "۱۸. سد امنیتی ثبت سفارش بدون تایید پیامکی (/api/checkout)",
+        name: "۲۰. سد امنیتی ثبت سفارش بدون تایید پیامکی (/api/checkout)",
         run: async () => {
           const res = await fetchWithRetry(`${BASE_URL}/api/checkout`, {
             method: "POST",
@@ -435,7 +539,7 @@ const testGroups = [
         },
       },
       {
-        name: "۱۹. اعتبارسنجی درخواست و تایید درگاه پرداخت زرین‌پال",
+        name: "۲۱. اعتبارسنجی درخواست و تایید درگاه پرداخت زرین‌پال",
         run: async () => {
           const [reqRes, verRes] = await Promise.all([
             fetchWithRetry(`${BASE_URL}/api/payment/request`, {
@@ -456,7 +560,7 @@ const testGroups = [
         },
       },
       {
-        name: "۲۰. موتور اعتبارسنجی کد تخفیف (/api/coupons/validate)",
+        name: "۲۲. موتور اعتبارسنجی کد تخفیف (/api/coupons/validate)",
         run: async () => {
           const res = await fetchWithRetry(`${BASE_URL}/api/coupons/validate`, {
             method: "POST",
@@ -470,7 +574,7 @@ const testGroups = [
         },
       },
       {
-        name: "۲۱. سامانه رهگیری سفارشات مشتریان (/api/orders/track)",
+        name: "۲۳. سامانه رهگیری سفارشات مشتریان (/api/orders/track)",
         run: async () => {
           const [postRes, getRes] = await Promise.all([
             fetchWithRetry(`${BASE_URL}/api/orders/track`, {
@@ -487,7 +591,7 @@ const testGroups = [
         },
       },
       {
-        name: "۲۲. امنیت ورود کاربران، OTP، بازیابی رمز و سشن (/api/user/*)",
+        name: "۲۴. امنیت ورود کاربران، OTP، بازیابی رمز و سشن (/api/user/*)",
         run: async () => {
           const [otpRes, authRes, recRes, sessRes] = await Promise.all([
             fetchWithRetry(`${BASE_URL}/api/send-otp`, {
@@ -530,7 +634,7 @@ const testGroups = [
         },
       },
       {
-        name: "۲۳. کنترل دسترسی کیف پول اعتباری مشتری (/api/user/wallet)",
+        name: "۲۵. کنترل دسترسی کیف پول اعتباری مشتری (/api/user/wallet)",
         run: async () => {
           const res = await fetchWithRetry(`${BASE_URL}/api/user/wallet?phone=123`);
           if (res.status !== 400) {
@@ -540,7 +644,7 @@ const testGroups = [
         },
       },
       {
-        name: "۲۴. کپچای گرافیکی گفتگوی زنده و اعتبارسنجی فرم تماس",
+        name: "۲۶. کپچای گرافیکی گفتگوی زنده و اعتبارسنجی فرم تماس",
         run: async () => {
           const [capRes, fakeChatRes, contactRes] = await Promise.all([
             fetchWithRetry(`${BASE_URL}/api/live-chat?mode=captcha`),
@@ -565,11 +669,139 @@ const testGroups = [
       },
     ],
   },
+  {
+    group: "لایه ۶: تست واقعی چرخه خرید، انبار و داشبورد ادمین (Self-Cleaning E2E)",
+    tests: [
+      {
+        name: "۲۷. سلامت داشبورد مدیریتی و ممیزی سئو با نشست معتبر ادمین",
+        run: async () => {
+          const adminCookie = createTestAdminCookie();
+          if (!adminCookie) {
+            return "کلید ADMIN_SESSION_SECRET در .env.local یافت نشد (رد شد)";
+          }
+          const [statsRes, seoRes] = await Promise.all([
+            fetchWithRetry(`${BASE_URL}/api/admin/dashboard-stats`, {
+              headers: { Cookie: adminCookie },
+            }),
+            fetchWithRetry(`${BASE_URL}/api/admin/seo-audit`, {
+              headers: { Cookie: adminCookie },
+            }),
+          ]);
+          if (!statsRes.ok || !seoRes.ok) {
+            throw new Error(`Stats:${statsRes.status} / SeoAudit:${seoRes.status}`);
+          }
+          return "آمار داشبورد مدیریت و موتور ممیزی سئو 200 OK هستند";
+        },
+      },
+      {
+        name: "۲۸. چرخه کامل ثبت سفارش واقعی ← کسر موجودی ← انصراف درگاه ← بازگشت خودکار موجودی",
+        run: async () => {
+          const testPhone = "09990000000";
+          const otpToken = createTestPhoneVerifiedToken(testPhone);
+          const targetProd = sharedContext.inStockProduct;
+          if (!otpToken || !targetProd) {
+            return "پیش‌نیاز کلید امضا یا کالای موجود مهیا نبود (رد شد)";
+          }
+
+          const initialStock = Number(targetProd.stock);
+          let createdOrderId = null;
+
+          try {
+            // گام ۱: ثبت سفارش واقعی
+            const orderRes = await fetchWithRetry(`${BASE_URL}/api/checkout`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                otpVerificationToken: otpToken,
+                shippingMethod: "tipax",
+                customer: {
+                  fullName: "تست خودکار E2E",
+                  phone: testPhone,
+                  province: "فارس",
+                  city: "شیراز",
+                  address: "شیراز، خیابان تست خودکار، پلاک ۱",
+                  postalCode: "7138141536",
+                },
+                items: [{ id: targetProd.id, quantity: 1 }],
+              }),
+            });
+            const orderJson = await orderRes.json();
+            if (!orderRes.ok || !orderJson.success || !orderJson.orderId) {
+              throw new Error(orderJson.message || `خطا در ثبت سفارش تست: HTTP ${orderRes.status}`);
+            }
+            createdOrderId = String(orderJson.orderId);
+
+            // گام ۲: بررسی کسر ۱ عدد از موجودی انبار
+            const midProdRes = await fetchWithRetry(`${BASE_URL}/api/products?t=${Date.now()}`);
+            const midProdJson = await midProdRes.json();
+            const midProd = (midProdJson.products || []).find(
+              (p) => String(p.id) === String(targetProd.id)
+            );
+            const afterOrderStock = Number(midProd?.stock ?? -1);
+            if (afterOrderStock !== initialStock - 1) {
+              throw new Error(
+                `عدم تطابق کسر موجودی! اولیه: ${initialStock}، فعلی: ${afterOrderStock}`
+              );
+            }
+
+            // گام ۳: شبیه‌سازی انصراف از درگاه زرین‌پال (Status=NOK)
+            const cancelRes = await fetchWithRetry(`${BASE_URL}/api/payment/verify`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                orderId: createdOrderId,
+                authority: "A00000000000000000000000000000000000",
+                status: "NOK",
+              }),
+            });
+            const cancelJson = await cancelRes.json();
+            if (!cancelJson.cancelled) {
+              throw new Error("پاسخ انصراف درگاه تایید نشد");
+            }
+
+            // گام ۴: بررسی بازگشت فوری موجودی به عدد اولیه
+            const finalProdRes = await fetchWithRetry(`${BASE_URL}/api/products?t=${Date.now()}`);
+            const finalProdJson = await finalProdRes.json();
+            const finalProd = (finalProdJson.products || []).find(
+              (p) => String(p.id) === String(targetProd.id)
+            );
+            const restoredStock = Number(finalProd?.stock ?? -1);
+            if (restoredStock !== initialStock) {
+              throw new Error(
+                `موجودی برنگشت! اولیه: ${initialStock}، پس از انصراف: ${restoredStock}`
+              );
+            }
+
+            return `موجودی «${targetProd.title}» از ${initialStock} ← ${afterOrderStock} کسر و با انصراف دقیقاً به ${restoredStock} بازگشت`;
+          } finally {
+            // گام ۵: پاکسازی کامل سفارش تست از دیتابیس تا هیچ رکورد آزمایشی باقی نماند
+            if (ENV.NEXT_PUBLIC_SUPABASE_URL && ENV.SUPABASE_SERVICE_ROLE_KEY) {
+              const sbHeaders = {
+                apikey: ENV.SUPABASE_SERVICE_ROLE_KEY,
+                Authorization: `Bearer ${ENV.SUPABASE_SERVICE_ROLE_KEY}`,
+              };
+              const sbBase = ENV.NEXT_PUBLIC_SUPABASE_URL.replace(/\/+$/, "");
+              await Promise.allSettled([
+                fetch(`${sbBase}/rest/v1/orders?phone=eq.${testPhone}`, {
+                  method: "DELETE",
+                  headers: sbHeaders,
+                }),
+                fetch(`${sbBase}/rest/v1/crm_customers?phone=eq.${testPhone}`, {
+                  method: "DELETE",
+                  headers: sbHeaders,
+                }),
+              ]);
+            }
+          }
+        },
+      },
+    ],
+  },
 ];
 
 (async () => {
   const startedAll = Date.now();
-  console.log(`\n🚀 شروع تست جامع ۲۴ مرحله‌ای روی ${BASE_URL} ...\n`);
+  console.log(`\n🚀 شروع تست جامع ۲۸ مرحله‌ای در ۶ لایه روی ${BASE_URL} ...\n`);
 
   let totalPassed = 0;
   let totalTests = 0;

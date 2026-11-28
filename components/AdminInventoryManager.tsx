@@ -55,6 +55,7 @@ export function AdminInventoryManager({
   const [sendingAlertForProdId, setSendingAlertForProdId] = useState<
     string | null
   >(null);
+  const [releasingExpired, setReleasingExpired] = useState(false);
 
   const [summary, setSummary] = useState({
     totalInventoryAssets: 0,
@@ -71,29 +72,26 @@ export function AdminInventoryManager({
     text: string;
   } | null>(null);
 
-  // فرم ورود / کسر موجودی انبار
   const [selectedProdId, setSelectedProdId] = useState("");
   const [stockDelta, setStockDelta] = useState<number>(10);
   const [purchaseCostInput, setPurchaseCostInput] = useState<number | "">("");
-  const [supplierInput, setSupplierInput] = useState("تأمین‌کننده رسمی");
+  const [supplierInput] = useState("تأمین‌کننده رسمی");
   const [noteInput, setNoteInput] = useState("");
   const [submittingStock, setSubmittingStock] = useState(false);
 
-  // مودال سوال تاییدیه امنیتی هنگام ورود مجدد موجودی
   const [confirmRestockModal, setConfirmRestockModal] = useState<{
     isOpen: boolean;
     product: ProductFinancialRow | null;
     delta: number;
   }>({ isOpen: false, product: null, delta: 0 });
 
-  // مودال ویرایش ۱۰۰٪ کامل کالا در حسابداری و انبار
   const [editingProduct, setEditingProduct] =
     useState<ProductFinancialRow | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
   const notify = (text: string, type: "success" | "error" = "success") => {
     setFeedback({ type, text });
-    setTimeout(() => setFeedback(null), 4000);
+    setTimeout(() => setFeedback(null), 5000);
   };
 
   const fetchBackInStockAlerts = useCallback(async () => {
@@ -198,6 +196,39 @@ export function AdminInventoryManager({
       supabase.removeChannel(chSiteInfo);
     };
   }, [fetchAccountingData, fetchBackInStockAlerts]);
+
+  const handleManualReleaseReservations = async (maxAgeMinutes: number) => {
+    if (
+      maxAgeMinutes === 0 &&
+      !confirm(
+        "آیا مطمئن هستید؟ تمامی سفارش‌های در وضعیت «در انتظار پرداخت» لغو شده و موجودی کالاها و اعتبار کیف پول آن‌ها بلافاصله آزاد می‌شود."
+      )
+    ) {
+      return;
+    }
+
+    soundEngine.playClick();
+    setReleasingExpired(true);
+    try {
+      const res = await fetch("/api/cron/release-inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maxAgeMinutes }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        notify(json.message);
+        await Promise.all([fetchAccountingData(), fetchBackInStockAlerts()]);
+      } else {
+        notify(json.message || "خطا در آزادسازی رزروهای انبار.", "error");
+      }
+    } catch {
+      notify("خطا در ارتباط با سرور.", "error");
+    } finally {
+      setReleasingExpired(false);
+    }
+  };
 
   const executeRestockTransaction = async () => {
     if (!selectedProdId) return;
@@ -452,7 +483,6 @@ export function AdminInventoryManager({
       className="space-y-6 font-sans select-text text-[var(--text-primary)]"
       dir="rtl"
     >
-      {/* هدر یکپارچه ۴ بخشی: حسابداری و انبار + سفارشات + گزارش مالی + منتظران پیامک موجودی */}
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2 md:gap-4">
         <div>
           <h1 className="text-base sm:text-sm md:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
@@ -553,7 +583,6 @@ export function AdminInventoryManager({
         </div>
       )}
 
-      {/* کارت‌های خلاصه ترازنامه مالی و انبار */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 text-xs">
         <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1 shadow-sm">
           <span className="text-[var(--text-secondary)] font-bold">
@@ -601,13 +630,10 @@ export function AdminInventoryManager({
         </div>
       </div>
 
-      {/* زیرمنوی ۲: سفارشات و بارنامه */}
       {activeSubTab === "orders" && <OrderManager />}
 
-      {/* زیرمنوی ۱: حسابداری و انبار کالا */}
       {activeSubTab === "accounting" && (
         <div className="space-y-6 text-xs">
-          {/* فرم ثبت ورود / خروج انبار با سیستم سوال تاییدیه امنیتی */}
           <form
             onSubmit={handlePrepareRestockSubmit}
             className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4"
@@ -616,8 +642,8 @@ export function AdminInventoryManager({
               ➕ ثبت سند ورود جدید به انبار / اصلاح موجودی و بهای خرید
             </h3>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-              <div className="lg:col-span-2">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="col-span-2">
                 <label className="block mb-1 font-bold text-[var(--text-secondary)]">
                   انتخاب کالا:
                 </label>
@@ -673,7 +699,7 @@ export function AdminInventoryManager({
                 />
               </div>
 
-              <div className="flex items-end">
+              <div className="flex items-end col-span-2 lg:col-span-1">
                 <button
                   type="submit"
                   disabled={submittingStock}
@@ -685,14 +711,13 @@ export function AdminInventoryManager({
             </div>
           </form>
 
-          {/* جدول کامل حسابداری و انبار با دکمه ویرایش ۱۰۰٪ هر محصول */}
           <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-[var(--card-border)] pb-3">
+            <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-3 border-b border-[var(--card-border)] pb-3">
               <h3 className="font-black text-sm">
                 جدول جامع کالاها، موجودی، بهای تمام‌شده و ویرایش کامل (
                 {filteredItems.length})
               </h3>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <input
                   type="text"
                   value={search}
@@ -700,6 +725,29 @@ export function AdminInventoryManager({
                   placeholder="🔍 جستجوی نام کالا، دسته، SKU..."
                   className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none"
                 />
+
+                <button
+                  type="button"
+                  disabled={releasingExpired}
+                  onClick={() => handleManualReleaseReservations(15)}
+                  className="px-3.5 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-400 hover:bg-amber-500 hover:text-slate-950 font-black cursor-pointer transition disabled:opacity-50"
+                  title="آزادسازی موجودی سفارش‌های پرداخت‌نشده که بیش از ۱۵ دقیقه از ثبت آن‌ها گذشته است"
+                >
+                  {releasingExpired
+                    ? "⏳ در حال آزادسازی..."
+                    : "🔓 آزادسازی رزروهای منقضی (+۱۵د)"}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={releasingExpired}
+                  onClick={() => handleManualReleaseReservations(0)}
+                  className="px-3.5 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 hover:bg-rose-500 hover:text-white font-black cursor-pointer transition disabled:opacity-50"
+                  title="لغو فوری تمامی سفارش‌های در انتظار پرداخت و بازگرداندن موجودی آن‌ها به انبار"
+                >
+                  ⚡ آزادسازی فوری همه معلق‌ها
+                </button>
+
                 <button
                   type="button"
                   onClick={handleExportMonthlyCsv}
@@ -843,7 +891,6 @@ export function AdminInventoryManager({
         </div>
       )}
 
-      {/* زیرمنوی ۳: گزارش مالی، گردش آخر ماه و تاریخچه اسناد انبار */}
       {activeSubTab === "reports" && (
         <div className="space-y-6 text-xs">
           <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
@@ -919,7 +966,6 @@ export function AdminInventoryManager({
         </div>
       )}
 
-      {/* زیرمنوی ۴: لیست مشتریان منتظر پیامک موجودی کالاها */}
       {activeSubTab === "alerts" && (
         <div className="space-y-6 text-xs">
           <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
@@ -1059,7 +1105,6 @@ export function AdminInventoryManager({
         </div>
       )}
 
-      {/* مودال سوال تاییدیه امنیتی هنگام ورود مجدد موجودی */}
       {confirmRestockModal.isOpen && confirmRestockModal.product && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
           <div className="w-full max-w-md rounded-3xl bg-[var(--modal-bg)] border border-amber-500/40 p-6 space-y-5 shadow-2xl text-xs">
@@ -1119,7 +1164,6 @@ export function AdminInventoryManager({
         </div>
       )}
 
-      {/* مودال ویرایش ۱۰۰٪ کامل محصول از داخل بخش حسابداری و انبار */}
       {editingProduct && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn"
@@ -1143,7 +1187,7 @@ export function AdminInventoryManager({
             </div>
 
             <form onSubmit={handleSaveFullProductEdit} className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:grid-cols-2 gap-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div className="sm:col-span-2">
                   <label className="block mb-1 font-bold text-[var(--text-secondary)]">
                     عنوان کامل کالا *

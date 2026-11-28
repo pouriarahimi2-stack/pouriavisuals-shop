@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseServer";
 import { triggerBackInStockNotifications } from "@/lib/backInStockService";
 
 let lastSweepTimestamp = 0;
-const SWEEP_THROTTLE_MS = 30_000; // حداکثر هر ۳۰ ثانیه یک‌بار برای درخواست‌های عمومی
+const SWEEP_THROTTLE_MS = 30_000;
 
 function extractWalletDeductionFromAddress(addressStr: string): number {
   const match = String(addressStr || "").match(
@@ -26,7 +26,6 @@ export async function releaseSinglePendingOrder(
   let refundedWallet = 0;
   const orderLabel = order.order_number || order.id;
 
-  // ۱. بازگرداندن موجودی کالاها به انبار و فعال‌سازی مجدد موجودی
   if (Array.isArray(order.items)) {
     for (const item of order.items) {
       const prodId = String(
@@ -96,7 +95,6 @@ export async function releaseSinglePendingOrder(
     }
   }
 
-  // ۲. بازگرداندن اعتبار کیف پول کسرشده
   const walletUsed = extractWalletDeductionFromAddress(order.address || "");
   const cleanPhone = String(order.phone || "").replace(/\D/g, "");
   if (walletUsed > 0 && /^09\d{9}$/.test(cleanPhone)) {
@@ -125,7 +123,6 @@ export async function releaseSinglePendingOrder(
     } catch {}
   }
 
-  // ۳. آزادسازی ظرفیت کد تخفیف استفاده‌شده
   if (order.coupon_code) {
     try {
       const { data: cpn } = await supabaseAdmin
@@ -146,7 +143,6 @@ export async function releaseSinglePendingOrder(
     } catch {}
   }
 
-  // ۴. تغییر وضعیت سفارش به لغوشده
   await supabaseAdmin
     .from("orders")
     .update({
@@ -186,16 +182,24 @@ export async function releaseExpiredPendingOrders(options?: {
       };
     }
 
-    const maxAgeMs = Math.max(5, Number(options?.maxAgeMinutes ?? 15)) * 60 * 1000;
-    const cutoffIso = new Date(now - maxAgeMs).toISOString();
+    const rawMinutes = Number(options?.maxAgeMinutes ?? 15);
+    const effectiveMinutes = options?.bypassThrottle
+      ? Math.max(0, rawMinutes)
+      : Math.max(5, rawMinutes);
+    const cutoffIso = new Date(now - effectiveMinutes * 60 * 1000).toISOString();
 
-    const { data: expiredOrders } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("orders")
       .select("id, order_number, phone, address, coupon_code, items")
       .eq("status", "pending")
       .eq("payment_status", "pending")
-      .lt("created_at", cutoffIso)
-      .limit(30);
+      .limit(40);
+
+    if (effectiveMinutes > 0) {
+      query = query.lt("created_at", cutoffIso);
+    }
+
+    const { data: expiredOrders } = await query;
 
     if (!expiredOrders || expiredOrders.length === 0) {
       return {
@@ -209,7 +213,12 @@ export async function releaseExpiredPendingOrders(options?: {
     let refundedWalletsCount = 0;
 
     for (const order of expiredOrders) {
-      const res = await releaseSinglePendingOrder(order);
+      const res = await releaseSinglePendingOrder(
+        order,
+        effectiveMinutes === 0
+          ? `آزادسازی دستی رزرو معلق توسط مدیر (${order.order_number || order.id})`
+          : undefined
+      );
       releasedItemsCount += res.releasedItems;
       if (res.refundedWallet > 0) refundedWalletsCount++;
     }

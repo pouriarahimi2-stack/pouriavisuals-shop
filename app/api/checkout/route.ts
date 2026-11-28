@@ -7,6 +7,7 @@ import { normalizeSystemSettings } from "@/lib/systemSettings";
 import { getMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
 import { logAuditEvent } from "@/lib/auditLogger";
 import { sendTextSMS } from "@/lib/otpService";
+import { releaseExpiredPendingOrders } from "@/lib/inventoryReleaser";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,12 @@ function getClientIp(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // آزادسازی فوری سفارش‌های پرداخت‌نشده منقضی پیش از کنترل موجودی انبار
+    await releaseExpiredPendingOrders({
+      maxAgeMinutes: 15,
+      bypassThrottle: true,
+    });
+
     const body = await req.json();
     const customer = body.customer || {};
     const items = Array.isArray(body.items) ? body.items : [];
@@ -391,7 +398,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // محاسبه و کسر ایمن اعتبار کیف پول
     let walletUsedAmount = 0;
     let prevWalletBalance = 0;
     let finalAmount = grandTotalBeforeWallet;
@@ -514,7 +520,6 @@ export async function POST(req: NextRequest) {
       if (!minErr && minInserted) {
         savedOrder = minInserted;
       } else {
-        // بازگردانی اعتبار کیف پول در صورت خطا در ثبت رکورد سفارش
         if (walletUsedAmount > 0) {
           await supabaseAdmin
             .from("customer_wallets")

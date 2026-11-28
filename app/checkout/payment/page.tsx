@@ -7,6 +7,8 @@ import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
 import { useCart } from "@/context/CartContext";
 
+const PENDING_GATEWAY_ORDER_KEY = "axon_pending_gateway_order_v1";
+
 function PaymentGatewayContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -54,6 +56,12 @@ function PaymentGatewayContent() {
       const json = await res.json();
 
       if (res.ok && json.success && json.paymentUrl) {
+        try {
+          sessionStorage.setItem(
+            PENDING_GATEWAY_ORDER_KEY,
+            JSON.stringify({ orderId, phone, createdAt: Date.now() })
+          );
+        } catch {}
         window.location.href = json.paymentUrl;
       } else {
         setPhase("failed");
@@ -66,6 +74,10 @@ function PaymentGatewayContent() {
   };
 
   const verifyZarinpalCallback = async () => {
+    try {
+      sessionStorage.removeItem(PENDING_GATEWAY_ORDER_KEY);
+    } catch {}
+
     const isCancelledByBank = Boolean(
       statusParam && statusParam.toUpperCase() !== "OK"
     );
@@ -129,6 +141,9 @@ function PaymentGatewayContent() {
     initiatedRef.current = true;
 
     if (walletPaid && orderId) {
+      try {
+        sessionStorage.removeItem(PENDING_GATEWAY_ORDER_KEY);
+      } catch {}
       if (typeof clearCart === "function") clearCart();
       const timer = setTimeout(() => {
         router.push("/account?orderId=" + encodeURIComponent(orderId));

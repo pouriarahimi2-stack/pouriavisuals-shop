@@ -1,8 +1,16 @@
 {
   "crons": [
     {
+      "path": "/api/cron/release-inventory",
+      "schedule": "0 3 * * *"
+    },
+    {
       "path": "/api/cron/news",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/review-sms",
+      "schedule": "0 11 * * *"
     },
     {
       "path": "/api/cron/backup",

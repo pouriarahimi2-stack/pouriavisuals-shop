@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { unpackProductRow, packProductDescription } from "@/lib/productUnpacker";
 import { triggerBackInStockNotifications } from "@/lib/backInStockService";
+import { releaseExpiredPendingOrders } from "@/lib/inventoryReleaser";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,9 @@ function filterRealUrls(arr: unknown[]): string[] {
 
 export async function GET(req: NextRequest) {
   try {
+    // آزادسازی غیرمسدودکننده رزروهای منقضی‌شده (بیش از ۱۵ دقیقه) هنگام بارگذاری کاتالوگ
+    releaseExpiredPendingOrders({ maxAgeMinutes: 15 }).catch(() => {});
+
     const isAdmin = await verifyAdminSession(req).catch(() => false);
 
     const { data, error } = await supabaseAdmin

@@ -2,17 +2,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
+import { getMasterSiteInfoRow, saveMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
 
 export const dynamic = "force-dynamic";
 
 function buildCouponPayload(body: any, isUpdate = false) {
   const rawCode = String(body.code || "").trim().toUpperCase();
-  
-  // تعیین دقیق نوع تخفیف
   const discountType =
     body.discount_type === "fixed" || body.type === "fixed" ? "fixed" : "percent";
 
-  // پوشش جامع تمام کلیدهای احتمالی مقدار تخفیف در جدول‌های مختلف
   const rawValue = Number(
     body.discount_percent ??
       body.discount_amount ??
@@ -41,9 +39,9 @@ function buildCouponPayload(body: any, isUpdate = false) {
       ? Number(body.usage_limit)
       : 100;
 
-  const couponId = body.id || ("cpn_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
+  const couponId =
+    body.id || "cpn_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
 
-  // ارسال هم‌زمان تمامی نام‌گذاری‌های استاندارد و معادل برای سازگاری کامل با هر اسکیمایی در Supabase
   const payload: Record<string, any> = {
     id: couponId,
     code: rawCode,
@@ -59,9 +57,12 @@ function buildCouponPayload(body: any, isUpdate = false) {
     usage_limit: usageLimit,
     target_type: body.target_type || "all",
     target_id: body.target_id || null,
-    starts_at: body.starts_at ? new Date(body.starts_at).toISOString() : new Date().toISOString(),
+    starts_at: body.starts_at
+      ? new Date(body.starts_at).toISOString()
+      : new Date().toISOString(),
     expires_at: body.expires_at ? new Date(body.expires_at).toISOString() : null,
     is_active: body.is_active !== false,
+    publish_to_header: body.publish_to_header !== false,
     updated_at: new Date().toISOString(),
   };
 
@@ -110,7 +111,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (isNaN(rawValue) || rawValue <= 0) {
-      return NextResponse.json({ success: false, message: "مقدار تخفیف باید بیشتر از صفر باشد." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "مقدار تخفیف باید بیشتر از صفر باشد." },
+        { status: 400 }
+      );
     }
 
     const { data: created, error } = await supabaseAdmin
@@ -142,13 +146,19 @@ export async function PUT(req: NextRequest) {
     const id = body.id;
 
     if (!id) {
-      return NextResponse.json({ success: false, message: "شناسه کوپن جهت ویرایش الزامی است." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "شناسه کوپن جهت ویرایش الزامی است." },
+        { status: 400 }
+      );
     }
 
     const { rawCode, rawValue, payload } = buildCouponPayload(body, true);
 
     if (!rawCode || isNaN(rawValue) || rawValue <= 0) {
-      return NextResponse.json({ success: false, message: "کد و مقدار تخفیف معتبر است." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "کد و مقدار تخفیف معتبر است." },
+        { status: 400 }
+      );
     }
 
     const { data: updated, error } = await supabaseAdmin
@@ -192,7 +202,11 @@ export async function PATCH(req: NextRequest) {
       .single();
 
     if (error) throw error;
-    return NextResponse.json({ success: true, message: "وضعیت کوپن تغییر یافت.", coupon: updated });
+    return NextResponse.json({
+      success: true,
+      message: "وضعیت کوپن تغییر یافت.",
+      coupon: updated,
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -212,7 +226,6 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, message: "شناسه کوپن الزامی است." }, { status: 400 });
     }
 
-    // ۱. واکشی اطلاعات کوپن قبل از حذف برای دریافت کد تخفیف
     const { data: couponToDelete } = await supabaseAdmin
       .from("coupons")
       .select("code")
@@ -221,42 +234,44 @@ export async function DELETE(req: NextRequest) {
 
     const couponCode = couponToDelete?.code;
 
-    // ۲. حذف رکورد از جدول coupons
     const { error } = await supabaseAdmin.from("coupons").delete().eq("id", id);
     if (error) throw error;
 
-    // ۳. پاکسازی خودکار نوار اعلان در site_info و Theme Builder در صورت تطابق کد
     if (couponCode) {
       try {
-        const { data: siteInfo } = await supabaseAdmin
-          .from("site_info")
-          .select("theme_builder_config, homepage_layout_config, header_announcement")
-          .limit(1)
-          .maybeSingle();
-
-        if (siteInfo) {
-          const tbCfg = siteInfo.theme_builder_config || {};
+        const siteRow = await getMasterSiteInfoRow();
+        if (siteRow) {
+          const layoutCfg = siteRow.homepage_layout_config || {};
+          const sys = layoutCfg.system_settings || {};
+          const tbCfg = layoutCfg.theme_builder_config || {};
           const globalH = tbCfg.globalHeader || {};
-          const currentText = String(globalH.announcementText || siteInfo.header_announcement || "");
+          const currentText = String(
+            sys.header_announcement ||
+              globalH.announcementText ||
+              siteRow.header_announcement ||
+              ""
+          );
 
-          // اگر متن نوار اعلان حاوی کد این کوپن باشد، نوار اعلان خاموش و خالی شود
           if (currentText.includes(couponCode)) {
-            const updatedTbCfg = {
-              ...tbCfg,
-              globalHeader: {
-                ...globalH,
-                announcementEnabled: false,
-                announcementText: "",
+            await saveMasterSiteInfoRow(
+              siteRow,
+              {
+                ...layoutCfg,
+                system_settings: {
+                  ...sys,
+                  header_announcement: "",
+                },
+                theme_builder_config: {
+                  ...tbCfg,
+                  globalHeader: {
+                    ...globalH,
+                    announcementEnabled: false,
+                    announcementText: "",
+                  },
+                },
               },
-            };
-
-            await supabaseAdmin
-              .from("site_info")
-              .update({
-                theme_builder_config: updatedTbCfg,
-                header_announcement: null,
-              })
-              .limit(1);
+              { header_announcement: "" }
+            );
           }
         }
       } catch (cleanErr) {

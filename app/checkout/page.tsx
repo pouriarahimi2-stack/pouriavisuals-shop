@@ -12,6 +12,7 @@ import { formatPrice } from "@/lib/formatters";
 import { supabase } from "@/lib/supabase";
 
 const CHECKOUT_DRAFT_KEY = "axon_checkout_form_draft_v2027";
+const PENDING_GATEWAY_ORDER_KEY = "axon_pending_gateway_order_v1";
 
 interface StoreFinancialRules {
   postShippingCost: number;
@@ -206,6 +207,7 @@ export default function CheckoutPage() {
   const [isOtpRequestLocked, setIsOtpRequestLocked] = useState(false);
   const [captchaVerified, setCaptchaVerified] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [releasedInfoMsg, setReleasedInfoMsg] = useState<string | null>(null);
 
   const fetchWalletForPhone = useCallback(async (rawPhoneVal: string) => {
     const clean = String(rawPhoneVal || "")
@@ -229,6 +231,36 @@ export default function CheckoutPage() {
       }
     } catch {}
   }, []);
+
+  // آزادسازی فوری سفارش ناتمام در صورت زدن دکمه Back مرورگر از درگاه بانک
+  useEffect(() => {
+    try {
+      const pendingRaw = sessionStorage.getItem(PENDING_GATEWAY_ORDER_KEY);
+      if (pendingRaw) {
+        sessionStorage.removeItem(PENDING_GATEWAY_ORDER_KEY);
+        const parsed = JSON.parse(pendingRaw);
+        if (parsed?.orderId && parsed?.phone) {
+          fetch(
+            `/api/orders/track?id=${encodeURIComponent(
+              String(parsed.orderId)
+            )}&phone=${encodeURIComponent(String(parsed.phone))}`,
+            { method: "DELETE" }
+          )
+            .then((r) => (r.ok ? r.json() : null))
+            .then((json) => {
+              if (json?.success) {
+                setReleasedInfoMsg(
+                  "✓ سفارش ناتمام قبلی لغو شد و موجودی کالا (و در صورت استفاده، اعتبار کیف پول) به حالت قبل بازگشت."
+                );
+                fetchWalletForPhone(String(parsed.phone));
+                setTimeout(() => setReleasedInfoMsg(null), 6000);
+              }
+            })
+            .catch(() => {});
+        }
+      }
+    } catch {}
+  }, [fetchWalletForPhone]);
 
   useEffect(() => {
     fetchWalletForPhone(phone);
@@ -302,7 +334,6 @@ export default function CheckoutPage() {
     else if (shippingMethod === "tipax") shippingCost = 0;
   }
 
-  // همسان‌سازی دقیق فرمول مالیات با محاسبه سرور (/api/checkout)
   const vatAmount =
     finalPayable > 0 && financialRules.vatPercent > 0
       ? Math.round((finalPayable * financialRules.vatPercent) / 100)
@@ -498,6 +529,17 @@ export default function CheckoutPage() {
         return;
       }
 
+      try {
+        sessionStorage.setItem(
+          PENDING_GATEWAY_ORDER_KEY,
+          JSON.stringify({
+            orderId: String(orderId),
+            phone: cleanPhone,
+            createdAt: Date.now(),
+          })
+        );
+      } catch {}
+
       router.push(
         "/checkout/payment?orderId=" +
           encodeURIComponent(String(orderId)) +
@@ -657,6 +699,12 @@ export default function CheckoutPage() {
           </div>
         )}
       </div>
+
+      {releasedInfoMsg && (
+        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-xs font-bold animate-fadeIn">
+          {releasedInfoMsg}
+        </div>
+      )}
 
       {!financialRules.allowGuestCheckout && !isUserLoggedIn && (
         <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-bold flex flex-wrap items-center justify-between gap-2">
@@ -885,7 +933,6 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* ستون چپ: صورتحساب، کیف پول و بخش ثبت کد تخفیف */}
         <div className="p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs h-fit">
           <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
             ۳. صورتحساب و تایید نهایی
